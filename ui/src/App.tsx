@@ -1,7 +1,7 @@
 import { Factory as FactoryIcon, Plus, Warehouse as WarehouseIcon } from 'lucide-react';
 import { useState } from 'react';
-import type { Action, Color, GameState } from '@container/engine';
-import { FACTORY_BUILD_COSTS, legalActions, WAREHOUSE_BUILD_COSTS } from '@container/engine';
+import type { Action, Color, GameState, StoredContainer } from '@container/engine';
+import { FACTORY_BUILD_COSTS, FACTORY_LOT_PRICES, legalActions, WAREHOUSE_BUILD_COSTS } from '@container/engine';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -18,19 +18,57 @@ const COLOR_HEX: Record<Color, string> = {
 
 const DEFAULT_NAMES = ['Ann', 'Bob', 'Cid'];
 
-function ContainerChip({ color }: { color: Color }) {
-  return (
+/** Next factory lot price, wrapping around the track. */
+function nextFactoryLot(price: number): number {
+  const index = FACTORY_LOT_PRICES.indexOf(price as (typeof FACTORY_LOT_PRICES)[number]);
+  return FACTORY_LOT_PRICES[(index + 1) % FACTORY_LOT_PRICES.length]!;
+}
+
+function StoredChip({
+  container,
+  testid,
+  onClick,
+  disabled,
+}: {
+  container: StoredContainer;
+  testid: string;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
+  const swatch = (
     <span
-      className="inline-block h-4 w-6 rounded-sm border border-black/20 shadow-sm"
-      style={{ backgroundColor: COLOR_HEX[color] }}
-      title={color}
+      className="h-4 w-6 rounded-sm border border-black/20 shadow-sm"
+      style={{ backgroundColor: COLOR_HEX[container.color] }}
     />
+  );
+  const label = <span className="text-[10px] leading-none tabular-nums text-muted-foreground">${container.price}</span>;
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        data-testid={testid}
+        title={`Reprice ${container.color} (1 action)`}
+        disabled={disabled}
+        onClick={onClick}
+        className="flex flex-col items-center gap-0.5 rounded transition-transform hover:scale-110 disabled:opacity-50"
+      >
+        {swatch}
+        {label}
+      </button>
+    );
+  }
+  return (
+    <span data-testid={testid} className="flex flex-col items-center gap-0.5">
+      {swatch}
+      {label}
+    </span>
   );
 }
 
 export default function App() {
   const [game, setGame] = useState<GameState | null>(null);
   const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
+  const [produceLot, setProduceLot] = useState<number>(2);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +84,6 @@ export default function App() {
     }
   }
 
-  const activePlayer = game ? game.players[game.activePlayerIndex] : undefined;
   const legal = game ? legalActions(game) : [];
   const can = (type: Action['type']) => legal.some((action) => action.type === type);
   const buildableColors = legal
@@ -63,11 +100,11 @@ export default function App() {
       <header className="border-b">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-3">
           <h1 className="text-lg font-bold tracking-tight sm:text-xl">Container</h1>
-          {game && activePlayer && (
+          {game && (
             <div className="flex items-center gap-3">
               <span data-testid="turn-info" className="text-sm text-muted-foreground">
-                Turn {game.turn} · <span className="font-medium text-foreground">{activePlayer.name}</span> ·{' '}
-                {game.actionsRemaining} action{game.actionsRemaining === 1 ? '' : 's'} left
+                Turn {game.turn} · <span className="font-medium text-foreground">{game.players[game.activePlayerIndex]?.name}</span>{' '}
+                · {game.actionsRemaining} action{game.actionsRemaining === 1 ? '' : 's'} left
               </span>
               <Button variant="outline" size="sm" data-testid="new-game" onClick={() => setGame(null)}>
                 New game
@@ -98,6 +135,8 @@ export default function App() {
               const isActive = index === game.activePlayerIndex;
               const nextFactoryCost = FACTORY_BUILD_COSTS[player.factories.length - 1];
               const nextWarehouseCost = WAREHOUSE_BUILD_COSTS[player.warehouses - 1];
+              const capacity = Math.min(player.factories.length, player.factoryLimit - player.factoryStore.length);
+              const canReprice = isActive && can('REPRICE') && !busy;
               return (
                 <Card
                   key={player.id}
@@ -119,7 +158,12 @@ export default function App() {
                       <FactoryIcon className="h-4 w-4" aria-hidden />
                       <span>Factories</span>
                       {player.factories.map((factory) => (
-                        <ContainerChip key={factory.id} color={factory.color} />
+                        <span
+                          key={factory.id}
+                          className="h-4 w-6 rounded-sm border border-black/20 shadow-sm"
+                          style={{ backgroundColor: COLOR_HEX[factory.color] }}
+                          title={factory.color}
+                        />
                       ))}
                       <span className="ml-auto inline-flex items-center gap-1" data-testid={`warehouses-${player.id}`}>
                         <WarehouseIcon className="h-4 w-4" aria-hidden />
@@ -129,28 +173,70 @@ export default function App() {
 
                     <div>
                       <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Factory store</span>
+                        <span>Factory store{isActive && canReprice ? ' (click to reprice)' : ''}</span>
                         <span data-testid={`store-count-${player.id}`}>
                           {player.factoryStore.length} / {player.factoryLimit}
                         </span>
                       </div>
-                      <div className="flex min-h-6 flex-wrap gap-1" data-testid={`store-${player.id}`}>
-                        {player.factoryStore.map((color, chipIndex) => (
-                          <ContainerChip key={chipIndex} color={color} />
+                      <div className="flex min-h-8 flex-wrap items-end gap-2" data-testid={`store-${player.id}`}>
+                        {player.factoryStore.map((container, chipIndex) => (
+                          <StoredChip
+                            key={chipIndex}
+                            container={container}
+                            testid={`store-chip-${player.id}-${chipIndex}`}
+                            disabled={busy}
+                            onClick={
+                              canReprice
+                                ? () =>
+                                    act(player.id, {
+                                      type: 'REPRICE',
+                                      district: 'factory',
+                                      arrangement: player.factoryStore.map((current, i) =>
+                                        i === chipIndex ? { color: current.color, price: nextFactoryLot(current.price) } : current,
+                                      ),
+                                    })
+                                : undefined
+                            }
+                          />
                         ))}
                       </div>
                     </div>
 
                     {isActive && (
                       <div className="space-y-2 border-t pt-3" data-testid="controls">
+                        <div>
+                          <div className="mb-1 text-xs text-muted-foreground">Produce into lot</div>
+                          <div className="flex flex-wrap gap-1">
+                            {FACTORY_LOT_PRICES.map((price) => (
+                              <button
+                                key={price}
+                                type="button"
+                                data-testid={`produce-lot-${price}`}
+                                onClick={() => setProduceLot(price)}
+                                className={cn(
+                                  'h-7 w-9 rounded border text-xs tabular-nums',
+                                  produceLot === price ? 'bg-primary text-primary-foreground' : 'bg-background',
+                                )}
+                              >
+                                ${price}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
                         <Button
                           size="sm"
                           className="w-full"
                           data-testid={`produce-${player.id}`}
                           disabled={busy || !can('PRODUCE')}
-                          onClick={() => act(player.id, { type: 'PRODUCE' })}
+                          onClick={() =>
+                            act(player.id, {
+                              type: 'PRODUCE',
+                              placements: player.factories.slice(0, capacity).map((f) => ({ color: f.color, price: produceLot })),
+                            })
+                          }
                         >
-                          <Plus className="h-4 w-4" aria-hidden /> Produce
+                          <Plus className="h-4 w-4" aria-hidden /> Produce into ${produceLot}
                         </Button>
 
                         <div>

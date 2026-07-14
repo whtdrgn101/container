@@ -18,7 +18,11 @@ How we get from the current vertical slice to a complete, faithful game, then to
 - ✅ **Slice 1 — Turn spine + Build:** `Action` union + `applyAction`/`endTurn`/`legalActions`, 2
   actions/turn with active-player enforcement, Build factory/warehouse (costs, limits, distinct
   colors, building supply). Canonical `POST /games/:id/actions` endpoint. Engine at 100% (46 tests).
-- ⏭️ **Next: Slice 2 — Pricing & Reprice.**
+- ✅ **Slice 2 — Pricing & Reprice:** `factoryStore`/`harborStore` are now priced lots
+  (`StoredContainer[]`); factory lots $1–$6, harbor lots $2–$7. Produce places into chosen lots;
+  new `reprice` action rearranges a district. Engine at 100% (56 tests). *(UI reprice is
+  click-to-cycle for now; a batch drag/reprice UI is deferred to Slice 8 polish.)*
+- ⏭️ **Next: Slice 3 — Ships & sailing.**
 
 ---
 
@@ -27,7 +31,7 @@ How we get from the current vertical slice to a complete, faithful game, then to
 | # | Slice | Delivers (demo) | Size | Depends on |
 |---|-------|-----------------|------|------------|
 | 1 | ✅ Turn spine + Build | Players alternate turns; build factories/warehouses; Produce is now a real "action" | M | Slice 0 |
-| 2 | Pricing & Reprice | Containers live in price lots ($1..$N); set/rearrange prices | M | 1 |
+| 2 | ✅ Pricing & Reprice | Containers live in price lots ($1..$N); set/rearrange prices | M | 1 |
 | 3 | Ships & sailing | Ship tokens move ocean ↔ harbors ↔ islands; legal movement | M | 1 |
 | 4 | Trade chain | Full produce → sell to harbor → load onto ship between players | M–L | 2, 3 |
 | 5 | Delivery auctions | Deliver to Container Island; secret bids, subsidy, buyout, bluff; scoring areas | L | 4 |

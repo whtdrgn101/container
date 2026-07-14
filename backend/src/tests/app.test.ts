@@ -90,6 +90,43 @@ describe('POST /games/:id/actions', () => {
     expect((response.json().game as GameState).players[0]?.factories).toHaveLength(2);
   });
 
+  it('produces into a chosen lot', async () => {
+    const game = await createThreePlayerGame();
+    const response = await act(game.id, 'p1', { type: 'PRODUCE', placements: [{ color: 'white', price: 5 }] });
+    expect(response.statusCode).toBe(200);
+    expect((response.json().game as GameState).players[0]?.factoryStore).toEqual([
+      { color: 'white', price: 2 },
+      { color: 'white', price: 5 },
+    ]);
+  });
+
+  it('reprices the factory district', async () => {
+    const game = await createThreePlayerGame();
+    const response = await act(game.id, 'p1', {
+      type: 'REPRICE',
+      district: 'factory',
+      arrangement: [{ color: 'white', price: 6 }],
+    });
+    expect(response.statusCode).toBe(200);
+    expect((response.json().game as GameState).players[0]?.factoryStore).toEqual([{ color: 'white', price: 6 }]);
+  });
+
+  it('rejects REPRICE without an arrangement (409)', async () => {
+    const game = await createThreePlayerGame();
+    const response = await act(game.id, 'p1', { type: 'REPRICE', district: 'factory' });
+    expect(response.statusCode).toBe(409);
+  });
+
+  it('rejects REPRICE with a missing district (400)', async () => {
+    const game = await createThreePlayerGame();
+    const response = await app.inject({
+      method: 'POST',
+      url: `/games/${game.id}/actions`,
+      payload: { playerId: 'p1', action: { type: 'REPRICE' } },
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
   it('rejects BUILD_FACTORY without a color (400)', async () => {
     const game = await createThreePlayerGame();
     const response = await app.inject({

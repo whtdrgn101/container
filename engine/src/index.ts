@@ -3,19 +3,23 @@ export type { Color } from './colors';
 export type { Action, ActionType } from './actions';
 export { GameError } from './errors';
 export type { GameErrorCode } from './errors';
-export type { Factory, GameState, MoveRecord, PlayerState, Supply } from './types';
+export type { District, Factory, GameState, MoveRecord, PlayerState, StoredContainer, Supply } from './types';
 export {
   createGame,
   getPlayer,
   produce,
+  reprice,
   buildFactory,
   buildWarehouse,
   endTurn,
   applyAction,
   legalActions,
   ACTIONS_PER_TURN,
+  DEFAULT_FACTORY_LOT,
   FACTORY_BUILD_COSTS,
+  FACTORY_LOT_PRICES,
   FACTORY_STORAGE_PER_FACTORY,
+  HARBOR_LOT_PRICES,
   MAX_FACTORIES,
   MAX_PLAYERS,
   MAX_WAREHOUSES,

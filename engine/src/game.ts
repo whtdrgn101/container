@@ -2,7 +2,7 @@ import type { Action } from './actions';
 import type { Color } from './colors';
 import { COLORS } from './colors';
 import { GameError } from './errors';
-import type { GameState, PlayerState, Supply } from './types';
+import type { District, GameState, PlayerState, StoredContainer, Supply } from './types';
 
 /** Starting cash: five $1s, five $2s, one $5 (rulebook setup step 12). */
 export const STARTING_MONEY = 20;
@@ -26,6 +26,13 @@ export const MAX_WAREHOUSES = 5;
 /** Supported player counts (rulebook: 3–5 players). */
 export const MIN_PLAYERS = 3;
 export const MAX_PLAYERS = 5;
+
+/** Valid storage-lot (sale) prices for each district, from the rulebook player board. */
+export const FACTORY_LOT_PRICES = [1, 2, 3, 4, 5, 6] as const;
+export const HARBOR_LOT_PRICES = [2, 3, 4, 5, 6, 7] as const;
+
+/** Default lot for freshly produced containers when the player doesn't specify one (the $2 lot). */
+export const DEFAULT_FACTORY_LOT = 2;
 
 /**
  * Cost to build the next factory, indexed by how many factories you already have (the first is FREE).
@@ -86,8 +93,9 @@ export function createGame(options: CreateGameOptions): GameState {
       money: STARTING_MONEY,
       factories: [{ id: `${playerId}-f1`, color }],
       // Setup step 11: start with 1 container matching your factory, in the $2 lot.
-      factoryStore: [color],
+      factoryStore: [{ color, price: DEFAULT_FACTORY_LOT }],
       factoryLimit: FACTORY_STORAGE_PER_FACTORY,
+      harborStore: [],
       warehouses: 1,
       harborLimit: WAREHOUSE_STORAGE_PER_WAREHOUSE,
     };
@@ -130,6 +138,8 @@ export function getPlayer(state: GameState, playerId: string): PlayerState {
   return state.players[seatOf(state, playerId)]!;
 }
 
+const colorsOf = (containers: readonly StoredContainer[]): Color[] => containers.map((c) => c.color);
+
 /** True if every element of `sub` can be matched to a distinct element of `sup` (multiset ⊆). */
 function isSubMultiset(sub: readonly Color[], sup: readonly Color[]): boolean {
   const remaining = new Map<Color, number>();
@@ -144,6 +154,15 @@ function isSubMultiset(sub: readonly Color[], sup: readonly Color[]): boolean {
     remaining.set(color, available - 1);
   }
   return true;
+}
+
+/** Throw INVALID_LOT_PRICE if any container sits in a lot price not valid for its district. */
+function assertValidLots(containers: readonly StoredContainer[], validPrices: readonly number[]): void {
+  for (const container of containers) {
+    if (!validPrices.includes(container.price)) {
+      throw new GameError('INVALID_LOT_PRICE', `$${container.price} is not a valid lot price here`);
+    }
+  }
 }
 
 /** Replace one player in the roster, returning a new player array. */
@@ -176,11 +195,13 @@ function record(
 // ---------------------------------------------------------------------------
 
 /**
- * Produce action (rulebook pg. 8): pay $1 union wages to the player on your right (next seat),
- * then produce one container per factory up to the factory storage limit. When output would exceed
- * the remaining room, `select` which colors to produce (you must still produce as many as fit).
+ * Produce action (rulebook pg. 8): pay $1 union wages to the player on your right (next seat), then
+ * produce one container per factory up to the factory storage limit, arranging them in lots (their
+ * sale prices). `placements` fully specifies the produced containers (colors + lot prices); it must
+ * be a sub-multiset of your factory colors, sized to what fits. Omitted → produce what fits into the
+ * default $2 lot.
  */
-export function produce(state: GameState, playerId: string, select?: readonly Color[]): GameState {
+export function produce(state: GameState, playerId: string, placements?: readonly StoredContainer[]): GameState {
   const seat = seatOf(state, playerId);
   const player = state.players[seat]!;
 
@@ -199,17 +220,18 @@ export function produce(state: GameState, playerId: string, select?: readonly Co
   const factoryColors = player.factories.map((factory) => factory.color);
   const capacity = Math.min(factoryColors.length, room);
 
-  let produced: readonly Color[];
-  if (select === undefined) {
-    produced = factoryColors.slice(0, capacity);
+  let produced: readonly StoredContainer[];
+  if (placements === undefined) {
+    produced = factoryColors.slice(0, capacity).map((color) => ({ color, price: DEFAULT_FACTORY_LOT }));
   } else {
-    if (select.length !== capacity) {
-      throw new GameError('INVALID_SELECTION', `Must produce exactly ${capacity} container(s), got ${select.length}`);
+    if (placements.length !== capacity) {
+      throw new GameError('INVALID_SELECTION', `Must produce exactly ${capacity} container(s), got ${placements.length}`);
     }
-    if (!isSubMultiset(select, factoryColors)) {
+    if (!isSubMultiset(colorsOf(placements), factoryColors)) {
       throw new GameError('INVALID_SELECTION', 'Selected colors do not match available factories');
     }
-    produced = select;
+    assertValidLots(placements, FACTORY_LOT_PRICES);
+    produced = placements;
   }
 
   const rightSeat = (seat + 1) % state.players.length;
@@ -223,7 +245,40 @@ export function produce(state: GameState, playerId: string, select?: readonly Co
     return current;
   });
 
-  return record(state, players, 'PRODUCE', playerId, {}, { produced: [...produced] });
+  return record(state, players, 'PRODUCE', playerId, {}, { produced: produced.map((c) => ({ ...c })) });
+}
+
+/**
+ * Reprice action (rulebook pg. 10): rearrange the containers in one district into new lots. The
+ * arrangement must contain exactly the same containers (by color) already there — you cannot add or
+ * remove, only re-price — and every lot price must be valid for that district.
+ */
+export function reprice(
+  state: GameState,
+  playerId: string,
+  district: District,
+  arrangement: readonly StoredContainer[],
+): GameState {
+  const seat = seatOf(state, playerId);
+  const player = state.players[seat]!;
+
+  const current = district === 'factory' ? player.factoryStore : player.harborStore;
+  const validPrices = district === 'factory' ? FACTORY_LOT_PRICES : HARBOR_LOT_PRICES;
+
+  assertValidLots(arrangement, validPrices);
+
+  const before = colorsOf(current);
+  const after = colorsOf(arrangement);
+  if (after.length !== before.length || !isSubMultiset(after, before)) {
+    throw new GameError('INVALID_SELECTION', 'Reprice must keep exactly the same containers in the district');
+  }
+
+  const updated: PlayerState =
+    district === 'factory'
+      ? { ...player, factoryStore: [...arrangement] }
+      : { ...player, harborStore: [...arrangement] };
+
+  return record(state, withPlayer(state, seat, updated), 'REPRICE', playerId, {}, { district });
 }
 
 /**
@@ -316,7 +371,7 @@ export function endTurn(state: GameState, playerId: string): GameState {
 
 /**
  * Apply an action for `playerId`, enforcing turn order and the per-turn action budget.
- * PRODUCE / BUILD_* each cost one action; END_TURN ends the turn. Throws GameError on any
+ * PRODUCE / BUILD_* / REPRICE each cost one action; END_TURN ends the turn. Throws GameError on any
  * illegal action; never mutates the input state.
  */
 export function applyAction(state: GameState, playerId: string, action: Action): GameState {
@@ -336,11 +391,16 @@ export function applyAction(state: GameState, playerId: string, action: Action):
   const apply = (): GameState => {
     switch (action.type) {
       case 'PRODUCE':
-        return produce(state, playerId, action.select);
+        return produce(state, playerId, action.placements);
       case 'BUILD_FACTORY':
         return buildFactory(state, playerId, action.color);
       case 'BUILD_WAREHOUSE':
         return buildWarehouse(state, playerId);
+      case 'REPRICE':
+        if (action.arrangement === undefined) {
+          throw new GameError('INVALID_SELECTION', 'REPRICE requires an arrangement');
+        }
+        return reprice(state, playerId, action.district, action.arrangement);
     }
   };
 
@@ -350,7 +410,8 @@ export function applyAction(state: GameState, playerId: string, action: Action):
 
 /**
  * Enumerate the actions the active player may legally take right now. Drives the UI (enable/disable)
- * and, later, AI search. END_TURN is always available on your turn.
+ * and, later, AI search. END_TURN is always available on your turn. PRODUCE and REPRICE are returned
+ * as markers (without placements/arrangement) — the caller supplies those.
  */
 export function legalActions(state: GameState): Action[] {
   const player = state.players[state.activePlayerIndex]!;
@@ -385,6 +446,13 @@ export function legalActions(state: GameState): Action[] {
     if (player.money >= cost && state.supply.warehouses > 0) {
       actions.push({ type: 'BUILD_WAREHOUSE' });
     }
+  }
+
+  if (player.factoryStore.length > 0) {
+    actions.push({ type: 'REPRICE', district: 'factory' });
+  }
+  if (player.harborStore.length > 0) {
+    actions.push({ type: 'REPRICE', district: 'harbor' });
   }
 
   return actions;

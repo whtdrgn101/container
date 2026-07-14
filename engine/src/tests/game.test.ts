@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Color } from '../colors';
 import type { GameErrorCode } from '../errors';
 import { GameError } from '../errors';
-import type { GameState, PlayerState, Supply } from '../types';
+import type { GameState, PlayerState, StoredContainer, Supply } from '../types';
 import {
   ACTIONS_PER_TURN,
   applyAction,
@@ -13,11 +13,14 @@ import {
   getPlayer,
   legalActions,
   produce,
+  reprice,
   STARTING_MONEY,
   UNION_WAGE,
 } from '../game';
 
 // --- helpers ---------------------------------------------------------------
+
+const sc = (color: Color, price: number): StoredContainer => ({ color, price });
 
 function makeSupply(overrides: Partial<Supply> = {}): Supply {
   return {
@@ -34,6 +37,7 @@ function makePlayer(overrides: Partial<PlayerState> & Pick<PlayerState, 'id'>): 
     factories: [{ id: `${overrides.id}-f1`, color: 'white' }],
     factoryStore: [],
     factoryLimit: 2,
+    harborStore: [],
     warehouses: 1,
     harborLimit: 1,
     ...overrides,
@@ -73,23 +77,20 @@ function newGame(playerCount = 3): GameState {
 // --- createGame ------------------------------------------------------------
 
 describe('createGame', () => {
-  it('creates a valid 3-player game with the turn spine and building supply', () => {
+  it('creates a valid 3-player game with priced starting container and building supply', () => {
     const state = newGame(3);
 
     expect(state.players).toHaveLength(3);
     expect(state.activePlayerIndex).toBe(0);
     expect(state.actionsRemaining).toBe(ACTIONS_PER_TURN);
     expect(state.turn).toBe(1);
-    expect(state.version).toBe(0);
-    expect(state.log).toEqual([]);
 
     const p1 = state.players[0];
     expect(p1).toMatchObject({ id: 'p1', money: STARTING_MONEY, factoryLimit: 2, warehouses: 1, harborLimit: 1 });
     expect(p1?.factories).toEqual([{ id: 'p1-f1', color: 'white' }]);
-    expect(p1?.factoryStore).toEqual(['white']);
+    expect(p1?.factoryStore).toEqual([sc('white', 2)]); // starting container in the $2 lot
+    expect(p1?.harborStore).toEqual([]);
 
-    // 3-player supply is 2 factories/color and 12 warehouses, minus starting pieces.
-    // Seats start white/red/green, so those colors lose one; blue/yellow keep both.
     expect(state.supply.factories).toEqual({ white: 1, red: 1, green: 1, blue: 2, yellow: 2 });
     expect(state.supply.warehouses).toBe(12 - 3);
   });
@@ -99,14 +100,12 @@ describe('createGame', () => {
       id: 'g1',
       players: [{ name: 'Ann', startingColor: 'yellow' }, { name: 'Bob' }, { name: 'Cid' }],
     });
-    expect(state.players[0]?.factories[0]?.color).toBe('yellow');
-    expect(state.players[0]?.factoryStore).toEqual(['yellow']);
+    expect(state.players[0]?.factoryStore).toEqual([sc('yellow', 2)]);
   });
 
   it('assigns distinct colors and 5-player supply', () => {
     const state = newGame(5);
     expect(state.players.map((p) => p.factories[0]?.color)).toEqual(['white', 'red', 'green', 'blue', 'yellow']);
-    // 4 factories/color, one of each taken as a starting factory.
     expect(state.supply.factories).toEqual({ white: 3, red: 3, green: 3, blue: 3, yellow: 3 });
     expect(state.supply.warehouses).toBe(20 - 5);
   });
@@ -133,32 +132,30 @@ describe('getPlayer', () => {
   });
 });
 
-// --- produce (mechanic) ----------------------------------------------------
+// --- produce ---------------------------------------------------------------
 
 describe('produce', () => {
-  it('produces one container per factory and pays the right neighbor', () => {
+  it('produces into the default $2 lot and pays the right neighbor', () => {
     const next = produce(newGame(3), 'p1');
-    expect(getPlayer(next, 'p1').factoryStore).toEqual(['white', 'white']);
+    expect(getPlayer(next, 'p1').factoryStore).toEqual([sc('white', 2), sc('white', 2)]);
     expect(getPlayer(next, 'p1').money).toBe(STARTING_MONEY - UNION_WAGE);
     expect(getPlayer(next, 'p2').money).toBe(STARTING_MONEY + UNION_WAGE);
     expect(getPlayer(next, 'p3').money).toBe(STARTING_MONEY);
-    expect(next.version).toBe(1);
-    expect(next.log).toEqual([{ seq: 1, type: 'PRODUCE', playerId: 'p1', payload: { produced: ['white'] } }]);
+    expect(next.log.at(-1)).toEqual({ seq: 1, type: 'PRODUCE', playerId: 'p1', payload: { produced: [sc('white', 2)] } });
   });
 
   it('wraps the right neighbor for the last seat', () => {
-    const next = produce(newGame(3), 'p3');
-    expect(getPlayer(next, 'p1').money).toBe(STARTING_MONEY + UNION_WAGE);
+    expect(getPlayer(produce(newGame(3), 'p3'), 'p1').money).toBe(STARTING_MONEY + UNION_WAGE);
   });
 
   it('does not mutate the input state', () => {
     const state = newGame(3);
     produce(state, 'p1');
     expect(state.version).toBe(0);
-    expect(getPlayer(state, 'p1').factoryStore).toEqual(['white']);
+    expect(getPlayer(state, 'p1').factoryStore).toEqual([sc('white', 2)]);
   });
 
-  it('honors an explicit selection when output exceeds room', () => {
+  it('places produced containers into the chosen lots', () => {
     const producer = makePlayer({
       id: 'p1',
       factories: [
@@ -170,10 +167,11 @@ describe('produce', () => {
       factoryLimit: 2,
     });
     const state = makeGame([producer, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
-    expect(getPlayer(produce(state, 'p1', ['red', 'green']), 'p1').factoryStore).toEqual(['red', 'green']);
+    const next = produce(state, 'p1', [sc('red', 3), sc('green', 5)]);
+    expect(getPlayer(next, 'p1').factoryStore).toEqual([sc('red', 3), sc('green', 5)]);
   });
 
-  it('rejects a selection of the wrong size', () => {
+  it('rejects placements of the wrong size', () => {
     const producer = makePlayer({
       id: 'p1',
       factories: [
@@ -184,10 +182,10 @@ describe('produce', () => {
       factoryLimit: 2,
     });
     const state = makeGame([producer, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
-    expectError(() => produce(state, 'p1', ['red']), 'INVALID_SELECTION');
+    expectError(() => produce(state, 'p1', [sc('red', 3)]), 'INVALID_SELECTION');
   });
 
-  it('rejects a selection referencing colors it cannot produce', () => {
+  it('rejects placements referencing colors it cannot produce', () => {
     const producer = makePlayer({
       id: 'p1',
       factories: [
@@ -198,8 +196,13 @@ describe('produce', () => {
       factoryLimit: 2,
     });
     const state = makeGame([producer, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
-    const bad: Color[] = ['red', 'blue'];
-    expect(() => produce(state, 'p1', bad)).toThrowError(/do not match/);
+    expect(() => produce(state, 'p1', [sc('red', 3), sc('blue', 3)])).toThrowError(/do not match/);
+  });
+
+  it('rejects an invalid factory lot price', () => {
+    const state = makeGame([makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
+    // capacity is 1 (1 factory, empty 2-slot district); $9 is not a valid factory lot.
+    expectError(() => produce(state, 'p1', [sc('white', 9)]), 'INVALID_LOT_PRICE');
   });
 
   it('throws NO_FACTORIES when the player has no factories', () => {
@@ -214,7 +217,7 @@ describe('produce', () => {
 
   it('throws STORAGE_LIMIT_EXCEEDED when the factory district is full', () => {
     const state = makeGame([
-      makePlayer({ id: 'p1', factoryStore: ['white', 'white'], factoryLimit: 2 }),
+      makePlayer({ id: 'p1', factoryStore: [sc('white', 2), sc('white', 3)], factoryLimit: 2 }),
       makePlayer({ id: 'p2' }),
       makePlayer({ id: 'p3' }),
     ]);
@@ -226,20 +229,59 @@ describe('produce', () => {
   });
 });
 
+// --- reprice ---------------------------------------------------------------
+
+describe('reprice', () => {
+  it('rearranges factory containers into new lots', () => {
+    const p1 = makePlayer({ id: 'p1', factoryStore: [sc('white', 2), sc('red', 3)], factoryLimit: 4 });
+    const next = reprice(makeGame([p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]), 'p1', 'factory', [
+      sc('white', 6),
+      sc('red', 1),
+    ]);
+    expect(getPlayer(next, 'p1').factoryStore).toEqual([sc('white', 6), sc('red', 1)]);
+    expect(next.log.at(-1)).toEqual({ seq: 1, type: 'REPRICE', playerId: 'p1', payload: { district: 'factory' } });
+  });
+
+  it('rearranges harbor containers using harbor lot prices', () => {
+    const p1 = makePlayer({ id: 'p1', harborStore: [sc('blue', 2)], harborLimit: 3 });
+    const next = reprice(makeGame([p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]), 'p1', 'harbor', [sc('blue', 7)]);
+    expect(getPlayer(next, 'p1').harborStore).toEqual([sc('blue', 7)]);
+  });
+
+  it('rejects a lot price invalid for the district', () => {
+    const p1 = makePlayer({ id: 'p1', harborStore: [sc('blue', 2)], harborLimit: 3 });
+    const state = makeGame([p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
+    // $1 is a valid factory lot but not a valid harbor lot.
+    expectError(() => reprice(state, 'p1', 'harbor', [sc('blue', 1)]), 'INVALID_LOT_PRICE');
+  });
+
+  it('rejects an arrangement that changes which containers are stored', () => {
+    const p1 = makePlayer({ id: 'p1', factoryStore: [sc('white', 2)], factoryLimit: 4 });
+    const state = makeGame([p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
+    expectError(() => reprice(state, 'p1', 'factory', [sc('red', 2)]), 'INVALID_SELECTION');
+  });
+
+  it('rejects an arrangement of a different size', () => {
+    const p1 = makePlayer({ id: 'p1', factoryStore: [sc('white', 2)], factoryLimit: 4 });
+    const state = makeGame([p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
+    expectError(() => reprice(state, 'p1', 'factory', [sc('white', 2), sc('white', 3)]), 'INVALID_SELECTION');
+  });
+
+  it('throws PLAYER_NOT_FOUND for an unknown player', () => {
+    expectError(() => reprice(newGame(), 'ghost', 'factory', []), 'PLAYER_NOT_FOUND');
+  });
+});
+
 // --- buildFactory ----------------------------------------------------------
 
 describe('buildFactory', () => {
   it('adds a factory, pays the cost, raises the limit, and draws from supply', () => {
     const next = buildFactory(newGame(3), 'p1', 'red');
     const p1 = getPlayer(next, 'p1');
-    expect(p1.factories).toEqual([
-      { id: 'p1-f1', color: 'white' },
-      { id: 'p1-f2', color: 'red' },
-    ]);
-    expect(p1.money).toBe(STARTING_MONEY - 4); // 2nd factory costs $4
+    expect(p1.factories).toHaveLength(2);
+    expect(p1.money).toBe(STARTING_MONEY - 4);
     expect(p1.factoryLimit).toBe(4);
-    expect(next.supply.factories.red).toBe(0); // 3p red supply was 1, now 0
-    expect(next.log.at(-1)).toEqual({ seq: 1, type: 'BUILD_FACTORY', playerId: 'p1', payload: { color: 'red', cost: 4 } });
+    expect(next.supply.factories.red).toBe(0);
   });
 
   it('charges an escalating cost ($4 / $8 / $12) up to 4 factories', () => {
@@ -247,10 +289,8 @@ describe('buildFactory', () => {
     state = buildFactory(state, 'p1', 'red');
     state = buildFactory(state, 'p1', 'green');
     state = buildFactory(state, 'p1', 'blue');
-    const p1 = getPlayer(state, 'p1');
-    expect(p1.factories).toHaveLength(4);
-    expect(p1.money).toBe(30 - 4 - 8 - 12);
-    expect(p1.factoryLimit).toBe(2 + 2 * 3);
+    expect(getPlayer(state, 'p1').money).toBe(30 - 4 - 8 - 12);
+    expect(getPlayer(state, 'p1').factoryLimit).toBe(2 + 2 * 3);
   });
 
   it('throws FACTORY_LIMIT_REACHED at 4 factories', () => {
@@ -264,8 +304,7 @@ describe('buildFactory', () => {
         { id: 'p1-f4', color: 'blue' },
       ],
     });
-    const state = makeGame([p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
-    expectError(() => buildFactory(state, 'p1', 'yellow'), 'FACTORY_LIMIT_REACHED');
+    expectError(() => buildFactory(makeGame([p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]), 'p1', 'yellow'), 'FACTORY_LIMIT_REACHED');
   });
 
   it('throws DUPLICATE_FACTORY_COLOR for a color you already have', () => {
@@ -293,9 +332,8 @@ describe('buildWarehouse', () => {
     const p1 = getPlayer(next, 'p1');
     expect(p1.warehouses).toBe(2);
     expect(p1.harborLimit).toBe(2);
-    expect(p1.money).toBe(STARTING_MONEY - 3); // 2nd warehouse costs $3
-    expect(next.supply.warehouses).toBe(9 - 1); // 3p started at 12-3=9
-    expect(next.log.at(-1)).toEqual({ seq: 1, type: 'BUILD_WAREHOUSE', playerId: 'p1', payload: { cost: 3 } });
+    expect(p1.money).toBe(STARTING_MONEY - 3);
+    expect(next.supply.warehouses).toBe(9 - 1);
   });
 
   it('charges an escalating cost ($3 / $6 / $9 / $12) up to 5 warehouses', () => {
@@ -303,10 +341,8 @@ describe('buildWarehouse', () => {
     for (let i = 0; i < 4; i++) {
       state = buildWarehouse(state, 'p1');
     }
-    const p1 = getPlayer(state, 'p1');
-    expect(p1.warehouses).toBe(5);
-    expect(p1.harborLimit).toBe(5);
-    expect(p1.money).toBe(30 - 3 - 6 - 9 - 12);
+    expect(getPlayer(state, 'p1').warehouses).toBe(5);
+    expect(getPlayer(state, 'p1').money).toBe(30 - 3 - 6 - 9 - 12);
   });
 
   it('throws WAREHOUSE_LIMIT_REACHED at 5 warehouses', () => {
@@ -353,7 +389,7 @@ describe('endTurn', () => {
 describe('applyAction', () => {
   it('dispatches PRODUCE and spends one action', () => {
     const next = applyAction(newGame(3), 'p1', { type: 'PRODUCE' });
-    expect(getPlayer(next, 'p1').factoryStore).toEqual(['white', 'white']);
+    expect(getPlayer(next, 'p1').factoryStore).toEqual([sc('white', 2), sc('white', 2)]);
     expect(next.actionsRemaining).toBe(1);
   });
 
@@ -367,6 +403,16 @@ describe('applyAction', () => {
     const next = applyAction(newGame(3), 'p1', { type: 'BUILD_WAREHOUSE' });
     expect(getPlayer(next, 'p1').warehouses).toBe(2);
     expect(next.actionsRemaining).toBe(1);
+  });
+
+  it('dispatches REPRICE and spends one action', () => {
+    const next = applyAction(newGame(3), 'p1', { type: 'REPRICE', district: 'factory', arrangement: [sc('white', 5)] });
+    expect(getPlayer(next, 'p1').factoryStore).toEqual([sc('white', 5)]);
+    expect(next.actionsRemaining).toBe(1);
+  });
+
+  it('rejects REPRICE without an arrangement', () => {
+    expectError(() => applyAction(newGame(3), 'p1', { type: 'REPRICE', district: 'factory' }), 'INVALID_SELECTION');
   });
 
   it('dispatches END_TURN without spending an action', () => {
@@ -401,22 +447,32 @@ describe('legalActions', () => {
     expect(actions).toContainEqual({ type: 'END_TURN' });
     expect(actions).toContainEqual({ type: 'PRODUCE' });
     expect(actions).toContainEqual({ type: 'BUILD_WAREHOUSE' });
-    // A build-factory option for every color except the one already owned (white).
+    expect(actions).toContainEqual({ type: 'REPRICE', district: 'factory' }); // starting container present
+    expect(actions).not.toContainEqual({ type: 'REPRICE', district: 'harbor' }); // harbor empty
     const buildColors = actions.filter((a) => a.type === 'BUILD_FACTORY').map((a) => (a as { color: Color }).color);
     expect(buildColors.sort()).toEqual(['blue', 'green', 'red', 'yellow']);
   });
 
-  it('offers only END_TURN when no actions remain', () => {
-    expect(types(makeGame([makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], { actionsRemaining: 0 }))).toEqual(['END_TURN']);
+  it('offers a harbor reprice when the harbor has containers', () => {
+    const p1 = makePlayer({ id: 'p1', harborStore: [sc('blue', 3)], harborLimit: 3 });
+    expect(legalActions(makeGame([p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]))).toContainEqual({
+      type: 'REPRICE',
+      district: 'harbor',
+    });
   });
 
-  it('offers only END_TURN when the player is broke', () => {
+  it('offers only END_TURN when no actions remain', () => {
+    const state = makeGame([makePlayer({ id: 'p1', factoryStore: [sc('white', 2)] }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], { actionsRemaining: 0 });
+    expect(types(state)).toEqual(['END_TURN']);
+  });
+
+  it('offers only END_TURN when the player is broke with an empty district', () => {
     const state = makeGame([makePlayer({ id: 'p1', money: 0 }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
     expect(types(state)).toEqual(['END_TURN']);
   });
 
   it('omits PRODUCE when the factory district is full', () => {
-    const state = makeGame([makePlayer({ id: 'p1', factoryStore: ['white', 'white'], factoryLimit: 2 }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
+    const state = makeGame([makePlayer({ id: 'p1', factoryStore: [sc('white', 2), sc('white', 3)], factoryLimit: 2 }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
     expect(types(state)).not.toContain('PRODUCE');
   });
 

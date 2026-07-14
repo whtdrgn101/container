@@ -154,10 +154,12 @@ check plan usage between sessions). Summary:
 - **Phase 0 — Foundation ✅** monorepo, tooling, test gates.
 - **Slice 0 — Produce ✅** architecture proof, wired end-to-end.
 - **Slice 1 — Turn spine + Build ✅** 2 actions/turn with active-player enforcement, Build
-  factory/warehouse, `legalActions`. *(This is what exists today.)*
-- **Slices 2–7 (core game, next):** pricing/Reprice → ships/sailing → trade chain → delivery
-  auctions → Off-Shore Bank & loans → game end & final scoring. After Slice 7 the game is fully
-  playable **hotseat**. 100% engine coverage gate throughout.
+  factory/warehouse, `legalActions`.
+- **Slice 2 — Pricing & Reprice ✅** districts are priced lots (`StoredContainer[]`; factory $1–$6,
+  harbor $2–$7); Produce places into lots; `reprice` action. *(This is what exists today.)*
+- **Slices 3–7 (core game, next):** ships/sailing → trade chain → delivery auctions → Off-Shore
+  Bank & loans → game end & final scoring. After Slice 7 the game is fully playable **hotseat**.
+  100% engine coverage gate throughout.
 - **Slice 8:** UI/UX polish, full board, visual regression.
 - **Track A — AI play** and **Track B — online multiplayer:** independent tracks after the core
   game is playable. The authoritative, serializable engine makes both additive (see `ROADMAP.md`).

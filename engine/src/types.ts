@@ -6,12 +6,21 @@ export interface Factory {
   readonly color: Color;
 }
 
+/** A container in a storage lot: its color and the lot price it currently sits in (its sale price). */
+export interface StoredContainer {
+  readonly color: Color;
+  readonly price: number;
+}
+
+/** The two storage districts on a player board. */
+export type District = 'factory' | 'harbor';
+
 /**
  * A single player's board state.
  *
- * This slice models the factory district (Produce/Build) plus the warehouse *count* and harbor
- * storage limit that the Build action affects. Harbor storage contents, the ship, scoring card,
- * loans, etc. arrive in later slices.
+ * Both districts store containers as priced lots (`StoredContainer[]`). The factory district is
+ * populated by Produce; the harbor district is filled by Factory Purchase (Slice 4) and is empty
+ * for now. The ship, scoring card, loans, etc. arrive in later slices.
  */
 export interface PlayerState {
   readonly id: string;
@@ -20,10 +29,12 @@ export interface PlayerState {
   readonly money: number;
   /** Built factories. Max 4, each a distinct color. */
   readonly factories: readonly Factory[];
-  /** Containers produced and awaiting sale in the factory district (flat list for now). */
-  readonly factoryStore: readonly Color[];
+  /** Containers awaiting sale in the factory district, each priced by its lot. */
+  readonly factoryStore: readonly StoredContainer[];
   /** Max containers storable in the factory district (2 per built factory). */
   readonly factoryLimit: number;
+  /** Containers awaiting sale in the harbor district, each priced by its lot. */
+  readonly harborStore: readonly StoredContainer[];
   /** Number of built warehouses (starts at 1, max 5). */
   readonly warehouses: number;
   /** Max containers storable in the harbor district (1 per built warehouse). */

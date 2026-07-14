@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { applyAction, COLORS, createGame, GameError } from '@container/engine';
-import type { Action, Color, NewPlayer } from '@container/engine';
+import type { Action, Color, District, NewPlayer, StoredContainer } from '@container/engine';
 import type { DB } from './db';
 import { GameRepository } from './repository';
 
@@ -15,10 +15,17 @@ interface CreateGameBody {
   players: NewPlayer[];
 }
 
+interface RawContainer {
+  color: string;
+  price: number;
+}
+
 interface RawAction {
   type: Action['type'];
   color?: string;
-  select?: string[];
+  placements?: RawContainer[];
+  district?: string;
+  arrangement?: RawContainer[];
 }
 
 interface ActionBody {
@@ -40,6 +47,16 @@ function sendGameError(reply: FastifyReply, error: unknown): FastifyReply {
   throw error;
 }
 
+/** JSON-schema for one container placement/arrangement item ({ color, price }). */
+const STORED_CONTAINER_SCHEMA = {
+  type: 'object',
+  required: ['color', 'price'],
+  properties: {
+    color: { type: 'string' },
+    price: { type: 'number' },
+  },
+} as const;
+
 const badRequest = (reply: FastifyReply, message: string) =>
   reply.code(400).send({ error: { code: 'BAD_ACTION', message } });
 
@@ -50,7 +67,9 @@ const notFound = (reply: FastifyReply, id: string) =>
 function parseAction(reply: FastifyReply, raw: RawAction): Action | null {
   switch (raw.type) {
     case 'PRODUCE':
-      return raw.select ? { type: 'PRODUCE', select: raw.select as Color[] } : { type: 'PRODUCE' };
+      return raw.placements
+        ? { type: 'PRODUCE', placements: raw.placements as StoredContainer[] }
+        : { type: 'PRODUCE' };
     case 'BUILD_FACTORY':
       if (!raw.color || !COLORS.includes(raw.color as Color)) {
         badRequest(reply, 'BUILD_FACTORY requires a valid container color');
@@ -59,6 +78,14 @@ function parseAction(reply: FastifyReply, raw: RawAction): Action | null {
       return { type: 'BUILD_FACTORY', color: raw.color as Color };
     case 'BUILD_WAREHOUSE':
       return { type: 'BUILD_WAREHOUSE' };
+    case 'REPRICE':
+      if (raw.district !== 'factory' && raw.district !== 'harbor') {
+        badRequest(reply, 'REPRICE requires a district of "factory" or "harbor"');
+        return null;
+      }
+      return raw.arrangement
+        ? { type: 'REPRICE', district: raw.district as District, arrangement: raw.arrangement as StoredContainer[] }
+        : { type: 'REPRICE', district: raw.district as District };
     case 'END_TURN':
       return { type: 'END_TURN' };
     default:
@@ -127,9 +154,11 @@ export function buildApp(options: AppOptions): FastifyInstance {
               type: 'object',
               required: ['type'],
               properties: {
-                type: { type: 'string', enum: ['PRODUCE', 'BUILD_FACTORY', 'BUILD_WAREHOUSE', 'END_TURN'] },
+                type: { type: 'string', enum: ['PRODUCE', 'BUILD_FACTORY', 'BUILD_WAREHOUSE', 'REPRICE', 'END_TURN'] },
                 color: { type: 'string' },
-                select: { type: 'array', items: { type: 'string' } },
+                district: { type: 'string', enum: ['factory', 'harbor'] },
+                placements: { type: 'array', items: STORED_CONTAINER_SCHEMA },
+                arrangement: { type: 'array', items: STORED_CONTAINER_SCHEMA },
               },
             },
           },
