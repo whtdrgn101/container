@@ -1,19 +1,17 @@
-export { COLORS } from './colors';
-export type { Color } from './colors';
+// Public API of @container/engine. Consumers (backend, ui) import only from here.
+
+// Domain types
+export { COLORS } from './core';
+export type { Color } from './core';
 export type { Action, ActionType } from './actions';
-export { GameError } from './errors';
-export type { GameErrorCode } from './errors';
-export type { District, Factory, GameState, MoveRecord, PlayerState, StoredContainer, Supply } from './types';
+export type { District, Factory, GameState, MoveRecord, PlayerState, StoredContainer, Supply } from './core';
+
+// Errors
+export { GameError } from './core';
+export type { GameErrorCode } from './core';
+
+// Constants (rulebook-sourced tuning values used by the UI)
 export {
-  createGame,
-  getPlayer,
-  produce,
-  reprice,
-  buildFactory,
-  buildWarehouse,
-  endTurn,
-  applyAction,
-  legalActions,
   ACTIONS_PER_TURN,
   DEFAULT_FACTORY_LOT,
   FACTORY_BUILD_COSTS,
@@ -28,5 +26,12 @@ export {
   UNION_WAGE,
   WAREHOUSE_BUILD_COSTS,
   WAREHOUSE_STORAGE_PER_WAREHOUSE,
-} from './game';
-export type { CreateGameOptions, NewPlayer } from './game';
+} from './core';
+
+// Setup + state accessors
+export { createGame } from './createGame';
+export type { CreateGameOptions, NewPlayer } from './createGame';
+export { getPlayer } from './internal';
+
+// Mechanics + turn-aware entry point
+export { produce, reprice, buildFactory, buildWarehouse, endTurn, applyAction, legalActions } from './actions';

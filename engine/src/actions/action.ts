@@ -1,5 +1,4 @@
-import type { Color } from './colors';
-import type { District, StoredContainer } from './types';
+import type { Color, District, StoredContainer } from '../core';
 
 /**
  * Everything a player can choose to do. `applyAction` is the turn-aware entry point that validates

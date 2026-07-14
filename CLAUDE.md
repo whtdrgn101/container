@@ -76,6 +76,46 @@ Both consumers transpile it directly:
 `engine` also has a real `build` (`tsc -p tsconfig.build.json` → `dist/`) used for typecheck/
 distribution; consumers may switch to `dist` later if we ever publish.
 
+### Engine module layout
+
+The engine is organized into small, single-responsibility modules (SRP) with barrel files; the
+public API is defined solely by `engine/src/index.ts`. Consumers import only from `@container/engine`,
+never deep paths.
+
+```
+engine/src/
+  index.ts            # THE public API (the only thing consumers import)
+  createGame.ts       # game setup
+  core/               # foundational data/types, no game logic
+    colors.ts  constants.ts  errors.ts  types.ts  index.ts
+  internal/           # shared helpers (DRY), not part of the public API
+    players.ts        # seatOf, getPlayer, withPlayer
+    containers.ts     # colorsOf, isSubMultiset, assertValidLots
+    record.ts         # record() — the one place that bumps version + appends to the log
+    index.ts
+  actions/            # ONE file per action/mechanic + the dispatcher
+    action.ts         # the Action union
+    produce.ts  build.ts  reprice.ts  endTurn.ts
+    applyAction.ts    # turn-aware dispatcher (the single entry point for a move)
+    legalActions.ts   # enumerates legal moves
+    index.ts
+  tests/              # ONE test file per piece + shared helpers
+    helpers.ts        # makeGame/makePlayer/sc/expectError/newGame (DRY test fixtures)
+    <piece>.test.ts
+```
+
+**Conventions (follow these when adding mechanics):**
+- **One mechanic = one file** in `actions/` + **one matching test file** in `tests/`. Reuse
+  `internal/` helpers rather than re-implementing (DRY). Never bump `version`/`log` outside `record()`.
+- **Barrels** (`index.ts`) only re-export; they contain no logic and are excluded from coverage
+  (along with type-only files `core/types.ts`, `actions/action.ts`).
+- **Keep files small and single-responsibility** — well under any 1000-line linter threshold. If a
+  file is growing past a few hundred lines, split it.
+- Within a folder, import siblings by **direct path** (e.g. `applyAction.ts` imports `./produce`),
+  not via the folder barrel, to avoid cycles. Import across folders via the barrel (`../core`, `../internal`).
+- Adding a new action = new `Action` variant in `action.ts` + a mechanic file + an `applyAction`
+  case + a `legalActions` branch + a public export in `src/index.ts` + a test file.
+
 ## Tech stack (and why)
 
 | Layer    | Choice                                   | Why |

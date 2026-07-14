@@ -22,7 +22,14 @@ How we get from the current vertical slice to a complete, faithful game, then to
   (`StoredContainer[]`); factory lots $1–$6, harbor lots $2–$7. Produce places into chosen lots;
   new `reprice` action rearranges a district. Engine at 100% (56 tests). *(UI reprice is
   click-to-cycle for now; a batch drag/reprice UI is deferred to Slice 8 polish.)*
+- ✅ **Refactor R1 — Engine modularization:** split the monolithic `game.ts`/`game.test.ts` into a
+  folder structure (`core/`, `internal/`, `actions/` with barrels + `createGame.ts`) and per-piece
+  test files with shared `tests/helpers.ts`. SOLID/DRY, small single-responsibility files. Public
+  `@container/engine` API unchanged; 56 tests still at 100%. See CLAUDE.md → "Engine module layout".
 - ⏭️ **Next: Slice 3 — Ships & sailing.**
+
+> **Convention going forward:** new engine mechanics are added as `actions/<name>.ts` + a matching
+> `tests/<name>.test.ts`, reusing `internal/` helpers. Keep files small and single-responsibility.
 
 ---
 
