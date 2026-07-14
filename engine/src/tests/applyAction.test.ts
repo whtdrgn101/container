@@ -81,6 +81,35 @@ describe('applyAction', () => {
     expectError(() => applyAction(newGame(3), 'ghost', { type: 'PRODUCE' }), 'PLAYER_NOT_FOUND');
   });
 
+  it('dispatches DELIVER (free) and ends the turn', () => {
+    const state = makeGame([
+      makePlayer({ id: 'p1', ship: { location: { kind: 'island' }, cargo: ['red'] } }),
+      makePlayer({ id: 'p2', money: 5 }),
+      makePlayer({ id: 'p3' }),
+    ]);
+    const next = applyAction(state, 'p1', { type: 'DELIVER', bids: { p2: 2 } });
+    expect(getPlayer(next, 'p2').scoringArea).toEqual(['red']);
+    expect(next.activePlayerIndex).toBe(1);
+  });
+
+  it('rejects DELIVER without bids', () => {
+    const state = makeGame([
+      makePlayer({ id: 'p1', ship: { location: { kind: 'island' }, cargo: ['red'] } }),
+      makePlayer({ id: 'p2' }),
+      makePlayer({ id: 'p3' }),
+    ]);
+    expectError(() => applyAction(state, 'p1', { type: 'DELIVER' }), 'INVALID_SELECTION');
+  });
+
+  it('forces the deliverer to resolve the auction before anything else', () => {
+    const state = makeGame([
+      makePlayer({ id: 'p1', ship: { location: { kind: 'island' }, cargo: ['red'] } }),
+      makePlayer({ id: 'p2' }),
+      makePlayer({ id: 'p3' }),
+    ]);
+    expectError(() => applyAction(state, 'p1', { type: 'END_TURN' }), 'MUST_DELIVER');
+  });
+
   it('rejects a third action in one turn', () => {
     let state = applyAction(newGame(3), 'p1', { type: 'BUILD_WAREHOUSE' });
     state = applyAction(state, 'p1', { type: 'BUILD_WAREHOUSE' });

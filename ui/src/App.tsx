@@ -117,6 +117,8 @@ export default function App() {
   const [pick, setPick] = useState<{ district: 'factory' | 'harbor'; sellerId: string; indices: number[] } | null>(null);
   // Which factory color the active player has selected to build from the shared supply.
   const [buildColor, setBuildColor] = useState<Color | null>(null);
+  // Opponents' bids in a delivery auction, keyed by player id.
+  const [bids, setBids] = useState<Record<string, number>>({});
 
   async function run(work: () => Promise<GameState>) {
     setBusy(true);
@@ -139,6 +141,8 @@ export default function App() {
   const activePlayer = game ? game.players[game.activePlayerIndex] : undefined;
   const nextFactoryCost = activePlayer ? FACTORY_BUILD_COSTS[activePlayer.factories.length - 1] : undefined;
   const containersGone = game ? COLORS.filter((color) => game.supply.containers[color] === 0).length : 0;
+  const mustDeliverNow =
+    !!activePlayer && activePlayer.ship.location.kind === 'island' && activePlayer.ship.cargo.length > 0;
 
   function act(playerId: string, action: Action) {
     if (!game) return;
@@ -158,6 +162,16 @@ export default function App() {
         : [...prev.indices, index];
       return indices.length ? { district, sellerId, indices } : null;
     });
+  }
+
+  /** Resolve the delivery auction with the entered bids (ends the turn). */
+  function submitDelivery() {
+    if (!game || !activePlayer) return;
+    const bidsToSubmit = bids;
+    setPick(null);
+    setBuildColor(null);
+    setBids({});
+    void run(() => api.applyAction(game.id, activePlayer.id, { type: 'DELIVER', bids: bidsToSubmit }));
   }
 
   /** Buy every selected container from the seller in a single action. */
@@ -461,8 +475,64 @@ export default function App() {
                       )}
                     </div>
 
-                    {isActive && (
-                      <div className="space-y-2 border-t pt-3" data-testid="controls">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground" data-testid={`scoring-${player.id}`}>
+                      <span>Island:</span>
+                      {player.scoringArea.length === 0 ? (
+                        <span>—</span>
+                      ) : (
+                        player.scoringArea.map((color, scoreIndex) => (
+                          <span
+                            key={scoreIndex}
+                            className="h-4 w-6 rounded-sm border border-black/20 shadow-sm"
+                            style={{ backgroundColor: COLOR_HEX[color] }}
+                            title={color}
+                          />
+                        ))
+                      )}
+                    </div>
+
+                    {isActive &&
+                      (mustDeliverNow ? (
+                        <div className="space-y-2 border-t pt-3" data-testid="auction">
+                          <div className="text-sm font-medium">Delivery auction</div>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span>Cargo:</span>
+                            {active.ship.cargo.map((color, cargoIndex) => (
+                              <span
+                                key={cargoIndex}
+                                className="h-4 w-6 rounded-sm border border-black/20 shadow-sm"
+                                style={{ backgroundColor: COLOR_HEX[color] }}
+                                title={color}
+                              />
+                            ))}
+                          </div>
+                          <p className="text-xs text-muted-foreground">Each opponent secretly bids cash ($0 allowed).</p>
+                          {game.players
+                            .filter((opp) => opp.id !== active.id)
+                            .map((opp) => (
+                              <label key={opp.id} className="flex items-center justify-between gap-2 text-sm">
+                                <span>{opp.name}</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  data-testid={`bid-${opp.id}`}
+                                  className="w-20 rounded-md border bg-background px-2 py-1 text-right text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                  value={bids[opp.id] ?? 0}
+                                  onChange={(event) =>
+                                    setBids((prev) => ({
+                                      ...prev,
+                                      [opp.id]: Math.max(0, Math.floor(Number(event.target.value) || 0)),
+                                    }))
+                                  }
+                                />
+                              </label>
+                            ))}
+                          <Button size="sm" className="w-full" data-testid="deliver" disabled={busy} onClick={submitDelivery}>
+                            Deliver (resolve auction)
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2 border-t pt-3" data-testid="controls">
                         <div>
                           <div className="mb-1 text-xs text-muted-foreground">Produce into lot</div>
                           <div className="flex flex-wrap gap-1">
@@ -541,8 +611,8 @@ export default function App() {
                         >
                           End turn
                         </Button>
-                      </div>
-                    )}
+                        </div>
+                      ))}
                   </CardContent>
                 </Card>
               );

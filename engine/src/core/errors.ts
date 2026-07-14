@@ -17,7 +17,9 @@ export type GameErrorCode =
   | 'INVALID_DESTINATION'
   | 'NOT_AN_OPPONENT'
   | 'SHIP_NOT_DOCKED'
-  | 'SHIP_CAPACITY_EXCEEDED';
+  | 'SHIP_CAPACITY_EXCEEDED'
+  | 'MUST_DELIVER'
+  | 'INVALID_DELIVERY';
 
 /**
  * Thrown when an action is illegal given the current state. Carries a stable `code`

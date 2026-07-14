@@ -30,6 +30,7 @@ export function makePlayer(overrides: Partial<PlayerState> & Pick<PlayerState, '
     warehouses: 1,
     harborLimit: 1,
     ship: { location: { kind: 'ocean' }, cargo: [] },
+    scoringArea: [],
     ...overrides,
   };
 }

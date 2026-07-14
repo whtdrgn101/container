@@ -58,6 +58,8 @@ export interface PlayerState {
   readonly harborLimit: number;
   /** The player's ship (starts in the ocean, empty). */
   readonly ship: ShipState;
+  /** Containers won at delivery auctions, on Container Island — scored at game end. */
+  readonly scoringArea: readonly Color[];
 }
 
 /** Shared components still available (drawn down as players produce / build). */

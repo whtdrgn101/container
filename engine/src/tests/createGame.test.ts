@@ -17,6 +17,7 @@ describe('createGame', () => {
     expect(p1?.factoryStore).toEqual([sc('white', 2)]); // starting container in the $2 lot
     expect(p1?.harborStore).toEqual([]);
     expect(p1?.ship).toEqual({ location: { kind: 'ocean' }, cargo: [] }); // starts in the ocean
+    expect(p1?.scoringArea).toEqual([]);
 
     expect(state.supply.factories).toEqual({ white: 1, red: 1, green: 1, blue: 2, yellow: 2 });
     expect(state.supply.warehouses).toBe(12 - 3);

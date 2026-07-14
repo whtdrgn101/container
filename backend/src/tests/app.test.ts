@@ -194,6 +194,13 @@ describe('POST /games/:id/actions', () => {
     expect(response.json().error.code).toBe('SHIP_NOT_DOCKED');
   });
 
+  it('rejects DELIVER when the ship is not at the island (409)', async () => {
+    const game = await createThreePlayerGame();
+    const response = await act(game.id, 'p1', { type: 'DELIVER', bids: {} });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('INVALID_DELIVERY');
+  });
+
   it('rejects BUILD_FACTORY without a color (400)', async () => {
     const game = await createThreePlayerGame();
     const response = await app.inject({

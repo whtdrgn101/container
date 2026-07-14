@@ -41,6 +41,7 @@ export {
   sail,
   factoryPurchase,
   harborPurchase,
+  deliver,
   buildFactory,
   buildWarehouse,
   endTurn,

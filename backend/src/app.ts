@@ -29,6 +29,7 @@ interface RawAction {
   to?: { kind?: string; playerId?: string };
   sellerId?: string;
   bought?: RawContainer[];
+  bids?: Record<string, number>;
 }
 
 interface ActionBody {
@@ -116,6 +117,8 @@ function parseAction(reply: FastifyReply, raw: RawAction): Action | null {
       return raw.bought
         ? { type: 'HARBOR_PURCHASE', bought: raw.bought as StoredContainer[] }
         : { type: 'HARBOR_PURCHASE' };
+    case 'DELIVER':
+      return raw.bids ? { type: 'DELIVER', bids: raw.bids } : { type: 'DELIVER' };
     case 'END_TURN':
       return { type: 'END_TURN' };
     default:
@@ -194,6 +197,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
                     'SAIL',
                     'FACTORY_PURCHASE',
                     'HARBOR_PURCHASE',
+                    'DELIVER',
                     'END_TURN',
                   ],
                 },
@@ -203,6 +207,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
                 placements: { type: 'array', items: STORED_CONTAINER_SCHEMA },
                 arrangement: { type: 'array', items: STORED_CONTAINER_SCHEMA },
                 bought: { type: 'array', items: STORED_CONTAINER_SCHEMA },
+                bids: { type: 'object', additionalProperties: { type: 'number' } },
                 to: {
                   type: 'object',
                   properties: {

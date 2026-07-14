@@ -9,6 +9,7 @@ import {
 } from '../core';
 import type { GameState } from '../core';
 import type { Action } from './action';
+import { mustDeliver } from './deliver';
 
 /**
  * Enumerate the actions the active player may legally take right now. Drives the UI (enable/disable)
@@ -16,6 +17,11 @@ import type { Action } from './action';
  * as markers (without placements/arrangement) — the caller supplies those.
  */
 export function legalActions(state: GameState): Action[] {
+  // At the island with cargo, the only legal move is to resolve the delivery auction.
+  if (mustDeliver(state)) {
+    return [{ type: 'DELIVER' }];
+  }
+
   const player = state.players[state.activePlayerIndex]!;
   const actions: Action[] = [{ type: 'END_TURN' }];
 

@@ -3,6 +3,7 @@ import type { GameState } from '../core';
 import { seatOf } from '../internal';
 import type { Action } from './action';
 import { buildFactory, buildWarehouse } from './build';
+import { deliver, mustDeliver } from './deliver';
 import { endTurn } from './endTurn';
 import { factoryPurchase } from './factoryPurchase';
 import { harborPurchase } from './harborPurchase';
@@ -21,8 +22,21 @@ export function applyAction(state: GameState, playerId: string, action: Action):
     throw new GameError('NOT_YOUR_TURN', `It is not player "${playerId}"'s turn`);
   }
 
+  // Arriving at the island with cargo forces the delivery auction before anything else.
+  if (mustDeliver(state) && action.type !== 'DELIVER') {
+    throw new GameError('MUST_DELIVER', 'You must resolve the delivery auction at Container Island');
+  }
+
   if (action.type === 'END_TURN') {
     return endTurn(state, playerId);
+  }
+
+  // DELIVER is a free anchor action that ends the turn — it costs no action point.
+  if (action.type === 'DELIVER') {
+    if (action.bids === undefined) {
+      throw new GameError('INVALID_SELECTION', 'DELIVER requires the opponents\' bids');
+    }
+    return deliver(state, playerId, action.bids);
   }
 
   if (state.actionsRemaining <= 0) {

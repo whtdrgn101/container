@@ -30,6 +30,15 @@ describe('legalActions', () => {
     });
   });
 
+  it('offers only DELIVER when the active ship is at the island with cargo', () => {
+    const state = makeGame([
+      makePlayer({ id: 'p1', ship: { location: { kind: 'island' }, cargo: ['red'] } }),
+      makePlayer({ id: 'p2' }),
+      makePlayer({ id: 'p3' }),
+    ]);
+    expect(legalActions(state)).toEqual([{ type: 'DELIVER' }]);
+  });
+
   it('offers only END_TURN when no actions remain', () => {
     const state = makeGame([makePlayer({ id: 'p1', factoryStore: [sc('white', 2)] }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], { actionsRemaining: 0 });
     expect(types(state)).toEqual(['END_TURN']);

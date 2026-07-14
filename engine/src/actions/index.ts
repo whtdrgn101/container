@@ -6,6 +6,7 @@ export * from './reprice';
 export * from './sail';
 export * from './factoryPurchase';
 export * from './harborPurchase';
+export * from './deliver';
 export * from './endTurn';
 export * from './applyAction';
 export * from './legalActions';
