@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Pure, deterministic game engine for Container. No I/O, no randomness — the single source of truth for game rules.",
+  "license": "BSD-3-Clause",
   "exports": {
     ".": "./src/index.ts"
   },

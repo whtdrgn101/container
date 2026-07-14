@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "React + Tailwind + shadcn UI for Container. Talks to the backend REST API.",
+  "license": "BSD-3-Clause",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

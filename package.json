@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "Digital version of the board game Container — TypeScript monorepo (shared engine + REST API + React UI).",
+  "license": "BSD-3-Clause",
   "engines": {
     "node": ">=22"
   },

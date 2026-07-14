@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "REST API for Container. Wraps the pure engine and persists game state to SQLite.",
+  "license": "BSD-3-Clause",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
