@@ -31,7 +31,13 @@ How we get from the current vertical slice to a complete, faithful game, then to
   never own harbor, no destination→destination); `legalActions` enumerates sail targets. Engine at
   100% (68 tests). *(Anchor effects — Harbor Purchase, delivery auction, bank load — attach in
   Slices 4–6; this slice is pure movement, and ship cargo stays empty until Slice 4 loading.)*
-- ⏭️ **Next: Slice 4 — Trade chain.**
+- ✅ **Slice 4 — Trade chain:** `factoryPurchase` (buy an opponent's factory containers into your
+  harbor by truck, pay the owner, respect harbor limit) and `harborPurchase` (ship docked at an
+  opponent → buy their harbor containers onto your ship, up to `SHIP_CAPACITY`). Produce → sell →
+  resell → load now works end-to-end. Engine at 100% (93 tests). *(Pricing-during-purchase is folded
+  into the separate Reprice action; the free anchor-purchase-on-arrival optimization is deferred to
+  Slice 8 polish.)*
+- ⏭️ **Next: Slice 5 — Delivery auctions.**
 
 > **Convention going forward:** new engine mechanics are added as `actions/<name>.ts` + a matching
 > `tests/<name>.test.ts`, reusing `internal/` helpers. Keep files small and single-responsibility.
@@ -45,7 +51,7 @@ How we get from the current vertical slice to a complete, faithful game, then to
 | 1 | ✅ Turn spine + Build | Players alternate turns; build factories/warehouses; Produce is now a real "action" | M | Slice 0 |
 | 2 | ✅ Pricing & Reprice | Containers live in price lots ($1..$N); set/rearrange prices | M | 1 |
 | 3 | ✅ Ships & sailing | Ship tokens move ocean ↔ harbors ↔ islands; legal movement | M | 1 |
-| 4 | Trade chain | Full produce → sell to harbor → load onto ship between players | M–L | 2, 3 |
+| 4 | ✅ Trade chain | Full produce → sell to harbor → load onto ship between players | M–L | 2, 3 |
 | 5 | Delivery auctions | Deliver to Container Island; secret bids, subsidy, buyout, bluff; scoring areas | L | 4 |
 | 6 | Off-Shore Bank & loans | Loans + interest; bank auctions (both lot types) | L | 3 |
 | 7 | Game end & final scoring | Play a full game to a declared winner | M | 5, 6 |

@@ -27,6 +27,8 @@ interface RawAction {
   district?: string;
   arrangement?: RawContainer[];
   to?: { kind?: string; playerId?: string };
+  sellerId?: string;
+  bought?: RawContainer[];
 }
 
 interface ActionBody {
@@ -102,6 +104,18 @@ function parseAction(reply: FastifyReply, raw: RawAction): Action | null {
       }
       return { type: 'SAIL', to: { kind: to.kind } as ShipLocation };
     }
+    case 'FACTORY_PURCHASE':
+      if (!raw.sellerId) {
+        badRequest(reply, 'FACTORY_PURCHASE requires a sellerId');
+        return null;
+      }
+      return raw.bought
+        ? { type: 'FACTORY_PURCHASE', sellerId: raw.sellerId, bought: raw.bought as StoredContainer[] }
+        : { type: 'FACTORY_PURCHASE', sellerId: raw.sellerId };
+    case 'HARBOR_PURCHASE':
+      return raw.bought
+        ? { type: 'HARBOR_PURCHASE', bought: raw.bought as StoredContainer[] }
+        : { type: 'HARBOR_PURCHASE' };
     case 'END_TURN':
       return { type: 'END_TURN' };
     default:
@@ -172,12 +186,23 @@ export function buildApp(options: AppOptions): FastifyInstance {
               properties: {
                 type: {
                   type: 'string',
-                  enum: ['PRODUCE', 'BUILD_FACTORY', 'BUILD_WAREHOUSE', 'REPRICE', 'SAIL', 'END_TURN'],
+                  enum: [
+                    'PRODUCE',
+                    'BUILD_FACTORY',
+                    'BUILD_WAREHOUSE',
+                    'REPRICE',
+                    'SAIL',
+                    'FACTORY_PURCHASE',
+                    'HARBOR_PURCHASE',
+                    'END_TURN',
+                  ],
                 },
                 color: { type: 'string' },
                 district: { type: 'string', enum: ['factory', 'harbor'] },
+                sellerId: { type: 'string' },
                 placements: { type: 'array', items: STORED_CONTAINER_SCHEMA },
                 arrangement: { type: 'array', items: STORED_CONTAINER_SCHEMA },
+                bought: { type: 'array', items: STORED_CONTAINER_SCHEMA },
                 to: {
                   type: 'object',
                   properties: {

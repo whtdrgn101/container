@@ -4,6 +4,8 @@ import { seatOf } from '../internal';
 import type { Action } from './action';
 import { buildFactory, buildWarehouse } from './build';
 import { endTurn } from './endTurn';
+import { factoryPurchase } from './factoryPurchase';
+import { harborPurchase } from './harborPurchase';
 import { produce } from './produce';
 import { reprice } from './reprice';
 import { sail } from './sail';
@@ -42,6 +44,16 @@ export function applyAction(state: GameState, playerId: string, action: Action):
         return reprice(state, playerId, action.district, action.arrangement);
       case 'SAIL':
         return sail(state, playerId, action.to);
+      case 'FACTORY_PURCHASE':
+        if (action.bought === undefined) {
+          throw new GameError('INVALID_SELECTION', 'FACTORY_PURCHASE requires the containers to buy');
+        }
+        return factoryPurchase(state, playerId, action.sellerId, action.bought);
+      case 'HARBOR_PURCHASE':
+        if (action.bought === undefined) {
+          throw new GameError('INVALID_SELECTION', 'HARBOR_PURCHASE requires the containers to buy');
+        }
+        return harborPurchase(state, playerId, action.bought);
     }
   };
 

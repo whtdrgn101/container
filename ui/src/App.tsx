@@ -1,7 +1,13 @@
 import { Factory as FactoryIcon, Plus, Ship as ShipIcon, Warehouse as WarehouseIcon } from 'lucide-react';
 import { useState } from 'react';
 import type { Action, Color, GameState, PlayerState, ShipLocation, StoredContainer } from '@container/engine';
-import { FACTORY_BUILD_COSTS, FACTORY_LOT_PRICES, legalActions, WAREHOUSE_BUILD_COSTS } from '@container/engine';
+import {
+  FACTORY_BUILD_COSTS,
+  FACTORY_LOT_PRICES,
+  legalActions,
+  SHIP_CAPACITY,
+  WAREHOUSE_BUILD_COSTS,
+} from '@container/engine';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -59,15 +65,20 @@ function StoredChip({
   testid,
   onClick,
   disabled,
+  selected,
 }: {
   container: StoredContainer;
   testid: string;
   onClick?: () => void;
   disabled?: boolean;
+  selected?: boolean;
 }) {
   const swatch = (
     <span
-      className="h-4 w-6 rounded-sm border border-black/20 shadow-sm"
+      className={cn(
+        'h-4 w-6 rounded-sm border border-black/20 shadow-sm',
+        selected && 'ring-2 ring-ring ring-offset-1',
+      )}
       style={{ backgroundColor: COLOR_HEX[container.color] }}
     />
   );
@@ -101,6 +112,8 @@ export default function App() {
   const [produceLot, setProduceLot] = useState<number>(2);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Which containers the active player has selected to buy (one district, one seller at a time).
+  const [pick, setPick] = useState<{ district: 'factory' | 'harbor'; sellerId: string; indices: number[] } | null>(null);
 
   async function run(work: () => Promise<GameState>) {
     setBusy(true);
@@ -123,7 +136,40 @@ export default function App() {
 
   function act(playerId: string, action: Action) {
     if (!game) return;
+    setPick(null);
     void run(() => api.applyAction(game.id, playerId, action));
+  }
+
+  /** Toggle a container into/out of the current buy selection. */
+  function toggleBuy(district: 'factory' | 'harbor', sellerId: string, index: number) {
+    setPick((prev) => {
+      if (!prev || prev.district !== district || prev.sellerId !== sellerId) {
+        return { district, sellerId, indices: [index] };
+      }
+      const indices = prev.indices.includes(index)
+        ? prev.indices.filter((i) => i !== index)
+        : [...prev.indices, index];
+      return indices.length ? { district, sellerId, indices } : null;
+    });
+  }
+
+  /** Buy every selected container from the seller in a single action. */
+  function commitBuy() {
+    if (!game || !pick) return;
+    const active = game.players[game.activePlayerIndex];
+    const seller = game.players.find((p) => p.id === pick.sellerId);
+    if (!active || !seller) return;
+    const store = pick.district === 'factory' ? seller.factoryStore : seller.harborStore;
+    const bought = pick.indices
+      .map((i) => store[i])
+      .filter((c): c is StoredContainer => c !== undefined)
+      .map((c) => ({ color: c.color, price: c.price }));
+    const action: Action =
+      pick.district === 'factory'
+        ? { type: 'FACTORY_PURCHASE', sellerId: pick.sellerId, bought }
+        : { type: 'HARBOR_PURCHASE', bought };
+    setPick(null);
+    void run(() => api.applyAction(game.id, active.id, action));
   }
 
   return (
@@ -168,6 +214,36 @@ export default function App() {
               const nextWarehouseCost = WAREHOUSE_BUILD_COSTS[player.warehouses - 1];
               const capacity = Math.min(player.factories.length, player.factoryLimit - player.factoryStore.length);
               const canReprice = isActive && can('REPRICE') && !busy;
+
+              // Buying is done by the active player from THIS card's player (an opponent).
+              const active = game.players[game.activePlayerIndex]!;
+              const canFactoryBuy =
+                !isActive &&
+                !busy &&
+                legal.some((a) => a.type === 'FACTORY_PURCHASE' && a.sellerId === player.id) &&
+                active.harborStore.length < active.harborLimit;
+              const activeShipLoc = active.ship.location;
+              const canHarborBuy =
+                !isActive &&
+                !busy &&
+                activeShipLoc.kind === 'harbor' &&
+                activeShipLoc.playerId === player.id &&
+                active.ship.cargo.length < SHIP_CAPACITY &&
+                player.harborStore.length > 0;
+
+              // Current buy selection against this card's store (if any).
+              const factoryPick = pick?.district === 'factory' && pick.sellerId === player.id ? pick.indices : [];
+              const factoryPickCost = factoryPick.reduce((s, i) => s + (player.factoryStore[i]?.price ?? 0), 0);
+              const factoryPickOk =
+                factoryPick.length > 0 &&
+                active.money >= factoryPickCost &&
+                active.harborStore.length + factoryPick.length <= active.harborLimit;
+              const harborPick = pick?.district === 'harbor' && pick.sellerId === player.id ? pick.indices : [];
+              const harborPickCost = harborPick.reduce((s, i) => s + (player.harborStore[i]?.price ?? 0), 0);
+              const harborPickOk =
+                harborPick.length > 0 &&
+                active.money >= harborPickCost &&
+                active.ship.cargo.length + harborPick.length <= SHIP_CAPACITY;
               return (
                 <Card
                   key={player.id}
@@ -202,14 +278,27 @@ export default function App() {
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid={`ship-${player.id}`}>
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground" data-testid={`ship-${player.id}`}>
                       <ShipIcon className="h-4 w-4" aria-hidden />
                       <span>{shipLabel(player.ship.location, game.players)}</span>
+                      <span className="flex flex-wrap gap-1" data-testid={`cargo-${player.id}`}>
+                        {player.ship.cargo.map((color, cargoIndex) => (
+                          <span
+                            key={cargoIndex}
+                            className="h-4 w-6 rounded-sm border border-black/20 shadow-sm"
+                            style={{ backgroundColor: COLOR_HEX[color] }}
+                            title={color}
+                          />
+                        ))}
+                      </span>
                     </div>
 
                     <div>
                       <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Factory store{isActive && canReprice ? ' (click to reprice)' : ''}</span>
+                        <span>
+                          Factory store
+                          {canReprice ? ' (click to reprice)' : canFactoryBuy ? ' (click to buy)' : ''}
+                        </span>
                         <span data-testid={`store-count-${player.id}`}>
                           {player.factoryStore.length} / {player.factoryLimit}
                         </span>
@@ -221,6 +310,7 @@ export default function App() {
                             container={container}
                             testid={`store-chip-${player.id}-${chipIndex}`}
                             disabled={busy}
+                            selected={factoryPick.includes(chipIndex)}
                             onClick={
                               canReprice
                                 ? () =>
@@ -231,11 +321,56 @@ export default function App() {
                                         i === chipIndex ? { color: current.color, price: nextFactoryLot(current.price) } : current,
                                       ),
                                     })
-                                : undefined
+                                : canFactoryBuy
+                                  ? () => toggleBuy('factory', player.id, chipIndex)
+                                  : undefined
                             }
                           />
                         ))}
                       </div>
+                      {canFactoryBuy && factoryPick.length > 0 && (
+                        <Button
+                          size="sm"
+                          className="mt-2 w-full"
+                          data-testid={`buy-factory-${player.id}`}
+                          disabled={busy || !factoryPickOk}
+                          onClick={commitBuy}
+                        >
+                          Buy {factoryPick.length} for ${factoryPickCost}
+                        </Button>
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Harbor{canHarborBuy ? ' (click to load ship)' : ''}</span>
+                        <span data-testid={`harbor-count-${player.id}`}>
+                          {player.harborStore.length} / {player.harborLimit}
+                        </span>
+                      </div>
+                      <div className="flex min-h-8 flex-wrap items-end gap-2" data-testid={`harbor-${player.id}`}>
+                        {player.harborStore.map((container, chipIndex) => (
+                          <StoredChip
+                            key={chipIndex}
+                            container={container}
+                            testid={`harbor-chip-${player.id}-${chipIndex}`}
+                            disabled={busy}
+                            selected={harborPick.includes(chipIndex)}
+                            onClick={canHarborBuy ? () => toggleBuy('harbor', player.id, chipIndex) : undefined}
+                          />
+                        ))}
+                      </div>
+                      {canHarborBuy && harborPick.length > 0 && (
+                        <Button
+                          size="sm"
+                          className="mt-2 w-full"
+                          data-testid={`buy-harbor-${player.id}`}
+                          disabled={busy || !harborPickOk}
+                          onClick={commitBuy}
+                        >
+                          Load {harborPick.length} for ${harborPickCost}
+                        </Button>
+                      )}
                     </div>
 
                     {isActive && (

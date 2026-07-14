@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ACTIONS_PER_TURN, applyAction, getPlayer } from '../index';
-import { expectError, newGame, sc } from './helpers';
+import { expectError, makeGame, makePlayer, newGame, sc } from './helpers';
 
 describe('applyAction', () => {
   it('dispatches PRODUCE and spends one action', () => {
@@ -29,6 +29,42 @@ describe('applyAction', () => {
 
   it('rejects REPRICE without an arrangement', () => {
     expectError(() => applyAction(newGame(3), 'p1', { type: 'REPRICE', district: 'factory' }), 'INVALID_SELECTION');
+  });
+
+  it('dispatches FACTORY_PURCHASE and spends one action', () => {
+    const state = makeGame([
+      makePlayer({ id: 'p1', harborLimit: 3 }),
+      makePlayer({ id: 'p2', factoryStore: [sc('red', 3)] }),
+      makePlayer({ id: 'p3' }),
+    ]);
+    const next = applyAction(state, 'p1', { type: 'FACTORY_PURCHASE', sellerId: 'p2', bought: [sc('red', 3)] });
+    expect(getPlayer(next, 'p1').harborStore).toEqual([sc('red', 2)]);
+    expect(next.actionsRemaining).toBe(1);
+  });
+
+  it('rejects FACTORY_PURCHASE without the containers to buy', () => {
+    const state = makeGame([makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
+    expectError(() => applyAction(state, 'p1', { type: 'FACTORY_PURCHASE', sellerId: 'p2' }), 'INVALID_SELECTION');
+  });
+
+  it('dispatches HARBOR_PURCHASE and spends one action', () => {
+    const state = makeGame([
+      makePlayer({ id: 'p1', ship: { location: { kind: 'harbor', playerId: 'p2' }, cargo: [] } }),
+      makePlayer({ id: 'p2', harborStore: [sc('red', 4)] }),
+      makePlayer({ id: 'p3' }),
+    ]);
+    const next = applyAction(state, 'p1', { type: 'HARBOR_PURCHASE', bought: [sc('red', 4)] });
+    expect(getPlayer(next, 'p1').ship.cargo).toEqual(['red']);
+    expect(next.actionsRemaining).toBe(1);
+  });
+
+  it('rejects HARBOR_PURCHASE without the containers to buy', () => {
+    const state = makeGame([
+      makePlayer({ id: 'p1', ship: { location: { kind: 'harbor', playerId: 'p2' }, cargo: [] } }),
+      makePlayer({ id: 'p2' }),
+      makePlayer({ id: 'p3' }),
+    ]);
+    expectError(() => applyAction(state, 'p1', { type: 'HARBOR_PURCHASE' }), 'INVALID_SELECTION');
   });
 
   it('dispatches END_TURN without spending an action', () => {

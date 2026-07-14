@@ -3,6 +3,7 @@ import {
   FACTORY_BUILD_COSTS,
   MAX_FACTORIES,
   MAX_WAREHOUSES,
+  SHIP_CAPACITY,
   UNION_WAGE,
   WAREHOUSE_BUILD_COSTS,
 } from '../core';
@@ -67,6 +68,24 @@ export function legalActions(state: GameState): Action[] {
     actions.push({ type: 'SAIL', to: { kind: 'bank' } });
   } else {
     actions.push({ type: 'SAIL', to: { kind: 'ocean' } });
+  }
+
+  // Factory Purchase: buy from any opponent who has factory containers, if you have harbor room.
+  if (player.harborStore.length < player.harborLimit) {
+    for (const opponent of state.players) {
+      if (opponent.id !== player.id && opponent.factoryStore.length > 0) {
+        actions.push({ type: 'FACTORY_PURCHASE', sellerId: opponent.id });
+      }
+    }
+  }
+
+  // Harbor Purchase: docked at an opponent whose harbor has containers, and your ship has room.
+  const shipLocation = player.ship.location;
+  if (shipLocation.kind === 'harbor') {
+    const seller = state.players.find((p) => p.id === shipLocation.playerId)!;
+    if (seller.harborStore.length > 0 && player.ship.cargo.length < SHIP_CAPACITY) {
+      actions.push({ type: 'HARBOR_PURCHASE' });
+    }
   }
 
   return actions;

@@ -88,6 +88,49 @@ describe('legalActions', () => {
     expect(types(state)).not.toContain('BUILD_WAREHOUSE');
   });
 
+  it('offers FACTORY_PURCHASE for opponents with factory stock (never yourself)', () => {
+    const actions = legalActions(newGame(3));
+    expect(actions).toContainEqual({ type: 'FACTORY_PURCHASE', sellerId: 'p2' });
+    expect(actions).toContainEqual({ type: 'FACTORY_PURCHASE', sellerId: 'p3' });
+    expect(actions).not.toContainEqual({ type: 'FACTORY_PURCHASE', sellerId: 'p1' });
+  });
+
+  it('omits FACTORY_PURCHASE when the harbor is full', () => {
+    const p1 = makePlayer({ id: 'p1', harborStore: [sc('blue', 2)], harborLimit: 1 });
+    const p2 = makePlayer({ id: 'p2', factoryStore: [sc('red', 2)] });
+    expect(types(makeGame([p1, p2, makePlayer({ id: 'p3' })]))).not.toContain('FACTORY_PURCHASE');
+  });
+
+  it('omits FACTORY_PURCHASE for an opponent with an empty factory', () => {
+    const p1 = makePlayer({ id: 'p1', harborLimit: 3 });
+    const p2 = makePlayer({ id: 'p2', factoryStore: [] });
+    const p3 = makePlayer({ id: 'p3', factoryStore: [sc('red', 2)] });
+    const actions = legalActions(makeGame([p1, p2, p3]));
+    expect(actions).not.toContainEqual({ type: 'FACTORY_PURCHASE', sellerId: 'p2' });
+    expect(actions).toContainEqual({ type: 'FACTORY_PURCHASE', sellerId: 'p3' });
+  });
+
+  it('offers HARBOR_PURCHASE when docked at an opponent with harbor stock', () => {
+    const p1 = makePlayer({ id: 'p1', ship: { location: { kind: 'harbor', playerId: 'p2' }, cargo: [] } });
+    const p2 = makePlayer({ id: 'p2', harborStore: [sc('red', 3)] });
+    expect(types(makeGame([p1, p2, makePlayer({ id: 'p3' })]))).toContain('HARBOR_PURCHASE');
+  });
+
+  it('omits HARBOR_PURCHASE when the docked harbor is empty', () => {
+    const p1 = makePlayer({ id: 'p1', ship: { location: { kind: 'harbor', playerId: 'p2' }, cargo: [] } });
+    const p2 = makePlayer({ id: 'p2', harborStore: [] });
+    expect(types(makeGame([p1, p2, makePlayer({ id: 'p3' })]))).not.toContain('HARBOR_PURCHASE');
+  });
+
+  it('omits HARBOR_PURCHASE when the ship is full', () => {
+    const p1 = makePlayer({
+      id: 'p1',
+      ship: { location: { kind: 'harbor', playerId: 'p2' }, cargo: ['white', 'white', 'white', 'white', 'white'] },
+    });
+    const p2 = makePlayer({ id: 'p2', harborStore: [sc('red', 3)] });
+    expect(types(makeGame([p1, p2, makePlayer({ id: 'p3' })]))).not.toContain('HARBOR_PURCHASE');
+  });
+
   it('omits builds when supply is exhausted', () => {
     const state = makeGame([makePlayer({ id: 'p1', money: 100 }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], {
       supply: { factories: { white: 0, red: 0, green: 0, blue: 0, yellow: 0 }, warehouses: 0 },

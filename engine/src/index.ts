@@ -35,4 +35,15 @@ export type { CreateGameOptions, NewPlayer } from './createGame';
 export { getPlayer } from './internal';
 
 // Mechanics + turn-aware entry point
-export { produce, reprice, sail, buildFactory, buildWarehouse, endTurn, applyAction, legalActions } from './actions';
+export {
+  produce,
+  reprice,
+  sail,
+  factoryPurchase,
+  harborPurchase,
+  buildFactory,
+  buildWarehouse,
+  endTurn,
+  applyAction,
+  legalActions,
+} from './actions';

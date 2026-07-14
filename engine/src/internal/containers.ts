@@ -20,6 +20,26 @@ export function isSubMultiset(sub: readonly Color[], sup: readonly Color[]): boo
   return true;
 }
 
+/**
+ * Remove `items` (matched by color AND price) from `from`, returning the remaining containers, or
+ * `null` if `items` is not a sub-multiset of `from`. Used to take purchased containers out of a
+ * seller's store.
+ */
+export function removeContainers(
+  from: readonly StoredContainer[],
+  items: readonly StoredContainer[],
+): StoredContainer[] | null {
+  const remaining = [...from];
+  for (const item of items) {
+    const index = remaining.findIndex((c) => c.color === item.color && c.price === item.price);
+    if (index === -1) {
+      return null;
+    }
+    remaining.splice(index, 1);
+  }
+  return remaining;
+}
+
 /** Throw INVALID_LOT_PRICE if any container sits in a lot price not valid for its district. */
 export function assertValidLots(containers: readonly StoredContainer[], validPrices: readonly number[]): void {
   for (const container of containers) {

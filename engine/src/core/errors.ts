@@ -14,7 +14,10 @@ export type GameErrorCode =
   | 'DUPLICATE_FACTORY_COLOR'
   | 'OUT_OF_SUPPLY'
   | 'CANNOT_ENTER_OWN_HARBOR'
-  | 'INVALID_DESTINATION';
+  | 'INVALID_DESTINATION'
+  | 'NOT_AN_OPPONENT'
+  | 'SHIP_NOT_DOCKED'
+  | 'SHIP_CAPACITY_EXCEEDED';
 
 /**
  * Thrown when an action is illegal given the current state. Carries a stable `code`

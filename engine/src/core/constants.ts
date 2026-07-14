@@ -36,6 +36,9 @@ export const HARBOR_LOT_PRICES = [2, 3, 4, 5, 6, 7] as const;
 /** Default lot for freshly produced containers when the player doesn't specify one (the $2 lot). */
 export const DEFAULT_FACTORY_LOT = 2;
 
+/** Default harbor lot for containers bought via Factory Purchase (buyer reprices afterward). */
+export const DEFAULT_HARBOR_LOT = 2;
+
 /**
  * Cost to build the next factory, indexed by how many factories you already have (the first is FREE).
  * From the rulebook player board: $4 and $12 are legible; $8 is the middle space (obscured by a

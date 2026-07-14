@@ -151,6 +151,49 @@ describe('POST /games/:id/actions', () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it('buys a container from an opponent factory into the harbor', async () => {
+    const game = await createThreePlayerGame();
+    // p2's starting factory color is red, in the $2 lot.
+    const response = await act(game.id, 'p1', {
+      type: 'FACTORY_PURCHASE',
+      sellerId: 'p2',
+      bought: [{ color: 'red', price: 2 }],
+    });
+    expect(response.statusCode).toBe(200);
+    const updated = response.json().game as GameState;
+    expect(updated.players[0]?.harborStore).toEqual([{ color: 'red', price: 2 }]);
+    expect(updated.players[0]?.money).toBe(18);
+    expect(updated.players[1]?.money).toBe(22);
+  });
+
+  it('rejects buying from yourself (409)', async () => {
+    const game = await createThreePlayerGame();
+    const response = await act(game.id, 'p1', {
+      type: 'FACTORY_PURCHASE',
+      sellerId: 'p1',
+      bought: [{ color: 'white', price: 2 }],
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('NOT_AN_OPPONENT');
+  });
+
+  it('rejects FACTORY_PURCHASE without a sellerId (400)', async () => {
+    const game = await createThreePlayerGame();
+    const response = await app.inject({
+      method: 'POST',
+      url: `/games/${game.id}/actions`,
+      payload: { playerId: 'p1', action: { type: 'FACTORY_PURCHASE', bought: [{ color: 'red', price: 2 }] } },
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('rejects HARBOR_PURCHASE when the ship is not docked (409)', async () => {
+    const game = await createThreePlayerGame();
+    const response = await act(game.id, 'p1', { type: 'HARBOR_PURCHASE', bought: [{ color: 'red', price: 2 }] });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('SHIP_NOT_DOCKED');
+  });
+
   it('rejects BUILD_FACTORY without a color (400)', async () => {
     const game = await createThreePlayerGame();
     const response = await app.inject({

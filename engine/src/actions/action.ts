@@ -13,6 +13,8 @@ export type Action =
   | { readonly type: 'BUILD_WAREHOUSE' }
   | { readonly type: 'REPRICE'; readonly district: District; readonly arrangement?: readonly StoredContainer[] }
   | { readonly type: 'SAIL'; readonly to: ShipLocation }
+  | { readonly type: 'FACTORY_PURCHASE'; readonly sellerId: string; readonly bought?: readonly StoredContainer[] }
+  | { readonly type: 'HARBOR_PURCHASE'; readonly bought?: readonly StoredContainer[] }
   | { readonly type: 'END_TURN' };
 
 export type ActionType = Action['type'];
