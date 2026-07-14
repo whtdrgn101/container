@@ -127,6 +127,30 @@ describe('POST /games/:id/actions', () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it('sails the ship to the Off-Shore Bank', async () => {
+    const game = await createThreePlayerGame();
+    const response = await act(game.id, 'p1', { type: 'SAIL', to: { kind: 'bank' } });
+    expect(response.statusCode).toBe(200);
+    expect((response.json().game as GameState).players[0]?.ship.location).toEqual({ kind: 'bank' });
+  });
+
+  it('rejects sailing into your own harbor (409)', async () => {
+    const game = await createThreePlayerGame();
+    const response = await act(game.id, 'p1', { type: 'SAIL', to: { kind: 'harbor', playerId: 'p1' } });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('CANNOT_ENTER_OWN_HARBOR');
+  });
+
+  it('rejects SAIL to a harbor without a playerId (400)', async () => {
+    const game = await createThreePlayerGame();
+    const response = await app.inject({
+      method: 'POST',
+      url: `/games/${game.id}/actions`,
+      payload: { playerId: 'p1', action: { type: 'SAIL', to: { kind: 'harbor' } } },
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
   it('rejects BUILD_FACTORY without a color (400)', async () => {
     const game = await createThreePlayerGame();
     const response = await app.inject({

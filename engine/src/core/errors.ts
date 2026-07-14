@@ -12,7 +12,9 @@ export type GameErrorCode =
   | 'FACTORY_LIMIT_REACHED'
   | 'WAREHOUSE_LIMIT_REACHED'
   | 'DUPLICATE_FACTORY_COLOR'
-  | 'OUT_OF_SUPPLY';
+  | 'OUT_OF_SUPPLY'
+  | 'CANNOT_ENTER_OWN_HARBOR'
+  | 'INVALID_DESTINATION';
 
 /**
  * Thrown when an action is illegal given the current state. Carries a stable `code`

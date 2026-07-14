@@ -56,5 +56,18 @@ export function legalActions(state: GameState): Action[] {
     actions.push({ type: 'REPRICE', district: 'harbor' });
   }
 
+  // Sail: from the ocean to any destination (never your own harbor); otherwise back to the ocean.
+  if (player.ship.location.kind === 'ocean') {
+    for (const opponent of state.players) {
+      if (opponent.id !== player.id) {
+        actions.push({ type: 'SAIL', to: { kind: 'harbor', playerId: opponent.id } });
+      }
+    }
+    actions.push({ type: 'SAIL', to: { kind: 'island' } });
+    actions.push({ type: 'SAIL', to: { kind: 'bank' } });
+  } else {
+    actions.push({ type: 'SAIL', to: { kind: 'ocean' } });
+  }
+
   return actions;
 }

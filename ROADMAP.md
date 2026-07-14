@@ -26,7 +26,12 @@ How we get from the current vertical slice to a complete, faithful game, then to
   folder structure (`core/`, `internal/`, `actions/` with barrels + `createGame.ts`) and per-piece
   test files with shared `tests/helpers.ts`. SOLID/DRY, small single-responsibility files. Public
   `@container/engine` API unchanged; 56 tests still at 100%. See CLAUDE.md → "Engine module layout".
-- ⏭️ **Next: Slice 3 — Ships & sailing.**
+- ✅ **Slice 3 — Ships & sailing:** each player has a ship (`ShipLocation` = ocean / opponent harbor
+  / island / bank, cargo up to `SHIP_CAPACITY` 5). `sail` action moves one hop (ocean ↔ destination,
+  never own harbor, no destination→destination); `legalActions` enumerates sail targets. Engine at
+  100% (68 tests). *(Anchor effects — Harbor Purchase, delivery auction, bank load — attach in
+  Slices 4–6; this slice is pure movement, and ship cargo stays empty until Slice 4 loading.)*
+- ⏭️ **Next: Slice 4 — Trade chain.**
 
 > **Convention going forward:** new engine mechanics are added as `actions/<name>.ts` + a matching
 > `tests/<name>.test.ts`, reusing `internal/` helpers. Keep files small and single-responsibility.
@@ -39,7 +44,7 @@ How we get from the current vertical slice to a complete, faithful game, then to
 |---|-------|-----------------|------|------------|
 | 1 | ✅ Turn spine + Build | Players alternate turns; build factories/warehouses; Produce is now a real "action" | M | Slice 0 |
 | 2 | ✅ Pricing & Reprice | Containers live in price lots ($1..$N); set/rearrange prices | M | 1 |
-| 3 | Ships & sailing | Ship tokens move ocean ↔ harbors ↔ islands; legal movement | M | 1 |
+| 3 | ✅ Ships & sailing | Ship tokens move ocean ↔ harbors ↔ islands; legal movement | M | 1 |
 | 4 | Trade chain | Full produce → sell to harbor → load onto ship between players | M–L | 2, 3 |
 | 5 | Delivery auctions | Deliver to Container Island; secret bids, subsidy, buyout, bluff; scoring areas | L | 4 |
 | 6 | Off-Shore Bank & loans | Loans + interest; bank auctions (both lot types) | L | 3 |

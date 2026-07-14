@@ -4,7 +4,7 @@
 export { COLORS } from './core';
 export type { Color } from './core';
 export type { Action, ActionType } from './actions';
-export type { District, Factory, GameState, MoveRecord, PlayerState, StoredContainer, Supply } from './core';
+export type { District, Factory, GameState, MoveRecord, PlayerState, ShipLocation, ShipState, StoredContainer, Supply } from './core';
 
 // Errors
 export { GameError } from './core';
@@ -22,6 +22,7 @@ export {
   MAX_PLAYERS,
   MAX_WAREHOUSES,
   MIN_PLAYERS,
+  SHIP_CAPACITY,
   STARTING_MONEY,
   UNION_WAGE,
   WAREHOUSE_BUILD_COSTS,
@@ -34,4 +35,4 @@ export type { CreateGameOptions, NewPlayer } from './createGame';
 export { getPlayer } from './internal';
 
 // Mechanics + turn-aware entry point
-export { produce, reprice, buildFactory, buildWarehouse, endTurn, applyAction, legalActions } from './actions';
+export { produce, reprice, sail, buildFactory, buildWarehouse, endTurn, applyAction, legalActions } from './actions';

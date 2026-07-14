@@ -1,6 +1,6 @@
-import { Factory as FactoryIcon, Plus, Warehouse as WarehouseIcon } from 'lucide-react';
+import { Factory as FactoryIcon, Plus, Ship as ShipIcon, Warehouse as WarehouseIcon } from 'lucide-react';
 import { useState } from 'react';
-import type { Action, Color, GameState, StoredContainer } from '@container/engine';
+import type { Action, Color, GameState, PlayerState, ShipLocation, StoredContainer } from '@container/engine';
 import { FACTORY_BUILD_COSTS, FACTORY_LOT_PRICES, legalActions, WAREHOUSE_BUILD_COSTS } from '@container/engine';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +17,36 @@ const COLOR_HEX: Record<Color, string> = {
 };
 
 const DEFAULT_NAMES = ['Ann', 'Bob', 'Cid'];
+
+const nameOf = (players: readonly PlayerState[], id: string) => players.find((p) => p.id === id)?.name ?? id;
+
+/** Human-readable ship location, e.g. "Ocean" or "Bob's harbor". */
+function shipLabel(location: ShipLocation, players: readonly PlayerState[]): string {
+  switch (location.kind) {
+    case 'ocean':
+      return 'Ocean';
+    case 'island':
+      return 'Container Island';
+    case 'bank':
+      return 'Off-Shore Bank';
+    case 'harbor':
+      return `${nameOf(players, location.playerId)}'s harbor`;
+  }
+}
+
+/** Short label + testid suffix for a sail button target. */
+function sailTarget(location: ShipLocation, players: readonly PlayerState[]): { label: string; testid: string } {
+  switch (location.kind) {
+    case 'ocean':
+      return { label: 'Ocean', testid: 'sail-ocean' };
+    case 'island':
+      return { label: 'Island', testid: 'sail-island' };
+    case 'bank':
+      return { label: 'Bank', testid: 'sail-bank' };
+    case 'harbor':
+      return { label: nameOf(players, location.playerId), testid: `sail-harbor-${location.playerId}` };
+  }
+}
 
 /** Next factory lot price, wrapping around the track. */
 function nextFactoryLot(price: number): number {
@@ -89,6 +119,7 @@ export default function App() {
   const buildableColors = legal
     .filter((action): action is Extract<Action, { type: 'BUILD_FACTORY' }> => action.type === 'BUILD_FACTORY')
     .map((action) => action.color);
+  const sailActions = legal.filter((action): action is Extract<Action, { type: 'SAIL' }> => action.type === 'SAIL');
 
   function act(playerId: string, action: Action) {
     if (!game) return;
@@ -169,6 +200,11 @@ export default function App() {
                         <WarehouseIcon className="h-4 w-4" aria-hidden />
                         {player.warehouses}
                       </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid={`ship-${player.id}`}>
+                      <ShipIcon className="h-4 w-4" aria-hidden />
+                      <span>{shipLabel(player.ship.location, game.players)}</span>
                     </div>
 
                     <div>
@@ -274,6 +310,27 @@ export default function App() {
                           <WarehouseIcon className="h-4 w-4" aria-hidden /> Build warehouse
                           {nextWarehouseCost !== undefined ? ` ($${nextWarehouseCost})` : ''}
                         </Button>
+
+                        <div>
+                          <div className="mb-1 text-xs text-muted-foreground">Sail to</div>
+                          <div className="flex flex-wrap gap-1">
+                            {sailActions.map((sailAction) => {
+                              const target = sailTarget(sailAction.to, game.players);
+                              return (
+                                <Button
+                                  key={target.testid}
+                                  size="sm"
+                                  variant="outline"
+                                  data-testid={target.testid}
+                                  disabled={busy}
+                                  onClick={() => act(player.id, sailAction)}
+                                >
+                                  <ShipIcon className="h-4 w-4" aria-hidden /> {target.label}
+                                </Button>
+                              );
+                            })}
+                          </div>
+                        </div>
 
                         <Button
                           size="sm"

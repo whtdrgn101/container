@@ -22,6 +22,9 @@ export const ACTIONS_PER_TURN = 2;
 export const MAX_FACTORIES = 4;
 export const MAX_WAREHOUSES = 5;
 
+/** Max containers a ship can carry — fixed, cannot be increased (rulebook, pg. 9). */
+export const SHIP_CAPACITY = 5;
+
 /** Supported player counts (rulebook: 3–5 players). */
 export const MIN_PLAYERS = 3;
 export const MAX_PLAYERS = 5;

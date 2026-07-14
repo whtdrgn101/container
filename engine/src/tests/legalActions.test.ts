@@ -15,6 +15,11 @@ describe('legalActions', () => {
     expect(actions).not.toContainEqual({ type: 'REPRICE', district: 'harbor' }); // harbor empty
     const buildColors = actions.filter((a) => a.type === 'BUILD_FACTORY').map((a) => (a as { color: Color }).color);
     expect(buildColors.sort()).toEqual(['blue', 'green', 'red', 'yellow']);
+    // From the ocean: sail to each opponent's harbor + the two central boards.
+    expect(actions).toContainEqual({ type: 'SAIL', to: { kind: 'harbor', playerId: 'p2' } });
+    expect(actions).toContainEqual({ type: 'SAIL', to: { kind: 'island' } });
+    expect(actions).toContainEqual({ type: 'SAIL', to: { kind: 'bank' } });
+    expect(actions).not.toContainEqual({ type: 'SAIL', to: { kind: 'harbor', playerId: 'p1' } }); // never own harbor
   });
 
   it('offers a harbor reprice when the harbor has containers', () => {
@@ -30,9 +35,21 @@ describe('legalActions', () => {
     expect(types(state)).toEqual(['END_TURN']);
   });
 
-  it('offers only END_TURN when the player is broke with an empty district', () => {
+  it('offers no produce/build for a broke player, but sailing is still free', () => {
     const state = makeGame([makePlayer({ id: 'p1', money: 0 }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
-    expect(types(state)).toEqual(['END_TURN']);
+    const actions = types(state);
+    expect(actions).not.toContain('PRODUCE');
+    expect(actions).not.toContain('BUILD_FACTORY');
+    expect(actions).not.toContain('BUILD_WAREHOUSE');
+    expect(actions).toContain('SAIL'); // sailing costs an action, not money
+  });
+
+  it('offers a single sail-to-ocean option when docked at a harbor', () => {
+    const p1 = makePlayer({ id: 'p1', ship: { location: { kind: 'harbor', playerId: 'p2' }, cargo: [] } });
+    const sails = legalActions(makeGame([p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })])).filter(
+      (a) => a.type === 'SAIL',
+    );
+    expect(sails).toEqual([{ type: 'SAIL', to: { kind: 'ocean' } }]);
   });
 
   it('omits PRODUCE when the factory district is full', () => {

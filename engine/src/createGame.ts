@@ -57,6 +57,8 @@ export function createGame(options: CreateGameOptions): GameState {
       harborStore: [],
       warehouses: 1,
       harborLimit: WAREHOUSE_STORAGE_PER_WAREHOUSE,
+      // Setup step 8: each ship starts in the ocean, empty.
+      ship: { location: { kind: 'ocean' }, cargo: [] },
     };
   });
 

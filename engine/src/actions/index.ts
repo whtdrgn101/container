@@ -3,6 +3,7 @@ export * from './action';
 export * from './produce';
 export * from './build';
 export * from './reprice';
+export * from './sail';
 export * from './endTurn';
 export * from './applyAction';
 export * from './legalActions';

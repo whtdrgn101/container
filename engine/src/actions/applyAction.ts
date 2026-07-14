@@ -6,6 +6,7 @@ import { buildFactory, buildWarehouse } from './build';
 import { endTurn } from './endTurn';
 import { produce } from './produce';
 import { reprice } from './reprice';
+import { sail } from './sail';
 
 /**
  * Apply an action for `playerId`, enforcing turn order and the per-turn action budget.
@@ -39,6 +40,8 @@ export function applyAction(state: GameState, playerId: string, action: Action):
           throw new GameError('INVALID_SELECTION', 'REPRICE requires an arrangement');
         }
         return reprice(state, playerId, action.district, action.arrangement);
+      case 'SAIL':
+        return sail(state, playerId, action.to);
     }
   };
 

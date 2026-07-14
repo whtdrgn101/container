@@ -1,4 +1,4 @@
-import type { Color, District, StoredContainer } from '../core';
+import type { Color, District, ShipLocation, StoredContainer } from '../core';
 
 /**
  * Everything a player can choose to do. `applyAction` is the turn-aware entry point that validates
@@ -12,6 +12,7 @@ export type Action =
   | { readonly type: 'BUILD_FACTORY'; readonly color: Color }
   | { readonly type: 'BUILD_WAREHOUSE' }
   | { readonly type: 'REPRICE'; readonly district: District; readonly arrangement?: readonly StoredContainer[] }
+  | { readonly type: 'SAIL'; readonly to: ShipLocation }
   | { readonly type: 'END_TURN' };
 
 export type ActionType = Action['type'];

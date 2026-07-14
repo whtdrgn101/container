@@ -196,10 +196,13 @@ check plan usage between sessions). Summary:
 - **Slice 1 — Turn spine + Build ✅** 2 actions/turn with active-player enforcement, Build
   factory/warehouse, `legalActions`.
 - **Slice 2 — Pricing & Reprice ✅** districts are priced lots (`StoredContainer[]`; factory $1–$6,
-  harbor $2–$7); Produce places into lots; `reprice` action. *(This is what exists today.)*
-- **Slices 3–7 (core game, next):** ships/sailing → trade chain → delivery auctions → Off-Shore
-  Bank & loans → game end & final scoring. After Slice 7 the game is fully playable **hotseat**.
-  100% engine coverage gate throughout.
+  harbor $2–$7); Produce places into lots; `reprice` action.
+- **Slice 3 — Ships & sailing ✅** each player has a ship (`ShipLocation`, cargo ≤ `SHIP_CAPACITY`);
+  `sail` moves one hop (ocean ↔ opponent harbor / island / bank, never own harbor). Anchor *effects*
+  deferred to Slices 4–6; cargo empty until Slice 4. *(This is what exists today.)*
+- **Slices 4–7 (core game, next):** trade chain → delivery auctions → Off-Shore Bank & loans → game
+  end & final scoring. After Slice 7 the game is fully playable **hotseat**. 100% engine coverage
+  gate throughout.
 - **Slice 8:** UI/UX polish, full board, visual regression.
 - **Track A — AI play** and **Track B — online multiplayer:** independent tracks after the core
   game is playable. The authoritative, serializable engine makes both additive (see `ROADMAP.md`).

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { applyAction, COLORS, createGame, GameError } from '@container/engine';
-import type { Action, Color, District, NewPlayer, StoredContainer } from '@container/engine';
+import type { Action, Color, District, NewPlayer, ShipLocation, StoredContainer } from '@container/engine';
 import type { DB } from './db';
 import { GameRepository } from './repository';
 
@@ -26,6 +26,7 @@ interface RawAction {
   placements?: RawContainer[];
   district?: string;
   arrangement?: RawContainer[];
+  to?: { kind?: string; playerId?: string };
 }
 
 interface ActionBody {
@@ -86,6 +87,21 @@ function parseAction(reply: FastifyReply, raw: RawAction): Action | null {
       return raw.arrangement
         ? { type: 'REPRICE', district: raw.district as District, arrangement: raw.arrangement as StoredContainer[] }
         : { type: 'REPRICE', district: raw.district as District };
+    case 'SAIL': {
+      const to = raw.to;
+      if (!to || (to.kind !== 'ocean' && to.kind !== 'harbor' && to.kind !== 'island' && to.kind !== 'bank')) {
+        badRequest(reply, 'SAIL requires a destination kind of ocean/harbor/island/bank');
+        return null;
+      }
+      if (to.kind === 'harbor') {
+        if (!to.playerId) {
+          badRequest(reply, 'SAIL to a harbor requires a playerId');
+          return null;
+        }
+        return { type: 'SAIL', to: { kind: 'harbor', playerId: to.playerId } };
+      }
+      return { type: 'SAIL', to: { kind: to.kind } as ShipLocation };
+    }
     case 'END_TURN':
       return { type: 'END_TURN' };
     default:
@@ -154,11 +170,21 @@ export function buildApp(options: AppOptions): FastifyInstance {
               type: 'object',
               required: ['type'],
               properties: {
-                type: { type: 'string', enum: ['PRODUCE', 'BUILD_FACTORY', 'BUILD_WAREHOUSE', 'REPRICE', 'END_TURN'] },
+                type: {
+                  type: 'string',
+                  enum: ['PRODUCE', 'BUILD_FACTORY', 'BUILD_WAREHOUSE', 'REPRICE', 'SAIL', 'END_TURN'],
+                },
                 color: { type: 'string' },
                 district: { type: 'string', enum: ['factory', 'harbor'] },
                 placements: { type: 'array', items: STORED_CONTAINER_SCHEMA },
                 arrangement: { type: 'array', items: STORED_CONTAINER_SCHEMA },
+                to: {
+                  type: 'object',
+                  properties: {
+                    kind: { type: 'string', enum: ['ocean', 'harbor', 'island', 'bank'] },
+                    playerId: { type: 'string' },
+                  },
+                },
               },
             },
           },

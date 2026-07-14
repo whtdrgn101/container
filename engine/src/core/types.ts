@@ -16,6 +16,23 @@ export interface StoredContainer {
 export type District = 'factory' | 'harbor';
 
 /**
+ * Where a player's ship is. A ship is in the ocean, docked at an opponent's harbor, or at one of
+ * the two central boards (Container Island / Off-Shore Bank). It can never enter its own harbor.
+ */
+export type ShipLocation =
+  | { readonly kind: 'ocean' }
+  | { readonly kind: 'harbor'; readonly playerId: string }
+  | { readonly kind: 'island' }
+  | { readonly kind: 'bank' };
+
+/** A player's ship: where it is and what it's carrying (up to SHIP_CAPACITY containers). */
+export interface ShipState {
+  readonly location: ShipLocation;
+  /** Containers loaded for delivery (loaded via Harbor Purchase in Slice 4; empty for now). */
+  readonly cargo: readonly Color[];
+}
+
+/**
  * A single player's board state.
  *
  * Both districts store containers as priced lots (`StoredContainer[]`). The factory district is
@@ -39,6 +56,8 @@ export interface PlayerState {
   readonly warehouses: number;
   /** Max containers storable in the harbor district (1 per built warehouse). */
   readonly harborLimit: number;
+  /** The player's ship (starts in the ocean, empty). */
+  readonly ship: ShipState;
 }
 
 /** Shared building components still available to build (drawn down as players build). */
