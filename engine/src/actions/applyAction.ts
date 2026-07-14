@@ -36,7 +36,7 @@ export function applyAction(state: GameState, playerId: string, action: Action):
     if (action.bids === undefined) {
       throw new GameError('INVALID_SELECTION', 'DELIVER requires the opponents\' bids');
     }
-    return deliver(state, playerId, action.bids);
+    return deliver(state, playerId, action.bids, action.runoffBids, action.buyout);
   }
 
   if (state.actionsRemaining <= 0) {

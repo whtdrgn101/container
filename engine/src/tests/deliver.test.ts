@@ -63,4 +63,41 @@ describe('deliver', () => {
   it('rejects an unknown deliverer', () => {
     expectError(() => deliver(newGame(3), 'ghost', {}), 'PLAYER_NOT_FOUND');
   });
+
+  it('resolves a tie with a runoff auction (highest total wins)', () => {
+    const state = three(atIsland(['red']), makePlayer({ id: 'p2', money: 10 }), makePlayer({ id: 'p3', money: 10 }));
+    // Both bid $4 (tie). In the runoff p3 adds $2 → p3 wins with a total of $6.
+    const next = deliver(state, 'p1', { p2: 4, p3: 4 }, { p2: 0, p3: 2 });
+    expect(getPlayer(next, 'p3').scoringArea).toEqual(['red']);
+    expect(getPlayer(next, 'p3').money).toBe(10 - 6);
+    expect(getPlayer(next, 'p1').money).toBe(STARTING_MONEY + 12); // $6 bid + $6 subsidy
+    expect(getPlayer(next, 'p2').money).toBe(10); // lost, untouched
+  });
+
+  it('rejects a negative runoff bid', () => {
+    const state = three(atIsland(['red']), makePlayer({ id: 'p2', money: 10 }), makePlayer({ id: 'p3', money: 10 }));
+    expectError(() => deliver(state, 'p1', { p2: 4, p3: 4 }, { p3: -1 }), 'INVALID_SELECTION');
+  });
+
+  it('rejects a runoff bid the player cannot afford', () => {
+    const state = three(atIsland(['red']), makePlayer({ id: 'p2', money: 10 }), makePlayer({ id: 'p3', money: 5 }));
+    // p3: initial $4 + runoff $3 = $7 total > $5 on hand.
+    expectError(() => deliver(state, 'p1', { p2: 4, p3: 4 }, { p3: 3 }), 'INSUFFICIENT_FUNDS');
+  });
+
+  it('lets the deliverer buy out the auction and keep the containers', () => {
+    const state = three(atIsland(['red', 'green']), makePlayer({ id: 'p2', money: 10 }), makePlayer({ id: 'p3', money: 10 }));
+    const next = deliver(state, 'p1', { p2: 5, p3: 3 }, {}, true); // highest bid is $5 → buyout costs $5
+    expect(getPlayer(next, 'p1').scoringArea).toEqual(['red', 'green']); // deliverer keeps them
+    expect(getPlayer(next, 'p1').money).toBe(STARTING_MONEY - 5); // paid buyout, no subsidy
+    expect(getPlayer(next, 'p1').ship.cargo).toEqual([]);
+    expect(getPlayer(next, 'p2').money).toBe(10); // the bidder pays nothing on a buyout
+    expect(next.log.at(-1)).toMatchObject({ type: 'DELIVER', payload: { winnerId: 'p1', winningBid: 5, buyout: true } });
+  });
+
+  it('rejects a buyout the deliverer cannot afford', () => {
+    const p1 = makePlayer({ id: 'p1', money: 3, ship: { location: { kind: 'island' }, cargo: ['red'] } });
+    const state = three(p1, makePlayer({ id: 'p2', money: 10 }), makePlayer({ id: 'p3', money: 10 }));
+    expectError(() => deliver(state, 'p1', { p2: 5 }, {}, true), 'INSUFFICIENT_FUNDS');
+  });
 });

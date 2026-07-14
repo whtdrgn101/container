@@ -30,6 +30,8 @@ interface RawAction {
   sellerId?: string;
   bought?: RawContainer[];
   bids?: Record<string, number>;
+  runoffBids?: Record<string, number>;
+  buyout?: boolean;
 }
 
 interface ActionBody {
@@ -118,7 +120,12 @@ function parseAction(reply: FastifyReply, raw: RawAction): Action | null {
         ? { type: 'HARBOR_PURCHASE', bought: raw.bought as StoredContainer[] }
         : { type: 'HARBOR_PURCHASE' };
     case 'DELIVER':
-      return raw.bids ? { type: 'DELIVER', bids: raw.bids } : { type: 'DELIVER' };
+      return {
+        type: 'DELIVER',
+        ...(raw.bids ? { bids: raw.bids } : {}),
+        ...(raw.runoffBids ? { runoffBids: raw.runoffBids } : {}),
+        ...(raw.buyout ? { buyout: true } : {}),
+      };
     case 'END_TURN':
       return { type: 'END_TURN' };
     default:
@@ -208,6 +215,8 @@ export function buildApp(options: AppOptions): FastifyInstance {
                 arrangement: { type: 'array', items: STORED_CONTAINER_SCHEMA },
                 bought: { type: 'array', items: STORED_CONTAINER_SCHEMA },
                 bids: { type: 'object', additionalProperties: { type: 'number' } },
+                runoffBids: { type: 'object', additionalProperties: { type: 'number' } },
+                buyout: { type: 'boolean' },
                 to: {
                   type: 'object',
                   properties: {

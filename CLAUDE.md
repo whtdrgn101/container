@@ -201,12 +201,13 @@ check plan usage between sessions). Summary:
   `sail` moves one hop (ocean ↔ opponent harbor / island / bank, never own harbor).
 - **Slice 4 — Trade chain ✅** `factoryPurchase` (opponent factory → your harbor, by truck) and
   `harborPurchase` (docked ship → load an opponent's harbor goods). Ships carry cargo.
-- **Slice 5 — Delivery auctions 🟡 (core done)** container supply is tracked + drawn down by Produce
-  (end-game clock in the UI). Sailing a loaded ship to the island forces `deliver`: opponents bid,
-  highest wins cargo into `scoringArea`, deliverer earns bid + matching subsidy, turn ends. Buyout /
-  runoff / bluff-cards deferred to Slice 5b. *(This is what exists today.)*
-- **Slices 5b–7 (next):** auction extras → Off-Shore Bank & loans → game end & final scoring. After
-  Slice 7 the game is fully playable **hotseat**. 100% engine coverage gate throughout.
+- **Slice 5 — Delivery auctions ✅** container supply tracked + drawn down by Produce (end-game clock
+  in the UI). Sailing a loaded ship to the island forces `deliver`: opponents bid, highest wins cargo
+  into `scoringArea`, deliverer earns bid + matching subsidy, turn ends. **Buyout** and **runoff**
+  ties are in ($0 bluff bids work by construction; buyout pays the supply until the Bank in Slice 6).
+  *(This is what exists today.)*
+- **Slices 6–7 (next):** Off-Shore Bank & loans → game end & final scoring. After Slice 7 the game is
+  fully playable **hotseat**. 100% engine coverage gate throughout.
 - **Slice 8:** UI/UX polish, full board, visual regression.
 - **Track A — AI play** and **Track B — online multiplayer:** independent tracks after the core
   game is playable. The authoritative, serializable engine makes both additive (see `ROADMAP.md`).

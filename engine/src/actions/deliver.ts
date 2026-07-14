@@ -12,16 +12,25 @@ export function mustDeliver(state: GameState): boolean {
 }
 
 /**
- * Delivery auction (rulebook pg. 15). The deliverer's ship is at Container Island carrying cargo.
- * Opponents secretly bid cash (`bids`, keyed by player id; a missing/`$0` bid is a legal bluff). The
- * highest bidder wins: they pay their bid and take every container into their scoring area, while the
- * deliverer collects the bid PLUS a matching government subsidy from the supply (double the bid). The
- * turn then ends immediately.
+ * Delivery auction (rulebook pg. 15–16). The deliverer's ship is at Container Island carrying cargo.
+ * Opponents secretly bid cash (`bids`, keyed by player id; a missing/`$0` bid is a legal bluff).
  *
- * Deferred (Slice 5 seam / Slice 6): the buyout option, runoff auctions for ties (broken here by seat
- * order), and the physical $0 bluff-card hand.
+ *  - **Highest bid wins**: the winner pays their bid and takes every container into their scoring
+ *    area, while the deliverer collects the bid PLUS a matching government subsidy (double the bid).
+ *  - **Ties** trigger a **runoff**: tied players add cash via `runoffBids`; the highest *total* wins
+ *    (a still-tie falls to the earliest seat — the rulebook's "deliverer chooses" is simplified).
+ *  - **Buyout** (`buyout: true`): the deliverer declines the offer, pays the winning bid to the
+ *    supply (→ the Off-Shore Bank in Slice 6), keeps the containers themselves, and gets NO subsidy.
+ *
+ * The turn ends immediately either way.
  */
-export function deliver(state: GameState, delivererId: string, bids: Readonly<Record<string, number>>): GameState {
+export function deliver(
+  state: GameState,
+  delivererId: string,
+  bids: Readonly<Record<string, number>>,
+  runoffBids: Readonly<Record<string, number>> = {},
+  buyout = false,
+): GameState {
   const seat = seatOf(state, delivererId);
   const deliverer = state.players[seat]!;
 
@@ -29,14 +38,11 @@ export function deliver(state: GameState, delivererId: string, bids: Readonly<Re
     throw new GameError('INVALID_DELIVERY', 'A delivery happens at Container Island with cargo aboard');
   }
   const cargo = deliverer.ship.cargo;
+  const opponents = state.players.filter((player) => player.id !== delivererId);
 
-  // Highest bid wins; ties fall to the earliest seat (runoff deferred). Opponents only.
-  let winnerId = '';
-  let winningBid = -1;
-  for (const opponent of state.players) {
-    if (opponent.id === delivererId) {
-      continue;
-    }
+  // Validate initial bids and find the highest.
+  let maxInitial = 0;
+  for (const opponent of opponents) {
     const bid = bids[opponent.id] ?? 0;
     if (bid < 0) {
       throw new GameError('INVALID_SELECTION', 'Bids cannot be negative');
@@ -44,22 +50,65 @@ export function deliver(state: GameState, delivererId: string, bids: Readonly<Re
     if (bid > opponent.money) {
       throw new GameError('INSUFFICIENT_FUNDS', `Player "${opponent.id}" cannot bid $${bid}`);
     }
-    if (bid > winningBid) {
-      winningBid = bid;
-      winnerId = opponent.id;
+    if (bid > maxInitial) {
+      maxInitial = bid;
     }
   }
 
-  const players = state.players.map((player): PlayerState => {
-    if (player.id === delivererId) {
-      // Bid + matching government subsidy from the supply = double the winning bid.
-      return { ...player, money: player.money + winningBid * 2, ship: { ...player.ship, cargo: [] } };
+  const tied = opponents.filter((opponent) => (bids[opponent.id] ?? 0) === maxInitial);
+
+  let winner: PlayerState;
+  let winningBid: number;
+  if (tied.length === 1) {
+    winner = tied[0]!;
+    winningBid = maxInitial;
+  } else {
+    // Runoff: tied players add cash; highest total (initial + runoff) wins, still-tie → earliest seat.
+    let bestTotal = -1;
+    let runoffWinner = tied[0]!;
+    for (const opponent of tied) {
+      const extra = runoffBids[opponent.id] ?? 0;
+      if (extra < 0) {
+        throw new GameError('INVALID_SELECTION', 'Runoff bids cannot be negative');
+      }
+      const total = (bids[opponent.id] ?? 0) + extra;
+      if (total > opponent.money) {
+        throw new GameError('INSUFFICIENT_FUNDS', `Player "${opponent.id}" cannot bid $${total}`);
+      }
+      if (total > bestTotal) {
+        bestTotal = total;
+        runoffWinner = opponent;
+      }
     }
-    if (player.id === winnerId) {
-      return { ...player, money: player.money - winningBid, scoringArea: [...player.scoringArea, ...cargo] };
+    winner = runoffWinner;
+    winningBid = bestTotal;
+  }
+
+  let players: readonly PlayerState[];
+  let scoringWinnerId: string;
+  if (buyout) {
+    if (deliverer.money < winningBid) {
+      throw new GameError('INSUFFICIENT_FUNDS', `Player "${delivererId}" cannot afford the $${winningBid} buyout`);
     }
-    return player;
-  });
+    scoringWinnerId = delivererId;
+    players = state.players.map((player) =>
+      player.id === delivererId
+        ? { ...player, money: player.money - winningBid, scoringArea: [...player.scoringArea, ...cargo], ship: { ...player.ship, cargo: [] } }
+        : player,
+    );
+  } else {
+    scoringWinnerId = winner.id;
+    players = state.players.map((player) => {
+      if (player.id === delivererId) {
+        // Bid + matching government subsidy from the supply = double the winning bid.
+        return { ...player, money: player.money + winningBid * 2, ship: { ...player.ship, cargo: [] } };
+      }
+      if (player.id === winner.id) {
+        return { ...player, money: player.money - winningBid, scoringArea: [...player.scoringArea, ...cargo] };
+      }
+      return player;
+    });
+  }
 
   return record(
     state,
@@ -71,6 +120,6 @@ export function deliver(state: GameState, delivererId: string, bids: Readonly<Re
       actionsRemaining: ACTIONS_PER_TURN,
       turn: state.turn + 1,
     },
-    { winnerId, winningBid, containers: [...cargo] },
+    { winnerId: scoringWinnerId, winningBid, buyout, containers: [...cargo] },
   );
 }

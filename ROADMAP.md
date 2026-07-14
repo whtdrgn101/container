@@ -37,14 +37,15 @@ How we get from the current vertical slice to a complete, faithful game, then to
   resell → load now works end-to-end. Engine at 100% (93 tests). *(Pricing-during-purchase is folded
   into the separate Reprice action; the free anchor-purchase-on-arrival optimization is deferred to
   Slice 8 polish.)*
-- 🟡 **Slice 5 — Delivery auctions (core done):** container supply now tracked (`supply.containers`,
-  drawn down by Produce; shown in the UI as the end-game clock). Sailing a loaded ship to Container
-  Island forces a delivery auction: opponents bid, highest wins the cargo into their `scoringArea`,
-  and the deliverer collects the bid **plus a matching government subsidy** (double); the turn then
-  ends. `mustDeliver` gate + `deliver` action; ties break by seat order; `$0` bids (bluffs) allowed.
-  Engine at 100% (108 tests). **Deferred to a follow-up (Slice 5b):** the **buyout** option (needs the
-  Bank, Slice 6), **runoff auctions** for ties, and the physical **$0 bluff-card** hand.
-- ⏭️ **Next: Slice 5b (auction extras) or Slice 6 — Off-Shore Bank & loans.**
+- ✅ **Slice 5 — Delivery auctions:** container supply tracked (`supply.containers`, drawn down by
+  Produce; shown in the UI as the end-game clock). Sailing a loaded ship to Container Island forces a
+  delivery auction (`mustDeliver` gate + `deliver` action): opponents bid, highest wins the cargo into
+  their `scoringArea`, and the deliverer collects the bid **plus a matching government subsidy**
+  (double); the turn ends. **Buyout** (deliverer keeps the cargo, pays the winning bid — to the supply
+  for now, → the Bank in Slice 6, no subsidy) and **runoff auctions** for ties are in; `$0` bids
+  (bluffs) work by construction. Engine at 100% (113 tests). *(The physical $0 bluff-card hand is
+  cosmetic and out of scope.)*
+- ⏭️ **Next: Slice 6 — Off-Shore Bank & loans.**
 
 > **Convention going forward:** new engine mechanics are added as `actions/<name>.ts` + a matching
 > `tests/<name>.test.ts`, reusing `internal/` helpers. Keep files small and single-responsibility.
@@ -59,7 +60,7 @@ How we get from the current vertical slice to a complete, faithful game, then to
 | 2 | ✅ Pricing & Reprice | Containers live in price lots ($1..$N); set/rearrange prices | M | 1 |
 | 3 | ✅ Ships & sailing | Ship tokens move ocean ↔ harbors ↔ islands; legal movement | M | 1 |
 | 4 | ✅ Trade chain | Full produce → sell to harbor → load onto ship between players | M–L | 2, 3 |
-| 5 | 🟡 Delivery auctions | Deliver to Container Island; secret bids, subsidy, scoring areas (core; buyout/runoff/bluff-cards = Slice 5b) | L | 4 |
+| 5 | ✅ Delivery auctions | Deliver to Container Island; secret bids, subsidy, buyout, runoff ties, scoring areas | L | 4 |
 | 6 | Off-Shore Bank & loans | Loans + interest; bank auctions (both lot types) | L | 3 |
 | 7 | Game end & final scoring | Play a full game to a declared winner | M | 5, 6 |
 | 8 | UI/UX polish & full board | Complete board, animations, a11y, richer responsive, visual regression | M–L | 7 |

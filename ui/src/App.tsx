@@ -117,8 +117,9 @@ export default function App() {
   const [pick, setPick] = useState<{ district: 'factory' | 'harbor'; sellerId: string; indices: number[] } | null>(null);
   // Which factory color the active player has selected to build from the shared supply.
   const [buildColor, setBuildColor] = useState<Color | null>(null);
-  // Opponents' bids in a delivery auction, keyed by player id.
+  // Opponents' bids in a delivery auction (and runoff bids on a tie), keyed by player id.
   const [bids, setBids] = useState<Record<string, number>>({});
+  const [runoffBids, setRunoffBids] = useState<Record<string, number>>({});
 
   async function run(work: () => Promise<GameState>) {
     setBusy(true);
@@ -143,6 +144,13 @@ export default function App() {
   const containersGone = game ? COLORS.filter((color) => game.supply.containers[color] === 0).length : 0;
   const mustDeliverNow =
     !!activePlayer && activePlayer.ship.location.kind === 'island' && activePlayer.ship.cargo.length > 0;
+  const auctionOpponents = game && activePlayer ? game.players.filter((p) => p.id !== activePlayer.id) : [];
+  const maxBid = auctionOpponents.length > 0 ? Math.max(0, ...auctionOpponents.map((o) => bids[o.id] ?? 0)) : 0;
+  const tiedBidderIds = auctionOpponents.filter((o) => (bids[o.id] ?? 0) === maxBid).map((o) => o.id);
+  const runoffNeeded = mustDeliverNow && maxBid > 0 && tiedBidderIds.length >= 2;
+  const winningBidPreview = runoffNeeded
+    ? Math.max(0, ...tiedBidderIds.map((id) => (bids[id] ?? 0) + (runoffBids[id] ?? 0)))
+    : maxBid;
 
   function act(playerId: string, action: Action) {
     if (!game) return;
@@ -164,14 +172,20 @@ export default function App() {
     });
   }
 
-  /** Resolve the delivery auction with the entered bids (ends the turn). */
-  function submitDelivery() {
+  /** Resolve the delivery auction with the entered bids — accept the high bid, or buy out (ends the turn). */
+  function submitDelivery(buyout = false) {
     if (!game || !activePlayer) return;
-    const bidsToSubmit = bids;
+    const action: Action = {
+      type: 'DELIVER',
+      bids,
+      ...(runoffNeeded ? { runoffBids } : {}),
+      ...(buyout ? { buyout: true } : {}),
+    };
     setPick(null);
     setBuildColor(null);
     setBids({});
-    void run(() => api.applyAction(game.id, activePlayer.id, { type: 'DELIVER', bids: bidsToSubmit }));
+    setRunoffBids({});
+    void run(() => api.applyAction(game.id, activePlayer.id, action));
   }
 
   /** Buy every selected container from the seller in a single action. */
@@ -527,9 +541,46 @@ export default function App() {
                                 />
                               </label>
                             ))}
-                          <Button size="sm" className="w-full" data-testid="deliver" disabled={busy} onClick={submitDelivery}>
-                            Deliver (resolve auction)
-                          </Button>
+                          {runoffNeeded && (
+                            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2" data-testid="runoff">
+                              <div className="mb-1 text-xs font-medium text-destructive">
+                                Tie at ${maxBid} — runoff! Tied players add cash:
+                              </div>
+                              {tiedBidderIds.map((id) => (
+                                <label key={id} className="flex items-center justify-between gap-2 text-sm">
+                                  <span>{nameOf(game.players, id)} +</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    data-testid={`runoff-${id}`}
+                                    className="w-20 rounded-md border bg-background px-2 py-1 text-right text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    value={runoffBids[id] ?? 0}
+                                    onChange={(event) =>
+                                      setRunoffBids((prev) => ({
+                                        ...prev,
+                                        [id]: Math.max(0, Math.floor(Number(event.target.value) || 0)),
+                                      }))
+                                    }
+                                  />
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                            <Button size="sm" className="flex-1" data-testid="deliver" disabled={busy} onClick={() => submitDelivery(false)}>
+                              Deliver
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1"
+                              data-testid="buyout"
+                              disabled={busy}
+                              onClick={() => submitDelivery(true)}
+                            >
+                              Buy out (${winningBidPreview})
+                            </Button>
+                          </div>
                         </div>
                       ) : (
                         <div className="space-y-2 border-t pt-3" data-testid="controls">
