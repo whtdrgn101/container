@@ -1,0 +1,26 @@
+{
+  "name": "@container/backend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "REST API for Container. Wraps the pure engine and persists game state to SQLite.",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@container/engine": "workspace:*",
+    "better-sqlite3": "^11.8.0",
+    "fastify": "^5.2.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

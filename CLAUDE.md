@@ -1,0 +1,178 @@
+# CLAUDE.md — Container (digital board game)
+
+Context and working agreement for this repo. Read this first.
+
+## What we're building
+
+A faithful digital version of the board game **Container (10th Anniversary Edition)**.
+This is a learning project: the owner is an experienced software engineer who wants
+**good engineering practices** throughout — clean separation of concerns, strong typing,
+and high test coverage.
+
+Non-negotiables set at kickoff:
+
+- **100% unit-test coverage of the game engine** (mechanics). Enforced by a coverage gate.
+- The UI has automated tests via **Playwright**, including **responsive regression** tests
+  from desktop down to mobile widths.
+- Monorepo with separate `ui/` and `backend/` (plus a shared `engine/`).
+
+## The game (rules summary)
+
+Authoritative source: `reference_material/Container_Rulebook_v8.pdf` (20 pages). Read it
+before implementing any mechanic — do not implement rules from memory.
+
+Container is an economic supply-chain game for **3–5 players**. The twist: **you can never
+buy or ship your own containers** — you must entice opponents to buy and deliver yours.
+
+- **Five container colors:** `white`, `red`, `green`, `blue`, `yellow` (confirmed from the
+  scoring-card art; orange/purple etc. are *player* colors, not container colors).
+- **Board:** each player has a **factory district** (produce containers) and a **harbor
+  district** (resell containers). Central boards: **Container Island** (delivery auctions →
+  scoring) and the **Off-Shore Bank** (loans + auctions).
+- **Turn = 3 steps:** (1) pay $1 loan interest per loan, (2) win any Bank auction you're
+  leading, (3) **take 2 actions**.
+- **Actions:** Build, Produce, Factory Purchase, Harbor Purchase, Sail, Reprice, Call Bank.
+  Plus free "anchor" actions when a ship docks/arrives.
+- **The chain:** Produce (factory) → sell to an opponent's **harbor** (Factory Purchase) →
+  opponent's ship buys from a harbor (Harbor Purchase) → **Sail** to Container Island →
+  **delivery auction** (highest secret bid wins; deliverer earns the bid **plus** a matching
+  government subsidy). Bluff ($0) cards allowed.
+- **Scoring:** each player has a **secret scoring card** valuing colors differently; game ends
+  when the supply runs out of any **2 colors**. Final scoring discards your most-common island
+  color, scores the rest by your card, adds leftover-container value, and repays loans.
+
+A fuller mechanic-by-mechanic breakdown lives in the rulebook; capture edge cases as tests.
+
+## Architecture
+
+```
+container/
+├── engine/     @container/engine  — pure, deterministic rules core (NO I/O, NO randomness)
+├── backend/    @container/backend — Fastify REST API; persists state to SQLite
+├── ui/         @container/ui      — React + Tailwind + shadcn; talks to the API
+└── reference_material/            — the rulebook PDF
+```
+
+**Data flow:** UI → REST → backend → **engine** (authoritative) → SQLite snapshot + move log.
+
+The **engine is the single source of truth** for rules. It is a pure function library:
+`state + action → new state` (or throws a typed `GameError`). It has no dates, no random,
+no network, no DB. Randomness (e.g. dealing factory colors / scoring cards) is injected by
+callers so the engine stays deterministic and trivially testable. This is what makes the
+100% coverage gate achievable and keeps the door open for **online multiplayer** and **AI
+opponents** later (both just drive the same engine).
+
+### How the shared engine is consumed
+
+`@container/engine` exports **TypeScript source** (`exports: "./src/index.ts"`), not a build.
+Both consumers transpile it directly:
+
+- **backend** — `tsx` (dev/prod-start) and Vitest (`server.deps.inline: [/@container\/engine/]`)
+  transform the TS source across the workspace boundary.
+- **ui** — `vite.config.ts` aliases `@container/engine` → `../engine/src/index.ts` so Vite
+  bundles it as project source. This also gives the **frontend shared types** (`GameState`,
+  `Color`, …) for free.
+
+`engine` also has a real `build` (`tsc -p tsconfig.build.json` → `dist/`) used for typecheck/
+distribution; consumers may switch to `dist` later if we ever publish.
+
+## Tech stack (and why)
+
+| Layer    | Choice                                   | Why |
+|----------|------------------------------------------|-----|
+| Mono     | pnpm workspaces                          | first-class workspace deps, strict node_modules |
+| Language | TypeScript (strict, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`) | one language end-to-end; shared engine + types |
+| Engine   | plain TS + Vitest (v8 coverage, 100% gate) | pure logic, fastest possible tests |
+| Backend  | Fastify 5 + better-sqlite3               | fast, schema validation; synchronous SQLite is simple & plenty for this |
+| DB       | SQLite: `games` (JSON snapshot) + `moves` (append-only log) | engine state is serializable; log enables replay/audit |
+| UI       | Vite 6 + React 19 + Tailwind v4 + shadcn-style components | modern, fast; shadcn components live in-repo (`src/components/ui`) |
+| UI tests | Playwright (Chromium desktop + Pixel 5 mobile) | e2e + responsive regression |
+
+## Conventions
+
+- **Engine purity:** no I/O, no `Date`/`Math.random`, no mutation. Return new state; never
+  mutate inputs (there's a test asserting this). All rejections throw `GameError` with a
+  stable `GameErrorCode`.
+- **Error mapping:** the API maps `GameErrorCode` → HTTP (`PLAYER_NOT_FOUND` → 404,
+  `INVALID_PLAYER_COUNT` → 400, other illegal-move codes → 409). Add new codes in the engine,
+  not ad-hoc strings.
+- **Immutability + `readonly`** everywhere in engine types.
+- **Versioning:** `GameState.version` increments once per applied action; mirrored in the
+  `games` table for future optimistic-concurrency checks.
+- **Testids:** UI exposes `data-testid` hooks (`start-game`, `board`, `player-card-<id>`,
+  `money-<id>`, `store-count-<id>`, `produce-<id>`) — keep these stable; Playwright depends on them.
+- **shadcn components** are copied into `ui/src/components/ui` (not a dependency). Extend them
+  in place.
+- **Test layout:** engine/backend **unit tests live in `src/tests/`** (e.g. `engine/src/tests/`,
+  `backend/src/tests/`), not colocated beside source. UI **Playwright specs stay in `ui/e2e/`**.
+  Vitest's `include: ['src/**/*.test.ts']` and the coverage excludes already match the nested path,
+  so no config change is needed when adding tests.
+
+## Commands
+
+```bash
+pnpm install                # bootstrap the workspace
+
+# Tests
+pnpm test                   # every workspace's tests
+pnpm test:engine            # engine unit tests + 100% coverage gate
+pnpm test:backend           # backend integration tests (Fastify inject + :memory: sqlite)
+pnpm test:e2e               # Playwright (auto-starts API + UI); needs: pnpm --filter @container/ui exec playwright install chromium
+pnpm typecheck              # strict typecheck across all packages
+
+# Dev (run both in separate terminals)
+pnpm dev:backend            # API on :3001
+pnpm dev:ui                 # UI on :5173 (proxies /api → :3001)
+```
+
+## Testing strategy
+
+- **Engine:** exhaustive unit tests; **100% statements/branches/functions/lines** enforced in
+  `engine/vitest.config.ts`. Every rule and every rejection path gets a test. This is the
+  primary correctness guarantee.
+- **Backend:** integration tests via `app.inject` against an in-memory SQLite DB — covers HTTP
+  contract, validation, persistence, and error mapping.
+- **UI:** Playwright e2e for real user flows, plus a **responsive** spec asserting layout
+  reflow (cards stack on mobile, row on desktop) and **no horizontal overflow** at 320px.
+  Runs on desktop + mobile Chromium projects.
+
+## Roadmap
+
+The full, sliced plan lives in **[`ROADMAP.md`](./ROADMAP.md)** — read it before starting a phase.
+
+We build the rest of the game as **vertical slices** (engine → API → UI → tests), not big-bang
+layers. Each slice ends green and demoable, so it's a safe stopping point (and a clean place to
+check plan usage between sessions). Summary:
+
+- **Phase 0 — Foundation ✅** monorepo, tooling, test gates.
+- **Slice 0 — Produce ✅** architecture proof, wired end-to-end. *(This is what exists today.)*
+- **Slices 1–7 (core game, next):** turn spine + Build → pricing/Reprice → ships/sailing → trade
+  chain → delivery auctions → Off-Shore Bank & loans → game end & final scoring. After Slice 7 the
+  game is fully playable **hotseat**. 100% engine coverage gate throughout.
+- **Slice 8:** UI/UX polish, full board, visual regression.
+- **Track A — AI play** and **Track B — online multiplayer:** independent tracks after the core
+  game is playable. The authoritative, serializable engine makes both additive (see `ROADMAP.md`).
+
+## Decisions & assumptions log
+
+- **v1 is local hotseat / pass-and-play** (one screen). Online multiplayer and AI are future
+  roadmap items. Revisit before Phase 4 if priorities change.
+- **Container colors:** `white, red, green, blue, yellow` (from rulebook scoring cards).
+- **"Player on your right"** (Produce union wage) is modeled as the **next seat index**
+  `(seat + 1) % n`. Confirm against physical table convention if it ever matters for scoring.
+- **Factory storage limit = 2 × factories**; **harbor limit = 1 × warehouses** (rulebook pg. 5).
+  Starting player: 1 factory (dealt color), 1 warehouse, 1 matching container, $20, 2 bluff cards.
+- **Package manager is pnpm** (corepack couldn't symlink into `/usr/local/bin`; pnpm was
+  installed via Homebrew). Native `better-sqlite3` and `esbuild` builds are allow-listed in
+  `pnpm-workspace.yaml`.
+- **Slice scope:** the engine currently models only the factory district (what Produce needs).
+  `types.ts` calls out what's deferred to Phase 2.
+
+## Working agreement for Claude
+
+- When implementing a mechanic, **read the relevant rulebook page first**; cite it in a comment.
+- Never let engine coverage drop below 100%. Add tests with the code, not after.
+- Keep the engine pure. If you need I/O or randomness, it belongs in backend/ui or is injected.
+- Prefer extending the vertical-slice patterns (typed errors, immutable state, testids) over
+  inventing new ones.
+- Update this file's **Roadmap** and **Decisions log** when direction changes.

@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Test / coverage artifacts
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# Databases (local game state) — incl. WAL sidecar files (-wal / -shm)
+*.sqlite
+*.sqlite3
+*.db
+*.sqlite-wal
+*.sqlite-shm
+*.db-wal
+*.db-shm
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Reference material (large / copyrighted — kept locally, not committed)
+reference_material/*.pdf
+
+# OS / editor
+.DS_Store
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json

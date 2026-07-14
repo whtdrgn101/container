@@ -1,0 +1,9 @@
+packages:
+  - engine
+  - backend
+  - ui
+
+# Native/postinstall build scripts we explicitly trust (pnpm blocks all others).
+allowBuilds:
+  esbuild: true
+  better-sqlite3: true
