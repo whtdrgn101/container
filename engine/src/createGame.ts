@@ -1,6 +1,7 @@
 import {
   ACTIONS_PER_TURN,
   COLORS,
+  CONTAINER_SUPPLY_STANDARD,
   DEFAULT_FACTORY_LOT,
   FACTORY_STORAGE_PER_FACTORY,
   FACTORY_SUPPLY_PER_COLOR,
@@ -62,16 +63,21 @@ export function createGame(options: CreateGameOptions): GameState {
     };
   });
 
-  // Building supply, less what players took at setup (1 starting factory + 1 warehouse each).
+  // Supply, less what players took at setup (1 starting factory + container + 1 warehouse each).
   const perColor = FACTORY_SUPPLY_PER_COLOR[count]!;
+  const perColorContainers = CONTAINER_SUPPLY_STANDARD[count]!;
   const factories = {} as Record<Color, number>;
+  const containers = {} as Record<Color, number>;
   for (const color of COLORS) {
     factories[color] = perColor;
+    containers[color] = perColorContainers;
   }
   for (const player of playerStates) {
-    factories[player.factories[0]!.color] -= 1;
+    const startColor = player.factories[0]!.color;
+    factories[startColor] -= 1;
+    containers[startColor] -= 1; // starting container matches the starting factory color
   }
-  const supply: Supply = { factories, warehouses: WAREHOUSE_SUPPLY_TOTAL[count]! - count };
+  const supply: Supply = { containers, factories, warehouses: WAREHOUSE_SUPPLY_TOTAL[count]! - count };
 
   return {
     id,

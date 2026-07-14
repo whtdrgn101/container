@@ -60,8 +60,10 @@ export interface PlayerState {
   readonly ship: ShipState;
 }
 
-/** Shared building components still available to build (drawn down as players build). */
+/** Shared components still available (drawn down as players produce / build). */
 export interface Supply {
+  /** Containers still available, per color. Produce draws from here; the game ends when 2 colors hit 0. */
+  readonly containers: Readonly<Record<Color, number>>;
   /** Factory buildings still available, per color. */
   readonly factories: Readonly<Record<Color, number>>;
   /** Warehouse buildings still available. */

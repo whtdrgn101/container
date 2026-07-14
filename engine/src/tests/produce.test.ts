@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getPlayer, produce, STARTING_MONEY, UNION_WAGE } from '../index';
-import { expectError, makeGame, makePlayer, newGame, sc } from './helpers';
+import { expectError, makeGame, makePlayer, makeSupply, newGame, sc } from './helpers';
 
 describe('produce', () => {
   it('produces into the default $2 lot and pays the right neighbor', () => {
@@ -21,6 +21,19 @@ describe('produce', () => {
     produce(state, 'p1');
     expect(state.version).toBe(0);
     expect(getPlayer(state, 'p1').factoryStore).toEqual([sc('white', 2)]);
+    expect(state.supply.containers.white).toBe(10);
+  });
+
+  it('draws produced containers from the shared supply', () => {
+    const next = produce(newGame(3), 'p1'); // p1 produces 1 white
+    expect(next.supply.containers.white).toBe(10 - 1);
+  });
+
+  it('throws OUT_OF_SUPPLY when the produced color is exhausted', () => {
+    const state = makeGame([makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], {
+      supply: makeSupply({ containers: { white: 0, red: 10, green: 10, blue: 10, yellow: 10 } }),
+    });
+    expectError(() => produce(state, 'p1'), 'OUT_OF_SUPPLY'); // p1's factory is white
   });
 
   it('places produced containers into the chosen lots', () => {

@@ -20,6 +20,8 @@ describe('createGame', () => {
 
     expect(state.supply.factories).toEqual({ white: 1, red: 1, green: 1, blue: 2, yellow: 2 });
     expect(state.supply.warehouses).toBe(12 - 3);
+    // 3p: 11 containers/color, minus the starting container for white/red/green.
+    expect(state.supply.containers).toEqual({ white: 10, red: 10, green: 10, blue: 11, yellow: 11 });
   });
 
   it('respects an explicit starting color', () => {
@@ -35,6 +37,7 @@ describe('createGame', () => {
     expect(state.players.map((p) => p.factories[0]?.color)).toEqual(['white', 'red', 'green', 'blue', 'yellow']);
     expect(state.supply.factories).toEqual({ white: 3, red: 3, green: 3, blue: 3, yellow: 3 });
     expect(state.supply.warehouses).toBe(20 - 5);
+    expect(state.supply.containers).toEqual({ white: 16, red: 16, green: 16, blue: 16, yellow: 16 });
   });
 
   it('rejects fewer than 3 players', () => {

@@ -8,11 +8,15 @@ test('create a game and produce a container', async ({ page }) => {
   const board = page.getByTestId('board');
   await expect(board).toBeVisible();
 
-  // Initial state: 1 starting container, $20.
+  // Initial state: 1 starting container, $20, and 10 white containers left in the supply.
   await expect(page.getByTestId('store-count-p1')).toHaveText('1 / 2');
   await expect(page.getByTestId('money-p1')).toHaveText('$20');
+  await expect(page.getByTestId('supply-container-white')).toContainText('×10');
 
   await page.getByTestId('produce-p1').click();
+
+  // Producing a white container draws one from the supply.
+  await expect(page.getByTestId('supply-container-white')).toContainText('×9');
 
   // Produced 1 container; paid $1 union wage to the right neighbor (p2).
   await expect(page.getByTestId('store-count-p1')).toHaveText('2 / 2');

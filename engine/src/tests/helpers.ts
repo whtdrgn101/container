@@ -12,6 +12,7 @@ export const sc = (color: Color, price: number): StoredContainer => ({ color, pr
 
 export function makeSupply(overrides: Partial<Supply> = {}): Supply {
   return {
+    containers: { white: 10, red: 10, green: 10, blue: 10, yellow: 10 },
     factories: { white: 2, red: 2, green: 2, blue: 2, yellow: 2 },
     warehouses: 10,
     ...overrides,

@@ -42,6 +42,15 @@ export function produce(state: GameState, playerId: string, placements?: readonl
     produced = placements;
   }
 
+  // Draw the produced containers from the shared supply (factories are distinct colors, so ≤1 each).
+  const containers = { ...state.supply.containers };
+  for (const container of produced) {
+    if (containers[container.color] <= 0) {
+      throw new GameError('OUT_OF_SUPPLY', `No ${container.color} containers left in the supply`);
+    }
+    containers[container.color] -= 1;
+  }
+
   const rightSeat = (seat + 1) % state.players.length;
   const players = state.players.map((current, index) => {
     if (index === seat) {
@@ -53,5 +62,6 @@ export function produce(state: GameState, playerId: string, placements?: readonl
     return current;
   });
 
-  return record(state, players, 'PRODUCE', playerId, {}, { produced: produced.map((c) => ({ ...c })) });
+  const supply = { ...state.supply, containers };
+  return record(state, players, 'PRODUCE', playerId, { supply }, { produced: produced.map((c) => ({ ...c })) });
 }

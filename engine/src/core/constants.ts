@@ -58,3 +58,10 @@ export const FACTORY_SUPPLY_PER_COLOR: Readonly<Record<number, number>> = { 3: 2
 
 /** Warehouse buildings available total, by player count (rulebook setup table). Internal. */
 export const WAREHOUSE_SUPPLY_TOTAL: Readonly<Record<number, number>> = { 3: 12, 4: 16, 5: 20 };
+
+/**
+ * Containers available per color, by player count — STANDARD game length (rulebook setup table).
+ * (Short = 9/11/13, Extended = 12/16/20; we use Standard for now.) Internal.
+ * TODO(Slice 6): setup step 5 also seeds 3 random containers onto the Off-Shore Bank — deferred.
+ */
+export const CONTAINER_SUPPLY_STANDARD: Readonly<Record<number, number>> = { 3: 11, 4: 14, 5: 17 };

@@ -138,6 +138,7 @@ export default function App() {
   const sailActions = legal.filter((action): action is Extract<Action, { type: 'SAIL' }> => action.type === 'SAIL');
   const activePlayer = game ? game.players[game.activePlayerIndex] : undefined;
   const nextFactoryCost = activePlayer ? FACTORY_BUILD_COSTS[activePlayer.factories.length - 1] : undefined;
+  const containersGone = game ? COLORS.filter((color) => game.supply.containers[color] === 0).length : 0;
 
   function act(playerId: string, action: Action) {
     if (!game) return;
@@ -211,24 +212,19 @@ export default function App() {
         {game ? (
           <>
             <Card className="mb-4" data-testid="supply">
-              <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-3 p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium">Factory supply</span>
+              <CardContent className="space-y-3 p-4">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <span className="text-sm font-medium">Containers left</span>
                   {COLORS.map((color) => {
-                    const count = game.supply.factories[color];
-                    const selectable = buildableColors.includes(color) && !busy;
+                    const count = game.supply.containers[color];
                     return (
-                      <button
+                      <span
                         key={color}
-                        type="button"
-                        data-testid={`supply-factory-${color}`}
-                        title={`${color}: ${count} available`}
-                        disabled={!selectable}
-                        onClick={() => setBuildColor(color)}
+                        data-testid={`supply-container-${color}`}
+                        title={`${color}: ${count} left in the supply`}
                         className={cn(
-                          'flex items-center gap-1 rounded border px-1.5 py-1 text-xs tabular-nums transition-colors',
-                          selectable ? 'hover:bg-accent' : 'opacity-40',
-                          buildColor === color && 'ring-2 ring-ring',
+                          'flex items-center gap-1 text-xs tabular-nums',
+                          count === 0 && 'font-semibold text-destructive',
                         )}
                       >
                         <span
@@ -236,27 +232,63 @@ export default function App() {
                           style={{ backgroundColor: COLOR_HEX[color] }}
                         />
                         ×{count}
-                      </button>
+                      </span>
                     );
                   })}
+                  <span className="text-xs text-muted-foreground" data-testid="endgame-hint">
+                    {containersGone === 0
+                      ? 'Game ends when 2 colors run out'
+                      : `${containersGone}/2 colors exhausted — game ends at 2`}
+                  </span>
                 </div>
 
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <WarehouseIcon className="h-4 w-4" aria-hidden />
-                  <span data-testid="supply-warehouses">Warehouses: {game.supply.warehouses}</span>
-                </div>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t pt-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium">Factory supply</span>
+                    {COLORS.map((color) => {
+                      const count = game.supply.factories[color];
+                      const selectable = buildableColors.includes(color) && !busy;
+                      return (
+                        <button
+                          key={color}
+                          type="button"
+                          data-testid={`supply-factory-${color}`}
+                          title={`${color}: ${count} available`}
+                          disabled={!selectable}
+                          onClick={() => setBuildColor(color)}
+                          className={cn(
+                            'flex items-center gap-1 rounded border px-1.5 py-1 text-xs tabular-nums transition-colors',
+                            selectable ? 'hover:bg-accent' : 'opacity-40',
+                            buildColor === color && 'ring-2 ring-ring',
+                          )}
+                        >
+                          <span
+                            className="h-4 w-6 rounded-sm border border-black/20"
+                            style={{ backgroundColor: COLOR_HEX[color] }}
+                          />
+                          ×{count}
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                {activePlayer && buildColor && buildableColors.includes(buildColor) && nextFactoryCost !== undefined && (
-                  <Button
-                    size="sm"
-                    className="sm:ml-auto"
-                    data-testid="build-factory"
-                    disabled={busy}
-                    onClick={() => act(activePlayer.id, { type: 'BUILD_FACTORY', color: buildColor })}
-                  >
-                    <FactoryIcon className="h-4 w-4" aria-hidden /> Build {buildColor} factory (${nextFactoryCost})
-                  </Button>
-                )}
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <WarehouseIcon className="h-4 w-4" aria-hidden />
+                    <span data-testid="supply-warehouses">Warehouses: {game.supply.warehouses}</span>
+                  </div>
+
+                  {activePlayer && buildColor && buildableColors.includes(buildColor) && nextFactoryCost !== undefined && (
+                    <Button
+                      size="sm"
+                      className="sm:ml-auto"
+                      data-testid="build-factory"
+                      disabled={busy}
+                      onClick={() => act(activePlayer.id, { type: 'BUILD_FACTORY', color: buildColor })}
+                    >
+                      <FactoryIcon className="h-4 w-4" aria-hidden /> Build {buildColor} factory (${nextFactoryCost})
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
 

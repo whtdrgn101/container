@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { legalActions } from '../index';
 import type { Color, GameState } from '../index';
-import { makeGame, makePlayer, newGame, sc } from './helpers';
+import { makeGame, makePlayer, makeSupply, newGame, sc } from './helpers';
 
 const types = (state: GameState) => legalActions(state).map((a) => a.type);
 
@@ -133,7 +133,7 @@ describe('legalActions', () => {
 
   it('omits builds when supply is exhausted', () => {
     const state = makeGame([makePlayer({ id: 'p1', money: 100 }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], {
-      supply: { factories: { white: 0, red: 0, green: 0, blue: 0, yellow: 0 }, warehouses: 0 },
+      supply: makeSupply({ factories: { white: 0, red: 0, green: 0, blue: 0, yellow: 0 }, warehouses: 0 }),
     });
     const actions = types(state);
     expect(actions).not.toContain('BUILD_FACTORY');
