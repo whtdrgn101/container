@@ -1,4 +1,4 @@
-import type { Color, GameState, NewPlayer } from '@container/engine';
+import type { Action, GameState, NewPlayer } from '@container/engine';
 
 const BASE_URL = '/api';
 
@@ -26,13 +26,13 @@ export async function createGame(players: NewPlayer[]): Promise<GameState> {
   );
 }
 
-/** Run a player's Produce action and return the updated state. */
-export async function produce(gameId: string, playerId: string, select?: Color[]): Promise<GameState> {
+/** Apply an action for a player and return the updated state. */
+export async function applyAction(gameId: string, playerId: string, action: Action): Promise<GameState> {
   return unwrap(
-    await fetch(`${BASE_URL}/games/${gameId}/produce`, {
+    await fetch(`${BASE_URL}/games/${gameId}/actions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ playerId, select }),
+      body: JSON.stringify({ playerId, action }),
     }),
   );
 }

@@ -2,10 +2,16 @@
 export type GameErrorCode =
   | 'INVALID_PLAYER_COUNT'
   | 'PLAYER_NOT_FOUND'
+  | 'NOT_YOUR_TURN'
+  | 'NO_ACTIONS_REMAINING'
   | 'NO_FACTORIES'
   | 'INSUFFICIENT_FUNDS'
   | 'STORAGE_LIMIT_EXCEEDED'
-  | 'INVALID_SELECTION';
+  | 'INVALID_SELECTION'
+  | 'FACTORY_LIMIT_REACHED'
+  | 'WAREHOUSE_LIMIT_REACHED'
+  | 'DUPLICATE_FACTORY_COLOR'
+  | 'OUT_OF_SUPPLY';
 
 /**
  * Thrown when an action is illegal given the current state. Carries a stable `code`

@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import { createGame, GameError, produce } from '@container/engine';
-import type { Color, NewPlayer } from '@container/engine';
+import { applyAction, COLORS, createGame, GameError } from '@container/engine';
+import type { Action, Color, NewPlayer } from '@container/engine';
 import type { DB } from './db';
 import { GameRepository } from './repository';
 
@@ -15,9 +15,15 @@ interface CreateGameBody {
   players: NewPlayer[];
 }
 
-interface ProduceBody {
+interface RawAction {
+  type: Action['type'];
+  color?: string;
+  select?: string[];
+}
+
+interface ActionBody {
   playerId: string;
-  select?: Color[];
+  action: RawAction;
 }
 
 /** Map a domain error to an HTTP status. Unknown errors bubble to Fastify's 500 handler. */
@@ -28,14 +34,38 @@ function sendGameError(reply: FastifyReply, error: unknown): FastifyReply {
         ? 404
         : error.code === 'INVALID_PLAYER_COUNT'
           ? 400
-          : 409; // illegal move given current state
+          : 409; // illegal move given current state (wrong turn, no actions, bad build, …)
     return reply.code(status).send({ error: { code: error.code, message: error.message } });
   }
   throw error;
 }
 
+const badRequest = (reply: FastifyReply, message: string) =>
+  reply.code(400).send({ error: { code: 'BAD_ACTION', message } });
+
 const notFound = (reply: FastifyReply, id: string) =>
   reply.code(404).send({ error: { code: 'GAME_NOT_FOUND', message: `No game with id "${id}"` } });
+
+/** Turn a validated request body into a typed engine Action, or reply 400 and return null. */
+function parseAction(reply: FastifyReply, raw: RawAction): Action | null {
+  switch (raw.type) {
+    case 'PRODUCE':
+      return raw.select ? { type: 'PRODUCE', select: raw.select as Color[] } : { type: 'PRODUCE' };
+    case 'BUILD_FACTORY':
+      if (!raw.color || !COLORS.includes(raw.color as Color)) {
+        badRequest(reply, 'BUILD_FACTORY requires a valid container color');
+        return null;
+      }
+      return { type: 'BUILD_FACTORY', color: raw.color as Color };
+    case 'BUILD_WAREHOUSE':
+      return { type: 'BUILD_WAREHOUSE' };
+    case 'END_TURN':
+      return { type: 'END_TURN' };
+    default:
+      badRequest(reply, `Unknown action type "${String(raw.type)}"`);
+      return null;
+  }
+}
 
 /** Build a Fastify instance wired to a database. Pure factory — no listening, easy to test. */
 export function buildApp(options: AppOptions): FastifyInstance {
@@ -84,16 +114,24 @@ export function buildApp(options: AppOptions): FastifyInstance {
     return reply.send({ game: state });
   });
 
-  app.post<{ Params: { id: string }; Body: ProduceBody }>(
-    '/games/:id/produce',
+  app.post<{ Params: { id: string }; Body: ActionBody }>(
+    '/games/:id/actions',
     {
       schema: {
         body: {
           type: 'object',
-          required: ['playerId'],
+          required: ['playerId', 'action'],
           properties: {
             playerId: { type: 'string', minLength: 1 },
-            select: { type: 'array', items: { type: 'string' } },
+            action: {
+              type: 'object',
+              required: ['type'],
+              properties: {
+                type: { type: 'string', enum: ['PRODUCE', 'BUILD_FACTORY', 'BUILD_WAREHOUSE', 'END_TURN'] },
+                color: { type: 'string' },
+                select: { type: 'array', items: { type: 'string' } },
+              },
+            },
           },
         },
       },
@@ -101,8 +139,12 @@ export function buildApp(options: AppOptions): FastifyInstance {
     async (request, reply) => {
       const state = repo.get(request.params.id);
       if (!state) return notFound(reply, request.params.id);
+
+      const action = parseAction(reply, request.body.action);
+      if (!action) return reply; // parseAction already sent a 400
+
       try {
-        const next = produce(state, request.body.playerId, request.body.select);
+        const next = applyAction(state, request.body.playerId, action);
         repo.update(next);
         return reply.send({ game: next });
       } catch (error) {

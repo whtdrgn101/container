@@ -7,8 +7,8 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html'],
       include: ['src/**/*.ts'],
-      // index.ts is a re-export barrel; types.ts is compile-time only.
-      exclude: ['src/**/*.test.ts', 'src/index.ts', 'src/types.ts'],
+      // index.ts is a re-export barrel; types.ts and actions.ts are compile-time only.
+      exclude: ['src/**/*.test.ts', 'src/index.ts', 'src/types.ts', 'src/actions.ts'],
       thresholds: {
         statements: 100,
         branches: 100,

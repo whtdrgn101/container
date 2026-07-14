@@ -15,7 +15,10 @@ How we get from the current vertical slice to a complete, faithful game, then to
 
 - ✅ **Phase 0 — Foundation:** monorepo, tooling, test gates.
 - ✅ **Slice 0 — Produce (architecture proof):** Produce wired engine→API→UI, tests at every layer.
-- ⏭️ **Next: Slice 1.**
+- ✅ **Slice 1 — Turn spine + Build:** `Action` union + `applyAction`/`endTurn`/`legalActions`, 2
+  actions/turn with active-player enforcement, Build factory/warehouse (costs, limits, distinct
+  colors, building supply). Canonical `POST /games/:id/actions` endpoint. Engine at 100% (46 tests).
+- ⏭️ **Next: Slice 2 — Pricing & Reprice.**
 
 ---
 
@@ -23,7 +26,7 @@ How we get from the current vertical slice to a complete, faithful game, then to
 
 | # | Slice | Delivers (demo) | Size | Depends on |
 |---|-------|-----------------|------|------------|
-| 1 | Turn spine + Build | Players alternate turns; build factories/warehouses; Produce is now a real "action" | M | Slice 0 |
+| 1 | ✅ Turn spine + Build | Players alternate turns; build factories/warehouses; Produce is now a real "action" | M | Slice 0 |
 | 2 | Pricing & Reprice | Containers live in price lots ($1..$N); set/rearrange prices | M | 1 |
 | 3 | Ships & sailing | Ship tokens move ocean ↔ harbors ↔ islands; legal movement | M | 1 |
 | 4 | Trade chain | Full produce → sell to harbor → load onto ship between players | M–L | 2, 3 |

@@ -93,9 +93,16 @@ distribution; consumers may switch to `dist` later if we ever publish.
 - **Engine purity:** no I/O, no `Date`/`Math.random`, no mutation. Return new state; never
   mutate inputs (there's a test asserting this). All rejections throw `GameError` with a
   stable `GameErrorCode`.
+- **Action model:** all moves flow through `applyAction(state, playerId, action)` — the turn-aware
+  entry point that enforces turn order and the per-turn action budget (2), then dispatches to pure
+  mechanic functions (`produce`, `buildFactory`, `buildWarehouse`, `endTurn`). `legalActions(state)`
+  enumerates what the active player may do (drives UI enable/disable and, later, AI search). The
+  backend exposes this as `POST /games/:id/actions` with body `{ playerId, action }`; the UI imports
+  `legalActions` from the engine and computes availability client-side. Add new moves as `Action`
+  variants + a mechanic + a `legalActions` branch.
 - **Error mapping:** the API maps `GameErrorCode` → HTTP (`PLAYER_NOT_FOUND` → 404,
-  `INVALID_PLAYER_COUNT` → 400, other illegal-move codes → 409). Add new codes in the engine,
-  not ad-hoc strings.
+  `INVALID_PLAYER_COUNT` → 400, other illegal-move codes like `NOT_YOUR_TURN` / `NO_ACTIONS_REMAINING`
+  → 409). Add new codes in the engine, not ad-hoc strings.
 - **Immutability + `readonly`** everywhere in engine types.
 - **Versioning:** `GameState.version` increments once per applied action; mirrored in the
   `games` table for future optimistic-concurrency checks.
@@ -145,10 +152,12 @@ layers. Each slice ends green and demoable, so it's a safe stopping point (and a
 check plan usage between sessions). Summary:
 
 - **Phase 0 — Foundation ✅** monorepo, tooling, test gates.
-- **Slice 0 — Produce ✅** architecture proof, wired end-to-end. *(This is what exists today.)*
-- **Slices 1–7 (core game, next):** turn spine + Build → pricing/Reprice → ships/sailing → trade
-  chain → delivery auctions → Off-Shore Bank & loans → game end & final scoring. After Slice 7 the
-  game is fully playable **hotseat**. 100% engine coverage gate throughout.
+- **Slice 0 — Produce ✅** architecture proof, wired end-to-end.
+- **Slice 1 — Turn spine + Build ✅** 2 actions/turn with active-player enforcement, Build
+  factory/warehouse, `legalActions`. *(This is what exists today.)*
+- **Slices 2–7 (core game, next):** pricing/Reprice → ships/sailing → trade chain → delivery
+  auctions → Off-Shore Bank & loans → game end & final scoring. After Slice 7 the game is fully
+  playable **hotseat**. 100% engine coverage gate throughout.
 - **Slice 8:** UI/UX polish, full board, visual regression.
 - **Track A — AI play** and **Track B — online multiplayer:** independent tracks after the core
   game is playable. The authoritative, serializable engine makes both additive (see `ROADMAP.md`).
