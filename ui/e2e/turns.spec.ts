@@ -13,9 +13,12 @@ test('take actions, build, and end the turn', async ({ page }) => {
   await expect(page.getByTestId('player-card-p1')).toHaveAttribute('data-active', 'true');
   await expect(page.getByTestId('player-card-p2')).toHaveAttribute('data-active', 'false');
 
-  // Build a red factory → spends one action.
-  await page.getByTestId('build-factory-red').click();
+  // Build a red factory from the shared supply → spends one action.
+  await expect(page.getByTestId('supply-factory-red')).toContainText('×1'); // 3p: 1 red left
+  await page.getByTestId('supply-factory-red').click(); // select the color
+  await page.getByTestId('build-factory').click(); // Build (one action)
   await expect(page.getByTestId('turn-info')).toContainText('1 action left');
+  await expect(page.getByTestId('supply-factory-red')).toContainText('×0'); // supply drew down
 
   // Build a warehouse → spends the second action; warehouse count rises to 2.
   await page.getByTestId('build-warehouse').click();

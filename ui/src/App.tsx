@@ -2,6 +2,7 @@ import { Factory as FactoryIcon, Plus, Ship as ShipIcon, Warehouse as WarehouseI
 import { useState } from 'react';
 import type { Action, Color, GameState, PlayerState, ShipLocation, StoredContainer } from '@container/engine';
 import {
+  COLORS,
   FACTORY_BUILD_COSTS,
   FACTORY_LOT_PRICES,
   legalActions,
@@ -114,6 +115,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   // Which containers the active player has selected to buy (one district, one seller at a time).
   const [pick, setPick] = useState<{ district: 'factory' | 'harbor'; sellerId: string; indices: number[] } | null>(null);
+  // Which factory color the active player has selected to build from the shared supply.
+  const [buildColor, setBuildColor] = useState<Color | null>(null);
 
   async function run(work: () => Promise<GameState>) {
     setBusy(true);
@@ -133,10 +136,13 @@ export default function App() {
     .filter((action): action is Extract<Action, { type: 'BUILD_FACTORY' }> => action.type === 'BUILD_FACTORY')
     .map((action) => action.color);
   const sailActions = legal.filter((action): action is Extract<Action, { type: 'SAIL' }> => action.type === 'SAIL');
+  const activePlayer = game ? game.players[game.activePlayerIndex] : undefined;
+  const nextFactoryCost = activePlayer ? FACTORY_BUILD_COSTS[activePlayer.factories.length - 1] : undefined;
 
   function act(playerId: string, action: Action) {
     if (!game) return;
     setPick(null);
+    setBuildColor(null);
     void run(() => api.applyAction(game.id, playerId, action));
   }
 
@@ -203,14 +209,64 @@ export default function App() {
         )}
 
         {game ? (
-          <section
-            aria-label="Player boards"
-            data-testid="board"
-            className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-          >
+          <>
+            <Card className="mb-4" data-testid="supply">
+              <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-3 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium">Factory supply</span>
+                  {COLORS.map((color) => {
+                    const count = game.supply.factories[color];
+                    const selectable = buildableColors.includes(color) && !busy;
+                    return (
+                      <button
+                        key={color}
+                        type="button"
+                        data-testid={`supply-factory-${color}`}
+                        title={`${color}: ${count} available`}
+                        disabled={!selectable}
+                        onClick={() => setBuildColor(color)}
+                        className={cn(
+                          'flex items-center gap-1 rounded border px-1.5 py-1 text-xs tabular-nums transition-colors',
+                          selectable ? 'hover:bg-accent' : 'opacity-40',
+                          buildColor === color && 'ring-2 ring-ring',
+                        )}
+                      >
+                        <span
+                          className="h-4 w-6 rounded-sm border border-black/20"
+                          style={{ backgroundColor: COLOR_HEX[color] }}
+                        />
+                        ×{count}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <WarehouseIcon className="h-4 w-4" aria-hidden />
+                  <span data-testid="supply-warehouses">Warehouses: {game.supply.warehouses}</span>
+                </div>
+
+                {activePlayer && buildColor && buildableColors.includes(buildColor) && nextFactoryCost !== undefined && (
+                  <Button
+                    size="sm"
+                    className="sm:ml-auto"
+                    data-testid="build-factory"
+                    disabled={busy}
+                    onClick={() => act(activePlayer.id, { type: 'BUILD_FACTORY', color: buildColor })}
+                  >
+                    <FactoryIcon className="h-4 w-4" aria-hidden /> Build {buildColor} factory (${nextFactoryCost})
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+
+            <section
+              aria-label="Player boards"
+              data-testid="board"
+              className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+            >
             {game.players.map((player, index) => {
               const isActive = index === game.activePlayerIndex;
-              const nextFactoryCost = FACTORY_BUILD_COSTS[player.factories.length - 1];
               const nextWarehouseCost = WAREHOUSE_BUILD_COSTS[player.warehouses - 1];
               const capacity = Math.min(player.factories.length, player.factoryLimit - player.factoryStore.length);
               const canReprice = isActive && can('REPRICE') && !busy;
@@ -410,30 +466,6 @@ export default function App() {
                           <Plus className="h-4 w-4" aria-hidden /> Produce into ${produceLot}
                         </Button>
 
-                        <div>
-                          <div className="mb-1 text-xs text-muted-foreground">
-                            Build factory{nextFactoryCost !== undefined ? ` ($${nextFactoryCost})` : ''}
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {buildableColors.length === 0 ? (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            ) : (
-                              buildableColors.map((color) => (
-                                <button
-                                  key={color}
-                                  type="button"
-                                  data-testid={`build-factory-${color}`}
-                                  title={`Build ${color} factory`}
-                                  disabled={busy}
-                                  onClick={() => act(player.id, { type: 'BUILD_FACTORY', color })}
-                                  className="h-7 w-9 rounded border border-black/20 shadow-sm transition-transform hover:scale-105 disabled:opacity-50"
-                                  style={{ backgroundColor: COLOR_HEX[color] }}
-                                />
-                              ))
-                            )}
-                          </div>
-                        </div>
-
                         <Button
                           size="sm"
                           variant="outline"
@@ -483,7 +515,8 @@ export default function App() {
                 </Card>
               );
             })}
-          </section>
+            </section>
+          </>
         ) : (
           <Card className="mx-auto max-w-md">
             <CardHeader>
