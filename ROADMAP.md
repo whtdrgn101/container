@@ -85,7 +85,7 @@ How we get from the current vertical slice to a complete, faithful game, then to
 
 ---
 
-## Core game — remaining vertical slices
+## Core game — vertical slices (all complete ✅)
 
 | # | Slice | Delivers (demo) | Size | Depends on |
 |---|-------|-----------------|------|------------|
@@ -96,7 +96,7 @@ How we get from the current vertical slice to a complete, faithful game, then to
 | 5 | ✅ Delivery auctions | Deliver to Container Island; secret bids, subsidy, buyout, runoff ties, scoring areas | L | 4 |
 | 6 | ✅ Off-Shore Bank & loans | Loans + interest + default; Bank board + container-lot & cash-lot auctions | L | 3 |
 | 7 | ✅ Game end & final scoring | Play a full game to a declared winner | M | 5, 6 |
-| 8 | UI/UX polish & full board | Complete board, animations, a11y, richer responsive, visual regression | M–L | 7 |
+| 8 | ✅ UI/UX polish & board | Original SVG art, board minimap w/ click-to-sail, motion + a11y, visual-regression baselines | M–L | 7 |
 
 ### Slice 1 — Turn spine + Build  · **M** · rulebook pg. 6, 8
 The "game loop." Turns the current free-for-all Produce into a real turn-based game.
@@ -208,12 +208,23 @@ real project. The engine's **purity + serializability** is the key enabler: bots
 
 | # | Step | Delivers | Size |
 |---|------|----------|------|
-| B1 | Server-authoritative views | Per-player state projection (hidden info enforced **server-side**, never sent to the wrong client) | M–L |
+| B1 | ✅ Server-authoritative views | Per-player state projection (hidden info enforced **server-side**, never sent to the wrong client) | M–L |
 | B2 | Real-time transport | WebSockets, lobbies/rooms, join codes, reconnection & resume | L |
 | B3 | Accounts & persistence | Auth, saved/resumable games, spectators | M–L |
 
 The v1 hotseat engine is already authoritative and serializable, so online is **additive** — B1 mostly
 formalizes "what each player is allowed to see," which A0 also needs.
+
+- ✅ **B1 — Server-authoritative views:** the engine gains a pure `viewFor(state, viewerId): GameView`
+  projection (`engine/src/view.ts`) that redacts every non-viewer player's secret `scoringCard` to
+  `null` (all revealed once the game has `ended`, so final scoring is public; `null` viewer = a
+  spectator sees none). The DB still stores the full authoritative state; the backend applies
+  `viewFor` at **every** response boundary (`POST /games`, `GET /games/:id`, `POST .../actions`),
+  defaulting the viewer to the active player for hotseat and honoring `GET ?viewer=<id>` for a
+  specific seat/spectator. The UI now consumes `GameView` (nullable card) and reveals a card only
+  when present. Covered by engine unit tests (`viewFor`, 100%) + backend integration tests
+  (redaction, per-viewer deal, spectator). **B2/B3 build on this** — the transport just picks each
+  connected client's `viewerId` instead of defaulting to the active seat.
 
 ---
 

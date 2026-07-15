@@ -52,6 +52,10 @@ export { createGame } from './createGame';
 export type { CreateGameOptions, NewPlayer } from './createGame';
 export { getPlayer } from './internal';
 
+// Per-player view projection (hidden-info redaction for online / AI)
+export { viewFor } from './view';
+export type { GameView, PlayerView } from './view';
+
 // Mechanics + turn-aware entry point
 export {
   produce,

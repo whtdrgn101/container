@@ -1,4 +1,4 @@
-import type { Action, GameState, PlayerState, ShipLocation } from '@container/engine';
+import type { Action, GameView, PlayerView, ShipLocation } from '@container/engine';
 import { ShipSvg } from '@/components/art/Ship';
 import { cn } from '@/lib/utils';
 
@@ -24,7 +24,7 @@ function locKey(loc: ShipLocation): string {
 type Node = { key: string; left: number; top: number; label: string; testid: string };
 
 /** Percentage-positioned board nodes: the fixed locations plus one harbor per player. */
-function boardNodes(players: readonly PlayerState[]): Node[] {
+function boardNodes(players: readonly PlayerView[]): Node[] {
   const n = players.length;
   const harbors = players.map((p, i) => ({
     key: `harbor:${p.id}`,
@@ -100,7 +100,7 @@ export function BoardMap({
   onSail,
   busy,
 }: {
-  game: GameState;
+  game: GameView;
   sailActions: readonly SailAction[];
   onSail: (action: SailAction) => void;
   busy: boolean;
@@ -109,7 +109,7 @@ export function BoardMap({
   const activeId = game.players[game.activePlayerIndex]?.id;
 
   // Group ships by the node they occupy so several ships at one place fan out instead of overlapping.
-  const shipsByNode = new Map<string, PlayerState[]>();
+  const shipsByNode = new Map<string, PlayerView[]>();
   for (const p of game.players) {
     const key = locKey(p.ship.location);
     const list = shipsByNode.get(key) ?? [];

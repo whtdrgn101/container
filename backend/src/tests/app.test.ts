@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import type { Action, GameState } from '@container/engine';
+import type { Action, GameState, GameView } from '@container/engine';
 import { buildApp } from '../app';
 import { createDatabase } from '../db';
 
@@ -14,14 +14,14 @@ afterEach(async () => {
   await app.close();
 });
 
-async function createThreePlayerGame(): Promise<GameState> {
+async function createThreePlayerGame(): Promise<GameView> {
   const response = await app.inject({
     method: 'POST',
     url: '/games',
     payload: { players: [{ name: 'Ann' }, { name: 'Bob' }, { name: 'Cid' }] },
   });
   expect(response.statusCode).toBe(201);
-  return response.json().game as GameState;
+  return response.json().game as GameView;
 }
 
 function act(gameId: string, playerId: string, action: Action) {
@@ -36,11 +36,37 @@ describe('POST /games', () => {
     expect(game.players[0]?.money).toBe(20);
   });
 
-  it('deals a distinct secret scoring card to each player', async () => {
+  it('deals a distinct secret scoring card to each player, redacting it per viewer (B1)', async () => {
     const game = await createThreePlayerGame();
-    const ids = game.players.map((p) => p.scoringCard.id);
-    expect(new Set(ids).size).toBe(3); // dealt without replacement
-    ids.forEach((id) => expect(id).toMatch(/^sc\d$/));
+    // The create response is projected for the active player (seat 0): only they see their card.
+    expect(game.players[0]?.scoringCard).not.toBeNull();
+    expect(game.players[1]?.scoringCard).toBeNull();
+    expect(game.players[2]?.scoringCard).toBeNull();
+
+    // Fetched as each seat, a player sees its own card and no opponent's — and the deal is distinct.
+    const ownIds: string[] = [];
+    for (const seat of game.players) {
+      const response = await app.inject({ method: 'GET', url: `/games/${game.id}?viewer=${seat.id}` });
+      expect(response.statusCode).toBe(200);
+      const view = response.json().game as GameView;
+      for (const p of view.players) {
+        if (p.id === seat.id) {
+          expect(p.scoringCard).not.toBeNull();
+          expect(p.scoringCard!.id).toMatch(/^sc\d$/);
+          ownIds.push(p.scoringCard!.id);
+        } else {
+          expect(p.scoringCard).toBeNull();
+        }
+      }
+    }
+    expect(new Set(ownIds).size).toBe(3); // dealt without replacement
+  });
+
+  it('hides every scoring card from a spectator with no seat (B1)', async () => {
+    const game = await createThreePlayerGame();
+    const response = await app.inject({ method: 'GET', url: `/games/${game.id}?viewer=nobody` });
+    const view = response.json().game as GameView;
+    expect(view.players.every((p) => p.scoringCard === null)).toBe(true);
   });
 
   it('rejects an invalid player count with 400', async () => {

@@ -1,6 +1,6 @@
 import { Factory as FactoryIcon, Plus, Ship as ShipIcon, Warehouse as WarehouseIcon } from 'lucide-react';
 import { useState } from 'react';
-import type { Action, Color, GameState, PlayerState, ScoringCard, ShipLocation, StoredContainer } from '@container/engine';
+import type { Action, Color, GameState, GameView, PlayerView, ScoringCard, ShipLocation, StoredContainer } from '@container/engine';
 import {
   COLORS,
   FACTORY_BUILD_COSTS,
@@ -40,13 +40,13 @@ function ContainerChip({ color, className }: { color: Color; className?: string 
   );
 }
 
-const nameOf = (players: readonly PlayerState[], id: string) => players.find((p) => p.id === id)?.name ?? id;
+const nameOf = (players: readonly PlayerView[], id: string) => players.find((p) => p.id === id)?.name ?? id;
 
 /** Sort rank for a color on a scoring card ($10 color first, then the two-value color, then $6/$4/$2). */
 const cardRank = (card: ScoringCard, color: Color) => (color === card.twoValueColor ? 9 : card.values[color]);
 
 /** Human-readable ship location, e.g. "Ocean" or "Bob's harbor". */
-function shipLabel(location: ShipLocation, players: readonly PlayerState[]): string {
+function shipLabel(location: ShipLocation, players: readonly PlayerView[]): string {
   switch (location.kind) {
     case 'ocean':
       return 'Ocean';
@@ -60,7 +60,7 @@ function shipLabel(location: ShipLocation, players: readonly PlayerState[]): str
 }
 
 /** Short label + testid suffix for a sail button target. */
-function sailTarget(location: ShipLocation, players: readonly PlayerState[]): { label: string; testid: string } {
+function sailTarget(location: ShipLocation, players: readonly PlayerView[]): { label: string; testid: string } {
   switch (location.kind) {
     case 'ocean':
       return { label: 'Ocean', testid: 'sail-ocean' };
@@ -127,7 +127,7 @@ function StoredChip({
 }
 
 export default function App() {
-  const [game, setGame] = useState<GameState | null>(null);
+  const [game, setGame] = useState<GameView | null>(null);
   const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
   const [produceLot, setProduceLot] = useState<number>(2);
   const [busy, setBusy] = useState(false);
@@ -143,7 +143,7 @@ export default function App() {
   const [bankBid, setBankBid] = useState<Record<number, number>>({});
   const [bankCount, setBankCount] = useState<Record<number, number>>({});
 
-  async function run(work: () => Promise<GameState>) {
+  async function run(work: () => Promise<GameView>) {
     setBusy(true);
     setError(null);
     try {
@@ -155,7 +155,9 @@ export default function App() {
     }
   }
 
-  const legal = game ? legalActions(game) : [];
+  // legalActions is a pure read over observable state and never inspects hidden scoring cards,
+  // so passing the redacted per-viewer view (which only nulls out opponents' cards) is safe.
+  const legal = game ? legalActions(game as unknown as GameState) : [];
   const can = (type: Action['type']) => legal.some((action) => action.type === type);
   const buildableColors = legal
     .filter((action): action is Extract<Action, { type: 'BUILD_FACTORY' }> => action.type === 'BUILD_FACTORY')
@@ -536,6 +538,8 @@ export default function App() {
             >
             {game.players.map((player, index) => {
               const isActive = index === game.activePlayerIndex;
+              // The server only sends a player's secret scoring card to that player (all cards at game end).
+              const card = player.scoringCard;
               const nextWarehouseCost = WAREHOUSE_BUILD_COSTS[player.warehouses - 1];
               const capacity = Math.min(player.factories.length, player.factoryLimit - player.factoryStore.length);
               const canReprice = isActive && can('REPRICE') && !busy;
@@ -710,17 +714,17 @@ export default function App() {
                     </div>
 
                     <div className="border-t pt-2 text-xs" data-testid={`scoring-card-${player.id}`}>
-                      {isActive ? (
+                      {card ? (
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                          <span className="font-medium">Your card:</span>
+                          <span className="font-medium">{isActive ? 'Your card:' : 'Card:'}</span>
                           {[...COLORS]
-                            .sort((a, b) => cardRank(player.scoringCard, b) - cardRank(player.scoringCard, a))
+                            .sort((a, b) => cardRank(card, b) - cardRank(card, a))
                             .map((color) => {
-                              const isTwo = color === player.scoringCard.twoValueColor;
+                              const isTwo = color === card.twoValueColor;
                               return (
                                 <span key={color} className="flex items-center gap-1">
                                   <ContainerChip color={color} />
-                                  {isTwo ? `$10/$${player.scoringCard.values[color]} ★` : `$${player.scoringCard.values[color]}`}
+                                  {isTwo ? `$10/$${card.values[color]} ★` : `$${card.values[color]}`}
                                 </span>
                               );
                             })}

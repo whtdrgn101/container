@@ -220,6 +220,14 @@ check plan usage between sessions). Summary:
   shared). `status: 'active' | 'ended'` + `results` + `winnerIds`; UI shows a results screen.
 - 🎉 **Core game complete — fully playable hotseat.** Optional remaining work: Track A (AI),
   Track B (online multiplayer). Keep the 100% engine coverage gate for any new mechanics.
+- **Track B / B1 ✅ (server-authoritative views).** Hidden info is now enforced server-side: the engine
+  exposes a pure `viewFor(state, viewerId): GameView` (`engine/src/view.ts`) that redacts every
+  non-viewer player's secret `scoringCard` to `null` (all revealed once `status === 'ended'`; a `null`
+  viewer is a spectator). The DB keeps the full authoritative `GameState`; the backend applies `viewFor`
+  at every response boundary, defaulting the viewer to the active player (hotseat) and honoring
+  `GET /games/:id?viewer=<id>`. The UI consumes `GameView` (nullable `scoringCard`). **Never send a full
+  unredacted `GameState` to a client** — always project through `viewFor` (the UI's `legalActions` cast
+  is safe only because move enumeration never reads scoring cards).
 - **Slice 8 ✅ (UI/UX polish & board).** Original SVG art (`ui/src/components/art/{Container,Ship}.tsx`)
   replaces all colored-square chips via the `ContainerChip` wrapper (kept as `span[title]` for e2e
   counts). A `BoardMap` (`ui/src/components/BoardMap.tsx`) draws every ship on an

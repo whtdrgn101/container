@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import { applyAction, COLORS, createGame, GameError, SCORING_CARDS } from '@container/engine';
-import type { Action, Color, District, NewPlayer, ShipLocation, StoredContainer } from '@container/engine';
+import { applyAction, COLORS, createGame, GameError, SCORING_CARDS, viewFor } from '@container/engine';
+import type { Action, Color, District, GameState, NewPlayer, ShipLocation, StoredContainer } from '@container/engine';
 import type { DB } from './db';
 import { GameRepository } from './repository';
 
@@ -42,6 +42,9 @@ interface ActionBody {
   playerId: string;
   action: RawAction;
 }
+
+/** The id of whose turn it is — the default viewer for a shared (hotseat) client. */
+const activeId = (state: GameState): string | null => state.players[state.activePlayerIndex]?.id ?? null;
 
 /** Map a domain error to an HTTP status. Unknown errors bubble to Fastify's 500 handler. */
 function sendGameError(reply: FastifyReply, error: unknown): FastifyReply {
@@ -200,17 +203,19 @@ export function buildApp(options: AppOptions): FastifyInstance {
 
         const state = createGame({ id: randomUUID(), players });
         repo.create(state);
-        return reply.code(201).send({ game: state });
+        return reply.code(201).send({ game: viewFor(state, activeId(state)) });
       } catch (error) {
         return sendGameError(reply, error);
       }
     },
   );
 
-  app.get<{ Params: { id: string } }>('/games/:id', async (request, reply) => {
+  app.get<{ Params: { id: string }; Querystring: { viewer?: string } }>('/games/:id', async (request, reply) => {
     const state = repo.get(request.params.id);
     if (!state) return notFound(reply, request.params.id);
-    return reply.send({ game: state });
+    // Default the viewer to the active player (hotseat); `?viewer=<id>` targets a specific seat/spectator.
+    const viewer = request.query.viewer ?? activeId(state);
+    return reply.send({ game: viewFor(state, viewer) });
   });
 
   app.post<{ Params: { id: string }; Body: ActionBody }>(
@@ -279,7 +284,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       try {
         const next = applyAction(state, request.body.playerId, action);
         repo.update(next);
-        return reply.send({ game: next });
+        return reply.send({ game: viewFor(next, activeId(next)) });
       } catch (error) {
         return sendGameError(reply, error);
       }
