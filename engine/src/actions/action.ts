@@ -17,7 +17,15 @@ export type Action =
   | { readonly type: 'HARBOR_PURCHASE'; readonly bought?: readonly StoredContainer[] }
   | { readonly type: 'REQUEST_LOAN' }
   | { readonly type: 'REPAY_LOAN' }
-  | { readonly type: 'CALL_BANK'; readonly lotIndex: number; readonly bid?: number }
+  | {
+      readonly type: 'CALL_BANK';
+      readonly lotIndex: number;
+      readonly lotKind?: 'container' | 'cash';
+      /** Cash bid for a container lot. */
+      readonly bid?: number;
+      /** Containers to bid for a cash lot (removed from your board). */
+      readonly containerBid?: readonly StoredContainer[];
+    }
   | { readonly type: 'LOAD_FROM_BANK' }
   | {
       readonly type: 'DELIVER';

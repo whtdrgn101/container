@@ -50,7 +50,7 @@ How we get from the current vertical slice to a complete, faithful game, then to
   `createGame` deals one per player; the backend shuffles the deal. The UI reveals the **active**
   player's card (two-value color marked ★) and hides opponents' (hotseat secrecy). Final *scoring* by
   the card is still Slice 7.
-- 🟡 **Slice 6 — Off-Shore Bank (cash-lot auctions = 6c):**
+- ✅ **Slice 6 — Off-Shore Bank & loans (complete):**
   - **Loans:** `requestLoan`/`repayLoan` (free, $10, max 2); **start-of-turn interest** auto-settled
     on turn advance (via `advanceTurn`, shared by `endTurn` + `deliver`) — pay → forced loan →
     **default** seizing containers (scoring → ship → harbor → factory).
@@ -59,9 +59,11 @@ How we get from the current vertical slice to a complete, faithful game, then to
   - **Container-lot auctions:** `callBank` (bid cash; start/outbid), **win at the start of your turn**
     (`resolveBankWins`) → containers to your **holding area** → `loadHolding` (sail to the Bank, load
     onto your ship) → deliver. Engine at 100% (156 tests).
-  - *(Deferred to **6c**: **cash-lot auctions** — bidding containers for cash, with bid tiles /
-    reserve tokens. The physical bid-tile/reserve-token bookkeeping and the once-per-turn Call Bank
-    limit are simplified.)*
+  - **Cash-lot auctions (6c):** `callBank` on a cash lot bids **containers** (removed from your board)
+    to win the lot's cash; win at turn start → reserved containers feed the Bank container lots, cash
+    to hand. One auction per type at a time (`AUCTION_TYPE_LIMIT`). Engine at 100% (173 tests).
+    *(Simplified: the physical bid-tile / reserve-token storage bookkeeping and the once-per-turn Call
+    Bank limit — reserved containers leave the board immediately rather than counting via tokens.)*
 - ✅ **Slice 7 — Game end & final scoring:** the game ends when the supply runs out of **2 colors**
   (checked at turn-advance, after the active player finishes); open Bank auctions are awarded, then
   `finalScoring` scores each player — discard your most-common color (two-value rule for ties), score
@@ -72,8 +74,7 @@ How we get from the current vertical slice to a complete, faithful game, then to
   full-flow test; it isn't Playwright-tested because exhausting the supply through the UI isn't
   practical to click.)*
 - 🎉 **The core game is complete and finishable in hotseat.**
-- ⏭️ **Optional next:** Slice 6c (cash-lot Bank auctions) · Slice 8 (UI/UX polish & full board) ·
-  Track A (AI) · Track B (online).
+- ⏭️ **Optional next:** Slice 8 (UI/UX polish & full board) · Track A (AI) · Track B (online).
 
 > **Convention going forward:** new engine mechanics are added as `actions/<name>.ts` + a matching
 > `tests/<name>.test.ts`, reusing `internal/` helpers. Keep files small and single-responsibility.
@@ -89,7 +90,7 @@ How we get from the current vertical slice to a complete, faithful game, then to
 | 3 | ✅ Ships & sailing | Ship tokens move ocean ↔ harbors ↔ islands; legal movement | M | 1 |
 | 4 | ✅ Trade chain | Full produce → sell to harbor → load onto ship between players | M–L | 2, 3 |
 | 5 | ✅ Delivery auctions | Deliver to Container Island; secret bids, subsidy, buyout, runoff ties, scoring areas | L | 4 |
-| 6 | 🟡 Off-Shore Bank & loans | Loans + interest + default ✅; Bank board + container-lot auctions ✅; cash-lot auctions = 6c | L | 3 |
+| 6 | ✅ Off-Shore Bank & loans | Loans + interest + default; Bank board + container-lot & cash-lot auctions | L | 3 |
 | 7 | ✅ Game end & final scoring | Play a full game to a declared winner | M | 5, 6 |
 | 8 | UI/UX polish & full board | Complete board, animations, a11y, richer responsive, visual regression | M–L | 7 |
 

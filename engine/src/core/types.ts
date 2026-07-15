@@ -87,9 +87,10 @@ export interface BankAuction {
   readonly lotKind: 'container' | 'cash';
   readonly lotIndex: number;
   readonly highBidderId: string;
+  /** Cash amount for a container lot; number of containers for a cash lot. */
   readonly bid: number;
-  /** Containers a cash-lot bidder has committed (Slice 6c); empty for container-lot auctions. */
-  readonly reserved: readonly Color[];
+  /** Containers a cash-lot bidder has committed (returned on outbid); empty for container lots. */
+  readonly reserved: readonly StoredContainer[];
 }
 
 /** The Off-Shore Bank board: 3 cash lots (I/II/III), 3 container lots, auction tokens, live auctions. */

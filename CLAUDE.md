@@ -209,11 +209,11 @@ check plan usage between sessions). Summary:
 - **Scoring cards ✅ (Slice 7 groundwork):** each player is dealt a secret `ScoringCard` at
   `createGame` (backend shuffles the deck); the UI reveals only the active player's card. Final
   *scoring* by the card lands in Slice 7.
-- **Slice 6 — Off-Shore Bank 🟡 (cash-lot auctions = 6c)** loans (`requestLoan`/`repayLoan`, interest,
-  default). Bank board (`bank`: cash lots, container lots, tokens, auctions) + `holdingArea`. Interest,
-  default seizures, and delivery buyouts flow into the Bank. `callBank` (bid cash on container lots),
-  win at turn start (`resolveBankWins`) → holding → `loadHolding` → deliver. Cash-lot auctions (bid
-  containers for cash) are Slice 6c. *(This is what exists today.)*
+- **Slice 6 — Off-Shore Bank & loans ✅** loans (`requestLoan`/`repayLoan`, interest, default). Bank
+  board (`bank`: cash lots, container lots, tokens, auctions) + `holdingArea`. Interest, default
+  seizures, and delivery buyouts flow into the Bank. `callBank` on **container lots** (bid cash) and
+  **cash lots** (bid containers), one auction per type; win at turn start (`resolveBankWins`) →
+  holding/cash; `loadHolding` picks up won containers. *(This is what exists today.)*
 - **Slice 7 — Game end & final scoring ✅** ends when the supply runs out of 2 colors (checked at
   turn-advance); open Bank auctions awarded, then `finalScoring` (discard most-common w/ two-value
   rule, island score by card, leftover $3/$2/$0, −$11/loan) and winner (total → factory tiebreak →

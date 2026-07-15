@@ -76,10 +76,7 @@ export function applyAction(state: GameState, playerId: string, action: Action):
       case 'SAIL':
         return sail(state, playerId, action.to);
       case 'CALL_BANK':
-        if (action.bid === undefined) {
-          throw new GameError('BID_TOO_LOW', 'CALL_BANK requires a bid');
-        }
-        return callBank(state, playerId, action.lotIndex, action.bid);
+        return callBank(state, playerId, action.lotIndex, action.lotKind ?? 'container', action.bid, action.containerBid);
       case 'FACTORY_PURCHASE':
         if (action.bought === undefined) {
           throw new GameError('INVALID_SELECTION', 'FACTORY_PURCHASE requires the containers to buy');

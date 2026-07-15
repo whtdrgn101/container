@@ -251,6 +251,21 @@ describe('POST /games/:id/actions', () => {
     expect(response.json().error.code).toBe('SHIP_NOT_AT_BANK');
   });
 
+  it('starts a cash-lot Bank auction (bidding containers)', async () => {
+    const game = await createThreePlayerGame();
+    // p1's starting factory container is white in the $2 lot.
+    const response = await act(game.id, 'p1', {
+      type: 'CALL_BANK',
+      lotKind: 'cash',
+      lotIndex: 0,
+      containerBid: [{ color: 'white', price: 2 }],
+    });
+    expect(response.statusCode).toBe(200);
+    const updated = response.json().game as GameState;
+    expect(updated.bank.auctions[0]?.lotKind).toBe('cash');
+    expect(updated.players[0]?.factoryStore).toEqual([]); // white reserved off the board
+  });
+
   it('rejects BUILD_FACTORY without a color (400)', async () => {
     const game = await createThreePlayerGame();
     const response = await app.inject({

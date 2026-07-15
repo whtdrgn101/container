@@ -23,6 +23,7 @@ export type GameErrorCode =
   | 'LOAN_LIMIT_REACHED'
   | 'NO_LOANS_TO_REPAY'
   | 'NO_AUCTION_TOKEN'
+  | 'AUCTION_TYPE_LIMIT'
   | 'INVALID_BANK_LOT'
   | 'BID_TOO_LOW'
   | 'SHIP_NOT_AT_BANK'

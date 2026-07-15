@@ -33,9 +33,10 @@ export function payToBankContainers(
 }
 
 /**
- * Resolve any container-lot auctions the active player leads at the start of their turn (rulebook
- * turn step 2): the reserved cash bid is distributed into the Bank's cash lots and the won containers
- * go to the player's holding area. The token and auction are cleared.
+ * Resolve any Bank auctions the active player leads at the start of their turn (rulebook turn step 2).
+ * Container lot: the reserved cash bid feeds the cash lots and the won containers go to the holding
+ * area. Cash lot: the reserved containers feed the container lots and the won cash goes to hand. The
+ * tokens and auctions are cleared.
  */
 export function resolveBankWins(
   bank: BankState,
@@ -49,18 +50,28 @@ export function resolveBankWins(
   }
 
   let cashLots = [...bank.cashLots];
-  const containerLots = bank.containerLots.map((lot) => [...lot]);
+  let containerLots = bank.containerLots.map((lot) => [...lot]);
   let tokens = bank.tokens;
+  const skip = tokenedContainerLots(bank);
   const wonContainers: Color[] = [];
+  let wonCash = 0;
   for (const auction of won) {
-    cashLots = payToBankCash(cashLots, auction.bid);
-    wonContainers.push(...containerLots[auction.lotIndex]!);
-    containerLots[auction.lotIndex] = [];
+    if (auction.lotKind === 'container') {
+      cashLots = payToBankCash(cashLots, auction.bid);
+      wonContainers.push(...containerLots[auction.lotIndex]!);
+      containerLots[auction.lotIndex] = [];
+    } else {
+      containerLots = payToBankContainers(containerLots, auction.reserved.map((c) => c.color), skip);
+      wonCash += cashLots[auction.lotIndex]!;
+      cashLots[auction.lotIndex] = 0;
+    }
     tokens += 1;
   }
 
   const updatedPlayers = players.map((player) =>
-    player.id === activeId ? { ...player, holdingArea: [...player.holdingArea, ...wonContainers] } : player,
+    player.id === activeId
+      ? { ...player, holdingArea: [...player.holdingArea, ...wonContainers], money: player.money + wonCash }
+      : player,
   );
   return {
     players: updatedPlayers,

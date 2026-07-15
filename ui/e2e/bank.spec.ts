@@ -25,3 +25,22 @@ test('call a Bank auction, win it next turn, and load the containers', async ({ 
   await page.getByTestId('load-bank').click();
   await expect(page.getByTestId('cargo-p1').locator('span')).toHaveCount(2);
 });
+
+test('bid a container in a cash-lot auction and win the cash', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('start-game').click();
+  await expect(page.getByTestId('board')).toBeVisible();
+
+  // Ann bids her one factory container on cash lot III ($3). Cash bids cost containers, not money.
+  await page.getByTestId('bank-cash-call-2').click();
+  await expect(page.getByTestId('bank-cash-auction-2')).toContainText('Ann leads 1 container');
+  await expect(page.getByTestId('store-count-p1')).toHaveText('0 / 2'); // container reserved off the board
+  await expect(page.getByTestId('money-p1')).toHaveText('$20');
+
+  // Pass around; unopposed, Ann wins the $3 as her next turn begins.
+  await page.getByTestId('end-turn').click(); // Bob
+  await page.getByTestId('end-turn').click(); // Cid
+  await page.getByTestId('end-turn').click(); // Ann — wins
+  await expect(page.getByTestId('turn-info')).toContainText('Ann');
+  await expect(page.getByTestId('money-p1')).toHaveText('$23'); // + $3 from cash lot III
+});

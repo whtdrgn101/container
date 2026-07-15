@@ -110,7 +110,11 @@ export function legalActions(state: GameState): Action[] {
     }
   }
 
-  // Call Bank: start or outbid a container-lot auction you don't already lead.
+  // Call Bank — container lots: bid cash. Cash lots: bid containers. (One auction per type at a time.)
+  const canStart = (lotKind: 'container' | 'cash') =>
+    state.bank.tokens > 0 && !state.bank.auctions.some((a) => a.lotKind === lotKind);
+  const boardContainers = player.factoryStore.length + player.harborStore.length;
+
   state.bank.containerLots.forEach((lot, index) => {
     if (lot.length === 0) {
       return;
@@ -118,10 +122,24 @@ export function legalActions(state: GameState): Action[] {
     const auction = state.bank.auctions.find((a) => a.lotKind === 'container' && a.lotIndex === index);
     if (auction) {
       if (auction.highBidderId !== player.id && player.money > auction.bid) {
-        actions.push({ type: 'CALL_BANK', lotIndex: index });
+        actions.push({ type: 'CALL_BANK', lotKind: 'container', lotIndex: index });
       }
-    } else if (state.bank.tokens > 0 && player.money >= 1) {
-      actions.push({ type: 'CALL_BANK', lotIndex: index });
+    } else if (canStart('container') && player.money >= 1) {
+      actions.push({ type: 'CALL_BANK', lotKind: 'container', lotIndex: index });
+    }
+  });
+
+  state.bank.cashLots.forEach((cash, index) => {
+    if (cash === 0) {
+      return;
+    }
+    const auction = state.bank.auctions.find((a) => a.lotKind === 'cash' && a.lotIndex === index);
+    if (auction) {
+      if (auction.highBidderId !== player.id && boardContainers > auction.bid) {
+        actions.push({ type: 'CALL_BANK', lotKind: 'cash', lotIndex: index });
+      }
+    } else if (canStart('cash') && boardContainers >= 1) {
+      actions.push({ type: 'CALL_BANK', lotKind: 'cash', lotIndex: index });
     }
   });
 

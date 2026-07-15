@@ -34,6 +34,8 @@ interface RawAction {
   buyout?: boolean;
   lotIndex?: number;
   bid?: number;
+  lotKind?: string;
+  containerBid?: RawContainer[];
 }
 
 interface ActionBody {
@@ -137,9 +139,13 @@ function parseAction(reply: FastifyReply, raw: RawAction): Action | null {
         badRequest(reply, 'CALL_BANK requires a lotIndex');
         return null;
       }
-      return raw.bid !== undefined
-        ? { type: 'CALL_BANK', lotIndex: raw.lotIndex, bid: raw.bid }
-        : { type: 'CALL_BANK', lotIndex: raw.lotIndex };
+      return {
+        type: 'CALL_BANK',
+        lotIndex: raw.lotIndex,
+        lotKind: raw.lotKind === 'cash' ? 'cash' : 'container',
+        ...(raw.bid !== undefined ? { bid: raw.bid } : {}),
+        ...(raw.containerBid ? { containerBid: raw.containerBid as StoredContainer[] } : {}),
+      };
     case 'LOAD_FROM_BANK':
       return { type: 'LOAD_FROM_BANK' };
     case 'END_TURN':
@@ -242,6 +248,8 @@ export function buildApp(options: AppOptions): FastifyInstance {
                 district: { type: 'string', enum: ['factory', 'harbor'] },
                 sellerId: { type: 'string' },
                 lotIndex: { type: 'number' },
+                lotKind: { type: 'string', enum: ['container', 'cash'] },
+                containerBid: { type: 'array', items: STORED_CONTAINER_SCHEMA },
                 placements: { type: 'array', items: STORED_CONTAINER_SCHEMA },
                 arrangement: { type: 'array', items: STORED_CONTAINER_SCHEMA },
                 bought: { type: 'array', items: STORED_CONTAINER_SCHEMA },

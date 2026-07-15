@@ -124,8 +124,9 @@ export default function App() {
   // Opponents' bids in a delivery auction (and runoff bids on a tie), keyed by player id.
   const [bids, setBids] = useState<Record<string, number>>({});
   const [runoffBids, setRunoffBids] = useState<Record<string, number>>({});
-  // Per-container-lot bid amounts for Bank auctions, keyed by lot index.
+  // Per-container-lot cash bids and per-cash-lot container-count bids for Bank auctions, by lot index.
   const [bankBid, setBankBid] = useState<Record<number, number>>({});
+  const [bankCount, setBankCount] = useState<Record<number, number>>({});
 
   async function run(work: () => Promise<GameState>) {
     setBusy(true);
@@ -446,6 +447,65 @@ export default function App() {
                               onClick={() => act(activePlayer.id, { type: 'CALL_BANK', lotIndex: i, bid })}
                             >
                               {auction ? 'Outbid' : 'Call'}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  {game.bank.cashLots.map((cash, i) => {
+                    const auction = game.bank.auctions.find((a) => a.lotKind === 'cash' && a.lotIndex === i);
+                    const callable = legal.some((a) => a.type === 'CALL_BANK' && a.lotKind === 'cash' && a.lotIndex === i);
+                    const minCount = auction ? auction.bid + 1 : 1;
+                    const count = bankCount[i] ?? minCount;
+                    const board = activePlayer
+                      ? [...activePlayer.factoryStore, ...activePlayer.harborStore].sort((a, b) => a.price - b.price)
+                      : [];
+                    return (
+                      <div key={i} className="rounded-md border p-2" data-testid={`bank-cash-lot-${i}`}>
+                        <div className="mb-1 text-xs font-medium">
+                          Cash {LOT_LABELS[i]} — ${cash}
+                        </div>
+                        {auction && (
+                          <div className="mb-1 text-xs text-muted-foreground" data-testid={`bank-cash-auction-${i}`}>
+                            {nameOf(game.players, auction.highBidderId)} leads {auction.bid} container
+                            {auction.bid === 1 ? '' : 's'}
+                          </div>
+                        )}
+                        {callable && activePlayer && (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min={minCount}
+                              max={board.length}
+                              data-testid={`bank-count-${i}`}
+                              className="w-14 rounded border bg-background px-1 py-0.5 text-right text-xs"
+                              value={count}
+                              onChange={(event) =>
+                                setBankCount((prev) => ({
+                                  ...prev,
+                                  [i]: Math.max(minCount, Math.floor(Number(event.target.value) || minCount)),
+                                }))
+                              }
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              data-testid={`bank-cash-call-${i}`}
+                              disabled={busy || count > board.length}
+                              onClick={() =>
+                                act(activePlayer.id, {
+                                  type: 'CALL_BANK',
+                                  lotKind: 'cash',
+                                  lotIndex: i,
+                                  containerBid: board.slice(0, count),
+                                })
+                              }
+                            >
+                              {auction ? 'Outbid' : 'Bid'}
                             </Button>
                           </div>
                         )}
