@@ -74,7 +74,10 @@ How we get from the current vertical slice to a complete, faithful game, then to
   full-flow test; it isn't Playwright-tested because exhausting the supply through the UI isn't
   practical to click.)*
 - 🎉 **The core game is complete and finishable in hotseat.**
-- ⏭️ **Optional next:** Slice 8 (UI/UX polish & full board) · Track A (AI) · Track B (online).
+- ✅ **Slice 8a/8b — Art kit + board minimap:** original SVG container/ship glyphs replace every
+  colored-square chip; a `BoardMap` panel shows all ships on an ocean/island/bank/harbor board with
+  click-to-sail. 32 e2e green (desktop + mobile). Remaining: 8c (motion/a11y) · 8d (visual snapshots).
+- ⏭️ **Optional next:** Slice 8c/8d (polish) · Track A (AI) · Track B (online).
 
 > **Convention going forward:** new engine mechanics are added as `actions/<name>.ts` + a matching
 > `tests/<name>.test.ts`, reusing `internal/` helpers. Keep files small and single-responsibility.
@@ -157,8 +160,18 @@ The "game loop." Turns the current free-for-all Produce into a real turn-based g
   integration test** (scripted moves → expected winner).
 
 ### Slice 8 — UI/UX polish & full board  · **M–L**
-Complete board layout, ship/auction animations, accessibility pass, richer responsive breakpoints,
-and **Playwright visual-regression snapshots** (baseline screenshots per viewport).
+- ✅ **8a — Original SVG art kit:** hand-authored, CSP-safe, theme-aware SVG glyphs (`ContainerSvg`,
+  `ShipSvg`) — *original* corrugated-container and cargo-ship designs, not reproductions of any
+  published game's artwork. All colored-square chips (store, cargo, scoring, holding, supply, bank
+  lots, factories) now render `ContainerSvg` via the `ContainerChip` wrapper (kept as `span[title]`
+  so e2e counts hold).
+- ✅ **8b — Board minimap:** `BoardMap` panel above the player cards — an ocean with Container Island,
+  the Off-Shore Bank, and one dock per player. Every ship is drawn at its location (per-seat hull
+  tint, active ship pulsing, cargo count); clicking a legal destination sails the active player.
+  Responsive (`aspect-[5/2]`, `overflow-hidden`) and theme-aware. Covered by `e2e/board-map.spec.ts`.
+- ⏭️ **8c — Motion & a11y:** ship/auction transition animations, keyboard/focus + ARIA pass, richer
+  responsive breakpoints.
+- ⏭️ **8d — Visual regression:** Playwright snapshot baselines per viewport.
 
 **After Slice 7 the game is fully playable hotseat.** Slice 8 and both tracks below are independent.
 

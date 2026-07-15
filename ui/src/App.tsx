@@ -11,6 +11,8 @@ import {
 } from '@container/engine';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { BoardMap } from '@/components/BoardMap';
+import { ContainerSvg } from '@/components/art/Container';
 import { cn } from '@/lib/utils';
 import * as api from '@/lib/api';
 
@@ -25,6 +27,18 @@ const COLOR_HEX: Record<Color, string> = {
 
 const DEFAULT_NAMES = ['Ann', 'Bob', 'Cid'];
 const LOT_LABELS = ['I', 'II', 'III'];
+
+/**
+ * A single container glyph sized like the old colored swatch (h-4 w-6). Rendered as a
+ * `<span title={color}>` so e2e selectors that count `span[title]` / `span` keep working.
+ */
+function ContainerChip({ color, className }: { color: Color; className?: string }) {
+  return (
+    <span title={color} className={cn('inline-flex h-4 w-6 shrink-0', className)}>
+      <ContainerSvg color={COLOR_HEX[color]} />
+    </span>
+  );
+}
 
 const nameOf = (players: readonly PlayerState[], id: string) => players.find((p) => p.id === id)?.name ?? id;
 
@@ -81,11 +95,12 @@ function StoredChip({
   const swatch = (
     <span
       className={cn(
-        'h-4 w-6 rounded-sm border border-black/20 shadow-sm',
+        'inline-flex h-4 w-6 rounded-sm',
         selected && 'ring-2 ring-ring ring-offset-1',
       )}
-      style={{ backgroundColor: COLOR_HEX[container.color] }}
-    />
+    >
+      <ContainerSvg color={COLOR_HEX[container.color]} />
+    </span>
   );
   const label = <span className="text-[10px] leading-none tabular-nums text-muted-foreground">${container.price}</span>;
   if (onClick) {
@@ -314,10 +329,7 @@ export default function App() {
                           count === 0 && 'font-semibold text-destructive',
                         )}
                       >
-                        <span
-                          className="h-4 w-6 rounded-sm border border-black/20"
-                          style={{ backgroundColor: COLOR_HEX[color] }}
-                        />
+                        <ContainerChip color={color} />
                         ×{count}
                       </span>
                     );
@@ -349,10 +361,7 @@ export default function App() {
                             buildColor === color && 'ring-2 ring-ring',
                           )}
                         >
-                          <span
-                            className="h-4 w-6 rounded-sm border border-black/20"
-                            style={{ backgroundColor: COLOR_HEX[color] }}
-                          />
+                          <ContainerChip color={color} />
                           ×{count}
                         </button>
                       );
@@ -410,12 +419,7 @@ export default function App() {
                             <span className="text-xs text-muted-foreground">empty</span>
                           ) : (
                             lot.map((color, ci) => (
-                              <span
-                                key={ci}
-                                className="h-4 w-6 rounded-sm border border-black/20"
-                                style={{ backgroundColor: COLOR_HEX[color] }}
-                                title={color}
-                              />
+                              <ContainerChip key={ci} color={color} />
                             ))
                           )}
                         </div>
@@ -516,6 +520,15 @@ export default function App() {
               </CardContent>
             </Card>
 
+            {activePlayer && (
+              <BoardMap
+                game={game}
+                sailActions={sailActions}
+                onSail={(action) => act(activePlayer.id, action)}
+                busy={busy}
+              />
+            )}
+
             <section
               aria-label="Player boards"
               data-testid="board"
@@ -587,12 +600,7 @@ export default function App() {
                       <FactoryIcon className="h-4 w-4" aria-hidden />
                       <span>Factories</span>
                       {player.factories.map((factory) => (
-                        <span
-                          key={factory.id}
-                          className="h-4 w-6 rounded-sm border border-black/20 shadow-sm"
-                          style={{ backgroundColor: COLOR_HEX[factory.color] }}
-                          title={factory.color}
-                        />
+                        <ContainerChip key={factory.id} color={factory.color} />
                       ))}
                       <span className="ml-auto inline-flex items-center gap-1" data-testid={`warehouses-${player.id}`}>
                         <WarehouseIcon className="h-4 w-4" aria-hidden />
@@ -605,12 +613,7 @@ export default function App() {
                       <span>{shipLabel(player.ship.location, game.players)}</span>
                       <span className="flex flex-wrap gap-1" data-testid={`cargo-${player.id}`}>
                         {player.ship.cargo.map((color, cargoIndex) => (
-                          <span
-                            key={cargoIndex}
-                            className="h-4 w-6 rounded-sm border border-black/20 shadow-sm"
-                            style={{ backgroundColor: COLOR_HEX[color] }}
-                            title={color}
-                          />
+                          <ContainerChip key={cargoIndex} color={color} />
                         ))}
                       </span>
                     </div>
@@ -701,12 +704,7 @@ export default function App() {
                         <span>—</span>
                       ) : (
                         player.scoringArea.map((color, scoreIndex) => (
-                          <span
-                            key={scoreIndex}
-                            className="h-4 w-6 rounded-sm border border-black/20 shadow-sm"
-                            style={{ backgroundColor: COLOR_HEX[color] }}
-                            title={color}
-                          />
+                          <ContainerChip key={scoreIndex} color={color} />
                         ))
                       )}
                     </div>
@@ -721,10 +719,7 @@ export default function App() {
                               const isTwo = color === player.scoringCard.twoValueColor;
                               return (
                                 <span key={color} className="flex items-center gap-1">
-                                  <span
-                                    className="h-4 w-6 rounded-sm border border-black/20"
-                                    style={{ backgroundColor: COLOR_HEX[color] }}
-                                  />
+                                  <ContainerChip color={color} />
                                   {isTwo ? `$10/$${player.scoringCard.values[color]} ★` : `$${player.scoringCard.values[color]}`}
                                 </span>
                               );
@@ -739,12 +734,7 @@ export default function App() {
                       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground" data-testid={`holding-${player.id}`}>
                         <span>Bank holding:</span>
                         {player.holdingArea.map((color, holdIndex) => (
-                          <span
-                            key={holdIndex}
-                            className="h-4 w-6 rounded-sm border border-black/20 shadow-sm"
-                            style={{ backgroundColor: COLOR_HEX[color] }}
-                            title={color}
-                          />
+                          <ContainerChip key={holdIndex} color={color} />
                         ))}
                       </div>
                     )}
@@ -756,12 +746,7 @@ export default function App() {
                           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                             <span>Cargo:</span>
                             {active.ship.cargo.map((color, cargoIndex) => (
-                              <span
-                                key={cargoIndex}
-                                className="h-4 w-6 rounded-sm border border-black/20 shadow-sm"
-                                style={{ backgroundColor: COLOR_HEX[color] }}
-                                title={color}
-                              />
+                              <ContainerChip key={cargoIndex} color={color} />
                             ))}
                           </div>
                           <p className="text-xs text-muted-foreground">Each opponent secretly bids cash ($0 allowed).</p>
