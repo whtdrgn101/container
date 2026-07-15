@@ -214,8 +214,13 @@ check plan usage between sessions). Summary:
   default seizures, and delivery buyouts flow into the Bank. `callBank` (bid cash on container lots),
   win at turn start (`resolveBankWins`) → holding → `loadHolding` → deliver. Cash-lot auctions (bid
   containers for cash) are Slice 6c. *(This is what exists today.)*
-- **Slices 6c–7 (next):** cash-lot auctions → game end & final scoring. After Slice 7 the game is
-  fully playable **hotseat**. 100% engine coverage gate throughout.
+- **Slice 7 — Game end & final scoring ✅** ends when the supply runs out of 2 colors (checked at
+  turn-advance); open Bank auctions awarded, then `finalScoring` (discard most-common w/ two-value
+  rule, island score by card, leftover $3/$2/$0, −$11/loan) and winner (total → factory tiebreak →
+  shared). `status: 'active' | 'ended'` + `results` + `winnerIds`; UI shows a results screen.
+- 🎉 **Core game complete — fully playable hotseat.** Optional remaining work: Slice 6c (cash-lot
+  Bank auctions), Slice 8 (UI polish / full board), Track A (AI), Track B (online multiplayer).
+  Keep the 100% engine coverage gate for any new mechanics.
 - **Slice 8:** UI/UX polish, full board, visual regression.
 - **Track A — AI play** and **Track B — online multiplayer:** independent tracks after the core
   game is playable. The authoritative, serializable engine makes both additive (see `ROADMAP.md`).

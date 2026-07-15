@@ -110,6 +110,22 @@ export interface Supply {
   readonly warehouses: number;
 }
 
+/** A player's final-scoring breakdown (rulebook pg. 18). `total` decides the winner. */
+export interface PlayerScore {
+  readonly playerId: string;
+  /** Cash in hand at game end. */
+  readonly cash: number;
+  /** Value of the scoring area by the player's card, after discarding their most-common color. */
+  readonly islandScore: number;
+  /** $3 per container on ship + in holding, $2 per harbor container, $0 per factory container. */
+  readonly leftover: number;
+  /** $11 per outstanding loan, subtracted. */
+  readonly loanPenalty: number;
+  readonly total: number;
+  /** The color discarded from the scoring area (null if the scoring area was empty). */
+  readonly discardedColor: Color | null;
+}
+
 /** An append-only record of an applied action, for replay/audit and the backend move log. */
 export interface MoveRecord {
   readonly seq: number;
@@ -132,6 +148,12 @@ export interface GameState {
   readonly supply: Supply;
   /** The Off-Shore Bank board. */
   readonly bank: BankState;
+  /** Whether the game is still in progress or has ended (supply of 2 colors exhausted). */
+  readonly status: 'active' | 'ended';
+  /** Final-scoring breakdown per player; empty until the game ends. */
+  readonly results: readonly PlayerScore[];
+  /** Winner(s) — more than one on a shared victory; empty until the game ends. */
+  readonly winnerIds: readonly string[];
   /** Monotonic version, incremented once per applied action. Used for optimistic concurrency. */
   readonly version: number;
   readonly log: readonly MoveRecord[];

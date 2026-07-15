@@ -1,6 +1,7 @@
 import { ACTIONS_PER_TURN, GameError, LOAN_AMOUNT, MAX_LOANS } from '../core';
 import type { BankState, Color, GameState, PlayerState } from '../core';
 import { payToBankCash, payToBankContainers, record, resolveBankWins, seatOf, tokenedContainerLots, withPlayer } from '../internal';
+import { endGame, exhaustedColorCount } from './gameEnd';
 
 /** Request a $10 loan from the Off-Shore Bank (rulebook pg. 16). A free action — max 2 outstanding. */
 export function requestLoan(state: GameState, playerId: string): GameState {
@@ -101,6 +102,11 @@ export function advanceTurn(
   players: readonly PlayerState[],
   bank: BankState = state.bank,
 ): { players: readonly PlayerState[]; extra: Partial<GameState> } {
+  // The game ends when the supply has run out of 2 colors — the active player's turn just finished.
+  if (exhaustedColorCount(state.supply) >= 2) {
+    return endGame(state, players, bank);
+  }
+
   const nextIndex = (state.activePlayerIndex + 1) % players.length;
   const { players: afterInterest, seized, interestPaid } = settleInterest(players, nextIndex);
 

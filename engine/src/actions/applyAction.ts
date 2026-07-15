@@ -20,6 +20,9 @@ import { sail } from './sail';
  * illegal action; never mutates the input state. This is the single entry point for making a move.
  */
 export function applyAction(state: GameState, playerId: string, action: Action): GameState {
+  if (state.status === 'ended') {
+    throw new GameError('GAME_OVER', 'The game has ended');
+  }
   const seat = seatOf(state, playerId);
   if (seat !== state.activePlayerIndex) {
     throw new GameError('NOT_YOUR_TURN', `It is not player "${playerId}"'s turn`);

@@ -10,6 +10,7 @@ export * from './deliver';
 export * from './loans';
 export * from './callBank';
 export * from './loadHolding';
+export * from './gameEnd';
 export * from './endTurn';
 export * from './applyAction';
 export * from './legalActions';

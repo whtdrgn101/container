@@ -26,7 +26,8 @@ export type GameErrorCode =
   | 'INVALID_BANK_LOT'
   | 'BID_TOO_LOW'
   | 'SHIP_NOT_AT_BANK'
-  | 'NOTHING_IN_HOLDING';
+  | 'NOTHING_IN_HOLDING'
+  | 'GAME_OVER';
 
 /**
  * Thrown when an action is illegal given the current state. Carries a stable `code`

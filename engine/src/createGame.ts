@@ -127,6 +127,9 @@ export function createGame(options: CreateGameOptions): GameState {
     turn: 1,
     supply,
     bank,
+    status: 'active',
+    results: [],
+    winnerIds: [],
     version: 0,
     log: [],
   };

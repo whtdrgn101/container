@@ -62,7 +62,18 @@ How we get from the current vertical slice to a complete, faithful game, then to
   - *(Deferred to **6c**: **cash-lot auctions** — bidding containers for cash, with bid tiles /
     reserve tokens. The physical bid-tile/reserve-token bookkeeping and the once-per-turn Call Bank
     limit are simplified.)*
-- ⏭️ **Next: Slice 6c (cash-lot auctions) or Slice 7 — game end & final scoring.**
+- ✅ **Slice 7 — Game end & final scoring:** the game ends when the supply runs out of **2 colors**
+  (checked at turn-advance, after the active player finishes); open Bank auctions are awarded, then
+  `finalScoring` scores each player — discard your most-common color (two-value rule for ties), score
+  the scoring area by your card (two-value $10 if you collected every color else $5), leftover values
+  ($3 ship+holding / $2 harbor / $0 factory), minus $11 per loan — and the winner is decided (total,
+  factory tiebreak, shared). `applyAction` rejects once `status === 'ended'`; the UI shows a results
+  table + winner(s). Engine at 100% (169 tests). *(The end trigger is verified by an engine
+  full-flow test; it isn't Playwright-tested because exhausting the supply through the UI isn't
+  practical to click.)*
+- 🎉 **The core game is complete and finishable in hotseat.**
+- ⏭️ **Optional next:** Slice 6c (cash-lot Bank auctions) · Slice 8 (UI/UX polish & full board) ·
+  Track A (AI) · Track B (online).
 
 > **Convention going forward:** new engine mechanics are added as `actions/<name>.ts` + a matching
 > `tests/<name>.test.ts`, reusing `internal/` helpers. Keep files small and single-responsibility.
@@ -79,7 +90,7 @@ How we get from the current vertical slice to a complete, faithful game, then to
 | 4 | ✅ Trade chain | Full produce → sell to harbor → load onto ship between players | M–L | 2, 3 |
 | 5 | ✅ Delivery auctions | Deliver to Container Island; secret bids, subsidy, buyout, runoff ties, scoring areas | L | 4 |
 | 6 | 🟡 Off-Shore Bank & loans | Loans + interest + default ✅; Bank board + container-lot auctions ✅; cash-lot auctions = 6c | L | 3 |
-| 7 | Game end & final scoring | Play a full game to a declared winner | M | 5, 6 |
+| 7 | ✅ Game end & final scoring | Play a full game to a declared winner | M | 5, 6 |
 | 8 | UI/UX polish & full board | Complete board, animations, a11y, richer responsive, visual regression | M–L | 7 |
 
 ### Slice 1 — Turn spine + Build  · **M** · rulebook pg. 6, 8

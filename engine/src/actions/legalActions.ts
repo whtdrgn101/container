@@ -19,6 +19,9 @@ import { mustDeliver } from './deliver';
  * as markers (without placements/arrangement) — the caller supplies those.
  */
 export function legalActions(state: GameState): Action[] {
+  if (state.status === 'ended') {
+    return [];
+  }
   // At the island with cargo, the only legal move is to resolve the delivery auction.
   if (mustDeliver(state)) {
     return [{ type: 'DELIVER' }];

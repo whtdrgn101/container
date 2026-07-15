@@ -22,6 +22,8 @@ describe('createGame', () => {
     expect(p1?.scoringCard.id).toBe('sc1');
     expect(state.players[1]?.scoringCard.id).toBe('sc2');
     expect(p1?.loans).toBe(0);
+    expect(state.status).toBe('active');
+    expect(state.results).toEqual([]);
 
     expect(state.supply.factories).toEqual({ white: 1, red: 1, green: 1, blue: 2, yellow: 2 });
     expect(state.supply.warehouses).toBe(12 - 3);
