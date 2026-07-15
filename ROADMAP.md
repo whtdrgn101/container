@@ -264,6 +264,12 @@ formalizes "what each player is allowed to see," which A0 also needs.
   player (`controlledIds=[id]`, `viewer=id`), so you see only your own card and are turn-locked as usual.
   Since seats aren't authenticated (by design — home/family use), anyone may resume any seat. Backend
   `GET /games` summary test + `resume.spec.ts`.
+- ✅ **Deployment — single-image container:** a multi-stage `Dockerfile` builds the UI + native SQLite
+  and runs one Node/Fastify process that serves the web app **and** the API on one port (`ui/dist` static
+  + SPA fallback when `UI_DIST` is set; prod UI uses a same-origin API base). SQLite persists to a
+  `/data` volume. `docker-compose.yml` + `.dockerignore` + **[`DEPLOY.md`](./DEPLOY.md)** cover a
+  Portainer/home-NAS deploy. Verified: image builds, container serves UI+API, and games survive a restart
+  via the volume. No auth (trusted-LAN use).
 
 ---
 

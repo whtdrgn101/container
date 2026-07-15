@@ -1,6 +1,8 @@
 import type { Action, GameView, NewPlayer } from '@container/engine';
 
-const BASE_URL = '/api';
+// In dev the Vite server proxies `/api` → the backend (stripping the prefix). In a production build
+// the UI is served by the backend itself, so the API lives at the same origin's root.
+const BASE_URL = import.meta.env.PROD ? '' : '/api';
 
 interface ApiError {
   error?: { code?: string; message?: string };

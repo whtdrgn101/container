@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import type { FastifyInstance, FastifyReply } from 'fastify';
+import fastifyStatic from '@fastify/static';
 import fastifyWebsocket from '@fastify/websocket';
 import { applyAction, COLORS, createGame, GameError, MAX_PLAYERS, MIN_PLAYERS, SCORING_CARDS, viewFor } from '@container/engine';
 import type { Action, Color, District, GameState, NewPlayer, ShipLocation, StoredContainer } from '@container/engine';
@@ -13,6 +14,8 @@ import { GameRepository } from './repository';
 export interface AppOptions {
   db: DB;
   logger?: boolean;
+  /** Absolute path to the built UI (`ui/dist`). When set, the server also serves the web app. */
+  staticDir?: string;
 }
 
 interface CreateGameBody {
@@ -409,6 +412,20 @@ export function buildApp(options: AppOptions): FastifyInstance {
       return sendGameError(reply, error);
     }
   });
+
+  // Serve the built web app (production single-container deploy). API routes above take precedence;
+  // any other GET falls back to index.html since the UI is a single page.
+  if (options.staticDir) {
+    app.register(fastifyStatic, { root: options.staticDir });
+    app.setNotFoundHandler((request, reply) => {
+      if (request.method === 'GET' && !/^\/(games|lobbies|health)\b/.test(request.url)) {
+        return reply.sendFile('index.html');
+      }
+      return reply
+        .code(404)
+        .send({ error: { code: 'NOT_FOUND', message: `Route ${request.method} ${request.url} not found` } });
+    });
+  }
 
   return app;
 }

@@ -1,0 +1,25 @@
+# Installed fresh inside the image (host copies would be the wrong OS/arch for better-sqlite3).
+**/node_modules
+
+# Rebuilt inside the image.
+**/dist
+
+# Local databases and logs — never bake test data into the image.
+**/*.sqlite
+**/*.sqlite-wal
+**/*.sqlite-shm
+**/*.db
+**/*.db-wal
+**/*.db-shm
+*.log
+
+# Test/build artifacts and VCS.
+.git
+.gitignore
+**/test-results
+**/playwright-report
+**/.playwright
+**/coverage
+
+# Not needed at runtime.
+reference_material

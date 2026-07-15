@@ -172,7 +172,23 @@ pnpm typecheck              # strict typecheck across all packages
 # Dev (run both in separate terminals)
 pnpm dev:backend            # API on :3001
 pnpm dev:ui                 # UI on :5173 (proxies /api → :3001)
+
+# Production container (single image serves UI + API on one port; SQLite on a volume)
+docker build -t container-game:latest .
+docker run -d -p 8080:3001 -v container-game-data:/data container-game:latest  # → http://host:8080
 ```
+
+## Deployment (home server / Portainer)
+
+A single Docker image serves the built UI **and** the API on one port (`Dockerfile`, multi-stage:
+build UI + native SQLite, then a slim Node runtime). The backend serves `ui/dist` as static files when
+`UI_DIST` is set and falls back to `index.html` for non-API GETs (SPA); in a production build the UI's
+API base is same-origin (`import.meta.env.PROD ? '' : '/api'`), so there's no CORS/proxy. Games persist
+to `DATABASE_PATH` (default `/data/container.sqlite`) — mount `/data` to a volume so they survive
+restarts/updates. `docker-compose.yml` maps host `8080` → container `3001`; **[`DEPLOY.md`](./DEPLOY.md)**
+has Portainer stack instructions. No auth (trusted-LAN use). When adding a top-level API route, update
+the `setNotFoundHandler` allowlist regex in `app.ts` (`/^\/(games|lobbies|health)\b/`) so it isn't
+swallowed by the SPA fallback.
 
 ## Testing strategy
 
