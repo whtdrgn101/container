@@ -6,6 +6,8 @@ export type { Color } from './core';
 export type { Action, ActionType } from './actions';
 export { SCORING_CARDS } from './core';
 export type {
+  BankAuction,
+  BankState,
   District,
   Factory,
   GameState,
@@ -30,7 +32,10 @@ export {
   FACTORY_LOT_PRICES,
   FACTORY_STORAGE_PER_FACTORY,
   HARBOR_LOT_PRICES,
+  LOAN_AMOUNT,
+  LOAN_ENDGAME_COST,
   MAX_FACTORIES,
+  MAX_LOANS,
   MAX_PLAYERS,
   MAX_WAREHOUSES,
   MIN_PLAYERS,
@@ -54,6 +59,10 @@ export {
   factoryPurchase,
   harborPurchase,
   deliver,
+  requestLoan,
+  repayLoan,
+  callBank,
+  loadHolding,
   buildFactory,
   buildWarehouse,
   endTurn,

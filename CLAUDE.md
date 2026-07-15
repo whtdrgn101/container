@@ -209,7 +209,12 @@ check plan usage between sessions). Summary:
 - **Scoring cards ✅ (Slice 7 groundwork):** each player is dealt a secret `ScoringCard` at
   `createGame` (backend shuffles the deck); the UI reveals only the active player's card. Final
   *scoring* by the card lands in Slice 7.
-- **Slices 6–7 (next):** Off-Shore Bank & loans → game end & final scoring. After Slice 7 the game is
+- **Slice 6 — Off-Shore Bank 🟡 (cash-lot auctions = 6c)** loans (`requestLoan`/`repayLoan`, interest,
+  default). Bank board (`bank`: cash lots, container lots, tokens, auctions) + `holdingArea`. Interest,
+  default seizures, and delivery buyouts flow into the Bank. `callBank` (bid cash on container lots),
+  win at turn start (`resolveBankWins`) → holding → `loadHolding` → deliver. Cash-lot auctions (bid
+  containers for cash) are Slice 6c. *(This is what exists today.)*
+- **Slices 6c–7 (next):** cash-lot auctions → game end & final scoring. After Slice 7 the game is
   fully playable **hotseat**. 100% engine coverage gate throughout.
 - **Slice 8:** UI/UX polish, full board, visual regression.
 - **Track A — AI play** and **Track B — online multiplayer:** independent tracks after the core

@@ -19,7 +19,14 @@ export type GameErrorCode =
   | 'SHIP_NOT_DOCKED'
   | 'SHIP_CAPACITY_EXCEEDED'
   | 'MUST_DELIVER'
-  | 'INVALID_DELIVERY';
+  | 'INVALID_DELIVERY'
+  | 'LOAN_LIMIT_REACHED'
+  | 'NO_LOANS_TO_REPAY'
+  | 'NO_AUCTION_TOKEN'
+  | 'INVALID_BANK_LOT'
+  | 'BID_TOO_LOW'
+  | 'SHIP_NOT_AT_BANK'
+  | 'NOTHING_IN_HOLDING';
 
 /**
  * Thrown when an action is illegal given the current state. Carries a stable `code`

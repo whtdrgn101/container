@@ -6,7 +6,7 @@ import {
   SCORING_CARDS,
   STARTING_MONEY,
 } from '../index';
-import type { Color, GameErrorCode, GameState, PlayerState, StoredContainer, Supply } from '../index';
+import type { BankState, Color, GameErrorCode, GameState, PlayerState, StoredContainer, Supply } from '../index';
 
 /** Shorthand for a stored container ({ color, price }). */
 export const sc = (color: Color, price: number): StoredContainer => ({ color, price });
@@ -16,6 +16,16 @@ export function makeSupply(overrides: Partial<Supply> = {}): Supply {
     containers: { white: 10, red: 10, green: 10, blue: 10, yellow: 10 },
     factories: { white: 2, red: 2, green: 2, blue: 2, yellow: 2 },
     warehouses: 10,
+    ...overrides,
+  };
+}
+
+export function makeBank(overrides: Partial<BankState> = {}): BankState {
+  return {
+    cashLots: [1, 2, 3],
+    containerLots: [['white', 'red'], ['green'], []],
+    tokens: 1,
+    auctions: [],
     ...overrides,
   };
 }
@@ -33,6 +43,8 @@ export function makePlayer(overrides: Partial<PlayerState> & Pick<PlayerState, '
     ship: { location: { kind: 'ocean' }, cargo: [] },
     scoringArea: [],
     scoringCard: SCORING_CARDS[0]!,
+    loans: 0,
+    holdingArea: [],
     ...overrides,
   };
 }
@@ -45,6 +57,7 @@ export function makeGame(players: PlayerState[], overrides: Partial<GameState> =
     actionsRemaining: ACTIONS_PER_TURN,
     turn: 1,
     supply: makeSupply(),
+    bank: makeBank(),
     version: 0,
     log: [],
     ...overrides,

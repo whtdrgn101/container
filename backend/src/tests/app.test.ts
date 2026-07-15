@@ -208,6 +208,49 @@ describe('POST /games/:id/actions', () => {
     expect(response.json().error.code).toBe('INVALID_DELIVERY');
   });
 
+  it('takes a loan as a free action', async () => {
+    const game = await createThreePlayerGame();
+    const response = await act(game.id, 'p1', { type: 'REQUEST_LOAN' });
+    expect(response.statusCode).toBe(200);
+    const updated = response.json().game as GameState;
+    expect(updated.players[0]?.loans).toBe(1);
+    expect(updated.players[0]?.money).toBe(30);
+    expect(updated.actionsRemaining).toBe(2); // free
+  });
+
+  it('rejects repaying with no loans (409)', async () => {
+    const game = await createThreePlayerGame();
+    const response = await act(game.id, 'p1', { type: 'REPAY_LOAN' });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('NO_LOANS_TO_REPAY');
+  });
+
+  it('starts a Bank auction with CALL_BANK', async () => {
+    const game = await createThreePlayerGame();
+    const response = await act(game.id, 'p1', { type: 'CALL_BANK', lotIndex: 0, bid: 3 });
+    expect(response.statusCode).toBe(200);
+    const updated = response.json().game as GameState;
+    expect(updated.bank.auctions).toHaveLength(1);
+    expect(updated.players[0]?.money).toBe(17); // $3 reserved
+  });
+
+  it('rejects CALL_BANK without a lotIndex (400)', async () => {
+    const game = await createThreePlayerGame();
+    const response = await app.inject({
+      method: 'POST',
+      url: `/games/${game.id}/actions`,
+      payload: { playerId: 'p1', action: { type: 'CALL_BANK', bid: 3 } },
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('rejects LOAD_FROM_BANK when the ship is not at the Bank (409)', async () => {
+    const game = await createThreePlayerGame();
+    const response = await act(game.id, 'p1', { type: 'LOAD_FROM_BANK' });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('SHIP_NOT_AT_BANK');
+  });
+
   it('rejects BUILD_FACTORY without a color (400)', async () => {
     const game = await createThreePlayerGame();
     const response = await app.inject({

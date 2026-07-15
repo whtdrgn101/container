@@ -39,9 +39,30 @@ describe('legalActions', () => {
     expect(legalActions(state)).toEqual([{ type: 'DELIVER' }]);
   });
 
-  it('offers only END_TURN when no actions remain', () => {
+  it('offers REQUEST_LOAN (but not REPAY_LOAN) for a debt-free player', () => {
+    const actions = types(newGame(3));
+    expect(actions).toContain('REQUEST_LOAN');
+    expect(actions).not.toContain('REPAY_LOAN');
+  });
+
+  it('offers REPAY_LOAN with a loan + cash, and loans stay available with no actions left', () => {
+    const p1 = makePlayer({ id: 'p1', loans: 1, money: 20 });
+    const actions = types(makeGame([p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], { actionsRemaining: 0 }));
+    expect(actions).toContain('REPAY_LOAN');
+    expect(actions).toContain('REQUEST_LOAN');
+    expect(actions).not.toContain('PRODUCE'); // free actions only
+  });
+
+  it('omits loan actions at the loan limit or when too poor to repay', () => {
+    const p1 = makePlayer({ id: 'p1', loans: 2, money: 5 });
+    const actions = types(makeGame([p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]));
+    expect(actions).not.toContain('REQUEST_LOAN'); // at the limit
+    expect(actions).not.toContain('REPAY_LOAN'); // $5 < $10
+  });
+
+  it('offers only free actions (End turn / Request loan) when no actions remain', () => {
     const state = makeGame([makePlayer({ id: 'p1', factoryStore: [sc('white', 2)] }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], { actionsRemaining: 0 });
-    expect(types(state)).toEqual(['END_TURN']);
+    expect(types(state)).toEqual(['END_TURN', 'REQUEST_LOAN']);
   });
 
   it('offers no produce/build for a broke player, but sailing is still free', () => {

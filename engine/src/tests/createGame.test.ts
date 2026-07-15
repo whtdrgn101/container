@@ -21,11 +21,22 @@ describe('createGame', () => {
     // Each player is dealt a secret scoring card (default deal is by seat).
     expect(p1?.scoringCard.id).toBe('sc1');
     expect(state.players[1]?.scoringCard.id).toBe('sc2');
+    expect(p1?.loans).toBe(0);
 
     expect(state.supply.factories).toEqual({ white: 1, red: 1, green: 1, blue: 2, yellow: 2 });
     expect(state.supply.warehouses).toBe(12 - 3);
-    // 3p: 11 containers/color, minus the starting container for white/red/green.
-    expect(state.supply.containers).toEqual({ white: 10, red: 10, green: 10, blue: 11, yellow: 11 });
+    // 3p: 11 containers/color, minus the starting container (white/red/green) minus the 3 Bank
+    // containers (white, red in lot I; green in lot II).
+    expect(state.supply.containers).toEqual({ white: 9, red: 9, green: 9, blue: 11, yellow: 11 });
+    expect(p1?.holdingArea).toEqual([]);
+
+    // Off-Shore Bank board.
+    expect(state.bank).toEqual({
+      cashLots: [1, 2, 3],
+      containerLots: [['white', 'red'], ['green'], []],
+      tokens: 1, // 3–4 players
+      auctions: [],
+    });
   });
 
   it('respects an explicit starting color', () => {
@@ -41,7 +52,9 @@ describe('createGame', () => {
     expect(state.players.map((p) => p.factories[0]?.color)).toEqual(['white', 'red', 'green', 'blue', 'yellow']);
     expect(state.supply.factories).toEqual({ white: 3, red: 3, green: 3, blue: 3, yellow: 3 });
     expect(state.supply.warehouses).toBe(20 - 5);
-    expect(state.supply.containers).toEqual({ white: 16, red: 16, green: 16, blue: 16, yellow: 16 });
+    // 17/color − 1 starting − Bank seed (white/red/green).
+    expect(state.supply.containers).toEqual({ white: 15, red: 15, green: 15, blue: 16, yellow: 16 });
+    expect(state.bank.tokens).toBe(2); // 5 players
   });
 
   it('deals an explicitly chosen scoring card', () => {

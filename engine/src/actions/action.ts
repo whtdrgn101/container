@@ -15,6 +15,10 @@ export type Action =
   | { readonly type: 'SAIL'; readonly to: ShipLocation }
   | { readonly type: 'FACTORY_PURCHASE'; readonly sellerId: string; readonly bought?: readonly StoredContainer[] }
   | { readonly type: 'HARBOR_PURCHASE'; readonly bought?: readonly StoredContainer[] }
+  | { readonly type: 'REQUEST_LOAN' }
+  | { readonly type: 'REPAY_LOAN' }
+  | { readonly type: 'CALL_BANK'; readonly lotIndex: number; readonly bid?: number }
+  | { readonly type: 'LOAD_FROM_BANK' }
   | {
       readonly type: 'DELIVER';
       readonly bids?: Readonly<Record<string, number>>;

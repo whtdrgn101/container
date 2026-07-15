@@ -1,7 +1,9 @@
 import {
   COLORS,
   FACTORY_BUILD_COSTS,
+  LOAN_AMOUNT,
   MAX_FACTORIES,
+  MAX_LOANS,
   MAX_WAREHOUSES,
   SHIP_CAPACITY,
   UNION_WAGE,
@@ -24,6 +26,17 @@ export function legalActions(state: GameState): Action[] {
 
   const player = state.players[state.activePlayerIndex]!;
   const actions: Action[] = [{ type: 'END_TURN' }];
+
+  // Loans are free actions — available even with no action points left.
+  if (player.loans < MAX_LOANS) {
+    actions.push({ type: 'REQUEST_LOAN' });
+  }
+  if (player.loans > 0 && player.money >= LOAN_AMOUNT) {
+    actions.push({ type: 'REPAY_LOAN' });
+  }
+  if (player.ship.location.kind === 'bank' && player.holdingArea.length > 0 && player.ship.cargo.length < SHIP_CAPACITY) {
+    actions.push({ type: 'LOAD_FROM_BANK' });
+  }
 
   if (state.actionsRemaining <= 0) {
     return actions;
@@ -93,6 +106,21 @@ export function legalActions(state: GameState): Action[] {
       actions.push({ type: 'HARBOR_PURCHASE' });
     }
   }
+
+  // Call Bank: start or outbid a container-lot auction you don't already lead.
+  state.bank.containerLots.forEach((lot, index) => {
+    if (lot.length === 0) {
+      return;
+    }
+    const auction = state.bank.auctions.find((a) => a.lotKind === 'container' && a.lotIndex === index);
+    if (auction) {
+      if (auction.highBidderId !== player.id && player.money > auction.bid) {
+        actions.push({ type: 'CALL_BANK', lotIndex: index });
+      }
+    } else if (state.bank.tokens > 0 && player.money >= 1) {
+      actions.push({ type: 'CALL_BANK', lotIndex: index });
+    }
+  });
 
   return actions;
 }

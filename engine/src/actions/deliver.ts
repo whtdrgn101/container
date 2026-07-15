@@ -1,6 +1,7 @@
-import { ACTIONS_PER_TURN, GameError } from '../core';
+import { GameError } from '../core';
 import type { GameState, PlayerState } from '../core';
-import { record, seatOf } from '../internal';
+import { payToBankCash, record, seatOf } from '../internal';
+import { advanceTurn } from './loans';
 
 /**
  * True when the active player's ship is at Container Island carrying cargo — they must immediately
@@ -110,16 +111,16 @@ export function deliver(
     });
   }
 
-  return record(
-    state,
-    players,
-    'DELIVER',
-    delivererId,
-    {
-      activePlayerIndex: (state.activePlayerIndex + 1) % state.players.length,
-      actionsRemaining: ACTIONS_PER_TURN,
-      turn: state.turn + 1,
-    },
-    { winnerId: scoringWinnerId, winningBid, buyout, containers: [...cargo] },
-  );
+  // A buyout pays the winning bid into the Bank's cash lots (rulebook pg. 16).
+  const bankAfter = buyout
+    ? { ...state.bank, cashLots: payToBankCash(state.bank.cashLots, winningBid) }
+    : state.bank;
+
+  const advanced = advanceTurn(state, players, bankAfter);
+  return record(state, advanced.players, 'DELIVER', delivererId, advanced.extra, {
+    winnerId: scoringWinnerId,
+    winningBid,
+    buyout,
+    containers: [...cargo],
+  });
 }

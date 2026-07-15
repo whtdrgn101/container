@@ -25,6 +25,18 @@ export const MAX_WAREHOUSES = 5;
 /** Max containers a ship can carry — fixed, cannot be increased (rulebook, pg. 9). */
 export const SHIP_CAPACITY = 5;
 
+/** Bank loans (rulebook pg. 16): $10 cash each, max 2 outstanding, $1 interest per loan per turn. */
+export const LOAN_AMOUNT = 10;
+export const MAX_LOANS = 2;
+/** At game end each outstanding loan costs $10 principal + $1 interest (rulebook pg. 18). */
+export const LOAN_ENDGAME_COST = 11;
+
+/** Off-Shore Bank setup: cash lots I/II/III start at $1/$2/$3 (rulebook setup step 6). */
+export const BANK_CASH_LOT_SETUP: readonly number[] = [1, 2, 3];
+
+/** Auction tokens by player count (rulebook setup table): 1 for 3–4 players, 2 for 5. */
+export const BANK_AUCTION_TOKENS: Readonly<Record<number, number>> = { 3: 1, 4: 1, 5: 2 };
+
 /** Supported player counts (rulebook: 3–5 players). */
 export const MIN_PLAYERS = 3;
 export const MAX_PLAYERS = 5;

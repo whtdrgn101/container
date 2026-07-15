@@ -73,6 +73,31 @@ export interface PlayerState {
   readonly scoringArea: readonly Color[];
   /** This player's secret final scoring card (dealt at setup). */
   readonly scoringCard: ScoringCard;
+  /** Outstanding Off-Shore Bank loans (0–2). Each costs $1 interest at the start of your turn. */
+  readonly loans: number;
+  /** Containers won in Bank auctions, waiting at the Bank to be picked up by your ship. */
+  readonly holdingArea: readonly Color[];
+}
+
+/**
+ * An active Off-Shore Bank auction (rulebook pg. 12–14). `bid` is a cash amount for a container lot
+ * (you bid cash to win containers) or a container count for a cash lot (deferred to Slice 6c).
+ */
+export interface BankAuction {
+  readonly lotKind: 'container' | 'cash';
+  readonly lotIndex: number;
+  readonly highBidderId: string;
+  readonly bid: number;
+  /** Containers a cash-lot bidder has committed (Slice 6c); empty for container-lot auctions. */
+  readonly reserved: readonly Color[];
+}
+
+/** The Off-Shore Bank board: 3 cash lots (I/II/III), 3 container lots, auction tokens, live auctions. */
+export interface BankState {
+  readonly cashLots: readonly number[];
+  readonly containerLots: readonly (readonly Color[])[];
+  readonly tokens: number;
+  readonly auctions: readonly BankAuction[];
 }
 
 /** Shared components still available (drawn down as players produce / build). */
@@ -105,6 +130,8 @@ export interface GameState {
   readonly turn: number;
   /** Shared building supply. */
   readonly supply: Supply;
+  /** The Off-Shore Bank board. */
+  readonly bank: BankState;
   /** Monotonic version, incremented once per applied action. Used for optimistic concurrency. */
   readonly version: number;
   readonly log: readonly MoveRecord[];

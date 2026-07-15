@@ -24,6 +24,7 @@ const COLOR_HEX: Record<Color, string> = {
 };
 
 const DEFAULT_NAMES = ['Ann', 'Bob', 'Cid'];
+const LOT_LABELS = ['I', 'II', 'III'];
 
 const nameOf = (players: readonly PlayerState[], id: string) => players.find((p) => p.id === id)?.name ?? id;
 
@@ -123,6 +124,8 @@ export default function App() {
   // Opponents' bids in a delivery auction (and runoff bids on a tie), keyed by player id.
   const [bids, setBids] = useState<Record<string, number>>({});
   const [runoffBids, setRunoffBids] = useState<Record<string, number>>({});
+  // Per-container-lot bid amounts for Bank auctions, keyed by lot index.
+  const [bankBid, setBankBid] = useState<Record<number, number>>({});
 
   async function run(work: () => Promise<GameState>) {
     setBusy(true);
@@ -323,6 +326,84 @@ export default function App() {
               </CardContent>
             </Card>
 
+            <Card className="mb-4" data-testid="bank">
+              <CardContent className="space-y-3 p-4">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                  <span className="font-medium">Off-Shore Bank</span>
+                  <span className="text-xs text-muted-foreground" data-testid="bank-tokens">
+                    Tokens: {game.bank.tokens}
+                  </span>
+                  <span className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                    Cash lots:
+                    {game.bank.cashLots.map((cash, i) => (
+                      <span key={i} data-testid={`bank-cash-${i}`} className="tabular-nums">
+                        {LOT_LABELS[i]} ${cash}
+                      </span>
+                    ))}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  {game.bank.containerLots.map((lot, i) => {
+                    const auction = game.bank.auctions.find((a) => a.lotKind === 'container' && a.lotIndex === i);
+                    const callable = legal.some((a) => a.type === 'CALL_BANK' && a.lotIndex === i);
+                    const minBid = auction ? auction.bid + 1 : 1;
+                    const bid = bankBid[i] ?? minBid;
+                    return (
+                      <div key={i} className="rounded-md border p-2" data-testid={`bank-container-${i}`}>
+                        <div className="mb-1 text-xs font-medium">Lot {LOT_LABELS[i]}</div>
+                        <div className="flex min-h-6 flex-wrap gap-1">
+                          {lot.length === 0 ? (
+                            <span className="text-xs text-muted-foreground">empty</span>
+                          ) : (
+                            lot.map((color, ci) => (
+                              <span
+                                key={ci}
+                                className="h-4 w-6 rounded-sm border border-black/20"
+                                style={{ backgroundColor: COLOR_HEX[color] }}
+                                title={color}
+                              />
+                            ))
+                          )}
+                        </div>
+                        {auction && (
+                          <div className="mt-1 text-xs text-muted-foreground" data-testid={`bank-auction-${i}`}>
+                            {nameOf(game.players, auction.highBidderId)} leads ${auction.bid}
+                          </div>
+                        )}
+                        {callable && activePlayer && (
+                          <div className="mt-1 flex items-center gap-1">
+                            <input
+                              type="number"
+                              min={minBid}
+                              data-testid={`bank-bid-${i}`}
+                              className="w-14 rounded border bg-background px-1 py-0.5 text-right text-xs"
+                              value={bid}
+                              onChange={(event) =>
+                                setBankBid((prev) => ({
+                                  ...prev,
+                                  [i]: Math.max(minBid, Math.floor(Number(event.target.value) || minBid)),
+                                }))
+                              }
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              data-testid={`bank-call-${i}`}
+                              disabled={busy}
+                              onClick={() => act(activePlayer.id, { type: 'CALL_BANK', lotIndex: i, bid })}
+                            >
+                              {auction ? 'Outbid' : 'Call'}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
             <section
               aria-label="Player boards"
               data-testid="board"
@@ -372,12 +453,22 @@ export default function App() {
                 >
                   <CardHeader className="flex-row items-center justify-between">
                     <CardTitle>{player.name}</CardTitle>
-                    <span
-                      data-testid={`money-${player.id}`}
-                      className="rounded-full bg-secondary px-2 py-0.5 text-sm font-medium tabular-nums"
-                    >
-                      ${player.money}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {player.loans > 0 && (
+                        <span
+                          data-testid={`loans-${player.id}`}
+                          className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive"
+                        >
+                          🏦 {player.loans} loan{player.loans === 1 ? '' : 's'}
+                        </span>
+                      )}
+                      <span
+                        data-testid={`money-${player.id}`}
+                        className="rounded-full bg-secondary px-2 py-0.5 text-sm font-medium tabular-nums"
+                      >
+                        ${player.money}
+                      </span>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -532,6 +623,20 @@ export default function App() {
                       )}
                     </div>
 
+                    {player.holdingArea.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground" data-testid={`holding-${player.id}`}>
+                        <span>Bank holding:</span>
+                        {player.holdingArea.map((color, holdIndex) => (
+                          <span
+                            key={holdIndex}
+                            className="h-4 w-6 rounded-sm border border-black/20 shadow-sm"
+                            style={{ backgroundColor: COLOR_HEX[color] }}
+                            title={color}
+                          />
+                        ))}
+                      </div>
+                    )}
+
                     {isActive &&
                       (mustDeliverNow ? (
                         <div className="space-y-2 border-t pt-3" data-testid="auction">
@@ -678,6 +783,48 @@ export default function App() {
                             })}
                           </div>
                         </div>
+
+                        {(can('REQUEST_LOAN') || can('REPAY_LOAN')) && (
+                          <div className="flex gap-2">
+                            {can('REQUEST_LOAN') && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1"
+                                data-testid="request-loan"
+                                disabled={busy}
+                                onClick={() => act(player.id, { type: 'REQUEST_LOAN' })}
+                              >
+                                Take loan +$10
+                              </Button>
+                            )}
+                            {can('REPAY_LOAN') && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1"
+                                data-testid="repay-loan"
+                                disabled={busy}
+                                onClick={() => act(player.id, { type: 'REPAY_LOAN' })}
+                              >
+                                Repay −$10
+                              </Button>
+                            )}
+                          </div>
+                        )}
+
+                        {can('LOAD_FROM_BANK') && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full"
+                            data-testid="load-bank"
+                            disabled={busy}
+                            onClick={() => act(player.id, { type: 'LOAD_FROM_BANK' })}
+                          >
+                            Load ship from Bank holding
+                          </Button>
+                        )}
 
                         <Button
                           size="sm"

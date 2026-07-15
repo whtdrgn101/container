@@ -1,5 +1,7 @@
 import {
   ACTIONS_PER_TURN,
+  BANK_AUCTION_TOKENS,
+  BANK_CASH_LOT_SETUP,
   COLORS,
   CONTAINER_SUPPLY_STANDARD,
   DEFAULT_FACTORY_LOT,
@@ -13,7 +15,7 @@ import {
   WAREHOUSE_STORAGE_PER_WAREHOUSE,
   WAREHOUSE_SUPPLY_TOTAL,
 } from './core';
-import type { Color, GameState, PlayerState, ScoringCard, Supply } from './core';
+import type { BankState, Color, GameState, PlayerState, ScoringCard, Supply } from './core';
 
 /** Input for a single seat when creating a game. */
 export interface NewPlayer {
@@ -81,6 +83,8 @@ export function createGame(options: CreateGameOptions): GameState {
       scoringArea: [],
       // Setup step 13: deal each player a secret scoring card.
       scoringCard: scoringCardFor(seat, player.scoringCardId),
+      loans: 0,
+      holdingArea: [],
     };
   });
 
@@ -98,7 +102,22 @@ export function createGame(options: CreateGameOptions): GameState {
     factories[startColor] -= 1;
     containers[startColor] -= 1; // starting container matches the starting factory color
   }
+
+  // Setup step 5: seed 3 Bank containers (2 in lot I, 1 in lot II), taken from the container supply.
+  // TODO(verify): the physical setup picks these 3 colors at random; we seed deterministically.
+  const bankContainerLots: Color[][] = [['white', 'red'], ['green'], []];
+  for (const lot of bankContainerLots) {
+    for (const color of lot) {
+      containers[color] -= 1;
+    }
+  }
   const supply: Supply = { containers, factories, warehouses: WAREHOUSE_SUPPLY_TOTAL[count]! - count };
+  const bank: BankState = {
+    cashLots: [...BANK_CASH_LOT_SETUP],
+    containerLots: bankContainerLots,
+    tokens: BANK_AUCTION_TOKENS[count]!,
+    auctions: [],
+  };
 
   return {
     id,
@@ -107,6 +126,7 @@ export function createGame(options: CreateGameOptions): GameState {
     actionsRemaining: ACTIONS_PER_TURN,
     turn: 1,
     supply,
+    bank,
     version: 0,
     log: [],
   };

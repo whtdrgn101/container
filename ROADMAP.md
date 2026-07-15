@@ -50,7 +50,19 @@ How we get from the current vertical slice to a complete, faithful game, then to
   `createGame` deals one per player; the backend shuffles the deal. The UI reveals the **active**
   player's card (two-value color marked ★) and hides opponents' (hotseat secrecy). Final *scoring* by
   the card is still Slice 7.
-- ⏭️ **Next: Slice 6 — Off-Shore Bank & loans.**
+- 🟡 **Slice 6 — Off-Shore Bank (cash-lot auctions = 6c):**
+  - **Loans:** `requestLoan`/`repayLoan` (free, $10, max 2); **start-of-turn interest** auto-settled
+    on turn advance (via `advanceTurn`, shared by `endTurn` + `deliver`) — pay → forced loan →
+    **default** seizing containers (scoring → ship → harbor → factory).
+  - **Bank board + pot:** cash lots I/II/III + container lots + tokens. **Loan interest, default
+    seizures, and delivery buyouts now flow into the Bank** (pay-the-bank I→II→III distribution).
+  - **Container-lot auctions:** `callBank` (bid cash; start/outbid), **win at the start of your turn**
+    (`resolveBankWins`) → containers to your **holding area** → `loadHolding` (sail to the Bank, load
+    onto your ship) → deliver. Engine at 100% (156 tests).
+  - *(Deferred to **6c**: **cash-lot auctions** — bidding containers for cash, with bid tiles /
+    reserve tokens. The physical bid-tile/reserve-token bookkeeping and the once-per-turn Call Bank
+    limit are simplified.)*
+- ⏭️ **Next: Slice 6c (cash-lot auctions) or Slice 7 — game end & final scoring.**
 
 > **Convention going forward:** new engine mechanics are added as `actions/<name>.ts` + a matching
 > `tests/<name>.test.ts`, reusing `internal/` helpers. Keep files small and single-responsibility.
@@ -66,7 +78,7 @@ How we get from the current vertical slice to a complete, faithful game, then to
 | 3 | ✅ Ships & sailing | Ship tokens move ocean ↔ harbors ↔ islands; legal movement | M | 1 |
 | 4 | ✅ Trade chain | Full produce → sell to harbor → load onto ship between players | M–L | 2, 3 |
 | 5 | ✅ Delivery auctions | Deliver to Container Island; secret bids, subsidy, buyout, runoff ties, scoring areas | L | 4 |
-| 6 | Off-Shore Bank & loans | Loans + interest; bank auctions (both lot types) | L | 3 |
+| 6 | 🟡 Off-Shore Bank & loans | Loans + interest + default ✅; Bank board + container-lot auctions ✅; cash-lot auctions = 6c | L | 3 |
 | 7 | Game end & final scoring | Play a full game to a declared winner | M | 5, 6 |
 | 8 | UI/UX polish & full board | Complete board, animations, a11y, richer responsive, visual regression | M–L | 7 |
 

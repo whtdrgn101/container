@@ -3,10 +3,13 @@ import type { GameState } from '../core';
 import { seatOf } from '../internal';
 import type { Action } from './action';
 import { buildFactory, buildWarehouse } from './build';
+import { callBank } from './callBank';
 import { deliver, mustDeliver } from './deliver';
 import { endTurn } from './endTurn';
 import { factoryPurchase } from './factoryPurchase';
 import { harborPurchase } from './harborPurchase';
+import { loadHolding } from './loadHolding';
+import { repayLoan, requestLoan } from './loans';
 import { produce } from './produce';
 import { reprice } from './reprice';
 import { sail } from './sail';
@@ -39,6 +42,17 @@ export function applyAction(state: GameState, playerId: string, action: Action):
     return deliver(state, playerId, action.bids, action.runoffBids, action.buyout);
   }
 
+  // Loans and loading the ship at the Bank are free actions — no action point, no end of turn.
+  if (action.type === 'REQUEST_LOAN') {
+    return requestLoan(state, playerId);
+  }
+  if (action.type === 'REPAY_LOAN') {
+    return repayLoan(state, playerId);
+  }
+  if (action.type === 'LOAD_FROM_BANK') {
+    return loadHolding(state, playerId);
+  }
+
   if (state.actionsRemaining <= 0) {
     throw new GameError('NO_ACTIONS_REMAINING', `Player "${playerId}" has no actions left this turn`);
   }
@@ -58,6 +72,11 @@ export function applyAction(state: GameState, playerId: string, action: Action):
         return reprice(state, playerId, action.district, action.arrangement);
       case 'SAIL':
         return sail(state, playerId, action.to);
+      case 'CALL_BANK':
+        if (action.bid === undefined) {
+          throw new GameError('BID_TOO_LOW', 'CALL_BANK requires a bid');
+        }
+        return callBank(state, playerId, action.lotIndex, action.bid);
       case 'FACTORY_PURCHASE':
         if (action.bought === undefined) {
           throw new GameError('INVALID_SELECTION', 'FACTORY_PURCHASE requires the containers to buy');

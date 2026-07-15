@@ -21,12 +21,12 @@ describe('produce', () => {
     produce(state, 'p1');
     expect(state.version).toBe(0);
     expect(getPlayer(state, 'p1').factoryStore).toEqual([sc('white', 2)]);
-    expect(state.supply.containers.white).toBe(10);
+    expect(state.supply.containers.white).toBe(9); // 11 − starting − Bank seed
   });
 
   it('draws produced containers from the shared supply', () => {
     const next = produce(newGame(3), 'p1'); // p1 produces 1 white
-    expect(next.supply.containers.white).toBe(10 - 1);
+    expect(next.supply.containers.white).toBe(9 - 1);
   });
 
   it('throws OUT_OF_SUPPLY when the produced color is exhausted', () => {
