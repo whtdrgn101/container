@@ -18,9 +18,11 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       // Forward API calls to the backend; keeps the browser same-origin (no CORS).
+      // `ws: true` also proxies the WebSocket upgrade for the live game stream.
       '/api': {
         target: 'http://127.0.0.1:3001',
         changeOrigin: true,
+        ws: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },

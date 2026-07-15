@@ -54,7 +54,7 @@ export { getPlayer } from './internal';
 
 // Per-player view projection (hidden-info redaction for online / AI)
 export { viewFor } from './view';
-export type { GameView, PlayerView } from './view';
+export type { GameView, PlayerView, Viewer } from './view';
 
 // Mechanics + turn-aware entry point
 export {

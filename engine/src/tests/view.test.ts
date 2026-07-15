@@ -20,6 +20,20 @@ describe('viewFor', () => {
     expect(view.players.every((p) => p.scoringCard === null)).toBe(true);
   });
 
+  it('reveals exactly the cards of a viewer holding several seats, and no others', () => {
+    const p3 = makePlayer({ id: 'p3', scoringCard: SCORING_CARDS[2]! });
+    const threeSeat = makeGame([p1, p2, p3]);
+    const view = viewFor(threeSeat, ['p1', 'p3']);
+    expect(view.players[0]!.scoringCard).toEqual(SCORING_CARDS[0]); // held
+    expect(view.players[1]!.scoringCard).toBeNull(); // not held
+    expect(view.players[2]!.scoringCard).toEqual(SCORING_CARDS[2]); // held
+  });
+
+  it('treats an empty seat list as a spectator (no cards)', () => {
+    const view = viewFor(game, []);
+    expect(view.players.every((p) => p.scoringCard === null)).toBe(true);
+  });
+
   it('reveals all cards once the game has ended, regardless of viewer', () => {
     const ended = makeGame([p1, p2], { status: 'ended' });
     const view = viewFor(ended, null);

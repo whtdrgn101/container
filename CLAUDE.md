@@ -54,6 +54,8 @@ container/
 ```
 
 **Data flow:** UI → REST → backend → **engine** (authoritative) → SQLite snapshot + move log.
+Moves always go over REST; the backend then **pushes** the new state to all connected clients over a
+WebSocket (`GameHub`), each projected per-viewer via `viewFor`. The socket is push-only (never a move channel).
 
 The **engine is the single source of truth** for rules. It is a pure function library:
 `state + action → new state` (or throws a typed `GameError`). It has no dates, no random,
@@ -228,6 +230,40 @@ check plan usage between sessions). Summary:
   `GET /games/:id?viewer=<id>`. The UI consumes `GameView` (nullable `scoringCard`). **Never send a full
   unredacted `GameState` to a client** — always project through `viewFor` (the UI's `legalActions` cast
   is safe only because move enumeration never reads scoring cards).
+- **Track B / B2 ✅ (real-time transport).** `GameHub` (`backend/src/hub.ts`) is an in-process pub/sub:
+  `subscribe(gameId, socket, viewerId)` / `broadcast(gameId, state)`, each socket projected through
+  `viewFor` (a `null` viewerId follows the active player). `@fastify/websocket` serves
+  `GET /games/:id/stream`; `POST .../actions` calls `hub.broadcast` after `repo.update`. **REST stays
+  authoritative — the socket is push-only; clients never send moves over it.** The UI subscribes via
+  `api.subscribeGame` (version-guarded so a late push can't overwrite newer POST state; auto-reconnects)
+  and offers join-by-code; Vite's `/api` proxy has `ws: true`. Tests: backend `app.injectWS` (initial
+  snapshot + per-action push + fixed-seat viewer + unknown-game close) and `e2e/live-sync.spec.ts`
+  (two browser contexts). The socket is push-only; any connected client can drive the active seat.
+- **Track B / lobby ✅ (create → join & name → start).** Pre-game **lobbies** are coordination state
+  *outside* the engine (`backend/src/lobbies.ts`: `lobbies` table + `LobbyRepository`; a `Lobby` is
+  `{ id, seats, members: (name|null)[], status, gameId }`). Endpoints: `POST /lobbies {seats}` (3–5 empty
+  seats), `GET /lobbies/:id`, `POST /lobbies/:id/join {name}` (claims the next empty seat),
+  `POST /lobbies/:id/start` (all seats filled → `newGameFromNames` → `createGame`, links `gameId`). UI:
+  the landing screen has **Create a shared game** (seat-count picker) beside the hotseat quick-start;
+  **join-by-code** resolves a lobby *or* a started game; the waiting room **polls** `GET /lobbies/:id`
+  (the game itself uses the WebSocket), shows seats filling live, lets a client claim ≥1 seat by name, and
+  **Start** moves everyone into the game. Keep the hotseat quick-start + its testids intact — `createGame`
+  still needs all players up front.
+- **Track B / seat identity + turn-locking ✅.** Entering a game from the lobby binds the window to the
+  seats you claimed via `controlledIds` (lobby seat _i_ → player `p{i+1}`; `null` = drive every seat, for
+  hotseat / bare join). A bound client views the game **as its own seats** and shows an **identity banner**
+  ("You are …" + "Your turn" / "Waiting for …"), and gates every action affordance on `canDrive`
+  (`controlledIds` includes the active player) so off-turn clients can't act. **When adding new action
+  controls, gate them on `canDrive` too.**
+- **Hidden info: `viewFor` takes a `Viewer` = one seat, a seat _list_, or `null`/`[]`.** A seat-bound
+  client sends `?viewer=p1,p3` (its own seats, comma-separated) on **all three** response paths — `GET`,
+  the **`POST /actions` reply**, and the **WS stream** — so it sees exactly its own cards and nothing else,
+  regardless of whose turn it is. Never "follow the active player" for a bound client (that once leaked the
+  active seat's card, e.g. a host holding two seats seeing a third player's card). `null` viewer = follow
+  active (hotseat, single device); empty list = spectator (no cards). **Any new endpoint that returns game
+  state must project through `viewFor` with the caller's viewer.** Caveats that remain: turn-locking is
+  client-side (the API isn't seat-authenticated), and the delivery auction's secret bids are still entered
+  on the active player's screen.
 - **Slice 8 ✅ (UI/UX polish & board).** Original SVG art (`ui/src/components/art/{Container,Ship}.tsx`)
   replaces all colored-square chips via the `ContainerChip` wrapper (kept as `span[title]` for e2e
   counts). A `BoardMap` (`ui/src/components/BoardMap.tsx`) draws every ship on an

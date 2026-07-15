@@ -209,7 +209,7 @@ real project. The engine's **purity + serializability** is the key enabler: bots
 | # | Step | Delivers | Size |
 |---|------|----------|------|
 | B1 | ✅ Server-authoritative views | Per-player state projection (hidden info enforced **server-side**, never sent to the wrong client) | M–L |
-| B2 | Real-time transport | WebSockets, lobbies/rooms, join codes, reconnection & resume | L |
+| B2 | ✅ Real-time transport + lobby | WebSocket live stream, join-by-code, auto-reconnect; **lobby** (create empty seats → join & name → start) | L |
 | B3 | Accounts & persistence | Auth, saved/resumable games, spectators | M–L |
 
 The v1 hotseat engine is already authoritative and serializable, so online is **additive** — B1 mostly
@@ -225,6 +225,33 @@ formalizes "what each player is allowed to see," which A0 also needs.
   when present. Covered by engine unit tests (`viewFor`, 100%) + backend integration tests
   (redaction, per-viewer deal, spectator). **B2/B3 build on this** — the transport just picks each
   connected client's `viewerId` instead of defaulting to the active seat.
+- ✅ **B2 — Real-time transport:** a `GameHub` (`backend/src/hub.ts`) fans game state out over
+  WebSockets — one game = one room, one socket = one seat. `GET /games/:id/stream?viewer=<id>`
+  (via `@fastify/websocket`) sends an initial snapshot then a push on every mutation, each projected
+  through `viewFor` for that socket's seat (omit `viewer` to follow the active player, for hotseat).
+  REST stays authoritative: `POST .../actions` broadcasts the new state after persisting. The UI adds
+  **join-by-code** (landing screen) + a shareable code in the header, and subscribes to the stream
+  with a version-guarded, auto-reconnecting client (`api.subscribeGame`); Vite proxies the WS upgrade.
+  Backend `injectWS` tests + a two-context Playwright live-sync spec.
+- ✅ **B2 lobby — create → join & name → start:** a pre-game **lobby** (coordination state outside the
+  engine: `lobbies` table + `LobbyRepository`, `backend/src/lobbies.ts`). `POST /lobbies {seats}` makes a
+  room of empty seats; `POST /lobbies/:id/join {name}` claims the next seat; `POST /lobbies/:id/start`
+  runs `createGame` from the claimed names (all seats must be filled) and links the game. The UI landing
+  screen offers **Create a shared game** (pick 3–5 seats) alongside the hotseat quick-start; **join-by-code**
+  resolves a lobby *or* a started game; the waiting room polls, shows seats filling live, lets a client
+  claim one or more seats by name, and **Start** transitions everyone into the game. A client may claim
+  several seats (solo testing). Backend lobby tests + a two-context Playwright `lobby.spec.ts`.
+- ✅ **B2 seat identity + turn-locking:** entering a game from the lobby binds the window to the seats you
+  claimed (`controlledIds`; lobby seat _i_ → player `p{i+1}`). Each client streams the game **as its own
+  seats** (`?viewer=p1,p3`), so it sees only its own secret card(s); an **identity banner** shows "You
+  are …" and either "Your turn" or "Waiting for …"; and all action controls are gated on `canDrive` (you
+  control the active seat) so off-turn clients can't submit moves. `viewFor` accepts a **seat list**,
+  applied on all three response paths (GET, the POST-action reply, and the WS stream), so a client holding
+  several seats sees exactly its own cards and never another player's — a bound client never "follows the
+  active player" (which once leaked the active seat's card). Hotseat / bare join keep `controlledIds = null`
+  (drive every seat), preserving single-device play. Covered by the extended `lobby.spec.ts` + backend
+  multi-viewer tests. *Still simplified: the delivery auction's secret bids are still entered on the active
+  player's screen (not each opponent's device), and turn-locking is client-side (not seat-authenticated).*
 
 ---
 

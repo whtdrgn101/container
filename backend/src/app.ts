@@ -1,9 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import { applyAction, COLORS, createGame, GameError, SCORING_CARDS, viewFor } from '@container/engine';
+import fastifyWebsocket from '@fastify/websocket';
+import { applyAction, COLORS, createGame, GameError, MAX_PLAYERS, MIN_PLAYERS, SCORING_CARDS, viewFor } from '@container/engine';
 import type { Action, Color, District, GameState, NewPlayer, ShipLocation, StoredContainer } from '@container/engine';
 import type { DB } from './db';
+import { GameHub } from './hub';
+import type { Lobby } from './lobbies';
+import { LobbyRepository } from './lobbies';
 import { GameRepository } from './repository';
 
 export interface AppOptions {
@@ -45,6 +49,19 @@ interface ActionBody {
 
 /** The id of whose turn it is — the default viewer for a shared (hotseat) client. */
 const activeId = (state: GameState): string | null => state.players[state.activePlayerIndex]?.id ?? null;
+
+/** Create a fresh game from a list of player names: shuffle the scoring deck and deal one per seat. */
+function newGameFromNames(names: string[]): GameState {
+  const cardIds = SCORING_CARDS.map((card) => card.id);
+  for (let i = cardIds.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const swap = cardIds[i]!;
+    cardIds[i] = cardIds[j]!;
+    cardIds[j] = swap;
+  }
+  const players = names.map((name, seat) => ({ name, scoringCardId: cardIds[seat]! }));
+  return createGame({ id: randomUUID(), players });
+}
 
 /** Map a domain error to an HTTP status. Unknown errors bubble to Fastify's 500 handler. */
 function sendGameError(reply: FastifyReply, error: unknown): FastifyReply {
@@ -163,8 +180,36 @@ function parseAction(reply: FastifyReply, raw: RawAction): Action | null {
 export function buildApp(options: AppOptions): FastifyInstance {
   const app = Fastify({ logger: options.logger ?? false });
   const repo = new GameRepository(options.db);
+  const lobbies = new LobbyRepository(options.db);
+  const hub = new GameHub();
+
+  app.register(fastifyWebsocket);
 
   app.get('/health', async () => ({ status: 'ok' }));
+
+  // Live game stream. A client connects, gets an immediate snapshot, then receives a push on every
+  // state change — each projected for `?viewer=<id>` (omit to follow the active player, for hotseat).
+  app.register(async (instance) => {
+    instance.get<{ Params: { id: string }; Querystring: { viewer?: string } }>(
+      '/games/:id/stream',
+      { websocket: true },
+      (socket, request) => {
+        const state = repo.get(request.params.id);
+        if (!state) {
+          socket.close(1008, `No game with id "${request.params.id}"`);
+          return;
+        }
+        // No `?viewer` ⇒ follow the active player; `?viewer=p1,p3` ⇒ those seats; `?viewer=` ⇒ spectator.
+        const viewer =
+          request.query.viewer !== undefined ? request.query.viewer.split(',').filter(Boolean) : null;
+        const unsubscribe = hub.subscribe(request.params.id, socket, viewer);
+        socket.on('close', unsubscribe);
+        // Send the first snapshot on the next tick, after the open handshake settles, so a client
+        // that attaches its message handler right after connecting never misses it.
+        setImmediate(() => hub.sendState(socket, state, viewer));
+      },
+    );
+  });
 
   app.post<{ Body: CreateGameBody }>(
     '/games',
@@ -191,17 +236,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
     },
     async (request, reply) => {
       try {
-        // Shuffle the scoring cards and deal one to each player (kept secret client-side).
-        const cardIds = SCORING_CARDS.map((card) => card.id);
-        for (let i = cardIds.length - 1; i > 0; i -= 1) {
-          const j = Math.floor(Math.random() * (i + 1));
-          const swap = cardIds[i]!;
-          cardIds[i] = cardIds[j]!;
-          cardIds[j] = swap;
-        }
-        const players = request.body.players.map((player, seat) => ({ ...player, scoringCardId: cardIds[seat]! }));
-
-        const state = createGame({ id: randomUUID(), players });
+        const state = newGameFromNames(request.body.players.map((player) => player.name));
         repo.create(state);
         return reply.code(201).send({ game: viewFor(state, activeId(state)) });
       } catch (error) {
@@ -213,12 +248,13 @@ export function buildApp(options: AppOptions): FastifyInstance {
   app.get<{ Params: { id: string }; Querystring: { viewer?: string } }>('/games/:id', async (request, reply) => {
     const state = repo.get(request.params.id);
     if (!state) return notFound(reply, request.params.id);
-    // Default the viewer to the active player (hotseat); `?viewer=<id>` targets a specific seat/spectator.
-    const viewer = request.query.viewer ?? activeId(state);
+    // No `?viewer` ⇒ follow the active player (hotseat). `?viewer=p1,p3` ⇒ those seats; `?viewer=` ⇒ none.
+    const viewer =
+      request.query.viewer !== undefined ? request.query.viewer.split(',').filter(Boolean) : activeId(state);
     return reply.send({ game: viewFor(state, viewer) });
   });
 
-  app.post<{ Params: { id: string }; Body: ActionBody }>(
+  app.post<{ Params: { id: string }; Body: ActionBody; Querystring: { viewer?: string } }>(
     '/games/:id/actions',
     {
       schema: {
@@ -284,12 +320,89 @@ export function buildApp(options: AppOptions): FastifyInstance {
       try {
         const next = applyAction(state, request.body.playerId, action);
         repo.update(next);
-        return reply.send({ game: viewFor(next, activeId(next)) });
+        hub.broadcast(request.params.id, next); // push the new state to every connected client
+        // Project the reply for the acting client's own seats (not the active player), so ending a
+        // turn never leaks the next player's card. No `?viewer` ⇒ follow the active player (hotseat).
+        const viewer =
+          request.query.viewer !== undefined ? request.query.viewer.split(',').filter(Boolean) : activeId(next);
+        return reply.send({ game: viewFor(next, viewer) });
       } catch (error) {
         return sendGameError(reply, error);
       }
     },
   );
+
+  // --- Lobbies: create an empty room, join by code with a name, start when every seat is filled ---
+
+  const lobbyNotFound = (reply: FastifyReply, id: string) =>
+    reply.code(404).send({ error: { code: 'LOBBY_NOT_FOUND', message: `No lobby with id "${id}"` } });
+
+  app.post<{ Body: { seats?: number } }>(
+    '/lobbies',
+    { schema: { body: { type: 'object', properties: { seats: { type: 'number' } } } } },
+    async (request, reply) => {
+      const seats = request.body?.seats ?? MIN_PLAYERS;
+      if (!Number.isInteger(seats) || seats < MIN_PLAYERS || seats > MAX_PLAYERS) {
+        return reply
+          .code(400)
+          .send({ error: { code: 'INVALID_SEAT_COUNT', message: `Seats must be ${MIN_PLAYERS}–${MAX_PLAYERS}` } });
+      }
+      const lobby: Lobby = {
+        id: randomUUID(),
+        seats,
+        members: Array.from({ length: seats }, () => null),
+        status: 'open',
+        gameId: null,
+      };
+      lobbies.create(lobby);
+      return reply.code(201).send({ lobby });
+    },
+  );
+
+  app.get<{ Params: { id: string } }>('/lobbies/:id', async (request, reply) => {
+    const lobby = lobbies.get(request.params.id);
+    if (!lobby) return lobbyNotFound(reply, request.params.id);
+    return reply.send({ lobby });
+  });
+
+  app.post<{ Params: { id: string }; Body: { name: string } }>(
+    '/lobbies/:id/join',
+    { schema: { body: { type: 'object', required: ['name'], properties: { name: { type: 'string', minLength: 1 } } } } },
+    async (request, reply) => {
+      const lobby = lobbies.get(request.params.id);
+      if (!lobby) return lobbyNotFound(reply, request.params.id);
+      if (lobby.status !== 'open') {
+        return reply.code(409).send({ error: { code: 'LOBBY_STARTED', message: 'This game has already started' } });
+      }
+      const seat = lobby.members.findIndex((member) => member === null);
+      if (seat === -1) {
+        return reply.code(409).send({ error: { code: 'LOBBY_FULL', message: 'All seats are taken' } });
+      }
+      const members = lobby.members.map((member, i) => (i === seat ? request.body.name.trim() : member));
+      const updated: Lobby = { ...lobby, members };
+      lobbies.update(updated);
+      return reply.send({ lobby: updated, seat });
+    },
+  );
+
+  app.post<{ Params: { id: string } }>('/lobbies/:id/start', async (request, reply) => {
+    const lobby = lobbies.get(request.params.id);
+    if (!lobby) return lobbyNotFound(reply, request.params.id);
+    if (lobby.status === 'started') {
+      return reply.code(409).send({ error: { code: 'LOBBY_STARTED', message: 'This game has already started' } });
+    }
+    if (lobby.members.some((member) => member === null)) {
+      return reply.code(409).send({ error: { code: 'LOBBY_NOT_READY', message: 'Every seat must be filled first' } });
+    }
+    try {
+      const state = newGameFromNames(lobby.members as string[]);
+      repo.create(state);
+      lobbies.update({ ...lobby, status: 'started', gameId: state.id });
+      return reply.code(201).send({ game: viewFor(state, activeId(state)) });
+    } catch (error) {
+      return sendGameError(reply, error);
+    }
+  });
 
   return app;
 }

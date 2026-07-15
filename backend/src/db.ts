@@ -26,6 +26,15 @@ CREATE TABLE IF NOT EXISTS moves (
   PRIMARY KEY (game_id, seq),
   FOREIGN KEY (game_id) REFERENCES games(id)
 );
+
+-- Pre-game lobbies: a shareable room with N seats that players claim by name before the game starts.
+-- Stored as a JSON snapshot (like games); short-lived coordination state, not part of the engine.
+CREATE TABLE IF NOT EXISTS lobbies (
+  id         TEXT PRIMARY KEY,
+  data       TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
 `;
 
 /** Open (or create) a SQLite database and ensure the schema exists. Defaults to in-memory. */

@@ -14,23 +14,28 @@ export interface PlayerView extends Omit<PlayerState, 'scoringCard'> {
   readonly scoringCard: ScoringCard | null;
 }
 
-/** A full game state projected for one viewer. Structurally a GameState with redacted players. */
+/** Who a projection was built for: a single seat, several seats (one client holding many), or none. */
+export type Viewer = string | readonly string[] | null;
+
+/** A full game state projected for a viewer. Structurally a GameState with redacted players. */
 export interface GameView extends Omit<GameState, 'players'> {
   readonly players: readonly PlayerView[];
-  /** Who this projection was built for (`null` for a spectator with no seat). */
-  readonly viewerId: string | null;
+  /** Who this projection was built for (`null`/`[]` for a spectator with no seat). */
+  readonly viewerId: Viewer;
 }
 
 /**
- * Project `state` for `viewerId`, hiding every other player's scoring card. A card is revealed only
- * to its owner — except once the game has ended, when all cards become public for final scoring.
- * Pass `null` for a spectator (sees no cards until the game ends).
+ * Project `state` for `viewer`, hiding every non-viewer player's scoring card. A card is revealed
+ * only to a seat that viewer holds — except once the game has ended, when all cards become public
+ * for final scoring. `viewer` may be one seat id, a list of seat ids (a client holding several
+ * seats sees all of its own cards and no others), or `null`/`[]` for a spectator (no cards).
  */
-export function viewFor(state: GameState, viewerId: string | null): GameView {
+export function viewFor(state: GameState, viewer: Viewer): GameView {
   const revealAll = state.status === 'ended';
+  const seats = viewer == null ? [] : typeof viewer === 'string' ? [viewer] : viewer;
   const players = state.players.map((player) => ({
     ...player,
-    scoringCard: revealAll || player.id === viewerId ? player.scoringCard : null,
+    scoringCard: revealAll || seats.includes(player.id) ? player.scoringCard : null,
   }));
-  return { ...state, players, viewerId };
+  return { ...state, players, viewerId: viewer };
 }

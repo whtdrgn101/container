@@ -1,11 +1,13 @@
 import { Factory as FactoryIcon, Plus, Ship as ShipIcon, Warehouse as WarehouseIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Action, Color, GameState, GameView, PlayerView, ScoringCard, ShipLocation, StoredContainer } from '@container/engine';
 import {
   COLORS,
   FACTORY_BUILD_COSTS,
   FACTORY_LOT_PRICES,
   legalActions,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
   SHIP_CAPACITY,
   WAREHOUSE_BUILD_COSTS,
 } from '@container/engine';
@@ -15,6 +17,7 @@ import { BoardMap } from '@/components/BoardMap';
 import { ContainerSvg } from '@/components/art/Container';
 import { cn } from '@/lib/utils';
 import * as api from '@/lib/api';
+import type { Lobby } from '@/lib/api';
 
 /** Display colors for the five container types (see engine COLORS). */
 const COLOR_HEX: Record<Color, string> = {
@@ -25,7 +28,9 @@ const COLOR_HEX: Record<Color, string> = {
   yellow: '#eab308',
 };
 
-const DEFAULT_NAMES = ['Ann', 'Bob', 'Cid'];
+/** Prefilled seat names. The first MIN_PLAYERS are the default game; extras fill in as seats are added. */
+const NAME_POOL = ['Ann', 'Bob', 'Cid', 'Dan', 'Eve'];
+const DEFAULT_NAMES = NAME_POOL.slice(0, MIN_PLAYERS);
 const LOT_LABELS = ['I', 'II', 'III'];
 
 /**
@@ -142,18 +147,143 @@ export default function App() {
   // Per-container-lot cash bids and per-cash-lot container-count bids for Bank auctions, by lot index.
   const [bankBid, setBankBid] = useState<Record<number, number>>({});
   const [bankCount, setBankCount] = useState<Record<number, number>>({});
+  // Code entered on the landing screen to join an existing game or lobby.
+  const [joinCode, setJoinCode] = useState('');
+  // Shared-game (lobby) setup + waiting-room state.
+  const [lobbySeats, setLobbySeats] = useState(MIN_PLAYERS);
+  const [lobby, setLobby] = useState<Lobby | null>(null);
+  // Seats this client has claimed (a solo tester can fill several; each device usually claims one).
+  const [mySeats, setMySeats] = useState<number[]>([]);
+  const [seatName, setSeatName] = useState('');
+  // The player ids this client controls. `null` = control every seat (hotseat / bare join). An
+  // array binds the window to the seats claimed in the lobby: you only act on those players' turns.
+  const [controlledIds, setControlledIds] = useState<string[] | null>(null);
 
-  async function run(work: () => Promise<GameView>) {
+  /** Run async work with busy/error handling but no state assignment (for lobby flows). */
+  async function guard(work: () => Promise<void>) {
     setBusy(true);
     setError(null);
     try {
-      setGame(await work());
+      await work();
     } catch (caught) {
       setError((caught as Error).message);
     } finally {
       setBusy(false);
     }
   }
+
+  async function run(work: () => Promise<GameView>) {
+    await guard(async () => setGame(await work()));
+  }
+
+  /** Reset everything and return to the landing screen. */
+  function resetToLanding() {
+    setGame(null);
+    setLobby(null);
+    setMySeats([]);
+    setControlledIds(null);
+    setError(null);
+  }
+
+  // Lobby seats map to player ids in seat order (createGame assigns p1, p2, … by seat).
+  const seatsToIds = (seats: number[]) => seats.map((seat) => `p${seat + 1}`);
+  // A seat-bound client always views as its OWN seats (comma-separated) — never "follow active" —
+  // so it only ever sees its own secret cards. `''` (no seats) is a spectator; `undefined` is hotseat.
+  const viewerFor = (ids: string[]) => ids.join(',');
+
+  /** Enter a started game bound to the seats claimed in the lobby (empty seats ⇒ spectator). */
+  async function enterGameAs(id: string, seats: number[]) {
+    const ids = seatsToIds(seats);
+    const mine = await api.getGame(id, viewerFor(ids));
+    setControlledIds(ids);
+    setLobby(null);
+    setGame(mine);
+  }
+
+  /** Enter a code that may be a lobby or a started game, and route to the right screen. */
+  async function joinByCode(code: string) {
+    await guard(async () => {
+      try {
+        const found = await api.getLobby(code);
+        if (found.status === 'started' && found.gameId) {
+          await enterGameAs(found.gameId, mySeats); // usually a fresh spectator (no claimed seats)
+        } else {
+          setMySeats([]);
+          setLobby(found);
+        }
+      } catch {
+        // Not a lobby code — fall back to a direct game id (a bare join controls every seat).
+        setControlledIds(null);
+        setGame(await api.getGame(code));
+      }
+    });
+  }
+
+  /** Create a shared game (an empty lobby) and enter its waiting room. */
+  async function createSharedGame() {
+    await guard(async () => {
+      const created = await api.createLobby(lobbySeats);
+      setMySeats([]);
+      setLobby(created);
+    });
+  }
+
+  /** Claim the next open seat in the current lobby with the entered name. */
+  async function takeSeat() {
+    if (!lobby) return;
+    await guard(async () => {
+      const { lobby: updated, seat } = await api.joinLobby(lobby.id, seatName.trim());
+      setMySeats((prev) => [...prev, seat]);
+      setLobby(updated);
+      setSeatName('');
+    });
+  }
+
+  /** Start the current (full) lobby's game, entering it bound to this client's claimed seats. */
+  async function startLobbyGame() {
+    if (!lobby) return;
+    const id = lobby.id;
+    const seats = mySeats;
+    await guard(async () => {
+      const started = await api.startLobby(id);
+      await enterGameAs(started.id, seats);
+    });
+  }
+
+  // Live sync: while in a game, subscribe to its server stream (as this client's seat) and apply
+  // pushed state. The version guard keeps a late push from overwriting newer state from a POST.
+  const gameId = game?.id;
+  // Hotseat (null) follows the active player; a seat-bound client streams as its own seats only.
+  const streamViewer = controlledIds === null ? undefined : controlledIds.join(',');
+  useEffect(() => {
+    if (!gameId) return;
+    return api.subscribeGame(
+      gameId,
+      (pushed) => setGame((prev) => (prev && prev.id === pushed.id && pushed.version >= prev.version ? pushed : prev)),
+      streamViewer,
+    );
+  }, [gameId, streamViewer]);
+
+  // While waiting in an open lobby, poll it so seats fill in and we transition when the host starts.
+  const lobbyId = lobby?.id;
+  const lobbyOpen = lobby?.status === 'open';
+  useEffect(() => {
+    if (!lobbyId || !lobbyOpen) return;
+    const timer = setInterval(() => {
+      void api
+        .getLobby(lobbyId)
+        .then(async (fresh) => {
+          if (fresh.status === 'started' && fresh.gameId) {
+            await enterGameAs(fresh.gameId, mySeats);
+          } else {
+            setLobby(fresh);
+          }
+        })
+        .catch(() => undefined);
+    }, 1500);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- enterGameAs is stable enough for this poll
+  }, [lobbyId, lobbyOpen, mySeats]);
 
   // legalActions is a pure read over observable state and never inspects hidden scoring cards,
   // so passing the redacted per-viewer view (which only nulls out opponents' cards) is safe.
@@ -164,6 +294,11 @@ export default function App() {
     .map((action) => action.color);
   const sailActions = legal.filter((action): action is Extract<Action, { type: 'SAIL' }> => action.type === 'SAIL');
   const activePlayer = game ? game.players[game.activePlayerIndex] : undefined;
+  // This client may drive the game only when it controls the active seat (or controls all seats, in
+  // hotseat). This is what binds the window to the seat you joined as and locks other players' turns.
+  const canDrive = !controlledIds || (!!activePlayer && controlledIds.includes(activePlayer.id));
+  const myNames =
+    controlledIds && game ? game.players.filter((p) => controlledIds.includes(p.id)).map((p) => p.name) : null;
   const nextFactoryCost = activePlayer ? FACTORY_BUILD_COSTS[activePlayer.factories.length - 1] : undefined;
   const containersGone = game ? COLORS.filter((color) => game.supply.containers[color] === 0).length : 0;
   const mustDeliverNow =
@@ -177,10 +312,10 @@ export default function App() {
     : maxBid;
 
   function act(playerId: string, action: Action) {
-    if (!game) return;
+    if (!game || !canDrive) return; // only the client controlling the active seat may submit moves
     setPick(null);
     setBuildColor(null);
-    void run(() => api.applyAction(game.id, playerId, action));
+    void run(() => api.applyAction(game.id, playerId, action, streamViewer));
   }
 
   /** Toggle a container into/out of the current buy selection. */
@@ -198,7 +333,7 @@ export default function App() {
 
   /** Resolve the delivery auction with the entered bids — accept the high bid, or buy out (ends the turn). */
   function submitDelivery(buyout = false) {
-    if (!game || !activePlayer) return;
+    if (!game || !activePlayer || !canDrive) return;
     const action: Action = {
       type: 'DELIVER',
       bids,
@@ -209,7 +344,7 @@ export default function App() {
     setBuildColor(null);
     setBids({});
     setRunoffBids({});
-    void run(() => api.applyAction(game.id, activePlayer.id, action));
+    void run(() => api.applyAction(game.id, activePlayer.id, action, streamViewer));
   }
 
   /** Buy every selected container from the seller in a single action. */
@@ -228,7 +363,7 @@ export default function App() {
         ? { type: 'FACTORY_PURCHASE', sellerId: pick.sellerId, bought }
         : { type: 'HARBOR_PURCHASE', bought };
     setPick(null);
-    void run(() => api.applyAction(game.id, active.id, action));
+    void run(() => api.applyAction(game.id, active.id, action, streamViewer));
   }
 
   return (
@@ -238,11 +373,21 @@ export default function App() {
           <h1 className="text-lg font-bold tracking-tight sm:text-xl">Container</h1>
           {game && (
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                data-testid="game-code"
+                data-game-id={game.id}
+                title="Copy game code — share it so another device can join this game"
+                onClick={() => void navigator.clipboard?.writeText(game.id).catch(() => undefined)}
+                className="hidden items-center gap-1 rounded border px-2 py-1 font-mono text-xs text-muted-foreground transition-colors hover:bg-accent sm:inline-flex"
+              >
+                <span aria-hidden>🔗</span> {game.id.slice(0, 8)}
+              </button>
               <span data-testid="turn-info" className="text-sm text-muted-foreground">
                 Turn {game.turn} · <span className="font-medium text-foreground">{game.players[game.activePlayerIndex]?.name}</span>{' '}
                 · {game.actionsRemaining} action{game.actionsRemaining === 1 ? '' : 's'} left
               </span>
-              <Button variant="outline" size="sm" data-testid="new-game" onClick={() => setGame(null)}>
+              <Button variant="outline" size="sm" data-testid="new-game" onClick={resetToLanding}>
                 New game
               </Button>
             </div>
@@ -263,6 +408,26 @@ export default function App() {
 
         {game ? (
           <>
+            {controlledIds && game.status === 'active' && (
+              <div
+                data-testid="identity-banner"
+                className={cn(
+                  'mb-4 flex flex-wrap items-center gap-x-2 rounded-lg border px-4 py-2 text-sm',
+                  canDrive ? 'border-primary bg-primary/10 font-medium' : 'text-muted-foreground',
+                )}
+              >
+                {myNames && myNames.length > 0 ? (
+                  <span>
+                    You are <span className="font-semibold text-foreground">{myNames.join(' & ')}</span>.
+                  </span>
+                ) : (
+                  <span>Spectating.</span>
+                )}
+                <span data-testid="turn-status">
+                  {canDrive ? '✋ Your turn — take your actions.' : `Waiting for ${activePlayer?.name}…`}
+                </span>
+              </div>
+            )}
             {game.status === 'ended' && (
               <Card className="reveal-in mb-4" data-testid="results">
                 <CardHeader>
@@ -308,7 +473,7 @@ export default function App() {
                       </tbody>
                     </table>
                   </div>
-                  <Button className="mt-3" variant="outline" data-testid="new-game-end" onClick={() => setGame(null)}>
+                  <Button className="mt-3" variant="outline" data-testid="new-game-end" onClick={resetToLanding}>
                     New game
                   </Button>
                 </CardContent>
@@ -375,7 +540,7 @@ export default function App() {
                     <span data-testid="supply-warehouses">Warehouses: {game.supply.warehouses}</span>
                   </div>
 
-                  {activePlayer && buildColor && buildableColors.includes(buildColor) && nextFactoryCost !== undefined && (
+                  {activePlayer && canDrive && buildColor && buildableColors.includes(buildColor) && nextFactoryCost !== undefined && (
                     <Button
                       size="sm"
                       className="sm:ml-auto"
@@ -410,7 +575,7 @@ export default function App() {
                 <div className="flex flex-wrap gap-3">
                   {game.bank.containerLots.map((lot, i) => {
                     const auction = game.bank.auctions.find((a) => a.lotKind === 'container' && a.lotIndex === i);
-                    const callable = legal.some((a) => a.type === 'CALL_BANK' && a.lotIndex === i);
+                    const callable = canDrive && legal.some((a) => a.type === 'CALL_BANK' && a.lotIndex === i);
                     const minBid = auction ? auction.bid + 1 : 1;
                     const bid = bankBid[i] ?? minBid;
                     return (
@@ -464,7 +629,7 @@ export default function App() {
                 <div className="flex flex-wrap gap-3">
                   {game.bank.cashLots.map((cash, i) => {
                     const auction = game.bank.auctions.find((a) => a.lotKind === 'cash' && a.lotIndex === i);
-                    const callable = legal.some((a) => a.type === 'CALL_BANK' && a.lotKind === 'cash' && a.lotIndex === i);
+                    const callable = canDrive && legal.some((a) => a.type === 'CALL_BANK' && a.lotKind === 'cash' && a.lotIndex === i);
                     const minCount = auction ? auction.bid + 1 : 1;
                     const count = bankCount[i] ?? minCount;
                     const board = activePlayer
@@ -525,7 +690,7 @@ export default function App() {
             {activePlayer && (
               <BoardMap
                 game={game}
-                sailActions={sailActions}
+                sailActions={canDrive ? sailActions : []}
                 onSail={(action) => act(activePlayer.id, action)}
                 busy={busy}
               />
@@ -542,19 +707,21 @@ export default function App() {
               const card = player.scoringCard;
               const nextWarehouseCost = WAREHOUSE_BUILD_COSTS[player.warehouses - 1];
               const capacity = Math.min(player.factories.length, player.factoryLimit - player.factoryStore.length);
-              const canReprice = isActive && can('REPRICE') && !busy;
+              const canReprice = isActive && can('REPRICE') && !busy && canDrive;
 
               // Buying is done by the active player from THIS card's player (an opponent).
               const active = game.players[game.activePlayerIndex]!;
               const canFactoryBuy =
                 !isActive &&
                 !busy &&
+                canDrive &&
                 legal.some((a) => a.type === 'FACTORY_PURCHASE' && a.sellerId === player.id) &&
                 active.harborStore.length < active.harborLimit;
               const activeShipLoc = active.ship.location;
               const canHarborBuy =
                 !isActive &&
                 !busy &&
+                canDrive &&
                 activeShipLoc.kind === 'harbor' &&
                 activeShipLoc.playerId === player.id &&
                 active.ship.cargo.length < SHIP_CAPACITY &&
@@ -744,6 +911,7 @@ export default function App() {
                     )}
 
                     {isActive &&
+                      canDrive &&
                       (mustDeliverNow ? (
                         <div className="reveal-in space-y-2 border-t pt-3" data-testid="auction">
                           <div className="text-sm font-medium">Delivery auction</div>
@@ -945,33 +1113,210 @@ export default function App() {
             })}
             </section>
           </>
+        ) : lobby ? (
+          <Card className="mx-auto max-w-md" data-testid="lobby">
+            <CardHeader>
+              <CardTitle>Waiting for players</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Share this code. The game starts once every seat is filled.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <button
+                type="button"
+                data-testid="lobby-code"
+                data-lobby-id={lobby.id}
+                title="Copy game code"
+                onClick={() => void navigator.clipboard?.writeText(lobby.id).catch(() => undefined)}
+                className="flex w-full items-center justify-center gap-2 rounded-md border px-3 py-2 font-mono text-xs transition-colors hover:bg-accent"
+              >
+                <span aria-hidden>🔗</span> {lobby.id}
+              </button>
+
+              <ul className="space-y-1" data-testid="lobby-seats">
+                {lobby.members.map((member, i) => (
+                  <li
+                    // eslint-disable-next-line react/no-array-index-key -- fixed positional seats
+                    key={i}
+                    data-testid={`lobby-seat-${i}`}
+                    className={cn(
+                      'flex items-center justify-between rounded-md border px-3 py-2 text-sm',
+                      mySeats.includes(i) && 'border-primary ring-1 ring-primary',
+                    )}
+                  >
+                    <span className="text-muted-foreground">Seat {i + 1}</span>
+                    <span className={member ? 'font-medium' : 'text-muted-foreground'}>
+                      {member ?? 'Empty'}
+                      {mySeats.includes(i) ? ' (you)' : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              {lobby.members.some((member) => member === null) && (
+                <div className="flex gap-2">
+                  <input
+                    aria-label="Your name"
+                    data-testid="seat-name"
+                    placeholder="Your name"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    value={seatName}
+                    onChange={(event) => setSeatName(event.target.value)}
+                  />
+                  <Button data-testid="take-seat" disabled={busy || seatName.trim() === ''} onClick={() => void takeSeat()}>
+                    Take a seat
+                  </Button>
+                </div>
+              )}
+
+              <Button
+                className="w-full"
+                data-testid="start-lobby"
+                disabled={busy || lobby.members.some((member) => member === null)}
+                onClick={() => void startLobbyGame()}
+              >
+                {lobby.members.some((member) => member === null) ? 'Waiting for all seats…' : 'Start game'}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                data-testid="leave-lobby"
+                onClick={() => {
+                  setLobby(null);
+                  setMySeats([]);
+                }}
+              >
+                Leave
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
           <Card className="mx-auto max-w-md">
             <CardHeader>
               <CardTitle>New game</CardTitle>
+              <p className="text-sm text-muted-foreground">Container is for {MIN_PLAYERS}–{MAX_PLAYERS} players.</p>
             </CardHeader>
             <CardContent className="space-y-3">
-              {names.map((name, index) => (
-                <input
-                  // eslint-disable-next-line react/no-array-index-key -- fixed-length setup form
-                  key={index}
-                  aria-label={`Player ${index + 1} name`}
-                  data-testid={`player-name-${index}`}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  value={name}
-                  onChange={(event) =>
-                    setNames((prev) => prev.map((value, j) => (j === index ? event.target.value : value)))
-                  }
-                />
-              ))}
+              <div className="space-y-2 rounded-lg border p-3">
+                <div className="text-sm font-medium">Create a shared game</div>
+                <p className="text-xs text-muted-foreground">
+                  Make a room and share the code — each player joins and names their own seat.
+                </p>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Players</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    aria-label="Fewer players"
+                    data-testid="seats-dec"
+                    disabled={busy || lobbySeats <= MIN_PLAYERS}
+                    onClick={() => setLobbySeats((n) => Math.max(MIN_PLAYERS, n - 1))}
+                  >
+                    −
+                  </Button>
+                  <span data-testid="seat-count" className="w-5 text-center text-sm tabular-nums">
+                    {lobbySeats}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    aria-label="More players"
+                    data-testid="seats-inc"
+                    disabled={busy || lobbySeats >= MAX_PLAYERS}
+                    onClick={() => setLobbySeats((n) => Math.min(MAX_PLAYERS, n + 1))}
+                  >
+                    +
+                  </Button>
+                  <Button className="ml-auto" data-testid="create-lobby" disabled={busy} onClick={() => void createSharedGame()}>
+                    Create game
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground">or play hotseat on one device</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              <div className="space-y-2">
+                {names.map((name, index) => (
+                  // eslint-disable-next-line react/no-array-index-key -- rows are positional seats
+                  <div key={index} className="flex items-center gap-2">
+                    <span className="w-14 shrink-0 text-xs text-muted-foreground">Seat {index + 1}</span>
+                    <input
+                      aria-label={`Player ${index + 1} name`}
+                      data-testid={`player-name-${index}`}
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      value={name}
+                      onChange={(event) =>
+                        setNames((prev) => prev.map((value, j) => (j === index ? event.target.value : value)))
+                      }
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Remove seat ${index + 1}`}
+                      data-testid={`remove-player-${index}`}
+                      disabled={busy || names.length <= MIN_PLAYERS}
+                      onClick={() => setNames((prev) => prev.filter((_, j) => j !== index))}
+                    >
+                      ✕
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                data-testid="add-player"
+                disabled={busy || names.length >= MAX_PLAYERS}
+                onClick={() => setNames((prev) => [...prev, NAME_POOL[prev.length] ?? `Player ${prev.length + 1}`])}
+              >
+                <Plus className="h-4 w-4" aria-hidden /> Add seat
+              </Button>
+
+              {names.some((name) => name.trim() === '') && (
+                <p className="text-xs text-destructive" data-testid="setup-hint">
+                  Every seat needs a name.
+                </p>
+              )}
+
               <Button
                 className="w-full"
                 data-testid="start-game"
-                disabled={busy}
-                onClick={() => void run(() => api.createGame(names.map((name) => ({ name }))))}
+                disabled={busy || names.some((name) => name.trim() === '')}
+                onClick={() => void run(() => api.createGame(names.map((name) => ({ name: name.trim() }))))}
               >
-                Start game
+                Start game ({names.length} player{names.length === 1 ? '' : 's'})
               </Button>
+
+              <div className="flex items-center gap-2 pt-2">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground">or join by code</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              <div className="flex gap-2">
+                <input
+                  aria-label="Game code"
+                  data-testid="join-code"
+                  placeholder="Paste a game code to join"
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  value={joinCode}
+                  onChange={(event) => setJoinCode(event.target.value)}
+                />
+                <Button
+                  variant="outline"
+                  data-testid="join-game"
+                  disabled={busy || joinCode.trim() === ''}
+                  onClick={() => void joinByCode(joinCode.trim())}
+                >
+                  Join
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}

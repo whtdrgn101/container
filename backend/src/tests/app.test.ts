@@ -1,13 +1,16 @@
+import { once } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { Action, GameState, GameView } from '@container/engine';
 import { buildApp } from '../app';
 import { createDatabase } from '../db';
+import type { StateMessage } from '../hub';
 
 let app: FastifyInstance;
 
-beforeEach(() => {
+beforeEach(async () => {
   app = buildApp({ db: createDatabase(':memory:') });
+  await app.ready(); // load plugins (registers @fastify/websocket's injectWS + upgrade handler)
 });
 
 afterEach(async () => {
@@ -26,6 +29,22 @@ async function createThreePlayerGame(): Promise<GameView> {
 
 function act(gameId: string, playerId: string, action: Action) {
   return app.inject({ method: 'POST', url: `/games/${gameId}/actions`, payload: { playerId, action } });
+}
+
+type WsClient = Awaited<ReturnType<FastifyInstance['injectWS']>>;
+
+/** Wrap a WebSocket in a pull-based reader: `next()` resolves with the next JSON message. */
+function reader(socket: WsClient): () => Promise<StateMessage> {
+  const queue: StateMessage[] = [];
+  const pending: Array<(m: StateMessage) => void> = [];
+  socket.on('message', (raw: unknown) => {
+    const msg = JSON.parse(String(raw)) as StateMessage;
+    const resolve = pending.shift();
+    if (resolve) resolve(msg);
+    else queue.push(msg);
+  });
+  return () =>
+    queue.length ? Promise.resolve(queue.shift()!) : new Promise<StateMessage>((r) => pending.push(r));
 }
 
 describe('POST /games', () => {
@@ -97,6 +116,15 @@ describe('GET /games/:id', () => {
     const response = await app.inject({ method: 'GET', url: '/games/does-not-exist' });
     expect(response.statusCode).toBe(404);
     expect(response.json().error.code).toBe('GAME_NOT_FOUND');
+  });
+
+  it('projects a multi-seat viewer to exactly those seats and no others (B2)', async () => {
+    const game = await createThreePlayerGame();
+    const response = await app.inject({ method: 'GET', url: `/games/${game.id}?viewer=p1,p3` });
+    const view = response.json().game as GameView;
+    expect(view.players[0]!.scoringCard).not.toBeNull(); // held
+    expect(view.players[1]!.scoringCard).toBeNull(); // not held
+    expect(view.players[2]!.scoringCard).not.toBeNull(); // held
   });
 });
 
@@ -343,10 +371,145 @@ describe('POST /games/:id/actions', () => {
     expect(response.statusCode).toBe(404);
   });
 
+  it('projects an action reply for the acting client’s seats, not the next active player (B2)', async () => {
+    const game = await createThreePlayerGame();
+    // p1 ends their turn (active becomes p2). A client controlling seats p1 & p3 must not see p2's card.
+    const response = await app.inject({
+      method: 'POST',
+      url: `/games/${game.id}/actions?viewer=p1,p3`,
+      payload: { playerId: 'p1', action: { type: 'END_TURN' } },
+    });
+    const view = response.json().game as GameView;
+    expect(view.activePlayerIndex).toBe(1); // p2 is now active…
+    expect(view.players[1]!.scoringCard).toBeNull(); // …but p2's card is not leaked to this client
+    expect(view.players[0]!.scoringCard).not.toBeNull(); // own seat
+    expect(view.players[2]!.scoringCard).not.toBeNull(); // own seat
+  });
+
   it('returns 404 for an unknown player', async () => {
     const game = await createThreePlayerGame();
     const response = await act(game.id, 'ghost', { type: 'PRODUCE' });
     expect(response.statusCode).toBe(404);
     expect(response.json().error.code).toBe('PLAYER_NOT_FOUND');
+  });
+});
+
+describe('GET /games/:id/stream (WebSocket, B2)', () => {
+  it('sends an initial snapshot, then pushes a projected update on every action', async () => {
+    const game = await createThreePlayerGame();
+    const socket = await app.injectWS(`/games/${game.id}/stream`); // no viewer → follows the active player
+    const next = reader(socket);
+
+    // Initial snapshot: active is seat 0, so only p1's secret card is revealed.
+    const initial = await next();
+    expect(initial.type).toBe('state');
+    expect(initial.game.version).toBe(0);
+    expect(initial.game.players[0]!.scoringCard).not.toBeNull();
+    expect(initial.game.players[1]!.scoringCard).toBeNull();
+
+    // p1 ends their turn over REST; the socket receives a fresh push...
+    await act(game.id, 'p1', { type: 'END_TURN' });
+    const pushed = await next();
+    expect(pushed.game.activePlayerIndex).toBe(1);
+    // ...now projected for the new active player (seat 1), so the reveal follows the turn.
+    expect(pushed.game.players[1]!.scoringCard).not.toBeNull();
+    expect(pushed.game.players[0]!.scoringCard).toBeNull();
+
+    socket.close();
+  });
+
+  it('pins the projection to a fixed seat when ?viewer is given', async () => {
+    const game = await createThreePlayerGame();
+    const socket = await app.injectWS(`/games/${game.id}/stream?viewer=p2`);
+    const next = reader(socket);
+
+    const initial = await next();
+    // p2 always sees only their own card, even though seat 0 is active.
+    expect(initial.game.players[1]!.scoringCard).not.toBeNull();
+    expect(initial.game.players[0]!.scoringCard).toBeNull();
+
+    await act(game.id, 'p1', { type: 'PRODUCE' });
+    const pushed = await next();
+    expect(pushed.game.version).toBe(1);
+    expect(pushed.game.players[1]!.scoringCard).not.toBeNull();
+    expect(pushed.game.players[0]!.scoringCard).toBeNull();
+
+    socket.close();
+  });
+
+  it('closes the socket for an unknown game', async () => {
+    const socket = await app.injectWS('/games/does-not-exist/stream');
+    const [code] = (await once(socket, 'close')) as [number];
+    expect(code).toBe(1008);
+  });
+});
+
+describe('Lobbies (pre-game seat claiming)', () => {
+  async function createLobby(seats?: number) {
+    const response = await app.inject({ method: 'POST', url: '/lobbies', payload: seats ? { seats } : {} });
+    expect(response.statusCode).toBe(201);
+    return response.json().lobby as { id: string; seats: number; members: (string | null)[]; status: string };
+  }
+
+  const join = (id: string, name: string) =>
+    app.inject({ method: 'POST', url: `/lobbies/${id}/join`, payload: { name } });
+
+  it('creates an empty lobby with the requested number of seats', async () => {
+    const lobby = await createLobby(4);
+    expect(lobby.seats).toBe(4);
+    expect(lobby.members).toEqual([null, null, null, null]);
+    expect(lobby.status).toBe('open');
+  });
+
+  it('defaults to the 3-seat minimum and rejects out-of-range counts', async () => {
+    expect((await createLobby()).seats).toBe(3);
+    const tooFew = await app.inject({ method: 'POST', url: '/lobbies', payload: { seats: 2 } });
+    expect(tooFew.statusCode).toBe(400);
+    expect(tooFew.json().error.code).toBe('INVALID_SEAT_COUNT');
+  });
+
+  it('lets players claim seats by name, then starts a real game once full', async () => {
+    const lobby = await createLobby(3);
+
+    const first = await join(lobby.id, 'Tim');
+    expect(first.statusCode).toBe(200);
+    expect(first.json().seat).toBe(0);
+    expect(first.json().lobby.members).toEqual(['Tim', null, null]);
+
+    await join(lobby.id, 'Sam');
+    const third = await join(lobby.id, 'Lee');
+    expect(third.json().seat).toBe(2);
+
+    const started = await app.inject({ method: 'POST', url: `/lobbies/${lobby.id}/start` });
+    expect(started.statusCode).toBe(201);
+    const game = started.json().game as GameView;
+    expect(game.players.map((p) => p.name)).toEqual(['Tim', 'Sam', 'Lee']);
+
+    // The lobby now points at the started game, and its code still resolves.
+    const after = await app.inject({ method: 'GET', url: `/lobbies/${lobby.id}` });
+    expect(after.json().lobby.status).toBe('started');
+    expect(after.json().lobby.gameId).toBe(game.id);
+  });
+
+  it('refuses to start until every seat is filled', async () => {
+    const lobby = await createLobby(3);
+    await join(lobby.id, 'Tim');
+    const notReady = await app.inject({ method: 'POST', url: `/lobbies/${lobby.id}/start` });
+    expect(notReady.statusCode).toBe(409);
+    expect(notReady.json().error.code).toBe('LOBBY_NOT_READY');
+  });
+
+  it('rejects joining a full lobby and a missing lobby', async () => {
+    const lobby = await createLobby(3);
+    await join(lobby.id, 'A');
+    await join(lobby.id, 'B');
+    await join(lobby.id, 'C');
+    const full = await join(lobby.id, 'D');
+    expect(full.statusCode).toBe(409);
+    expect(full.json().error.code).toBe('LOBBY_FULL');
+
+    const missing = await join('does-not-exist', 'Z');
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json().error.code).toBe('LOBBY_NOT_FOUND');
   });
 });
