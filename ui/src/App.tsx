@@ -262,7 +262,7 @@ export default function App() {
         {game ? (
           <>
             {game.status === 'ended' && (
-              <Card className="mb-4" data-testid="results">
+              <Card className="reveal-in mb-4" data-testid="results">
                 <CardHeader>
                   <CardTitle data-testid="winner">
                     🏁 Game over — {game.winnerIds.map((id) => nameOf(game.players, id)).join(' & ')}{' '}
@@ -741,7 +741,7 @@ export default function App() {
 
                     {isActive &&
                       (mustDeliverNow ? (
-                        <div className="space-y-2 border-t pt-3" data-testid="auction">
+                        <div className="reveal-in space-y-2 border-t pt-3" data-testid="auction">
                           <div className="text-sm font-medium">Delivery auction</div>
                           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                             <span>Cargo:</span>

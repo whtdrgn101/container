@@ -74,10 +74,11 @@ How we get from the current vertical slice to a complete, faithful game, then to
   full-flow test; it isn't Playwright-tested because exhausting the supply through the UI isn't
   practical to click.)*
 - 🎉 **The core game is complete and finishable in hotseat.**
-- ✅ **Slice 8a/8b — Art kit + board minimap:** original SVG container/ship glyphs replace every
+- ✅ **Slice 8 — UI/UX polish & board:** original SVG container/ship glyphs replace every
   colored-square chip; a `BoardMap` panel shows all ships on an ocean/island/bank/harbor board with
-  click-to-sail. 32 e2e green (desktop + mobile). Remaining: 8c (motion/a11y) · 8d (visual snapshots).
-- ⏭️ **Optional next:** Slice 8c/8d (polish) · Track A (AI) · Track B (online).
+  click-to-sail; motion + a11y pass (reduced-motion-aware); visual-regression baselines per viewport.
+  34 e2e green (desktop + mobile).
+- ⏭️ **Optional next:** Track A (AI) · Track B (online).
 
 > **Convention going forward:** new engine mechanics are added as `actions/<name>.ts` + a matching
 > `tests/<name>.test.ts`, reusing `internal/` helpers. Keep files small and single-responsibility.
@@ -169,9 +170,16 @@ The "game loop." Turns the current free-for-all Produce into a real turn-based g
   the Off-Shore Bank, and one dock per player. Every ship is drawn at its location (per-seat hull
   tint, active ship pulsing, cargo count); clicking a legal destination sails the active player.
   Responsive (`aspect-[5/2]`, `overflow-hidden`) and theme-aware. Covered by `e2e/board-map.spec.ts`.
-- ⏭️ **8c — Motion & a11y:** ship/auction transition animations, keyboard/focus + ARIA pass, richer
-  responsive breakpoints.
-- ⏭️ **8d — Visual regression:** Playwright snapshot baselines per viewport.
+- ✅ **8c — Motion & a11y:** ships glide between locations (`transition-[left,top]`) and the active
+  ship pulses; the auction and results panels fade/slide in (`.reveal-in`). All motion is gated on
+  `motion-safe` / `prefers-reduced-motion`. Board nodes are focusable `<button>`s with `aria-label`
+  and a visible focus ring; the board has `role="img"` + a descriptive label. Board is taller on
+  narrow screens (`aspect-[3/2] sm:aspect-[5/2]`).
+- ✅ **8d — Visual regression:** `e2e/visual.spec.ts` captures a `toHaveScreenshot` baseline of the
+  board minimap per viewport (desktop + mobile). Baselines live in
+  `ui/e2e/visual.spec.ts-snapshots/` and are committed. Only the board is snapshotted because it's
+  deterministic at game start; player cards depend on the randomized deal. *Note: Playwright suffixes
+  baselines per-OS (`-darwin`); regenerate with `--update-snapshots` if running e2e on another OS/CI.*
 
 **After Slice 7 the game is fully playable hotseat.** Slice 8 and both tracks below are independent.
 

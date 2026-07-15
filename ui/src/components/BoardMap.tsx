@@ -122,9 +122,9 @@ export function BoardMap({
   return (
     <div
       data-testid="board-map"
-      aria-label="Game board"
-      className="relative mb-4 w-full overflow-hidden rounded-xl border shadow-sm"
-      style={{ aspectRatio: '5 / 2' }}
+      role="img"
+      aria-label="Game board showing each player's ship and the sea lanes between harbors, the Container Island, and the Off-Shore Bank"
+      className="relative mb-4 aspect-[3/2] w-full overflow-hidden rounded-xl border shadow-sm sm:aspect-[5/2]"
     >
       {/* Ocean */}
       <div className="absolute inset-0 bg-gradient-to-b from-sky-200 to-sky-400 dark:from-sky-900 dark:to-slate-900" />
@@ -155,10 +155,12 @@ export function BoardMap({
             type="button"
             data-testid={node.testid}
             title={clickable ? `Sail to ${node.label}` : node.label}
+            aria-label={clickable ? `Sail to ${node.label}` : node.label}
             disabled={!clickable}
             onClick={() => sail && onSail(sail)}
             className={cn(
-              'group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5',
+              'group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 rounded',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-1',
               clickable ? 'cursor-pointer' : 'cursor-default',
             )}
             style={{ left: `${node.left}%`, top: `${node.top}%` }}
@@ -167,7 +169,7 @@ export function BoardMap({
               <span
                 className={cn(
                   'block h-9 w-12 rounded-md transition-transform sm:h-11 sm:w-16',
-                  clickable && 'group-hover:scale-110',
+                  clickable && 'motion-safe:group-hover:scale-110',
                   clickable && 'ring-2 ring-amber-400 ring-offset-1',
                 )}
               >
@@ -178,7 +180,7 @@ export function BoardMap({
               <span
                 className={cn(
                   'block h-3 w-16 rounded-full border-2 border-dashed border-white/50 transition-transform sm:w-24',
-                  clickable && 'group-hover:scale-110 border-amber-400',
+                  clickable && 'border-amber-400 motion-safe:group-hover:scale-110',
                 )}
               />
             )}
@@ -207,14 +209,14 @@ export function BoardMap({
               key={p.id}
               data-testid={`board-ship-${p.id}`}
               title={`${p.name} — ${p.ship.cargo.length} cargo`}
-              className="pointer-events-none absolute flex flex-col items-center"
+              className="pointer-events-none absolute flex flex-col items-center motion-safe:transition-[left,top] motion-safe:duration-700 motion-safe:ease-in-out"
               style={{
                 left: `calc(${node.left}% + ${spread}px)`,
                 top: `calc(${node.top}% - 20px)`,
                 transform: 'translate(-50%, -50%)',
               }}
             >
-              <span className={cn('block h-6 w-10 drop-shadow sm:h-7 sm:w-12', isActive && 'animate-pulse')}>
+              <span className={cn('block h-6 w-10 drop-shadow sm:h-7 sm:w-12', isActive && 'motion-safe:animate-pulse')}>
                 <ShipSvg tint={SHIP_TINTS[seat % SHIP_TINTS.length]} />
               </span>
               <span

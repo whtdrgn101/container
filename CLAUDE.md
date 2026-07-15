@@ -218,13 +218,16 @@ check plan usage between sessions). Summary:
   turn-advance); open Bank auctions awarded, then `finalScoring` (discard most-common w/ two-value
   rule, island score by card, leftover $3/$2/$0, −$11/loan) and winner (total → factory tiebreak →
   shared). `status: 'active' | 'ended'` + `results` + `winnerIds`; UI shows a results screen.
-- 🎉 **Core game complete — fully playable hotseat.** Optional remaining work: Slice 8c/8d (polish),
-  Track A (AI), Track B (online multiplayer). Keep the 100% engine coverage gate for any new mechanics.
-- **Slice 8a/8b ✅** Original SVG art (`ui/src/components/art/{Container,Ship}.tsx`) replaces all
-  colored-square chips via the `ContainerChip` wrapper (kept as `span[title]` for e2e counts); a
-  `BoardMap` (`ui/src/components/BoardMap.tsx`) draws every ship on an ocean/island/bank/harbor board
-  with click-to-sail. Art is **original** — do not reproduce any published game's specific artwork.
-- **Slice 8c/8d (remaining):** motion + a11y pass; Playwright visual-regression snapshots per viewport.
+- 🎉 **Core game complete — fully playable hotseat.** Optional remaining work: Track A (AI),
+  Track B (online multiplayer). Keep the 100% engine coverage gate for any new mechanics.
+- **Slice 8 ✅ (UI/UX polish & board).** Original SVG art (`ui/src/components/art/{Container,Ship}.tsx`)
+  replaces all colored-square chips via the `ContainerChip` wrapper (kept as `span[title]` for e2e
+  counts). A `BoardMap` (`ui/src/components/BoardMap.tsx`) draws every ship on an
+  ocean/island/bank/harbor board with click-to-sail. Motion (ship glide, active pulse, `.reveal-in`
+  panels) is `motion-safe`/`prefers-reduced-motion`-gated; board nodes are focusable buttons with
+  aria-labels. Visual-regression baselines: `ui/e2e/visual.spec.ts` (board only — deterministic at
+  start; snapshots are per-OS `-darwin`, regenerate with `--update-snapshots` on other OS/CI). Art is
+  **original** — do not reproduce any published game's specific artwork.
 - **Track A — AI play** and **Track B — online multiplayer:** independent tracks after the core
   game is playable. The authoritative, serializable engine makes both additive (see `ROADMAP.md`).
 

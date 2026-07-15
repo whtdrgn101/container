@@ -74,3 +74,20 @@
     font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
   }
 }
+
+/* Subtle entrance for panels that appear mid-turn (auction, results). Motion-reduced users get none. */
+@keyframes reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .reveal-in {
+    animation: reveal-in 220ms ease-out;
+  }
+}
