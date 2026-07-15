@@ -16,6 +16,17 @@ export interface StoredContainer {
 export type District = 'factory' | 'harbor';
 
 /**
+ * A player's secret final scoring card (rulebook pg. 18). Assigns a base cash value to each container
+ * color in your Container Island scoring area. One color is the "two-value" color: worth $10 at game
+ * end if you collected at least one of every color, otherwise its base value ($5).
+ */
+export interface ScoringCard {
+  readonly id: string;
+  readonly values: Readonly<Record<Color, number>>;
+  readonly twoValueColor: Color;
+}
+
+/**
  * Where a player's ship is. A ship is in the ocean, docked at an opponent's harbor, or at one of
  * the two central boards (Container Island / Off-Shore Bank). It can never enter its own harbor.
  */
@@ -60,6 +71,8 @@ export interface PlayerState {
   readonly ship: ShipState;
   /** Containers won at delivery auctions, on Container Island — scored at game end. */
   readonly scoringArea: readonly Color[];
+  /** This player's secret final scoring card (dealt at setup). */
+  readonly scoringCard: ScoringCard;
 }
 
 /** Shared components still available (drawn down as players produce / build). */

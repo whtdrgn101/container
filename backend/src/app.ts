@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import { applyAction, COLORS, createGame, GameError } from '@container/engine';
+import { applyAction, COLORS, createGame, GameError, SCORING_CARDS } from '@container/engine';
 import type { Action, Color, District, NewPlayer, ShipLocation, StoredContainer } from '@container/engine';
 import type { DB } from './db';
 import { GameRepository } from './repository';
@@ -166,7 +166,17 @@ export function buildApp(options: AppOptions): FastifyInstance {
     },
     async (request, reply) => {
       try {
-        const state = createGame({ id: randomUUID(), players: request.body.players });
+        // Shuffle the scoring cards and deal one to each player (kept secret client-side).
+        const cardIds = SCORING_CARDS.map((card) => card.id);
+        for (let i = cardIds.length - 1; i > 0; i -= 1) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const swap = cardIds[i]!;
+          cardIds[i] = cardIds[j]!;
+          cardIds[j] = swap;
+        }
+        const players = request.body.players.map((player, seat) => ({ ...player, scoringCardId: cardIds[seat]! }));
+
+        const state = createGame({ id: randomUUID(), players });
         repo.create(state);
         return reply.code(201).send({ game: state });
       } catch (error) {

@@ -36,6 +36,13 @@ describe('POST /games', () => {
     expect(game.players[0]?.money).toBe(20);
   });
 
+  it('deals a distinct secret scoring card to each player', async () => {
+    const game = await createThreePlayerGame();
+    const ids = game.players.map((p) => p.scoringCard.id);
+    expect(new Set(ids).size).toBe(3); // dealt without replacement
+    ids.forEach((id) => expect(id).toMatch(/^sc\d$/));
+  });
+
   it('rejects an invalid player count with 400', async () => {
     const response = await app.inject({
       method: 'POST',

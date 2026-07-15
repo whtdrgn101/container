@@ -206,6 +206,9 @@ check plan usage between sessions). Summary:
   into `scoringArea`, deliverer earns bid + matching subsidy, turn ends. **Buyout** and **runoff**
   ties are in ($0 bluff bids work by construction; buyout pays the supply until the Bank in Slice 6).
   *(This is what exists today.)*
+- **Scoring cards ✅ (Slice 7 groundwork):** each player is dealt a secret `ScoringCard` at
+  `createGame` (backend shuffles the deck); the UI reveals only the active player's card. Final
+  *scoring* by the card lands in Slice 7.
 - **Slices 6–7 (next):** Off-Shore Bank & loans → game end & final scoring. After Slice 7 the game is
   fully playable **hotseat**. 100% engine coverage gate throughout.
 - **Slice 8:** UI/UX polish, full board, visual regression.

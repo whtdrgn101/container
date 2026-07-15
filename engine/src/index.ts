@@ -4,7 +4,19 @@
 export { COLORS } from './core';
 export type { Color } from './core';
 export type { Action, ActionType } from './actions';
-export type { District, Factory, GameState, MoveRecord, PlayerState, ShipLocation, ShipState, StoredContainer, Supply } from './core';
+export { SCORING_CARDS } from './core';
+export type {
+  District,
+  Factory,
+  GameState,
+  MoveRecord,
+  PlayerState,
+  ScoringCard,
+  ShipLocation,
+  ShipState,
+  StoredContainer,
+  Supply,
+} from './core';
 
 // Errors
 export { GameError } from './core';

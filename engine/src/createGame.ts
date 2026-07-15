@@ -8,11 +8,12 @@ import {
   GameError,
   MAX_PLAYERS,
   MIN_PLAYERS,
+  SCORING_CARDS,
   STARTING_MONEY,
   WAREHOUSE_STORAGE_PER_WAREHOUSE,
   WAREHOUSE_SUPPLY_TOTAL,
 } from './core';
-import type { Color, GameState, PlayerState, Supply } from './core';
+import type { Color, GameState, PlayerState, ScoringCard, Supply } from './core';
 
 /** Input for a single seat when creating a game. */
 export interface NewPlayer {
@@ -22,6 +23,23 @@ export interface NewPlayer {
    * deterministic, so callers inject the assignment. Defaults to the Nth container color by seat.
    */
   readonly startingColor?: Color;
+  /**
+   * The id of this player's secret scoring card. Dealt at random in the physical game; injected by
+   * the caller for determinism. Defaults to the Nth card by seat.
+   */
+  readonly scoringCardId?: string;
+}
+
+/** Look up a scoring card by id, or throw. */
+function scoringCardFor(seat: number, id?: string): ScoringCard {
+  if (id === undefined) {
+    return SCORING_CARDS[seat % SCORING_CARDS.length]!;
+  }
+  const card = SCORING_CARDS.find((candidate) => candidate.id === id);
+  if (!card) {
+    throw new GameError('INVALID_SELECTION', `No scoring card with id "${id}"`);
+  }
+  return card;
 }
 
 export interface CreateGameOptions {
@@ -61,6 +79,8 @@ export function createGame(options: CreateGameOptions): GameState {
       // Setup step 8: each ship starts in the ocean, empty.
       ship: { location: { kind: 'ocean' }, cargo: [] },
       scoringArea: [],
+      // Setup step 13: deal each player a secret scoring card.
+      scoringCard: scoringCardFor(seat, player.scoringCardId),
     };
   });
 

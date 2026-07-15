@@ -18,6 +18,9 @@ describe('createGame', () => {
     expect(p1?.harborStore).toEqual([]);
     expect(p1?.ship).toEqual({ location: { kind: 'ocean' }, cargo: [] }); // starts in the ocean
     expect(p1?.scoringArea).toEqual([]);
+    // Each player is dealt a secret scoring card (default deal is by seat).
+    expect(p1?.scoringCard.id).toBe('sc1');
+    expect(state.players[1]?.scoringCard.id).toBe('sc2');
 
     expect(state.supply.factories).toEqual({ white: 1, red: 1, green: 1, blue: 2, yellow: 2 });
     expect(state.supply.warehouses).toBe(12 - 3);
@@ -39,6 +42,21 @@ describe('createGame', () => {
     expect(state.supply.factories).toEqual({ white: 3, red: 3, green: 3, blue: 3, yellow: 3 });
     expect(state.supply.warehouses).toBe(20 - 5);
     expect(state.supply.containers).toEqual({ white: 16, red: 16, green: 16, blue: 16, yellow: 16 });
+  });
+
+  it('deals an explicitly chosen scoring card', () => {
+    const state = createGame({
+      id: 'g1',
+      players: [{ name: 'Ann', scoringCardId: 'sc4' }, { name: 'Bob' }, { name: 'Cid' }],
+    });
+    expect(state.players[0]?.scoringCard.id).toBe('sc4');
+  });
+
+  it('rejects an unknown scoring card id', () => {
+    expectError(
+      () => createGame({ id: 'g1', players: [{ name: 'Ann', scoringCardId: 'nope' }, { name: 'Bob' }, { name: 'Cid' }] }),
+      'INVALID_SELECTION',
+    );
   });
 
   it('rejects fewer than 3 players', () => {

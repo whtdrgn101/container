@@ -45,6 +45,11 @@ How we get from the current vertical slice to a complete, faithful game, then to
   for now, → the Bank in Slice 6, no subsidy) and **runoff auctions** for ties are in; `$0` bids
   (bluffs) work by construction. Engine at 100% (113 tests). *(The physical $0 bluff-card hand is
   cosmetic and out of scope.)*
+- ✅ **Scoring cards (Slice 7 groundwork):** `ScoringCard` type + a 5-card deck (`SCORING_CARDS`; sc1 =
+  rulebook example, structure faithful — *exact color→slot layout to verify vs. components*).
+  `createGame` deals one per player; the backend shuffles the deal. The UI reveals the **active**
+  player's card (two-value color marked ★) and hides opponents' (hotseat secrecy). Final *scoring* by
+  the card is still Slice 7.
 - ⏭️ **Next: Slice 6 — Off-Shore Bank & loans.**
 
 > **Convention going forward:** new engine mechanics are added as `actions/<name>.ts` + a matching

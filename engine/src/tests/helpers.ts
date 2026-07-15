@@ -3,6 +3,7 @@ import {
   ACTIONS_PER_TURN,
   createGame,
   GameError,
+  SCORING_CARDS,
   STARTING_MONEY,
 } from '../index';
 import type { Color, GameErrorCode, GameState, PlayerState, StoredContainer, Supply } from '../index';
@@ -31,6 +32,7 @@ export function makePlayer(overrides: Partial<PlayerState> & Pick<PlayerState, '
     harborLimit: 1,
     ship: { location: { kind: 'ocean' }, cargo: [] },
     scoringArea: [],
+    scoringCard: SCORING_CARDS[0]!,
     ...overrides,
   };
 }

@@ -1,6 +1,6 @@
 import { Factory as FactoryIcon, Plus, Ship as ShipIcon, Warehouse as WarehouseIcon } from 'lucide-react';
 import { useState } from 'react';
-import type { Action, Color, GameState, PlayerState, ShipLocation, StoredContainer } from '@container/engine';
+import type { Action, Color, GameState, PlayerState, ScoringCard, ShipLocation, StoredContainer } from '@container/engine';
 import {
   COLORS,
   FACTORY_BUILD_COSTS,
@@ -26,6 +26,9 @@ const COLOR_HEX: Record<Color, string> = {
 const DEFAULT_NAMES = ['Ann', 'Bob', 'Cid'];
 
 const nameOf = (players: readonly PlayerState[], id: string) => players.find((p) => p.id === id)?.name ?? id;
+
+/** Sort rank for a color on a scoring card ($10 color first, then the two-value color, then $6/$4/$2). */
+const cardRank = (card: ScoringCard, color: Color) => (color === card.twoValueColor ? 9 : card.values[color]);
 
 /** Human-readable ship location, e.g. "Ocean" or "Bob's harbor". */
 function shipLabel(location: ShipLocation, players: readonly PlayerState[]): string {
@@ -502,6 +505,30 @@ export default function App() {
                             title={color}
                           />
                         ))
+                      )}
+                    </div>
+
+                    <div className="border-t pt-2 text-xs" data-testid={`scoring-card-${player.id}`}>
+                      {isActive ? (
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <span className="font-medium">Your card:</span>
+                          {[...COLORS]
+                            .sort((a, b) => cardRank(player.scoringCard, b) - cardRank(player.scoringCard, a))
+                            .map((color) => {
+                              const isTwo = color === player.scoringCard.twoValueColor;
+                              return (
+                                <span key={color} className="flex items-center gap-1">
+                                  <span
+                                    className="h-4 w-6 rounded-sm border border-black/20"
+                                    style={{ backgroundColor: COLOR_HEX[color] }}
+                                  />
+                                  {isTwo ? `$10/$${player.scoringCard.values[color]} ★` : `$${player.scoringCard.values[color]}`}
+                                </span>
+                              );
+                            })}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">🂠 Secret scoring card</span>
                       )}
                     </div>
 
