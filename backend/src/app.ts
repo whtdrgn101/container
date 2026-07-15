@@ -245,6 +245,9 @@ export function buildApp(options: AppOptions): FastifyInstance {
     },
   );
 
+  // In-progress games, for the home-screen "resume" list. Summaries only — no secret scoring cards.
+  app.get('/games', async () => ({ games: repo.listActive() }));
+
   app.get<{ Params: { id: string }; Querystring: { viewer?: string } }>('/games/:id', async (request, reply) => {
     const state = repo.get(request.params.id);
     if (!state) return notFound(reply, request.params.id);
@@ -358,6 +361,9 @@ export function buildApp(options: AppOptions): FastifyInstance {
       return reply.code(201).send({ lobby });
     },
   );
+
+  // The home-screen "waiting for players" list: open lobbies with a free seat.
+  app.get('/lobbies', async () => ({ lobbies: lobbies.listOpen() }));
 
   app.get<{ Params: { id: string } }>('/lobbies/:id', async (request, reply) => {
     const lobby = lobbies.get(request.params.id);

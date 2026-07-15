@@ -17,7 +17,7 @@ import { BoardMap } from '@/components/BoardMap';
 import { ContainerSvg } from '@/components/art/Container';
 import { cn } from '@/lib/utils';
 import * as api from '@/lib/api';
-import type { Lobby } from '@/lib/api';
+import type { GameSummary, Lobby } from '@/lib/api';
 
 /** Display colors for the five container types (see engine COLORS). */
 const COLOR_HEX: Record<Color, string> = {
@@ -158,6 +158,11 @@ export default function App() {
   // The player ids this client controls. `null` = control every seat (hotseat / bare join). An
   // array binds the window to the seats claimed in the lobby: you only act on those players' turns.
   const [controlledIds, setControlledIds] = useState<string[] | null>(null);
+  // Open games shown on the home screen, and the display name used to join one.
+  const [openLobbies, setOpenLobbies] = useState<Lobby[]>([]);
+  const [displayName, setDisplayName] = useState('');
+  // In-progress games shown on the home screen, for resuming after a closed tab.
+  const [activeGames, setActiveGames] = useState<GameSummary[]>([]);
 
   /** Run async work with busy/error handling but no state assignment (for lobby flows). */
   async function guard(work: () => Promise<void>) {
@@ -228,6 +233,24 @@ export default function App() {
     });
   }
 
+  /** Join an open game listed on the home screen: claim a seat with the display name and enter it. */
+  async function joinFromBrowse(id: string) {
+    await guard(async () => {
+      const { lobby: updated, seat } = await api.joinLobby(id, displayName.trim());
+      setMySeats([seat]);
+      setLobby(updated);
+    });
+  }
+
+  /** Resume an in-progress game bound to a chosen seat (no login — just pick who you are). */
+  async function resumeAs(gameId: string, playerId: string) {
+    await guard(async () => {
+      const mine = await api.getGame(gameId, playerId);
+      setControlledIds([playerId]);
+      setGame(mine);
+    });
+  }
+
   /** Claim the next open seat in the current lobby with the entered name. */
   async function takeSeat() {
     if (!lobby) return;
@@ -285,6 +308,29 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- enterGameAs is stable enough for this poll
   }, [lobbyId, lobbyOpen, mySeats]);
 
+  // On the home screen, poll the list of open games so friends can hop into one another started.
+  const onLanding = !game && !lobby;
+  useEffect(() => {
+    if (!onLanding) return;
+    let active = true;
+    const load = () => {
+      void api
+        .listLobbies()
+        .then((list) => active && setOpenLobbies(list))
+        .catch(() => undefined);
+      void api
+        .listActiveGames()
+        .then((list) => active && setActiveGames(list))
+        .catch(() => undefined);
+    };
+    load();
+    const timer = setInterval(load, 3000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [onLanding]);
+
   // legalActions is a pure read over observable state and never inspects hidden scoring cards,
   // so passing the redacted per-viewer view (which only nulls out opponents' cards) is safe.
   const legal = game ? legalActions(game as unknown as GameState) : [];
@@ -299,6 +345,19 @@ export default function App() {
   const canDrive = !controlledIds || (!!activePlayer && controlledIds.includes(activePlayer.id));
   const myNames =
     controlledIds && game ? game.players.filter((p) => controlledIds.includes(p.id)).map((p) => p.name) : null;
+
+  // Put the display name you're playing as in the tab title, so multiple windows are easy to tell
+  // apart when playtesting. Prefer your in-game seat name(s); fall back to a claimed lobby seat name.
+  const tabName =
+    myNames && myNames.length > 0
+      ? myNames.join(' & ')
+      : lobby && mySeats.length > 0
+        ? mySeats.map((seat) => lobby.members[seat]).filter(Boolean).join(' & ')
+        : null;
+  useEffect(() => {
+    document.title = tabName ? `Container [${tabName}]` : 'Container';
+  }, [tabName]);
+
   const nextFactoryCost = activePlayer ? FACTORY_BUILD_COSTS[activePlayer.factories.length - 1] : undefined;
   const containersGone = game ? COLORS.filter((color) => game.supply.containers[color] === 0).length : 0;
   const mustDeliverNow =
@@ -1192,11 +1251,101 @@ export default function App() {
             </CardContent>
           </Card>
         ) : (
-          <Card className="mx-auto max-w-md">
-            <CardHeader>
-              <CardTitle>New game</CardTitle>
-              <p className="text-sm text-muted-foreground">Container is for {MIN_PLAYERS}–{MAX_PLAYERS} players.</p>
-            </CardHeader>
+          <div className="mx-auto max-w-md space-y-4">
+            {openLobbies.length > 0 && (
+              <Card data-testid="waiting-games">
+                <CardHeader>
+                  <CardTitle>Games waiting for players</CardTitle>
+                  <p className="text-sm text-muted-foreground">Pick a name and hop into a game someone started.</p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <input
+                    aria-label="Display name"
+                    data-testid="display-name"
+                    placeholder="Your name"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    value={displayName}
+                    onChange={(event) => setDisplayName(event.target.value)}
+                  />
+                  <ul className="space-y-2">
+                    {openLobbies.map((open) => {
+                      const taken = open.members.filter((m): m is string => m !== null);
+                      return (
+                        <li
+                          key={open.id}
+                          data-testid={`waiting-game-${open.id}`}
+                          className="flex items-center justify-between gap-2 rounded-md border px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <div className="font-mono text-xs text-muted-foreground">{open.id.slice(0, 8)}</div>
+                            <div className="truncate text-xs text-muted-foreground">
+                              {taken.length}/{open.seats} players{taken.length ? ` · ${taken.join(', ')}` : ''}
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            data-testid={`join-waiting-${open.id}`}
+                            disabled={busy || displayName.trim() === ''}
+                            onClick={() => void joinFromBrowse(open.id)}
+                          >
+                            Join
+                          </Button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+
+            {activeGames.length > 0 && (
+              <Card data-testid="active-games">
+                <CardHeader>
+                  <CardTitle>Games in progress</CardTitle>
+                  <p className="text-sm text-muted-foreground">Closed your tab? Pick your seat to jump back in.</p>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {activeGames.map((active) => (
+                      <li
+                        key={active.id}
+                        data-testid={`active-game-${active.id}`}
+                        className="space-y-2 rounded-md border px-3 py-2"
+                      >
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span className="font-mono">{active.id.slice(0, 8)}</span>
+                          <span>Turn {active.turn}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span className="mr-1 text-xs text-muted-foreground">Resume as</span>
+                          {active.players.map((player) => (
+                            <Button
+                              key={player.id}
+                              size="sm"
+                              variant="outline"
+                              data-testid={`resume-${active.id}-${player.id}`}
+                              disabled={busy}
+                              onClick={() => void resumeAs(active.id, player.id)}
+                              className={cn(player.id === active.activePlayerId && 'ring-1 ring-primary')}
+                              title={player.id === active.activePlayerId ? `${player.name} (their turn)` : player.name}
+                            >
+                              {player.name}
+                              {player.id === active.activePlayerId ? ' •' : ''}
+                            </Button>
+                          ))}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle>New game</CardTitle>
+                <p className="text-sm text-muted-foreground">Container is for {MIN_PLAYERS}–{MAX_PLAYERS} players.</p>
+              </CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-2 rounded-lg border p-3">
                 <div className="text-sm font-medium">Create a shared game</div>
@@ -1318,7 +1467,8 @@ export default function App() {
                 </Button>
               </div>
             </CardContent>
-          </Card>
+            </Card>
+          </div>
         )}
       </main>
     </div>

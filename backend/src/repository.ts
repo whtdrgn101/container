@@ -5,6 +5,15 @@ interface GameRow {
   state: string;
 }
 
+/** A public, secret-free summary of a game — enough to list & resume it, with no scoring cards. */
+export interface GameSummary {
+  id: string;
+  turn: number;
+  status: GameState['status'];
+  activePlayerId: string | null;
+  players: { id: string; name: string }[];
+}
+
 interface MoveRow {
   seq: number;
   type: string;
@@ -33,6 +42,23 @@ export class GameRepository {
   get(id: string): GameState | undefined {
     const row = this.db.prepare(`SELECT state FROM games WHERE id = ?`).get(id) as GameRow | undefined;
     return row ? (JSON.parse(row.state) as GameState) : undefined;
+  }
+
+  /** Secret-free summaries of in-progress games (most-recently-updated first), for the resume list. */
+  listActive(limit = 50): GameSummary[] {
+    const rows = this.db
+      .prepare(`SELECT state FROM games ORDER BY updated_at DESC LIMIT ?`)
+      .all(limit) as GameRow[];
+    return rows
+      .map((row) => JSON.parse(row.state) as GameState)
+      .filter((state) => state.status === 'active')
+      .map((state) => ({
+        id: state.id,
+        turn: state.turn,
+        status: state.status,
+        activePlayerId: state.players[state.activePlayerIndex]?.id ?? null,
+        players: state.players.map((player) => ({ id: player.id, name: player.name })),
+      }));
   }
 
   /** Overwrite a game's snapshot and append any newly-logged moves. */

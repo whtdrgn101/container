@@ -118,6 +118,17 @@ describe('GET /games/:id', () => {
     expect(response.json().error.code).toBe('GAME_NOT_FOUND');
   });
 
+  it('lists in-progress games as secret-free summaries for resuming', async () => {
+    const game = await createThreePlayerGame();
+    const response = await app.inject({ method: 'GET', url: '/games' });
+    const summary = (response.json().games as { id: string; players: { id: string; name: string }[]; activePlayerId: string }[]).find(
+      (g) => g.id === game.id,
+    )!;
+    expect(summary.players.map((p) => p.name)).toEqual(['Ann', 'Bob', 'Cid']);
+    expect(summary.activePlayerId).toBe('p1');
+    expect(summary.players[0]).not.toHaveProperty('scoringCard'); // no hidden info in the summary
+  });
+
   it('projects a multi-seat viewer to exactly those seats and no others (B2)', async () => {
     const game = await createThreePlayerGame();
     const response = await app.inject({ method: 'GET', url: `/games/${game.id}?viewer=p1,p3` });
@@ -489,6 +500,24 @@ describe('Lobbies (pre-game seat claiming)', () => {
     const after = await app.inject({ method: 'GET', url: `/lobbies/${lobby.id}` });
     expect(after.json().lobby.status).toBe('started');
     expect(after.json().lobby.gameId).toBe(game.id);
+  });
+
+  it('lists open lobbies with a free seat, excluding full/started ones', async () => {
+    const open = await createLobby(3);
+    const partial = await createLobby(3);
+    await join(partial.id, 'Solo'); // 1/3 — still open
+
+    const full = await createLobby(3);
+    await join(full.id, 'A');
+    await join(full.id, 'B');
+    await join(full.id, 'C');
+    await app.inject({ method: 'POST', url: `/lobbies/${full.id}/start` }); // full + started
+
+    const response = await app.inject({ method: 'GET', url: '/lobbies' });
+    const ids = (response.json().lobbies as { id: string }[]).map((l) => l.id);
+    expect(ids).toContain(open.id);
+    expect(ids).toContain(partial.id);
+    expect(ids).not.toContain(full.id);
   });
 
   it('refuses to start until every seat is filled', async () => {

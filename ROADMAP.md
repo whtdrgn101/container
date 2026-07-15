@@ -210,7 +210,7 @@ real project. The engine's **purity + serializability** is the key enabler: bots
 |---|------|----------|------|
 | B1 | ✅ Server-authoritative views | Per-player state projection (hidden info enforced **server-side**, never sent to the wrong client) | M–L |
 | B2 | ✅ Real-time transport + lobby | WebSocket live stream, join-by-code, auto-reconnect; **lobby** (create empty seats → join & name → start) | L |
-| B3 | Accounts & persistence | Auth, saved/resumable games, spectators | M–L |
+| B3 | Accounts & persistence | Auth, spectators *(open-games browser + resumable games done, no accounts)* | M–L |
 
 The v1 hotseat engine is already authoritative and serializable, so online is **additive** — B1 mostly
 formalizes "what each player is allowed to see," which A0 also needs.
@@ -252,6 +252,18 @@ formalizes "what each player is allowed to see," which A0 also needs.
   (drive every seat), preserving single-device play. Covered by the extended `lobby.spec.ts` + backend
   multi-viewer tests. *Still simplified: the delivery auction's secret bids are still entered on the active
   player's screen (not each opponent's device), and turn-locking is client-side (not seat-authenticated).*
+- ✅ **B2 open-games browser (no accounts):** `GET /lobbies` lists open lobbies that still have a free
+  seat (`LobbyRepository.listOpen`, newest first). The home screen polls it and shows a **"Games waiting
+  for players"** card; you pick a **display name** and click Join to claim a seat and drop straight into
+  the waiting room — no code needed. Aimed at a home-server deployment where friends/family just hit the
+  site and play. Backend `GET /lobbies` test + a two-context `browse.spec.ts`. *(Accounts/auth remain B3.)*
+- ✅ **B2 resume in-progress games (no login):** game state is already persisted server-side, so a player
+  who closed their tab can jump back in. `GET /games` (`GameRepository.listActive`) returns secret-free
+  summaries (id, turn, player names, whose turn — **no scoring cards**); the home screen polls it and shows
+  a **"Games in progress"** card. Picking a seat (`Resume as <name>`) re-enters the game bound to that
+  player (`controlledIds=[id]`, `viewer=id`), so you see only your own card and are turn-locked as usual.
+  Since seats aren't authenticated (by design — home/family use), anyone may resume any seat. Backend
+  `GET /games` summary test + `resume.spec.ts`.
 
 ---
 

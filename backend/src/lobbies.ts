@@ -37,6 +37,14 @@ export class LobbyRepository {
     return row ? (JSON.parse(row.data) as Lobby) : undefined;
   }
 
+  /** Open lobbies that still have a free seat, newest first — the "waiting for players" list. */
+  listOpen(): Lobby[] {
+    const rows = this.db.prepare(`SELECT data FROM lobbies ORDER BY created_at DESC`).all() as LobbyRow[];
+    return rows
+      .map((row) => JSON.parse(row.data) as Lobby)
+      .filter((lobby) => lobby.status === 'open' && lobby.members.some((member) => member === null));
+  }
+
   update(lobby: Lobby): void {
     const now = new Date().toISOString();
     this.db.prepare(`UPDATE lobbies SET data = ?, updated_at = ? WHERE id = ?`).run(JSON.stringify(lobby), now, lobby.id);

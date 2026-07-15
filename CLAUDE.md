@@ -264,6 +264,20 @@ check plan usage between sessions). Summary:
   state must project through `viewFor` with the caller's viewer.** Caveats that remain: turn-locking is
   client-side (the API isn't seat-authenticated), and the delivery auction's secret bids are still entered
   on the active player's screen.
+- **Track B / open-games browser ✅ (no accounts).** `GET /lobbies` (`LobbyRepository.listOpen`) returns
+  open lobbies with a free seat, newest first; the home screen polls it (every 3s while on the landing
+  screen) and renders a **"Games waiting for players"** card. You enter a **display name** and Join to
+  claim a seat and enter the waiting room — no code required. Intended for a home-server deploy where
+  people just visit and play without accounts. Note: the Playwright backend shares one `:memory:` DB
+  across the run, so `GET /lobbies` can surface lobbies from other specs — the browse spec targets its own
+  lobby by code, and the browse card is landing-only (board/responsive specs start a game first).
+- **Track B / resume in-progress games ✅ (no login).** `GET /games` (`GameRepository.listActive`, newest
+  first, capped) returns **secret-free** summaries — `{ id, turn, status, activePlayerId, players:[{id,name}] }`,
+  **never** scoring cards. The home screen polls it and shows a **"Games in progress"** card; `Resume as
+  <name>` calls `resumeAs(gameId, playerId)` → `controlledIds=[id]`, fetches `getGame(id, viewer=id)`, and
+  enters bound to that seat (own card only, turn-locked). Seats are **not** authenticated — anyone can
+  resume any seat (intentional for home/LAN use). The same shared-`:memory:`-DB caveat applies to `GET
+  /games` in e2e (resume spec targets its own game by id; the resume card is landing-only).
 - **Slice 8 ✅ (UI/UX polish & board).** Original SVG art (`ui/src/components/art/{Container,Ship}.tsx`)
   replaces all colored-square chips via the `ContainerChip` wrapper (kept as `span[title]` for e2e
   counts). A `BoardMap` (`ui/src/components/BoardMap.tsx`) draws every ship on an

@@ -81,6 +81,29 @@ export async function createLobby(seats: number): Promise<Lobby> {
   );
 }
 
+/** List open lobbies that still have a free seat (the home-screen "waiting for players" list). */
+export async function listLobbies(): Promise<Lobby[]> {
+  const response = await fetch(`${BASE_URL}/lobbies`);
+  if (!response.ok) await fail(response);
+  return ((await response.json()) as { lobbies: Lobby[] }).lobbies;
+}
+
+/** A secret-free summary of an in-progress game (for the home-screen "resume" list). */
+export interface GameSummary {
+  id: string;
+  turn: number;
+  status: 'active' | 'ended';
+  activePlayerId: string | null;
+  players: { id: string; name: string }[];
+}
+
+/** List in-progress games so a player who closed their tab can jump back into a seat. */
+export async function listActiveGames(): Promise<GameSummary[]> {
+  const response = await fetch(`${BASE_URL}/games`);
+  if (!response.ok) await fail(response);
+  return ((await response.json()) as { games: GameSummary[] }).games;
+}
+
 /** Fetch a lobby by code, or throw if it doesn't exist. */
 export async function getLobby(id: string): Promise<Lobby> {
   return unwrapLobby(await fetch(`${BASE_URL}/lobbies/${id}`));
