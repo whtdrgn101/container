@@ -1,40 +1,27 @@
-import type { Action, GameView, NewPlayer } from '@container/engine';
+/**
+ * The games-platform API client — **game-agnostic** (roadmap C2).
+ *
+ * Mirrors the backend's split exactly: this file is the core (games, lobbies, the live stream), and a
+ * game's own endpoints live in its own client (`games/container/api.ts`, serving
+ * `/games/:id/container/…`). Nothing here may import `@container/engine` or know what a container,
+ * a bid or a scoring card is.
+ *
+ * **A game's state is `unknown` here on purpose.** Only the game's own board can read it, so every
+ * function that returns one is generic in `S`: the shell calls them bare and passes the opaque state
+ * to whichever board the registry picked, while a board calls them with its own view type
+ * (`api.getGame<GameView>(…)`) and stays fully typed. Don't widen a board to `unknown` to make a call
+ * type-check — pass the type parameter instead.
+ */
 
 // In dev the Vite server proxies `/api` → the backend (stripping the prefix). In a production build
 // the UI is served by the backend itself, so the API lives at the same origin's root.
-const BASE_URL = import.meta.env.PROD ? '' : '/api';
+export const BASE_URL = import.meta.env.PROD ? '' : '/api';
 
 interface ApiError {
   error?: { code?: string; message?: string };
 }
 
-const JSON_HEADERS = { 'content-type': 'application/json' };
-
-/**
- * A pending delivery auction, as this client is allowed to see it (A1).
- *
- * The server keeps the bids; this projection carries only what the viewer may know. During
- * `bidding` you can see *that* an opponent has bid but never *what* — including if you're the
- * deliverer, which is the point: you choose whether to buy out without knowing what you'd be paid.
- * `revealed` fills in only once every opponent has committed.
- */
-export interface DeliveryAuctionView {
-  gameId: string;
-  delivererId: string;
-  cargo: string[];
-  /** `runoff`: the leaders tied and are secretly adding cash to their existing bid (pg. 16). */
-  phase: 'bidding' | 'runoff' | 'decision';
-  /** Seats owing a bid **this round** — in a runoff, only the tied players. */
-  bidders: { playerId: string; hasBid: boolean }[];
-  yourBid: number | null;
-  /** Opening bids; revealed once they're all in, and stay visible through a runoff. */
-  revealed: Record<string, number> | null;
-  /** Extra cash added in the runoff; revealed once the runoff closes. */
-  runoffRevealed: Record<string, number> | null;
-  winningBid: number | null;
-  /** Bidders the deliverer must pick between when a runoff ends still level. Usually empty. */
-  choiceRequired: string[];
-}
+export const JSON_HEADERS = { 'content-type': 'application/json' };
 
 /** A claimed lobby seat: who's in it, and whether that's a person or the AI. */
 export interface LobbyMember {
@@ -45,7 +32,7 @@ export interface LobbyMember {
 /** A pre-game lobby: a shareable room whose seats players claim by name before the game starts. */
 export interface Lobby {
   id: string;
-  /** Which game the room is for (roadmap C1). Always 'container' until C2 offers a picker. */
+  /** Which game the room is for (roadmap C1) — its seat count is that game's rule, not a constant. */
   gameType: string;
   seats: number;
   members: (LobbyMember | null)[];
@@ -54,25 +41,55 @@ export interface Lobby {
 }
 
 /**
- * A game plus the seats an AI holds. `bots` travels beside the state rather than inside it: which
- * seats are bots is coordination state, and the engine never learns about it.
+ * A game, plus what a generic caller needs to make sense of it.
+ *
+ * `gameType` says which board reads `game`; `bots` travels beside the state rather than inside it,
+ * because which seats are bots is coordination state the engine never learns about.
  */
-export interface GamePayload {
-  game: GameView;
+export interface GamePayload<S = unknown> {
+  game: S;
+  gameType: string;
   bots: string[];
 }
 
+/** One of the games this server hosts, from `GET /games/catalog`. */
+export interface GameInfo {
+  id: string;
+  name: string;
+  minPlayers: number;
+  maxPlayers: number;
+}
+
+/** A secret-free summary of an in-progress game (for the home-screen "resume" list). */
+export interface GameSummary {
+  id: string;
+  /** Which game this is, so the shell knows which board to open. */
+  gameType: string;
+  turn: number;
+  status: 'active' | 'ended';
+  activePlayerId: string | null;
+  players: { id: string; name: string }[];
+  /** Seats an AI holds. Never offer these to resume — the server already plays them. */
+  bots: string[];
+}
+
+/** A seat in a new game: a name, plus whether the AI should play it. */
+export interface NewSeat {
+  name: string;
+  bot?: boolean;
+}
+
 /** Throw an Error carrying the server's message (used for any non-2xx response). */
-async function fail(response: Response): Promise<never> {
+export async function fail(response: Response): Promise<never> {
   const body = (await response.json().catch(() => ({}))) as ApiError;
   throw new Error(body.error?.message ?? `Request failed (${response.status})`);
 }
 
-// The server sends a per-viewer projection (opponents' secret scoring cards are redacted to null).
-async function unwrap(response: Response): Promise<GamePayload> {
+// The server sends a per-viewer projection (opponents' secret cards are redacted to null).
+export async function unwrap<S = unknown>(response: Response): Promise<GamePayload<S>> {
   if (!response.ok) await fail(response);
-  const body = (await response.json()) as { game: GameView; bots?: string[] };
-  return { game: body.game, bots: body.bots ?? [] };
+  const body = (await response.json()) as { game: S; gameType: string; bots?: string[] };
+  return { game: body.game, gameType: body.gameType, bots: body.bots ?? [] };
 }
 
 async function unwrapLobby(response: Response): Promise<Lobby> {
@@ -80,35 +97,42 @@ async function unwrapLobby(response: Response): Promise<Lobby> {
   return ((await response.json()) as { lobby: Lobby }).lobby;
 }
 
-/** A seat in a new game: a name, plus whether the AI should play it. */
-export type NewSeat = NewPlayer & { bot?: boolean };
+/** The games this server hosts — what the picker lists, and where seat bounds come from. */
+export async function listGameTypes(): Promise<GameInfo[]> {
+  const response = await fetch(`${BASE_URL}/games/catalog`);
+  if (!response.ok) await fail(response);
+  return ((await response.json()) as { games: GameInfo[] }).games;
+}
 
-/** Create a new game and return its initial state. */
-export async function createGame(players: NewSeat[]): Promise<GamePayload> {
-  return unwrap(
+/** Create a new game of `gameType` and return its initial state. */
+export async function createGame<S = unknown>(gameType: string, players: NewSeat[]): Promise<GamePayload<S>> {
+  return unwrap<S>(
     await fetch(`${BASE_URL}/games`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ players }),
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ gameType, players }),
     }),
   );
 }
 
 /**
- * Apply an action for a player and return the updated state. `viewer` (your seat ids) projects the
- * response for your own seats so the reply never reveals another player's card; omit for hotseat.
+ * Apply an action for a player and return the updated state.
+ *
+ * `action` is opaque: the server delegates all validation to the game's own module, so the shape is
+ * the game's business. `viewer` (your seat ids) projects the response for your own seats so the reply
+ * never reveals another player's card; omit for hotseat.
  */
-export async function applyAction(
+export async function applyAction<S = unknown>(
   gameId: string,
   playerId: string,
-  action: Action,
+  action: unknown,
   viewer?: string,
-): Promise<GamePayload> {
+): Promise<GamePayload<S>> {
   const query = viewer !== undefined ? `?viewer=${encodeURIComponent(viewer)}` : '';
-  return unwrap(
+  return unwrap<S>(
     await fetch(`${BASE_URL}/games/${gameId}/actions${query}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: JSON_HEADERS,
       body: JSON.stringify({ playerId, action }),
     }),
   );
@@ -118,74 +142,19 @@ export async function applyAction(
  * Fetch a game's current state by id. `viewer` is a comma-separated list of your seat ids (see only
  * those seats' hidden info); `''` is a spectator (no cards); omit it to follow the active player.
  */
-export async function getGame(gameId: string, viewer?: string): Promise<GamePayload> {
+export async function getGame<S = unknown>(gameId: string, viewer?: string): Promise<GamePayload<S>> {
   const query = viewer !== undefined ? `?viewer=${encodeURIComponent(viewer)}` : '';
-  return unwrap(await fetch(`${BASE_URL}/games/${gameId}${query}`));
+  return unwrap<S>(await fetch(`${BASE_URL}/games/${gameId}${query}`));
 }
 
-/**
- * Endpoints that belong to Container specifically, rather than to the games platform.
- *
- * The server hosts games plural (roadmap C1), so each game's own routes live under
- * `/games/:id/<gameType>/…` — the delivery auction is Container's, not something every game has.
- * Only this game's own endpoints go here; `/games/:id` and `/games/:id/actions` are the shared core's
- * and stay unprefixed.
- *
- * Hardcoding the type is honest for now: this whole client *is* Container's board. C2 splits it into
- * a generic shell plus a typed per-game client, and this constant is the seam that becomes.
- */
-const gameRoute = (gameId: string, path: string) => `${BASE_URL}/games/${gameId}/container${path}`;
-
-/**
- * Fetch the open delivery auction, as seen by one `viewer` seat, or `null` if none is open.
- *
- * `viewer` is a *single* seat, not a list: bids are per-player, so a hotseat client holding every
- * seat asks once per player as it prompts them.
- */
-export async function getAuction(gameId: string, viewer?: string): Promise<DeliveryAuctionView | null> {
-  const query = viewer !== undefined ? `?viewer=${encodeURIComponent(viewer)}` : '';
-  const response = await fetch(gameRoute(gameId, `/auction${query}`));
-  if (!response.ok) await fail(response);
-  return ((await response.json()) as { auction: DeliveryAuctionView | null }).auction;
-}
-
-/** Place one seat's sealed bid. $0 is a legal bluff. Returns the auction as that bidder sees it. */
-export async function placeBid(gameId: string, playerId: string, bid: number): Promise<DeliveryAuctionView> {
-  const response = await fetch(gameRoute(gameId, '/auction/bids'), {
-    method: 'POST',
-    headers: JSON_HEADERS,
-    body: JSON.stringify({ playerId, bid }),
-  });
-  if (!response.ok) await fail(response);
-  return ((await response.json()) as { auction: DeliveryAuctionView }).auction;
-}
-
-/**
- * Deliverer only: accept the high bid, or `buyout` to pay the Bank and keep the containers.
- * `winnerId` names the tied bidder who takes the cargo — required exactly when the auction reports
- * `choiceRequired` and you are not buying out.
- */
-export async function resolveAuction(
-  gameId: string,
-  playerId: string,
-  buyout: boolean,
-  viewer?: string,
-  winnerId?: string,
-): Promise<GamePayload> {
-  const query = viewer !== undefined ? `?viewer=${encodeURIComponent(viewer)}` : '';
-  return unwrap(
-    await fetch(gameRoute(gameId, `/auction/resolve${query}`), {
+/** Create an empty lobby for `gameType` with `seats` unclaimed seats (its id is the shareable code). */
+export async function createLobby(gameType: string, seats: number): Promise<Lobby> {
+  return unwrapLobby(
+    await fetch(`${BASE_URL}/lobbies`, {
       method: 'POST',
       headers: JSON_HEADERS,
-      body: JSON.stringify({ playerId, buyout, ...(winnerId ? { winnerId } : {}) }),
+      body: JSON.stringify({ gameType, seats }),
     }),
-  );
-}
-
-/** Create an empty lobby with `seats` unclaimed seats and return it (its id is the shareable code). */
-export async function createLobby(seats: number): Promise<Lobby> {
-  return unwrapLobby(
-    await fetch(`${BASE_URL}/lobbies`, { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ seats }) }),
   );
 }
 
@@ -194,19 +163,6 @@ export async function listLobbies(): Promise<Lobby[]> {
   const response = await fetch(`${BASE_URL}/lobbies`);
   if (!response.ok) await fail(response);
   return ((await response.json()) as { lobbies: Lobby[] }).lobbies;
-}
-
-/** A secret-free summary of an in-progress game (for the home-screen "resume" list). */
-export interface GameSummary {
-  id: string;
-  /** Which game this is (roadmap C1), so C2's shell knows which board to open. */
-  gameType: string;
-  turn: number;
-  status: 'active' | 'ended';
-  activePlayerId: string | null;
-  players: { id: string; name: string }[];
-  /** Seats an AI holds. Never offer these to resume — the server already plays them. */
-  bots: string[];
 }
 
 /** List in-progress games so a player who closed their tab can jump back into a seat. */
@@ -248,8 +204,8 @@ export async function joinLobby(id: string, name: string, bot = false): Promise<
 }
 
 /** Start a full lobby's game and return the created game state. */
-export async function startLobby(id: string): Promise<GamePayload> {
-  return unwrap(await fetch(`${BASE_URL}/lobbies/${id}/start`, { method: 'POST' }));
+export async function startLobby<S = unknown>(id: string): Promise<GamePayload<S>> {
+  return unwrap<S>(await fetch(`${BASE_URL}/lobbies/${id}/start`, { method: 'POST' }));
 }
 
 /** Absolute ws(s):// URL for the live stream, derived from the current page origin. */
@@ -258,17 +214,35 @@ function streamUrl(gameId: string): string {
   return `${proto}//${window.location.host}${BASE_URL}/games/${gameId}/stream`;
 }
 
+/** The state push every game gets. A board casts `game` to its own view type. */
+export interface StatePush {
+  type: 'state';
+  game: unknown;
+  gameType: string;
+  bots?: string[];
+}
+
+/** Anything else the server pushes down the same socket — a game's own side-channel. */
+export interface GameMessage {
+  type: string;
+  [key: string]: unknown;
+}
+
 /**
- * Subscribe to a game's live updates over WebSocket. Calls `onState` with each pushed projection,
- * and `onAuction` when a delivery auction opens, gains a bid, reveals, or closes (`null`).
- * Reconnects automatically with a short backoff. Returns a function that permanently closes the
- * subscription (call it on unmount / when leaving the game).
+ * Subscribe to a game's live updates over WebSocket. Reconnects automatically with a short backoff;
+ * returns a function that permanently closes the subscription (call it on unmount / when leaving).
+ *
+ * **One socket per game, and the shell owns it.** `onState` gets every `type: 'state'` push; anything
+ * else goes to `onMessage` verbatim for the game's board to interpret. This mirrors the backend: the
+ * core pushes state, and a module pushes its own side-channels down the same hub (Container's
+ * `type: 'auction'`). The transport must not learn what an auction is — it used to take an `onAuction`
+ * callback typed against Container, which is exactly the coupling C2 removes.
  */
 export function subscribeGame(
   gameId: string,
-  onState: (game: GameView, bots: string[]) => void,
+  onState: (push: StatePush) => void,
   viewer?: string,
-  onAuction?: (auction: DeliveryAuctionView | null) => void,
+  onMessage?: (message: GameMessage) => void,
 ): () => void {
   let socket: WebSocket | null = null;
   let closed = false;
@@ -281,14 +255,9 @@ export function subscribeGame(
     socket = ws;
     ws.onmessage = (event) => {
       try {
-        const msg = JSON.parse(event.data as string) as {
-          type: string;
-          game: GameView;
-          bots?: string[];
-          auction: DeliveryAuctionView | null;
-        };
-        if (msg.type === 'state') onState(msg.game, msg.bots ?? []);
-        else if (msg.type === 'auction') onAuction?.(msg.auction);
+        const msg = JSON.parse(event.data as string) as GameMessage;
+        if (msg.type === 'state') onState(msg as unknown as StatePush);
+        else onMessage?.(msg);
       } catch {
         // ignore malformed frames
       }

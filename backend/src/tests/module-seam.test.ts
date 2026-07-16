@@ -279,6 +279,35 @@ describe('hosting two games at once', () => {
     expect((started.json().game as { count?: number }).count).toBeDefined();
   });
 
+  // A game view is an opaque blob to anyone generic, so every payload carrying one must say what it
+  // is — otherwise C2's shell has no way to pick a board for a state it just fetched.
+  it('tags every game payload with its type, on create, read and act', async () => {
+    const counter = await createOf('counter', [{ name: 'Ann' }, { name: 'Bo' }]);
+    const container = await createOf('container', threeNames);
+
+    const read = await app.inject({ method: 'GET', url: `/games/${counter.id}` });
+    expect(read.json().gameType).toBe('counter');
+
+    const acted = await app.inject({
+      method: 'POST',
+      url: `/games/${counter.id}/actions`,
+      payload: { playerId: 'p1', action: { type: 'BUMP', by: 1 } },
+    });
+    expect(acted.json().gameType).toBe('counter');
+
+    expect((await app.inject({ method: 'GET', url: `/games/${container.id}` })).json().gameType).toBe('container');
+  });
+
+  it('tags the live stream’s pushes too, so a socket-only client can tell', async () => {
+    const counter = await createOf('counter', [{ name: 'Ann' }, { name: 'Bo' }]);
+    const socket = await app.injectWS(`/games/${counter.id}/stream`);
+    const first = await new Promise<{ gameType: string }>((resolve) => {
+      socket.on('message', (data: Buffer) => resolve(JSON.parse(data.toString())));
+    });
+    expect(first.gameType).toBe('counter');
+    await socket.terminate();
+  });
+
   it('tags each listing with its game type, so a generic client knows which board to open', async () => {
     const container = await createOf('container', threeNames);
     const counter = await createOf('counter', [{ name: 'Ann' }, { name: 'Bo' }]);

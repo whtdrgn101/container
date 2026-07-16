@@ -1,5 +1,5 @@
 import type { Action, GameView, PlayerView, ShipLocation } from '@container/engine';
-import { ShipSvg } from '@/components/art/Ship';
+import { ShipSvg } from './art/Ship';
 import { cn } from '@/lib/utils';
 
 /** Distinct hull tints per seat, so each player's ship reads apart on the water. */

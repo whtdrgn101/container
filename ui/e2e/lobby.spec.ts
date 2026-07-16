@@ -76,3 +76,30 @@ test('create an empty lobby, join and name seats by code, then start', async ({ 
   await hostCtx.close();
   await guestCtx.close();
 });
+
+/**
+ * Leaving a waiting room drops only *this window's* binding — the seat keeps your name server-side.
+ * So getting back in must return you to your own seat, not claim another one.
+ *
+ * It used to claim: the only way back was "Join", which takes the next *empty* seat, so you came back
+ * as a second player under your own name and could fill your own room.
+ */
+test('rejoin a lobby you already hold a seat in, rather than claiming another', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('create-lobby').click();
+  const code = await page.getByTestId('lobby-code').getAttribute('data-lobby-id');
+  await page.getByTestId('seat-name').fill('Tim');
+  await page.getByTestId('take-seat').click();
+  await expect(page.getByTestId('lobby-seat-0')).toContainText('Tim (you)');
+
+  await page.getByTestId('leave-lobby').click();
+  await expect(page.getByTestId(`waiting-game-${code}`)).toBeVisible();
+
+  // Back in as yourself, in the seat you already had.
+  await page.getByTestId(`rejoin-waiting-${code}-0`).click();
+  await expect(page.getByTestId('lobby')).toBeVisible();
+  await expect(page.getByTestId('lobby-seat-0')).toContainText('Tim (you)');
+  // …and no second Tim: the other seats are still free for real players.
+  await expect(page.getByTestId('lobby-seat-1')).toContainText('Empty');
+  await expect(page.getByTestId('lobby-seat-2')).toContainText('Empty');
+});

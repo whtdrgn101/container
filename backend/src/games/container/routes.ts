@@ -155,8 +155,11 @@ export function registerAuctionRoutes(app: FastifyInstance, ctx: ModuleContext):
         ctx.bots.tick(request.params.id);
 
         const settled = (gameOf(request.params.id) ?? next) as GameState;
+        // Same shape as the core's `gamePayload` — `gameType` included, since a generic client reads
+        // this reply exactly like any other and still has to know which board it belongs to.
         return reply.send({
           game: viewFor(settled, viewerFrom(request.query.viewer, settled)),
+          gameType: 'container',
           bots: ctx.botSeats.listForGame(request.params.id),
         });
       } catch (error) {

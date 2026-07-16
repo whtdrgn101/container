@@ -53,6 +53,13 @@ container/
 │   └── src/games/                 — the GameModule seam: module.ts (contract), registry.ts,
 │                                    container/ (Container as one registered game)
 ├── ui/         @container/ui      — React + Tailwind + shadcn; talks to the API
+│   └── src/
+│       ├── App.tsx                — the Game Hub shell: routing + seat binding (knows no game)
+│       ├── shell/                 — Header, Landing, WaitingRoom (generic)
+│       ├── hooks/                 — useGameTransport (one socket), useHomeLists
+│       ├── lib/api.ts             — the platform API client (generic)
+│       └── games/                 — the GameClient seam: types.ts, registry.ts,
+│                                    container/ (board + panels + its own api.ts)
 └── reference_material/            — the rulebook PDF
 ```
 
@@ -103,6 +110,38 @@ literal: two games can run side by side on one server, proven by `tests/module-s
   thing that couldn't survive a second game.
 - **Randomness is injected** (`createGame({ rng })`), never reached for inside a module. That's what
   keeps every engine pure, deterministic and replayable.
+### The `GameClient` seam — the UI side (Track C / C2)
+
+The UI mirrors the backend split. `App.tsx` is the **Game Hub shell**: landing, lobby, navigation,
+seat binding, and the transport. A game plugs in a **board**; the shell renders it and never reads a
+game's state.
+
+- **⚠️ Nothing outside `ui/src/games/<game>/` may import `@container/engine`** — and
+  `e2e/architecture.spec.ts` fails the build if it does. This is the rule most likely to be undone by
+  accident (someone needs `COLORS` in a shell file, adds one import, and the games room is quietly a
+  Container app again). If shell code seems to need a rule, a colour, a piece or a seat count, the
+  need belongs on the other side: **seat bounds come from `GET /games/catalog`**, not `MIN_PLAYERS`.
+- **Only `games/registry.ts` may name a specific game.** Also enforced by that spec.
+- **`unknown` at the seam, never inside a board.** `lib/api.ts` is generic in `S`
+  (`getGame<GameView>(…)`); `games/container/api.ts` pins the types back, so the board is fully typed.
+  Don't widen a board's props to `unknown` to make a call type-check — pass the type parameter.
+  There is **exactly one cast**, at registration in `registry.ts`; TypeScript can't type a
+  heterogeneous list of `GameClient<S>` (React props are contravariant, so the backend's
+  method-bivariance trick doesn't apply). What makes it sound: `gameType` picks the client, so a board
+  only ever gets a state its own game produced.
+- **The shell owns the socket; the board owns its side-channels.** `useGameTransport` handles
+  `type: 'state'` and hands every other frame back as `lastMessage` for the board to interpret
+  (Container reads `type: 'auction'`). `subscribeGame` used to take an `onAuction` callback typed
+  against Container — don't put a game's concept back into the transport.
+- **The header's status line is a plugin slot** (`GameClient.Status`), because "2 actions left" is a
+  Container rule. Keep `Status` cheap and non-lazy: it renders before the board chunk lands.
+- **The board is lazy** (`lazy(() => import('./Board'))`) and must stay that way — it's a real 41 kB
+  chunk carrying the engine, the panels and the art, and the hub's landing screen ships none of it.
+  Importing the board (or anything heavy) from `games/container/index.ts` would silently undo that.
+- **Every game payload carries `gameType`** (`{ game, gameType, bots }`, plus the WS state push), which
+  is how the shell picks a board for a state it just fetched. A new route returning game state must
+  include it.
+
 - **The honest test is `tests/module-seam.test.ts`**, which drives a stub *counter* game through the core.
   Container's own tests pass fine even if the core is secretly hardcoded to Container — only a second
   game can tell. Keep that file working; it's the thing that caught the repository reading `state.version`.
@@ -487,8 +526,12 @@ check plan usage between sessions). Summary:
   migration — `readLobby` defaults old rows to `'container'`). `POST /games`/`POST /lobbies` take an
   optional `gameType`, defaulting to `AppOptions.defaultGameType` so the hotseat quick-start still works.
   **The core no longer imports `@container/engine` at all.**
-  **Next: C2** — the UI shell (game picker, per-game lazy-loaded boards). The UI is still wholly
-  Container's: `api.ts`'s `gameRoute()` hardcodes `/container`, and that constant is the seam C2 splits.
+- **Track C / C2 ✅ (UI shell — the site is a games room).** `App.tsx` went from **1895 lines to 364**
+  and no longer knows what Container is; no file in `ui/src` is over ~380. See "The `GameClient` seam"
+  above for the working rules. The board is a lazy plugin (its own 41 kB chunk), the landing screen
+  reads seat bounds from `GET /games/catalog`, and the picker appears only once two games are
+  registered. Pure refactor — all 76 e2e specs passed **unchanged**, testids intact.
+  **Next: C3** — a second game, the only honest test of the abstraction.
 - **Track B — online multiplayer:** independent track. The authoritative, serializable engine makes all
   of these additive (see `ROADMAP.md`).
 

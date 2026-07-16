@@ -23,6 +23,8 @@ export interface StateMessage {
   readonly type: 'state';
   /** A `GameView` — whatever the game's own `viewFor` produced for this subscriber. */
   readonly game: unknown;
+  /** Which game this is, so a client hosting several knows how to read `game` (roadmap C2). */
+  readonly gameType: string;
   /**
    * Seats an AI holds. Rides alongside the game rather than inside it: bot-ness is coordination
    * state, not a rule, so it never enters a game's state (see `bots.ts`).

@@ -1,0 +1,52 @@
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { expect, test } from '@playwright/test';
+
+/**
+ * The C2 seam, enforced.
+ *
+ * A static check rather than a browser test — it belongs with the UI's tests, and Playwright is the
+ * UI's only runner. It's cheap, and the rule it guards is the one thing a refactor is most likely to
+ * quietly undo: someone needs `COLORS` in a shell file, adds one import, and the "games room" is a
+ * Container app again with nothing failing to say so.
+ *
+ * The rule: **the shell knows no game.** Everything Container understands lives under
+ * `src/games/container/`. If a shell file needs a rule, a colour, a piece, or a seat count, that need
+ * belongs on the other side of the seam (seat bounds, for instance, come from `GET /games/catalog`).
+ */
+const SRC = join(fileURLToPath(new URL('.', import.meta.url)), '..', 'src');
+
+/** Where a game's own code is allowed to live. Everything else is the shell. */
+const GAME_DIR = join(SRC, 'games');
+
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap((entry) => {
+    const path = join(dir, entry);
+    if (statSync(path).isDirectory()) return sourceFiles(path);
+    return /\.tsx?$/.test(entry) ? [path] : [];
+  });
+}
+
+test('the shell imports no game engine', () => {
+  const offenders = sourceFiles(SRC)
+    .filter((path) => !path.startsWith(GAME_DIR))
+    .filter((path) => {
+      const source = readFileSync(path, 'utf8');
+      // Match real imports only — these files *talk about* the rule in their comments.
+      return /^\s*import\s[^;]*from\s+'@container\/engine'/m.test(source);
+    })
+    .map((path) => path.slice(SRC.length + 1));
+
+  expect(offenders, 'shell files must not import @container/engine — move the need into games/<game>/').toEqual([]);
+});
+
+test('only the registry reaches into a game', () => {
+  const offenders = sourceFiles(SRC)
+    .filter((path) => !path.startsWith(GAME_DIR))
+    .filter((path) => path !== join(SRC, 'games', 'registry.ts'))
+    .filter((path) => /^\s*import\s[^;]*from\s+'[^']*games\/container/m.test(readFileSync(path, 'utf8')))
+    .map((path) => path.slice(SRC.length + 1));
+
+  expect(offenders, 'only games/registry.ts may name a specific game').toEqual([]);
+});

@@ -134,6 +134,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
     // A null viewer follows whoever is active (a shared hotseat screen shows the current player); a
     // seat list projects for exactly those seats; an empty list is a spectator (sees no cards).
     game: module.viewFor(state, viewer ?? module.summarize(state).activePlayerId),
+    gameType: module.id,
     bots: botSeats.listForGame(gameId),
   });
 
@@ -231,9 +232,16 @@ export function buildApp(options: AppOptions): FastifyInstance {
     return repo.get(gameId) ?? state;
   };
 
-  /** The `{ game, bots }` payload every state-returning route replies with. */
+  /**
+   * The `{ game, gameType, bots }` payload every state-returning route replies with.
+   *
+   * `gameType` rides along because a game view is an opaque blob to anyone generic: a client that
+   * hosts more than one game (roadmap C2's shell) has no other way to know which board to render for
+   * a state it just fetched. Same reason the column exists server-side.
+   */
   const gamePayload = (module: AnyGameModule, gameId: string, state: unknown, viewer: Viewer) => ({
     game: module.viewFor(state, viewer),
+    gameType: module.id,
     bots: botSeats.listForGame(gameId),
   });
 

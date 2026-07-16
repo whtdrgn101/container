@@ -44,3 +44,31 @@ test('bid a container in a cash-lot auction and win the cash', async ({ page }) 
   await expect(page.getByTestId('turn-info')).toContainText('Ann');
   await expect(page.getByTestId('money-p1')).toHaveText('$23'); // + $3 from cash lot III
 });
+
+/**
+ * Regression: the two lot kinds share an index, and a Call button must answer for its own kind.
+ *
+ * Only one auction *per kind* runs at a time (pg. 17), so starting a container auction makes every
+ * other container lot uncallable — while the cash lots carry on independently. The container lot's
+ * button used to light up whenever any CALL_BANK was legal at its index, so a callable cash lot lit
+ * its container twin; clicking it sent a container call the engine then refused.
+ *
+ * Five players deliberately: auction tokens are 1 for 3–4 players and 2 for 5 (setup table), and with
+ * a single token the first auction spends it and *nothing* is callable — which hides the bug rather
+ * than fixing it.
+ */
+test('a callable cash lot does not light up the container lot at the same index', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('add-player').click();
+  await page.getByTestId('add-player').click();
+  await page.getByTestId('start-game').click();
+  await expect(page.getByTestId('board')).toBeVisible();
+
+  // Ann starts a container auction on lot I. One auction per kind, so lot III is now uncallable…
+  await page.getByTestId('bank-call-0').click();
+  await expect(page.getByTestId('bank-auction-0')).toContainText('Ann leads $1');
+
+  // …even though the *cash* lot at that same index still is (the second token is unspent).
+  await expect(page.getByTestId('bank-cash-call-2')).toBeVisible();
+  await expect(page.getByTestId('bank-call-2')).toHaveCount(0);
+});

@@ -448,7 +448,7 @@ and makes everything above them generic.
 |---|------|----------|------|
 | C0 | ✅ `GameModule` interface + registry | One typed contract every game implements; Container re-registered through it. No behaviour change | M |
 | C1 | ✅ `game_type` routing | The column, the backfill, `moduleFor`, namespaced module routes, a generic `GameHub` | M |
-| C2 | UI shell | Game picker, per-game lazy-loaded boards, generic lobby/landing; Container's board becomes one plugin | M–L |
+| C2 | ✅ UI shell | Game picker, per-game lazy-loaded boards, generic lobby/landing; Container's board becomes one plugin | M–L |
 | C3 | Second game | Proves the seams are real — the only honest test of the abstraction | L |
 | C4 | Cross-game polish | Per-game rules blurbs, shared results screen, per-game bot registration | M |
 
@@ -540,10 +540,37 @@ thing C0 undid.
 home server, so this was taken rather than aliased — but a client mid-auction across the deploy would
 have to reload.
 
-**Still true, and now C2's problem — generic typing vs. the UI's free shared types.** The UI gets
-`GameState`/`Color` free by aliasing the engine source, and a generic shell erases that. The fix is a
-typed per-game client module on the UI side — **don't let `unknown` leak into board components.**
-`api.ts`'s `gameRoute()` (which hardcodes `/container`) is the seam that becomes.
+### ✅ C2 — UI shell (shipped)
+
+**`App.tsx`: 1895 lines → 364, and it no longer knows what Container is.** Nothing in `ui/src` is over
+~380 lines. Two splits, done together on purpose: the architectural one (shell vs plugin) drew the
+boundaries, and the size one (panels) meant the board didn't just inherit the monolith.
+
+```
+App.tsx 364   shell: routing + seat binding      games/types.ts 69     the GameClient contract
+shell/  558   Header, Landing, WaitingRoom       games/registry.ts     the lookup (one cast)
+hooks/  140   useGameTransport, useHomeLists     games/container/      Board 271 + panels + api 112
+lib/api.ts 279 the platform client (generic)                           BoardMap, GameLog, art, chips
+```
+
+- **The board is a real plugin**: `lazy(() => import('./Board'))` builds as its own **41.65 kB chunk**
+  (11.74 kB gzip) carrying the engine, panels and art — the hub's landing screen ships none of it.
+- **The picker** shows only once two games are registered; with one it would be a button that does
+  nothing. Seat bounds and the game's name now come from `GET /games/catalog`, so the landing screen
+  stopped importing `MIN_PLAYERS`/`MAX_PLAYERS` from Container's engine.
+- **`gameType` on every payload** (and the WS push) is what lets the shell pick a board for a state.
+- **The transport is generic**: `subscribeGame` handed a Container-typed `onAuction` callback before;
+  now the shell handles `type: 'state'` and forwards every other frame to the board verbatim.
+- **The header's status line is a plugin slot** — "2 actions left" is a Container rule.
+- **Generic typing vs. the UI's free shared types — solved as planned.** `lib/api.ts` is generic in
+  `S`; `games/container/api.ts` pins it back to `GameView`, so boards stay fully typed and **no
+  `unknown` reaches a board component**. One cast, at registration: TypeScript can't type a
+  heterogeneous list of `GameClient<S>` (React props are contravariant, so the backend's
+  method-bivariance trick doesn't transfer).
+- **`e2e/architecture.spec.ts` enforces the seam** — no `@container/engine` outside `games/<game>/`,
+  and only the registry may name a game. Verified to actually fail when violated.
+
+Pure refactor: all **76 e2e specs passed unchanged**, testids intact.
 
 **Sequencing note (resolved):** C0/C1 touch `app.ts`, `repository.ts`, and `lobbies.ts` — the *same*
 files Track A needed for the `BotRunner` and the pending auction, so Track A went first. A3–A5 are
