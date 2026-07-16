@@ -149,6 +149,8 @@ export default function App() {
   // time behind a "pass the device" gate, so only one seat is ever mid-bid.
   const [bidDraft, setBidDraft] = useState<number>(0);
   const [bidderSeatId, setBidderSeatId] = useState<string | null>(null);
+  // Which tied bidder the deliverer has picked, when a runoff ends level (pg. 16).
+  const [tieChoice, setTieChoice] = useState<string | null>(null);
   // Per-container-lot cash bids and per-cash-lot container-count bids for Bank auctions, by lot index.
   const [bankBid, setBankBid] = useState<Record<number, number>>({});
   const [bankCount, setBankCount] = useState<Record<number, number>>({});
@@ -434,12 +436,16 @@ export default function App() {
     });
   }
 
-  /** Deliverer only: accept the high bid (bid + matching subsidy), or buy out and keep the cargo. */
-  function resolveDelivery(buyout: boolean) {
+  /**
+   * Deliverer only: accept the high bid (bid + matching subsidy), or buy out and keep the cargo.
+   * `winnerId` is required exactly when a runoff ended level and the cargo is going to a bidder.
+   */
+  function resolveDelivery(buyout: boolean, winnerId?: string) {
     if (!game || !auction) return;
     setPick(null);
     setBuildColor(null);
-    void run(() => api.resolveAuction(game.id, auction.delivererId, buyout, streamViewer));
+    setTieChoice(null);
+    void run(() => api.resolveAuction(game.id, auction.delivererId, buyout, streamViewer, winnerId));
   }
 
   /** Buy every selected container from the seller in a single action. */
@@ -533,6 +539,7 @@ export default function App() {
                 <CardHeader>
                   <CardTitle className="text-base">
                     Delivery auction — {nameOf(game.players, auction.delivererId)} is delivering
+                    {auction.phase === 'runoff' && <span className="ml-2 text-destructive">· runoff!</span>}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -543,7 +550,19 @@ export default function App() {
                     ))}
                   </div>
 
-                  {/* Who still owes a bid. That someone has bid is public; the amount is not. */}
+                  {/*
+                    A runoff keeps the opening bids on the table (pg. 16): the tied players add cash
+                    knowing exactly what they're level on, which is the whole tension of the round.
+                  */}
+                  {auction.phase === 'runoff' && auction.revealed && (
+                    <p className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs" data-testid="runoff-banner">
+                      Tied at ${Math.max(0, ...Object.values(auction.revealed))} —{' '}
+                      {auction.bidders.map((b) => nameOf(game.players, b.playerId)).join(' and ')} add cash to their
+                      existing bid. Highest total wins.
+                    </p>
+                  )}
+
+                  {/* Who still owes a bid this round. That someone has bid is public; the amount is not. */}
                   <div className="flex flex-wrap gap-2 text-xs" data-testid="auction-bidders">
                     {auction.bidders.map((bidder) => (
                       <span
@@ -559,7 +578,7 @@ export default function App() {
                     ))}
                   </div>
 
-                  {auction.phase === 'bidding' ? (
+                  {auction.phase !== 'decision' ? (
                     seatsStillToBid.length > 0 ? (
                       bidderSeatId === null ? (
                         /*
@@ -587,11 +606,20 @@ export default function App() {
                       ) : (
                         <div className="space-y-2 rounded-md border p-3">
                           <label className="flex items-center justify-between gap-2 text-sm">
-                            <span className="font-medium">{nameOf(game.players, bidderSeatId)}'s secret bid</span>
+                            <span className="font-medium">
+                              {auction.phase === 'runoff'
+                                ? `${nameOf(game.players, bidderSeatId)} adds to their $${auction.revealed?.[bidderSeatId] ?? 0} bid`
+                                : `${nameOf(game.players, bidderSeatId)}'s secret bid`}
+                            </span>
                             <input
                               type="number"
                               min={0}
-                              max={game.players.find((p) => p.id === bidderSeatId)?.money ?? 0}
+                              // A runoff bid stacks on top of the opening bid, so what's left to
+                              // spend is the cash still in hand, not the whole pile.
+                              max={
+                                (game.players.find((p) => p.id === bidderSeatId)?.money ?? 0) -
+                                (auction.phase === 'runoff' ? (auction.revealed?.[bidderSeatId] ?? 0) : 0)
+                              }
                               autoFocus
                               data-testid="bid-input"
                               className="w-24 rounded-md border bg-background px-2 py-1 text-right text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -600,7 +628,9 @@ export default function App() {
                             />
                           </label>
                           <p className="text-xs text-muted-foreground">
-                            $0 is a legal bluff. Nobody sees this until everyone has bid.
+                            {auction.phase === 'runoff'
+                              ? 'Added to your first bid — you never get that back. Highest total wins.'
+                              : '$0 is a legal bluff. Nobody sees this until everyone has bid.'}
                           </p>
                           <Button
                             size="sm"
@@ -624,39 +654,88 @@ export default function App() {
                     <div className="space-y-3" data-testid="auction-reveal">
                       {/* Every bid is in, so revealing them all at once keeps the bidding simultaneous. */}
                       <div className="space-y-1">
-                        {auction.bidders.map((bidder) => {
-                          const amount = auction.revealed?.[bidder.playerId] ?? 0;
+                        {Object.keys(auction.revealed ?? {}).map((playerId) => {
+                          const opening = auction.revealed?.[playerId] ?? 0;
+                          const added = auction.runoffRevealed?.[playerId];
+                          const total = opening + (added ?? 0);
                           return (
                             <div
-                              key={bidder.playerId}
-                              data-testid={`revealed-${bidder.playerId}`}
+                              key={playerId}
+                              data-testid={`revealed-${playerId}`}
                               className={cn(
                                 'flex justify-between rounded px-2 py-1 text-sm',
-                                amount === auction.winningBid && 'bg-primary/10 font-medium',
+                                total === auction.winningBid && 'bg-primary/10 font-medium',
                               )}
                             >
-                              <span>{nameOf(game.players, bidder.playerId)}</span>
-                              <span className="tabular-nums">${amount}</span>
+                              <span>{nameOf(game.players, playerId)}</span>
+                              <span className="tabular-nums">
+                                {added === undefined ? (
+                                  `$${opening}`
+                                ) : (
+                                  // Show the arithmetic: a runoff total is the opening bid *plus*
+                                  // the addition, and players will want to check it.
+                                  <>
+                                    <span className="text-muted-foreground">
+                                      ${opening} + ${added} ={' '}
+                                    </span>
+                                    ${total}
+                                  </>
+                                )}
+                              </span>
                             </div>
                           );
                         })}
                       </div>
+
                       {iAmDeliverer ? (
-                        <div className="flex gap-2">
-                          <Button size="sm" className="flex-1" data-testid="deliver" disabled={busy} onClick={() => resolveDelivery(false)}>
-                            Deliver (earn ${(auction.winningBid ?? 0) * 2})
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1"
-                            data-testid="buyout"
-                            disabled={busy}
-                            onClick={() => resolveDelivery(true)}
-                          >
-                            Buy out (${auction.winningBid ?? 0})
-                          </Button>
-                        </div>
+                        <>
+                          {/*
+                            A runoff that ends level is the deliverer's call (pg. 16) — the engine
+                            refuses to guess, so the choice must be made here before Deliver unlocks.
+                          */}
+                          {auction.choiceRequired.length > 0 && (
+                            <div className="space-y-2 rounded-md border border-destructive/40 bg-destructive/10 p-2" data-testid="tie-choice">
+                              <p className="text-xs font-medium text-destructive">
+                                Still tied at ${auction.winningBid} — you choose who gets the cargo:
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {auction.choiceRequired.map((playerId) => (
+                                  <Button
+                                    key={playerId}
+                                    size="sm"
+                                    variant={tieChoice === playerId ? 'default' : 'outline'}
+                                    data-testid={`choose-winner-${playerId}`}
+                                    onClick={() => setTieChoice(playerId)}
+                                  >
+                                    {nameOf(game.players, playerId)}
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              className="flex-1"
+                              data-testid="deliver"
+                              disabled={busy || (auction.choiceRequired.length > 0 && tieChoice === null)}
+                              onClick={() => resolveDelivery(false, tieChoice ?? undefined)}
+                            >
+                              Deliver (earn ${(auction.winningBid ?? 0) * 2})
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1"
+                              data-testid="buyout"
+                              disabled={busy}
+                              // A buyout needs no winner: every tied bidder just takes their bid back.
+                              onClick={() => resolveDelivery(true)}
+                            >
+                              Buy out (${auction.winningBid ?? 0})
+                            </Button>
+                          </div>
+                        </>
                       ) : (
                         <p className="text-sm text-muted-foreground">
                           Waiting for {nameOf(game.players, auction.delivererId)} to accept or buy out…

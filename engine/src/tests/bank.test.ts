@@ -191,7 +191,7 @@ describe('Bank pot routing', () => {
   it('routes a delivery buyout into the Bank cash lots', () => {
     const p1 = makePlayer({ id: 'p1', ship: { location: { kind: 'island' }, cargo: ['red', 'green'] } });
     const state = makeGame([p1, makePlayer({ id: 'p2', money: 10 }), makePlayer({ id: 'p3', money: 10 })]);
-    const next = deliver(state, 'p1', { p2: 4 }, {}, true);
+    const next = deliver(state, 'p1', { bids: { p2: 4 }, buyout: true });
     expect(next.bank.cashLots).toEqual([3, 3, 4]);
   });
 });

@@ -1,7 +1,7 @@
-import type { GameView } from '@container/engine';
+import type { Color, GameView } from '@container/engine';
 import { BotError } from './errors';
 import type { Ctx } from './types';
-import { BID_SHADING, gainFrom, selfOf } from './valuation';
+import { BID_SHADING, RUNOFF_SHADING, expectedValueFor, gainFrom, selfOf } from './valuation';
 
 /**
  * This bot's sealed bid on the active player's delivery (rulebook pg. 15–16).
@@ -32,6 +32,27 @@ export function bidFor(view: GameView, bidderId: string): number {
 }
 
 /**
+ * How much more this bot will add in a runoff, on top of the bid it already has on the table (pg. 16).
+ *
+ * A runoff means your opening bid wasn't enough to win outright, so the shading that made that bid
+ * profitable is now the thing losing you the cargo. The bot therefore reaches closer to its true
+ * valuation here than it did opening — still under it, since winning at exactly your valuation is
+ * worth no more than losing. Two bots that value the cargo identically will deadlock, which is
+ * correct: that is precisely the case the rulebook hands to the deliverer to break.
+ */
+export function runoffBidFor(view: GameView, bidderId: string, openingBid: number): number {
+  const me = selfOf(view, bidderId);
+  const deliverer = view.players[view.activePlayerIndex];
+  if (!deliverer) {
+    throw new BotError(`Game "${view.id}" has no active player to bid against`);
+  }
+  const value = gainFrom(me, deliverer.ship.cargo);
+  // The opening bid isn't sunk — a loser gets it back — so the ceiling is a total, not an increment.
+  const ceiling = Math.min(me.money, Math.floor(value * RUNOFF_SHADING));
+  return Math.max(0, ceiling - openingBid);
+}
+
+/**
  * Should the deliverer buy their own cargo out (rulebook pg. 16)?
  *
  * Buyout: pay the winning bid to the Bank and keep the containers, forfeiting the subsidy.
@@ -46,4 +67,29 @@ export function wantsBuyout(ctx: Ctx, winningBid: number): boolean {
   const keepingCargo = gainFrom(ctx.me, ctx.me.ship.cargo) - winningBid;
   const sellingCargo = 2 * winningBid;
   return keepingCargo > sellingCargo;
+}
+
+/**
+ * Which tied bidder to hand the cargo to when a runoff ends level — "the player delivering
+ * containers chooses which tied bidder wins" (pg. 16).
+ *
+ * The containers have to go to *someone*, and they're worth points to whoever gets them, so the bot
+ * gives them to whoever they help least. It cannot see their cards, but their scoring areas are
+ * public, so "least" is measured in expectation over the cards each could still hold.
+ */
+export function chooseTiedWinner(ctx: Ctx, tied: readonly string[], cargo: readonly Color[]): string {
+  let choice = tied[0]!;
+  let leastHelped = Infinity;
+  for (const id of tied) {
+    const opponent = ctx.opponents.find((player) => player.id === id);
+    if (!opponent) {
+      continue;
+    }
+    const helped = expectedValueFor(ctx, opponent, cargo);
+    if (helped < leastHelped) {
+      leastHelped = helped;
+      choice = id;
+    }
+  }
+  return choice;
 }

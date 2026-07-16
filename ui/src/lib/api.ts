@@ -22,11 +22,18 @@ export interface DeliveryAuctionView {
   gameId: string;
   delivererId: string;
   cargo: string[];
-  phase: 'bidding' | 'decision';
+  /** `runoff`: the leaders tied and are secretly adding cash to their existing bid (pg. 16). */
+  phase: 'bidding' | 'runoff' | 'decision';
+  /** Seats owing a bid **this round** — in a runoff, only the tied players. */
   bidders: { playerId: string; hasBid: boolean }[];
   yourBid: number | null;
+  /** Opening bids; revealed once they're all in, and stay visible through a runoff. */
   revealed: Record<string, number> | null;
+  /** Extra cash added in the runoff; revealed once the runoff closes. */
+  runoffRevealed: Record<string, number> | null;
   winningBid: number | null;
+  /** Bidders the deliverer must pick between when a runoff ends still level. Usually empty. */
+  choiceRequired: string[];
 }
 
 /** A pre-game lobby: a shareable room whose seats players claim by name before the game starts. */
@@ -119,19 +126,24 @@ export async function placeBid(gameId: string, playerId: string, bid: number): P
   return ((await response.json()) as { auction: DeliveryAuctionView }).auction;
 }
 
-/** Deliverer only: accept the high bid, or `buyout` to pay the Bank and keep the containers. */
+/**
+ * Deliverer only: accept the high bid, or `buyout` to pay the Bank and keep the containers.
+ * `winnerId` names the tied bidder who takes the cargo — required exactly when the auction reports
+ * `choiceRequired` and you are not buying out.
+ */
 export async function resolveAuction(
   gameId: string,
   playerId: string,
   buyout: boolean,
   viewer?: string,
+  winnerId?: string,
 ): Promise<GameView> {
   const query = viewer !== undefined ? `?viewer=${encodeURIComponent(viewer)}` : '';
   return unwrap(
     await fetch(`${BASE_URL}/games/${gameId}/auction/resolve${query}`, {
       method: 'POST',
       headers: JSON_HEADERS,
-      body: JSON.stringify({ playerId, buyout }),
+      body: JSON.stringify({ playerId, buyout, ...(winnerId ? { winnerId } : {}) }),
     }),
   );
 }

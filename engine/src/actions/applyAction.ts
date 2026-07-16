@@ -52,7 +52,12 @@ export function applyAction(state: GameState, playerId: string, action: Action):
     if (action.bids === undefined) {
       throw new GameError('INVALID_SELECTION', 'DELIVER requires the opponents\' bids');
     }
-    return deliver(state, playerId, action.bids, action.runoffBids, action.buyout);
+    return deliver(state, playerId, {
+      bids: action.bids,
+      runoffBids: action.runoffBids,
+      buyout: action.buyout,
+      chosenWinnerId: action.chosenWinnerId,
+    });
   }
 
   // Repaying and loading the ship at the Bank are free actions — no action point, no end of turn.

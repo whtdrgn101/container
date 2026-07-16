@@ -104,3 +104,45 @@ test('a broke opponent can take a loan mid-auction so they can still bid', async
   await bidAs(page, '0');
   await expect(page.getByTestId('revealed-p1')).toContainText('$25');
 });
+
+test('runoff: a tie reopens bidding for the tied players and the higher total wins', async ({ page }) => {
+  // Rulebook pg. 16: tied players add cash *without* taking back their first bid; highest total wins.
+  await reachAuction(page);
+  await bidAs(page, '2'); // Ann
+  await bidAs(page, '2'); // Cid — level at $2
+
+  await expect(page.getByTestId('runoff-banner')).toBeVisible();
+  await expect(page.getByTestId('runoff-banner')).toContainText('Tied at $2');
+  // The opening bids are on the table, but nothing is resolved yet.
+  await expect(page.getByTestId('deliver')).toHaveCount(0);
+
+  await bidAs(page, '1'); // Ann adds $1 → $3 total
+  await bidAs(page, '0'); // Cid stands pat → $2 total
+
+  await expect(page.getByTestId('revealed-p1')).toContainText('$2 + $1 = $3');
+  await page.getByTestId('deliver').click();
+
+  await expect(page.getByTestId('scoring-p1').locator('span[title]')).toHaveCount(1);
+  await expect(page.getByTestId('money-p1')).toHaveText('$17'); // Ann paid her $3 total
+  await expect(page.getByTestId('money-p2')).toHaveText('$26'); // Bob: $3 + $3 subsidy
+});
+
+test('a runoff that stays level is the deliverer’s choice, not the earliest seat’s win', async ({ page }) => {
+  await reachAuction(page);
+  await bidAs(page, '2');
+  await bidAs(page, '2');
+  await bidAs(page, '0'); // neither adds anything…
+  await bidAs(page, '0'); // …so they are still level at $2
+
+  // Deliver stays locked until Bob actually decides — the engine refuses to guess.
+  await expect(page.getByTestId('tie-choice')).toBeVisible();
+  await expect(page.getByTestId('deliver')).toBeDisabled();
+
+  await page.getByTestId('choose-winner-p3').click(); // Bob picks Cid, the later seat
+  await page.getByTestId('deliver').click();
+
+  await expect(page.getByTestId('scoring-p3').locator('span[title]')).toHaveCount(1);
+  await expect(page.getByTestId('scoring-p1').locator('span[title]')).toHaveCount(0);
+  await expect(page.getByTestId('money-p3')).toHaveText('$18'); // Cid paid $2
+  await expect(page.getByTestId('money-p2')).toHaveText('$24'); // Bob: $2 + $2 subsidy
+});

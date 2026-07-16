@@ -32,6 +32,8 @@ export type Action =
       readonly bids?: Readonly<Record<string, number>>;
       readonly runoffBids?: Readonly<Record<string, number>>;
       readonly buyout?: boolean;
+      /** Deliverer's pick when a runoff leaves bidders still tied (pg. 16). */
+      readonly chosenWinnerId?: string;
     }
   | { readonly type: 'END_TURN' };
 

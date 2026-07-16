@@ -9,10 +9,20 @@
  * an opponent's secret scoring card.
  */
 export { decide } from './decide';
-export { bidFor, wantsBuyout } from './bid';
+export { bidFor, chooseTiedWinner, runoffBidFor, wantsBuyout } from './bid';
 export { playSelfPlay } from './selfPlay';
 export { BotError } from './errors';
-export { AVERAGE_COLOR_VALUE, BID_SHADING, expectedAuctionBid, gainFrom, islandScore, selfOf } from './valuation';
+export {
+  AVERAGE_COLOR_VALUE,
+  BID_SHADING,
+  RESALE_PER_CONTAINER,
+  RUNOFF_SHADING,
+  expectedAuctionBid,
+  expectedValueFor,
+  gainFrom,
+  islandScore,
+  selfOf,
+} from './valuation';
 
-export type { BidCollector, Candidate, Ctx, DecideOptions } from './types';
+export type { BidCollector, Candidate, Ctx, DecideOptions, RunoffCollector } from './types';
 export type { SelfPlayOptions, SelfPlayResult } from './selfPlay';

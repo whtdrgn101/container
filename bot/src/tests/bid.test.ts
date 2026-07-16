@@ -1,6 +1,6 @@
 import { SCORING_CARDS } from '@container/engine';
 import { describe, expect, it } from 'vitest';
-import { bidFor, wantsBuyout } from '../bid';
+import { bidFor, chooseTiedWinner, runoffBidFor, wantsBuyout } from '../bid';
 import { BotError } from '../errors';
 import { ctxFor, makeGame, makePlayer, viewOf } from './helpers';
 
@@ -87,5 +87,84 @@ describe('wantsBuyout', () => {
 
   it('cannot buy out what it cannot afford', () => {
     expect(wantsBuyout(deliverer(['white', 'red'], 0), 1)).toBe(false);
+  });
+});
+
+describe('runoffBidFor', () => {
+  const runoff = (area: ('white' | 'red')[], money = 20) =>
+    makeGame([
+      makePlayer({ id: 'p1', ship: { location: { kind: 'island' }, cargo: ['white', 'red'] } }),
+      makePlayer({ id: 'p2', money, scoringCard: CARD, scoringArea: area }),
+      makePlayer({ id: 'p3' }),
+    ]);
+
+  it('reaches nearer its true value than the opening bid did', () => {
+    // A runoff means the shaded opening bid wasn't enough — the caution that made it profitable is
+    // now the thing losing the cargo.
+    const state = runoff(['red']);
+    const opening = bidFor(viewOf(state, 'p2'), 'p2');
+    const extra = runoffBidFor(viewOf(state, 'p2'), 'p2', opening);
+    expect(extra).toBeGreaterThan(0);
+    expect(opening + extra).toBeLessThan(10); // still under the $10 the cargo is worth to p2
+  });
+
+  it('adds nothing for cargo it does not want', () => {
+    const state = makeGame([
+      makePlayer({ id: 'p1', ship: { location: { kind: 'island' }, cargo: ['white'] } }),
+      makePlayer({ id: 'p2', scoringCard: CARD, scoringArea: [] }),
+      makePlayer({ id: 'p3' }),
+    ]);
+    expect(runoffBidFor(viewOf(state, 'p2'), 'p2', 0)).toBe(0);
+  });
+
+  it('never commits more than it holds, counting the bid already on the table', () => {
+    const state = runoff(['red'], 5);
+    const extra = runoffBidFor(viewOf(state, 'p2'), 'p2', 4);
+    expect(4 + extra).toBeLessThanOrEqual(5);
+  });
+
+  it('refuses when there is no active deliverer to bid against', () => {
+    const state = { ...runoff(['red']), activePlayerIndex: 99 };
+    expect(() => runoffBidFor(viewOf(state, 'p2'), 'p2', 0)).toThrow(BotError);
+  });
+});
+
+describe('chooseTiedWinner', () => {
+  it('hands the cargo to whoever it helps least', () => {
+    // The containers must go to someone. p2's area already holds red+blue, so a white+green delivery
+    // completes a spread for them; p3 has nothing, and a lone pair is worth far less.
+    const ctx = ctxFor(
+      makeGame([
+        makePlayer({ id: 'p1', scoringCard: CARD, ship: { location: { kind: 'island' }, cargo: ['white', 'green'] } }),
+        makePlayer({ id: 'p2', scoringArea: ['red', 'blue'] }),
+        makePlayer({ id: 'p3', scoringArea: [] }),
+      ]),
+      'p1',
+    );
+    expect(chooseTiedWinner(ctx, ['p2', 'p3'], ['white', 'green'])).toBe('p3');
+  });
+
+  it('always returns one of the tied bidders', () => {
+    const ctx = ctxFor(
+      makeGame([
+        makePlayer({ id: 'p1', scoringCard: CARD, ship: { location: { kind: 'island' }, cargo: ['white'] } }),
+        makePlayer({ id: 'p2' }),
+        makePlayer({ id: 'p3' }),
+      ]),
+      'p1',
+    );
+    expect(['p2', 'p3']).toContain(chooseTiedWinner(ctx, ['p2', 'p3'], ['white']));
+  });
+
+  it('ignores an id that is not a real opponent', () => {
+    const ctx = ctxFor(
+      makeGame([
+        makePlayer({ id: 'p1', scoringCard: CARD, ship: { location: { kind: 'island' }, cargo: ['white'] } }),
+        makePlayer({ id: 'p2' }),
+        makePlayer({ id: 'p3' }),
+      ]),
+      'p1',
+    );
+    expect(chooseTiedWinner(ctx, ['ghost', 'p3'], ['white'])).toBe('p3');
   });
 });

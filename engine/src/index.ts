@@ -3,7 +3,7 @@
 // Domain types
 export { COLORS } from './core';
 export type { Color } from './core';
-export type { Action, ActionType } from './actions';
+export type { Action, ActionType, DeliveryOutcome, DeliveryResolution } from './actions';
 export { SCORING_CARDS } from './core';
 export type {
   BankAuction,
@@ -64,6 +64,9 @@ export {
   factoryPurchase,
   harborPurchase,
   deliver,
+  // How a set of bids resolves (price + who is still level). The backend projects the pending
+  // auction from it and the bot predicts the price with it — one copy of the tie rule, here.
+  deliveryOutcome,
   // Whether the active player is pinned at the island owing a delivery auction. The backend needs
   // this to know when to open a pending auction (A1); the bot re-derives its own turn from it.
   mustDeliver,

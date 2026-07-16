@@ -20,6 +20,8 @@ export type GameErrorCode =
   | 'SHIP_CAPACITY_EXCEEDED'
   | 'MUST_DELIVER'
   | 'INVALID_DELIVERY'
+  // A runoff ended still tied, so the deliverer must pick the winner (pg. 16).
+  | 'CHOICE_REQUIRED'
   | 'LOAN_LIMIT_REACHED'
   | 'NO_LOANS_TO_REPAY'
   | 'NO_AUCTION_TOKEN'

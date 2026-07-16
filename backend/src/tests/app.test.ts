@@ -858,3 +858,158 @@ describe('Delivery auctions — live push', () => {
     socket.terminate();
   });
 });
+
+describe('Delivery auctions — runoff and the deliverer’s tie choice (A1b, pg. 16)', () => {
+  const resolveWith = (gameId: string, body: Record<string, unknown>) =>
+    app.inject({ method: 'POST', url: `/games/${gameId}/auction/resolve`, payload: body });
+
+  it('opens a runoff when the leaders tie, and only they bid again', async () => {
+    const gameId = await startDelivery();
+    await bid(gameId, 'p2', 4);
+    await bid(gameId, 'p3', 4);
+
+    const auction = await getAuction(gameId, 'p1');
+    expect(auction.phase).toBe('runoff');
+    // The opening bids are public now — tied players add cash *knowing* what they're level on.
+    expect(auction.revealed).toEqual({ p2: 4, p3: 4 });
+    expect(auction.winningBid).toBeNull(); // not settled yet
+    // Only the tied players owe a runoff bid.
+    expect(auction.bidders.map((b: { playerId: string }) => b.playerId)).toEqual(['p2', 'p3']);
+  });
+
+  it('adds the runoff bid to the opening bid — the highest total wins', async () => {
+    const gameId = await startDelivery();
+    await bid(gameId, 'p2', 4);
+    await bid(gameId, 'p3', 4);
+    await bid(gameId, 'p2', 1); // p2 → $5 total
+    await bid(gameId, 'p3', 0); // p3 → $4 total
+
+    const auction = await getAuction(gameId, 'p1');
+    expect(auction.phase).toBe('decision');
+    expect(auction.runoffRevealed).toEqual({ p2: 1, p3: 0 });
+    expect(auction.winningBid).toBe(5);
+    expect(auction.choiceRequired).toEqual([]); // p2 won outright
+
+    const game = (await resolveWith(gameId, { playerId: 'p1' })).json().game as GameView;
+    expect(game.players[1]!.scoringArea).toEqual(['red', 'blue']);
+    expect(game.players[1]!.money).toBe(20 - 5); // paid the $5 total
+    expect(game.players[0]!.money).toBe(20 + 10); // total + matching subsidy
+  });
+
+  it('a runoff bid must be affordable on top of the opening bid, not on its own', async () => {
+    const gameId = await startDelivery();
+    await bid(gameId, 'p2', 15);
+    await bid(gameId, 'p3', 15);
+    // $15 already committed, so a further $10 would need $25 of the $20 they hold.
+    const response = await bid(gameId, 'p2', 10);
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('INSUFFICIENT_FUNDS');
+    expect((await bid(gameId, 'p2', 5)).statusCode).toBe(200); // exactly $20 is fine
+  });
+
+  it('keeps a non-tied player out of the runoff', async () => {
+    const base = createGame({
+      id: 'runoff-4p',
+      players: [{ name: 'Ann' }, { name: 'Bob' }, { name: 'Cid' }, { name: 'Dee' }],
+    });
+    const state: GameState = {
+      ...base,
+      players: base.players.map((player, seat) =>
+        seat === 0 ? { ...player, ship: { location: { kind: 'ocean' as const }, cargo: ['red' as const] } } : player,
+      ),
+    };
+    new GameRepository(db).create(state);
+    await act(state.id, 'p1', { type: 'SAIL', to: { kind: 'island' } });
+
+    await bid(state.id, 'p2', 5);
+    await bid(state.id, 'p3', 5);
+    await bid(state.id, 'p4', 1); // out of contention
+
+    const response = await bid(state.id, 'p4', 9);
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('NOT_A_BIDDER');
+  });
+
+  it('hands a still-level runoff to the deliverer to decide', async () => {
+    const gameId = await startDelivery();
+    await bid(gameId, 'p2', 4);
+    await bid(gameId, 'p3', 4);
+    await bid(gameId, 'p2', 2); // both reach $6
+    await bid(gameId, 'p3', 2);
+
+    const auction = await getAuction(gameId, 'p1');
+    expect(auction.phase).toBe('decision');
+    expect(auction.winningBid).toBe(6);
+    expect(auction.choiceRequired).toEqual(['p2', 'p3']);
+
+    // Resolving without naming a winner is refused by the engine, rather than quietly defaulting
+    // to the earliest seat as it used to.
+    const noChoice = await resolveWith(gameId, { playerId: 'p1' });
+    expect(noChoice.statusCode).toBe(409);
+    expect(noChoice.json().error.code).toBe('CHOICE_REQUIRED');
+
+    const game = (await resolveWith(gameId, { playerId: 'p1', winnerId: 'p3' })).json().game as GameView;
+    expect(game.players[2]!.scoringArea).toEqual(['red', 'blue']); // Cid, the *later* seat
+    expect(game.players[1]!.scoringArea).toEqual([]);
+    expect(game.players[2]!.money).toBe(20 - 6);
+    expect(game.players[0]!.money).toBe(20 + 12);
+  });
+
+  it('rejects handing the cargo to someone who is not tied', async () => {
+    const gameId = await startDelivery();
+    await bid(gameId, 'p2', 4);
+    await bid(gameId, 'p3', 1); // no tie at all
+    const response = await resolveWith(gameId, { playerId: 'p1', winnerId: 'p3' });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('INVALID_SELECTION');
+  });
+
+  it('needs no choice to buy out of a still-level runoff', async () => {
+    const gameId = await startDelivery();
+    await bid(gameId, 'p2', 3);
+    await bid(gameId, 'p3', 3);
+    await bid(gameId, 'p2', 0);
+    await bid(gameId, 'p3', 0);
+
+    const game = (await resolveWith(gameId, { playerId: 'p1', buyout: true })).json().game as GameView;
+    expect(game.players[0]!.scoringArea).toEqual(['red', 'blue']);
+    expect(game.players[0]!.money).toBe(20 - 3);
+    expect(game.players[1]!.money).toBe(20); // all tied bidders get their bids back
+    expect(game.players[2]!.money).toBe(20);
+  });
+
+  it('treats an all-$0 bluff as a tie the deliverer must break', async () => {
+    // Everyone bluffing $0 still ties for the highest bid, so it is a real decision rather than a
+    // free win for whoever sits earliest.
+    const gameId = await startDelivery();
+    await bid(gameId, 'p2', 0);
+    await bid(gameId, 'p3', 0);
+    expect((await getAuction(gameId, 'p1')).phase).toBe('runoff');
+
+    await bid(gameId, 'p2', 0);
+    await bid(gameId, 'p3', 0);
+    const auction = await getAuction(gameId, 'p1');
+    expect(auction.choiceRequired).toEqual(['p2', 'p3']);
+
+    const game = (await resolveWith(gameId, { playerId: 'p1', winnerId: 'p2' })).json().game as GameView;
+    expect(game.players[1]!.scoringArea).toEqual(['red', 'blue']);
+    expect(game.players[0]!.money).toBe(20); // $0 bid, $0 subsidy
+  });
+
+  it('keeps runoff bids secret until the runoff closes', async () => {
+    const gameId = await startDelivery();
+    await bid(gameId, 'p2', 4);
+    await bid(gameId, 'p3', 4);
+    await bid(gameId, 'p2', 7);
+
+    const toDeliverer = await getAuction(gameId, 'p1');
+    expect(toDeliverer.runoffRevealed).toBeNull();
+    expect(toDeliverer.bidders).toEqual([
+      { playerId: 'p2', hasBid: true },
+      { playerId: 'p3', hasBid: false },
+    ]);
+    // p2's $7 must not leak to the deliverer or to their rival mid-runoff.
+    expect((await getAuction(gameId, 'p3')).yourBid).toBeNull();
+    expect((await getAuction(gameId, 'p2')).yourBid).toBe(7);
+  });
+});

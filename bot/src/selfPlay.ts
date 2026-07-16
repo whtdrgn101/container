@@ -1,6 +1,6 @@
 import { applyAction, viewFor } from '@container/engine';
 import type { Color, GameState } from '@container/engine';
-import { bidFor } from './bid';
+import { bidFor, runoffBidFor } from './bid';
 import { decide } from './decide';
 import { BotError } from './errors';
 
@@ -46,6 +46,7 @@ export function playSelfPlay(initial: GameState, options: SelfPlayOptions = {}):
     const active = state.players[state.activePlayerIndex]!;
 
     // Every opponent bids from their own view — nobody sees another's card, exactly as at a table.
+    let opening: Record<string, number> = {};
     const collectBids = (_cargo: readonly Color[]): Record<string, number> => {
       const bids: Record<string, number> = {};
       for (const opponent of state.players) {
@@ -53,10 +54,21 @@ export function playSelfPlay(initial: GameState, options: SelfPlayOptions = {}):
           bids[opponent.id] = bidFor(viewFor(state, opponent.id), opponent.id);
         }
       }
+      opening = bids;
       return bids;
     };
 
-    const action = decide(viewFor(state, active.id), active.id, { collectBids });
+    // On a tie the tied players add cash on top of what they already bid (pg. 16) — again each from
+    // their own view, so nobody's runoff bid is informed by anything they shouldn't know.
+    const collectRunoffBids = (_cargo: readonly Color[], tied: readonly string[]): Record<string, number> => {
+      const extra: Record<string, number> = {};
+      for (const id of tied) {
+        extra[id] = runoffBidFor(viewFor(state, id), id, opening[id] ?? 0);
+      }
+      return extra;
+    };
+
+    const action = decide(viewFor(state, active.id), active.id, { collectBids, collectRunoffBids });
     state = applyAction(state, active.id, action);
     actions += 1;
 

@@ -1,5 +1,5 @@
 import { COLORS, SCORING_CARDS, finalScoring } from '@container/engine';
-import type { Color, GameView, PlayerState } from '@container/engine';
+import type { Color, GameView, PlayerState, PlayerView } from '@container/engine';
 import { BotError } from './errors';
 import type { Ctx } from './types';
 
@@ -62,6 +62,12 @@ export const AVERAGE_COLOR_VALUE =
 export const BID_SHADING = 0.6;
 
 /**
+ * How close to true value a bot goes in a *runoff*. Higher than `BID_SHADING`: a runoff proves the
+ * shaded opening bid wasn't enough, and the containers are about to go to someone else. Retuned in A5.
+ */
+export const RUNOFF_SHADING = 0.85;
+
+/**
  * The highest bid the bot expects `cargo` to draw, given only public information.
  *
  * A card is secret, but a scoring *area* is not — containers sit face-up on Container Island, and so
@@ -79,19 +85,28 @@ export function expectedAuctionBid(ctx: Ctx, cargo: readonly Color[]): number {
   if (cargo.length === 0) {
     return 0;
   }
-  const possibleCards = SCORING_CARDS.filter((card) => card.id !== ctx.me.scoringCard.id);
-
   let best = 0;
   for (const opponent of ctx.opponents) {
-    const totalValue = possibleCards.reduce(
-      (sum, card) => sum + Math.max(0, gainFrom({ ...opponent, scoringCard: card }, cargo)),
-      0,
-    );
-    const expectedValue = totalValue / possibleCards.length;
-    const bid = Math.min(opponent.money, Math.floor(expectedValue * BID_SHADING));
+    const bid = Math.min(opponent.money, Math.floor(expectedValueFor(ctx, opponent, cargo) * BID_SHADING));
     best = Math.max(best, bid);
   }
   return best;
+}
+
+/**
+ * What `cargo` is worth to one opponent, averaged over every card they might be holding.
+ *
+ * Their scoring *area* is public and their card is not, so this is the honest estimate: value the
+ * cargo against each candidate card and average. Cards the bot holds itself are excluded — it knows
+ * for certain nobody else has them.
+ */
+export function expectedValueFor(ctx: Ctx, opponent: PlayerView, cargo: readonly Color[]): number {
+  const possibleCards = SCORING_CARDS.filter((card) => card.id !== ctx.me.scoringCard.id);
+  const totalValue = possibleCards.reduce(
+    (sum, card) => sum + Math.max(0, gainFrom({ ...opponent, scoringCard: card }, cargo)),
+    0,
+  );
+  return totalValue / possibleCards.length;
 }
 
 /**

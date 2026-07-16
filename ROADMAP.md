@@ -44,7 +44,8 @@ How we get from the current vertical slice to a complete, faithful game, then to
   (double); the turn ends. **Buyout** (deliverer keeps the cargo, pays the winning bid — to the supply
   for now, → the Bank in Slice 6, no subsidy) and **runoff auctions** for ties are in; `$0` bids
   (bluffs) work by construction. Engine at 100% (113 tests). *(The physical $0 bluff-card hand is
-  cosmetic and out of scope.)*
+  cosmetic and out of scope. A still-tied runoff fell to the earliest seat here; **A1b** replaced that
+  with the rulebook's "the deliverer chooses".)*
 - ✅ **Scoring cards (Slice 7 groundwork):** `ScoringCard` type + a 5-card deck (`SCORING_CARDS`; sc1 =
   rulebook example, structure faithful — *exact color→slot layout to verify vs. components*).
   `createGame` deals one per player; the backend shuffles the deal. The UI reveals the **active**
@@ -194,7 +195,7 @@ real project. The engine's **purity + serializability** is the key enabler: bots
 |---|------|----------|------|
 | A0 | ✅ `@container/bot` + greedy bot + self-play | `decide(view, playerId) → Action`, `bidFor(...)`; headless self-play driver proves the brain with no server | M–L |
 | A1a | ✅ Delivery auction as coordination state | Pending auction outside the engine; each opponent bids from **their own device**, then the deliverer accepts or buys out. Unblocks bot deliveries **and** closes the secret-bid leak | L |
-| A1b | Runoff + deliverer's tie choice | Tie → runoff round (tied players add cash); still tied → the deliverer **chooses** the winner (pg. 16), replacing the engine's earliest-seat simplification | M |
+| A1b | ✅ Runoff + deliverer's tie choice | Tie → runoff round (tied players add cash); still tied → the deliverer **chooses** the winner (pg. 16), replacing the engine's earliest-seat simplification | M |
 | A2 | Bot seats end-to-end | Backend `BotRunner`; hotseat **"add AI player"**; lobby **"assign seat to AI"** | M–L |
 | A3 | Difficulty tiers + auction modeling | Easy/Normal/Hard; opponent-card estimation; basic bluff/counter-bluff | L |
 | A4 | Search-based bot (ISMCTS) | Information-Set Monte-Carlo Tree Search with determinization over hidden info, using engine sim | L |
@@ -284,10 +285,36 @@ real project. The engine's **purity + serializability** is the key enabler: bots
     opponent must be able to borrow *in order to bid*. `REQUEST_LOAN` now escapes both the turn check
     and `MUST_DELIVER`; `legalActions(state, playerId)` answers for off-turn seats. Repaying and Bank
     loading stay on-turn ("Unlike other free actions").
-  - **Ties still resolve by earliest seat** — the engine's existing simplification, and the seam A1b
-    picks up. The UI's old inline runoff panel is gone rather than left half-wired.
-  - Covered by engine tests (195, still 100%), backend integration tests (70, incl. redaction over
-    REST and WebSocket), and 4 Playwright specs incl. the secrecy property itself.
+  - Covered by engine tests (100%), backend integration tests (incl. redaction over REST and
+    WebSocket), and Playwright specs incl. the secrecy property itself.
+
+- ✅ **A1b — the runoff and the deliverer's tie choice. Track A1 is complete.**
+  - **The rule (pg. 16):** tied leaders add cash *without* taking their opening bid back, highest
+    **total** wins; if they're *still* level, "the player delivering containers **chooses** which tied
+    bidder wins". The engine used to hand it to the earliest seat, quietly deciding a real strategic
+    choice on the deliverer's behalf. It now throws `CHOICE_REQUIRED` rather than guess.
+  - **`deliver` takes a `DeliveryResolution` object** (`{ bids, runoffBids?, buyout?, chosenWinnerId? }`)
+    instead of six positional params — it mirrors the `DELIVER` action 1:1. A `chosenWinnerId` offered
+    when nothing is tied is **rejected**, so a caller can't quietly hand the cargo to whomever it likes.
+  - **A buyout needs no choice:** nobody wins the cargo, so a still-level runoff only sets the price
+    ("all tied bidders return their bids").
+  - **⚠️ One rule, one copy: `deliveryOutcome(state, delivererId, bids, runoffBids)` is exported.**
+    The tie logic was about to exist in *three* places — `deliver`, the backend's auction projection,
+    and the bot (which must predict the price to decide whether to buy out). Three copies is three
+    chances to drift, so the rule lives in the engine and the other two ask it. If you need to know
+    who wins an auction, **call this; don't re-derive it.**
+  - **The auction gained a `runoff` phase** (`bidding → runoff → decision`). The same
+    `POST .../auction/bids` endpoint serves both rounds — the phase decides where the bid lands — so
+    the API stayed the same size. Runoff bids are secret until the round closes, exactly like opening
+    bids; opening bids stay *visible* through the runoff, since pg. 16 means you add cash knowing what
+    you're level on. A runoff bid is validated against the **total**, as the opening bid isn't returned.
+  - **The bot plays it properly:** `runoffBidFor` reaches nearer true value than its opening bid (a
+    runoff proves the shading was what lost it), and `chooseTiedWinner` gives the containers to
+    whichever tied opponent they help *least* — measured in expectation over the cards that opponent
+    could still hold, since areas are public and cards aren't. Two bots valuing cargo alike deadlock,
+    which is correct: that's exactly the case the rulebook gives the deliverer.
+  - Engine 202 tests (100%), bot 94, backend 79, e2e 52 — incl. specs for the runoff round and for a
+    deliverer awarding a level tie to the *later* seat (proving it's a choice, not seat order).
 - **Why ISMCTS (A4):** it's the standard fit for hidden-info, auction/trick games; the deterministic
   engine lets it roll out thousands of sampled games cheaply. Note the bot holds a **redacted view**,
   so determinization means sampling the opponents' unseen scoring cards from `SCORING_CARDS` minus its
@@ -340,8 +367,9 @@ formalizes "what each player is allowed to see," which A0 also needs.
   several seats sees exactly its own cards and never another player's — a bound client never "follows the
   active player" (which once leaked the active seat's card). Hotseat / bare join keep `controlledIds = null`
   (drive every seat), preserving single-device play. Covered by the extended `lobby.spec.ts` + backend
-  multi-viewer tests. *Still simplified: the delivery auction's secret bids are still entered on the active
-  player's screen (not each opponent's device), and turn-locking is client-side (not seat-authenticated).*
+  multi-viewer tests. *Still simplified: turn-locking is client-side (not seat-authenticated). The delivery
+  auction's secret bids were the other caveat here — **fixed by A1a**, which moved bid collection
+  server-side so each opponent bids from their own device.*
 - ✅ **B2 open-games browser (no accounts):** `GET /lobbies` lists open lobbies that still have a free
   seat (`LobbyRepository.listOpen`, newest first). The home screen polls it and shows a **"Games waiting
   for players"** card; you pick a **display name** and click Join to claim a seat and drop straight into

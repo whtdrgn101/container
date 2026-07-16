@@ -1,4 +1,4 @@
-import { mustDeliver } from '@container/engine';
+import { deliveryOutcome, mustDeliver } from '@container/engine';
 import type { Color, GameState } from '@container/engine';
 import type { DB } from './db';
 
@@ -23,11 +23,14 @@ export interface DeliveryAuction {
   readonly cargo: readonly Color[];
   /**
    * `bidding` — opponents are still submitting sealed bids.
+   * `runoff`  — the leaders tied, so they secretly add cash without taking back their first bid (pg. 16).
    * `decision` — every bid is in and revealed; the deliverer accepts the high bid or buys out.
    */
-  readonly phase: 'bidding' | 'decision';
+  readonly phase: 'bidding' | 'runoff' | 'decision';
   /** Sealed cash bids by player id. SECRET while `phase === 'bidding'`. */
   readonly bids: Readonly<Record<string, number>>;
+  /** Extra cash added by tied players in a runoff. SECRET while `phase === 'runoff'`. */
+  readonly runoffBids: Readonly<Record<string, number>>;
 }
 
 /** What a *client* is allowed to know about an auction. Never carries another player's sealed bid. */
@@ -35,19 +38,29 @@ export interface DeliveryAuctionView {
   readonly gameId: string;
   readonly delivererId: string;
   readonly cargo: readonly Color[];
-  readonly phase: 'bidding' | 'decision';
-  /** Every seat that must bid, and whether it has — the amount stays hidden until the reveal. */
+  readonly phase: 'bidding' | 'runoff' | 'decision';
+  /**
+   * The seats that owe a bid **this round**, and whether they've placed it. In a runoff that's only
+   * the tied players. The amount stays hidden until the round's reveal.
+   */
   readonly bidders: readonly { readonly playerId: string; readonly hasBid: boolean }[];
-  /** The viewer's own bid, if they have placed one. You may always see what you yourself bid. */
+  /** The viewer's own bid for the current round. You may always see what you yourself bid. */
   readonly yourBid: number | null;
   /**
-   * All bids, revealed. `null` during `bidding` — populated only once every opponent has committed,
-   * which is what makes the bids simultaneous rather than a turn order advantage (pg. 15: "All
-   * opponents reveal their bids").
+   * The opening bids, revealed. `null` during `bidding` — populated only once every opponent has
+   * committed, which is what makes the bids simultaneous rather than a turn order advantage (pg. 15:
+   * "All opponents reveal their bids"). Stays visible through the runoff, per pg. 16.
    */
   readonly revealed: Readonly<Record<string, number>> | null;
-  /** The winning amount once revealed, else `null`. */
+  /** The extra cash tied players added, revealed once the runoff closes. */
+  readonly runoffRevealed: Readonly<Record<string, number>> | null;
+  /** The winning amount once known, else `null`. In a runoff this is the winning *total*. */
   readonly winningBid: number | null;
+  /**
+   * Bidders the deliverer must choose between — non-empty only when a runoff ended still level and
+   * the cargo is going to someone (pg. 16). A buyout needs no choice.
+   */
+  readonly choiceRequired: readonly string[];
 }
 
 /** The seats that owe a bid: everyone except the deliverer (pg. 15, "Each of your opponents"). */
@@ -58,7 +71,27 @@ export const biddersFor = (state: GameState, delivererId: string): string[] =>
 export const allBidsIn = (auction: DeliveryAuction, state: GameState): boolean =>
   biddersFor(state, auction.delivererId).every((id) => auction.bids[id] !== undefined);
 
-/** The highest bid on the table. A $0 bluff is a legal bid, so this floors at 0, never `-Infinity`. */
+/**
+ * The opening bids that tied for the lead — who bids again in a runoff (pg. 16). More than one means
+ * a runoff is needed, including when everyone bluffs $0, since they all tie for the highest bid.
+ *
+ * Asks the engine rather than re-deriving it: the tie rule is a *rule*, and a second copy here would
+ * be free to drift out of step with what `deliver` actually does.
+ */
+export function tiedForLead(auction: DeliveryAuction, state: GameState): string[] {
+  const { finalists } = deliveryOutcome(state, auction.delivererId, auction.bids);
+  return [...finalists];
+}
+
+/** True once every tied player has added their runoff cash. */
+export const allRunoffBidsIn = (auction: DeliveryAuction, state: GameState): boolean =>
+  tiedForLead(auction, state).every((id) => auction.runoffBids[id] !== undefined);
+
+/** The winning amount and who is still level on it, once the runoff (if any) has been bid out. */
+export const outcomeOf = (auction: DeliveryAuction, state: GameState) =>
+  deliveryOutcome(state, auction.delivererId, auction.bids, auction.runoffBids);
+
+/** The highest opening bid. A $0 bluff is a legal bid, so this floors at 0, never `-Infinity`. */
 export const winningBidOf = (auction: DeliveryAuction): number =>
   Math.max(0, ...Object.values(auction.bids));
 
@@ -77,6 +110,7 @@ export function openAuctionFor(state: GameState): DeliveryAuction {
     cargo: [...deliverer.ship.cargo],
     phase: 'bidding',
     bids: {},
+    runoffBids: {},
   };
 }
 
@@ -93,19 +127,32 @@ export function auctionViewFor(
   state: GameState,
   viewer: string | null,
 ): DeliveryAuctionView {
-  const revealed = auction.phase === 'decision';
+  // The opening bids are public from the moment they all land (pg. 15) and stay so through a
+  // runoff — the tied players are meant to add cash *knowing* what they're level on.
+  const openingRevealed = auction.phase !== 'bidding';
+  const settled = auction.phase === 'decision';
+  const inRunoff = auction.phase === 'runoff';
+
+  // Who owes a bid right now: everyone at first, only the tied players once a runoff starts.
+  const owing = inRunoff ? tiedForLead(auction, state) : biddersFor(state, auction.delivererId);
+  const round = inRunoff ? auction.runoffBids : auction.bids;
+
+  const { winningBid, finalists } = settled
+    ? outcomeOf(auction, state)
+    : { winningBid: 0, finalists: [] as readonly string[] };
+
   return {
     gameId: auction.gameId,
     delivererId: auction.delivererId,
     cargo: auction.cargo,
     phase: auction.phase,
-    bidders: biddersFor(state, auction.delivererId).map((playerId) => ({
-      playerId,
-      hasBid: auction.bids[playerId] !== undefined,
-    })),
-    yourBid: viewer !== null ? (auction.bids[viewer] ?? null) : null,
-    revealed: revealed ? { ...auction.bids } : null,
-    winningBid: revealed ? winningBidOf(auction) : null,
+    bidders: owing.map((playerId) => ({ playerId, hasBid: round[playerId] !== undefined })),
+    yourBid: viewer !== null ? (round[viewer] ?? null) : null,
+    revealed: openingRevealed ? { ...auction.bids } : null,
+    runoffRevealed: settled && Object.keys(auction.runoffBids).length > 0 ? { ...auction.runoffBids } : null,
+    winningBid: settled ? winningBid : null,
+    // Only a real deadlock needs the deliverer's ruling; one finalist decides itself.
+    choiceRequired: settled && finalists.length > 1 ? [...finalists] : [],
   };
 }
 

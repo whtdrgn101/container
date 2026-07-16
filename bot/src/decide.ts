@@ -1,6 +1,6 @@
-import { legalActions } from '@container/engine';
+import { deliveryOutcome, legalActions } from '@container/engine';
 import type { Action, GameState, GameView } from '@container/engine';
-import { wantsBuyout } from './bid';
+import { chooseTiedWinner, wantsBuyout } from './bid';
 import { BotError } from './errors';
 import { rank } from './policies/rank';
 import type { Candidate, Ctx, DecideOptions } from './types';
@@ -22,13 +22,33 @@ function buildDelivery(ctx: Ctx, options: DecideOptions): Action {
     );
   }
 
-  const bids = options.collectBids(ctx.me.ship.cargo);
-  const winningBid = Math.max(0, ...ctx.opponents.map((opponent) => bids[opponent.id] ?? 0));
+  const cargo = ctx.me.ship.cargo;
+  const state = ctx.view as unknown as GameState;
+  const bids = options.collectBids(cargo);
+
+  // A tie sends it to a runoff (pg. 16). The tied players' extra cash is theirs to decide, so — like
+  // the opening bids — the bot has to ask for it rather than invent it.
+  const opening = deliveryOutcome(state, ctx.me.id, bids);
+  const runoffBids =
+    opening.finalists.length > 1 ? (options.collectRunoffBids?.(cargo, opening.finalists) ?? {}) : {};
+
+  // Ask the engine how this actually resolves rather than re-deriving the tie rule here — the bot
+  // must agree with `deliver` exactly, or it will offer a choice the engine rejects (or skip one it
+  // demands).
+  const { winningBid, finalists } = deliveryOutcome(state, ctx.me.id, bids, runoffBids);
   const buyout = wantsBuyout(ctx, winningBid);
 
-  // No `runoffBids`: a tie among the bids resolves to the earliest seat, which is the engine's own
-  // documented simplification of "the deliverer chooses". Revisit with A1's real bid round-trip.
-  return buyout ? { type: 'DELIVER', bids, buyout: true } : { type: 'DELIVER', bids };
+  // Still level after the runoff and not buying out? Then the cargo is the deliverer's to award.
+  const chosenWinnerId =
+    !buyout && finalists.length > 1 ? chooseTiedWinner(ctx, finalists, cargo) : undefined;
+
+  return {
+    type: 'DELIVER',
+    bids,
+    ...(Object.keys(runoffBids).length > 0 ? { runoffBids } : {}),
+    ...(buyout ? { buyout: true } : {}),
+    ...(chosenWinnerId ? { chosenWinnerId } : {}),
+  };
 }
 
 /**

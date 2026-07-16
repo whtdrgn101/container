@@ -108,6 +108,50 @@ describe('decide — delivery', () => {
     expect(() => applyAction(state, 'p1', action)).not.toThrow();
   });
 
+  it('runs a runoff and picks a winner when it stays level', () => {
+    // Both opponents bid $5 → tied for the lead → runoff → still level. Selling at $5 pays $10 while
+    // keeping the $10 cargo would net $5, so the bot sells — and the rulebook then hands *it* the
+    // choice of who gets the containers (pg. 16), which it must make or the engine rejects the move.
+    const state = atIsland();
+    const collectRunoffBids = vi.fn(() => ({ p2: 0, p3: 0 }));
+    const action = expectPlayable(state, 'p1', { collectBids: () => ({ p2: 5, p3: 5 }), collectRunoffBids });
+
+    expect(collectRunoffBids).toHaveBeenCalledWith(['white', 'red'], ['p2', 'p3']);
+    expect(action).toMatchObject({ type: 'DELIVER' });
+    expect(['p2', 'p3']).toContain((action as { chosenWinnerId?: string }).chosenWinnerId);
+  });
+
+  it('does not run a runoff when someone leads outright', () => {
+    const collectRunoffBids = vi.fn(() => ({}));
+    const action = expectPlayable(atIsland(), 'p1', { collectBids: () => ({ p2: 4, p3: 1 }), collectRunoffBids });
+    expect(collectRunoffBids).not.toHaveBeenCalled();
+    expect(action).not.toHaveProperty('chosenWinnerId');
+  });
+
+  it('needs no winner when it buys a tied auction out', () => {
+    // A buyout takes the cargo itself, so there is nobody to choose — and the engine rejects a
+    // choice offered anyway.
+    const action = expectPlayable(atIsland(), 'p1', {
+      collectBids: () => ({ p2: 1, p3: 1 }),
+      collectRunoffBids: () => ({ p2: 0, p3: 0 }),
+    });
+    expect(action).toMatchObject({ type: 'DELIVER', buyout: true });
+    expect(action).not.toHaveProperty('chosenWinnerId');
+  });
+
+  it('leaves the tie to itself when no runoff collector is supplied', () => {
+    // Degenerate but legal: nobody adds anything, so it stays level and the deliverer decides.
+    const action = expectPlayable(atIsland(), 'p1', { collectBids: () => ({ p2: 5, p3: 5 }) });
+    expect(action).toHaveProperty('chosenWinnerId');
+  });
+
+  it('buys out an all-$0 tie rather than gifting the cargo away', () => {
+    // Everyone bluffing $0 ties for the lead, but the containers are worth $10 to this bot and cost
+    // nothing to keep — so the "choice" of who to hand them to never arises.
+    const action = expectPlayable(atIsland(), 'p1', { collectBids: () => ({ p2: 0, p3: 0 }) });
+    expect(action).toMatchObject({ type: 'DELIVER', buyout: true });
+  });
+
   it('treats a missing bid as a $0 bluff', () => {
     const state = atIsland();
     const action = expectPlayable(state, 'p1', { collectBids: () => ({}) });

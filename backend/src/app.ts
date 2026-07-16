@@ -6,7 +6,16 @@ import fastifyWebsocket from '@fastify/websocket';
 import { applyAction, COLORS, createGame, GameError, MAX_PLAYERS, MIN_PLAYERS, SCORING_CARDS, viewFor } from '@container/engine';
 import type { Action, Color, District, GameState, NewPlayer, ShipLocation, StoredContainer, Viewer } from '@container/engine';
 import type { DeliveryAuction } from './auctions';
-import { AuctionRepository, allBidsIn, auctionIsDue, auctionViewFor, biddersFor, openAuctionFor } from './auctions';
+import {
+  AuctionRepository,
+  allBidsIn,
+  allRunoffBidsIn,
+  auctionIsDue,
+  auctionViewFor,
+  biddersFor,
+  openAuctionFor,
+  tiedForLead,
+} from './auctions';
 import type { DB } from './db';
 import { GameHub } from './hub';
 import type { Lobby } from './lobbies';
@@ -437,27 +446,49 @@ export function buildApp(options: AppOptions): FastifyInstance {
 
       const auction = syncAuction(state);
       if (!auction) return auctionConflict(reply, 'NO_OPEN_AUCTION', 'No delivery auction is open');
-      if (auction.phase !== 'bidding') {
+      if (auction.phase === 'decision') {
         return auctionConflict(reply, 'BIDDING_CLOSED', 'Every bid is already in');
       }
 
       const { playerId, bid } = request.body;
-      if (!biddersFor(state, auction.delivererId).includes(playerId)) {
-        return auctionConflict(reply, 'NOT_A_BIDDER', `Player "${playerId}" is not bidding in this auction`);
+      const inRunoff = auction.phase === 'runoff';
+      // In a runoff only the tied players bid again (pg. 16); everyone else is out.
+      const owing = inRunoff ? tiedForLead(auction, state) : biddersFor(state, auction.delivererId);
+      if (!owing.includes(playerId)) {
+        return auctionConflict(
+          reply,
+          'NOT_A_BIDDER',
+          inRunoff
+            ? `Player "${playerId}" is not tied for the lead and does not bid in the runoff`
+            : `Player "${playerId}" is not bidding in this auction`,
+        );
       }
-      if (auction.bids[playerId] !== undefined) {
+      const round = inRunoff ? auction.runoffBids : auction.bids;
+      if (round[playerId] !== undefined) {
         // Bids go facedown and stay there (pg. 15) — no taking one back once committed.
         return auctionConflict(reply, 'ALREADY_BID', `Player "${playerId}" has already bid`);
       }
       const bidder = state.players.find((player) => player.id === playerId)!;
-      if (bid > bidder.money) {
-        return auctionConflict(reply, 'INSUFFICIENT_FUNDS', `Player "${playerId}" cannot bid $${bid}`);
+      // A runoff bid is *added* to the opening bid without taking it back, so it's the total that
+      // has to be affordable (pg. 16).
+      const committed = inRunoff ? (auction.bids[playerId] ?? 0) + bid : bid;
+      if (committed > bidder.money) {
+        return auctionConflict(reply, 'INSUFFICIENT_FUNDS', `Player "${playerId}" cannot bid $${committed}`);
       }
 
-      const withBid: DeliveryAuction = { ...auction, bids: { ...auction.bids, [playerId]: bid } };
       // The reveal is what makes the bids simultaneous: nobody's amount is visible until the last
       // opponent has committed, so bidding early costs you nothing and bidding late tells you nothing.
-      const next: DeliveryAuction = allBidsIn(withBid, state) ? { ...withBid, phase: 'decision' } : withBid;
+      let next: DeliveryAuction;
+      if (inRunoff) {
+        next = { ...auction, runoffBids: { ...auction.runoffBids, [playerId]: bid } };
+        if (allRunoffBidsIn(next, state)) next = { ...next, phase: 'decision' };
+      } else {
+        next = { ...auction, bids: { ...auction.bids, [playerId]: bid } };
+        if (allBidsIn(next, state)) {
+          // Level at the top → a runoff decides it; otherwise straight to the deliverer.
+          next = { ...next, phase: tiedForLead(next, state).length > 1 ? 'runoff' : 'decision' };
+        }
+      }
       auctions.save(next);
       pushAuction(request.params.id, next, state);
 
@@ -470,7 +501,11 @@ export function buildApp(options: AppOptions): FastifyInstance {
    * government subsidy) or buy out (pay the Bank, keep the containers). This is the one place a
    * DELIVER reaches the engine.
    */
-  app.post<{ Params: { id: string }; Body: { playerId: string; buyout?: boolean }; Querystring: { viewer?: string } }>(
+  app.post<{
+    Params: { id: string };
+    Body: { playerId: string; buyout?: boolean; winnerId?: string };
+    Querystring: { viewer?: string };
+  }>(
     '/games/:id/auction/resolve',
     {
       schema: {
@@ -480,6 +515,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
           properties: {
             playerId: { type: 'string', minLength: 1 },
             buyout: { type: 'boolean' },
+            winnerId: { type: 'string', minLength: 1 },
           },
         },
       },
@@ -498,10 +534,15 @@ export function buildApp(options: AppOptions): FastifyInstance {
       }
 
       try {
+        // The engine validates the choice (and demands one when a runoff stayed level) — we only
+        // pass it along, so there is one place that decides what a legal resolution is.
+        const buyout = request.body.buyout === true;
         const next = applyAction(state, auction.delivererId, {
           type: 'DELIVER',
           bids: auction.bids,
-          ...(request.body.buyout ? { buyout: true } : {}),
+          runoffBids: auction.runoffBids,
+          ...(buyout ? { buyout: true } : {}),
+          ...(!buyout && request.body.winnerId ? { chosenWinnerId: request.body.winnerId } : {}),
         });
         repo.update(next);
         auctions.clear(request.params.id);

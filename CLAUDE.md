@@ -309,9 +309,9 @@ check plan usage between sessions). Summary:
   regardless of whose turn it is. Never "follow the active player" for a bound client (that once leaked the
   active seat's card, e.g. a host holding two seats seeing a third player's card). `null` viewer = follow
   active (hotseat, single device); empty list = spectator (no cards). **Any new endpoint that returns game
-  state must project through `viewFor` with the caller's viewer.** Caveats that remain: turn-locking is
-  client-side (the API isn't seat-authenticated), and the delivery auction's secret bids are still entered
-  on the active player's screen.
+  state must project through `viewFor` with the caller's viewer.** Caveat that remains: turn-locking is
+  client-side (the API isn't seat-authenticated). *(The delivery auction's secret bids were the other
+  standing caveat here — fixed by A1a, which moved bid collection server-side.)*
 - **Track B / open-games browser ✅ (no accounts).** `GET /lobbies` (`LobbyRepository.listOpen`) returns
   open lobbies with a free seat, newest first; the home screen polls it (every 3s while on the landing
   screen) and renders a **"Games waiting for players"** card. You enter a **display name** and Join to
@@ -358,9 +358,22 @@ check plan usage between sessions). Summary:
     `applyAction`, so a broke opponent can borrow in order to bid. `legalActions(state, playerId)`
     takes an optional seat and answers for off-turn players. Repay/Bank-load stay on-turn.
   - **Hotseat** uses the same endpoints, prompting seats one at a time behind a pass-the-device gate.
-  - **Still simplified (A1b):** a still-tie resolves by earliest seat; the rulebook says the deliverer
-    chooses. The bot's `decide` still takes a `collectBids` resolver — A2's `BotRunner` wires it to
-    this auction.
+- **Track A / A1b ✅ (runoff + the deliverer's tie choice).** Phases are `bidding → runoff → decision`;
+  the same `POST .../auction/bids` endpoint serves both rounds (the phase decides where the bid lands).
+  A runoff bid is *added* to the opening bid, so it's validated against the **total**. Opening bids stay
+  visible through the runoff (pg. 16 — you add cash knowing what you're level on); runoff bids are
+  secret until that round closes.
+  - **`deliver` takes a `DeliveryResolution`** (`{ bids, runoffBids?, buyout?, chosenWinnerId? }`),
+    mirroring the `DELIVER` action. A still-level runoff throws **`CHOICE_REQUIRED`** rather than
+    guess a winner; offering `chosenWinnerId` when nothing is tied is rejected. A buyout needs no
+    choice (nobody wins the cargo).
+  - **⚠️ `deliveryOutcome(state, delivererId, bids, runoffBids)` is the ONE copy of the tie rule.**
+    The backend projects the auction from it and the bot predicts the price with it. **Never
+    re-derive who wins an auction** — that rule was about to exist in three places.
+  - **Bot:** `runoffBidFor` (reaches nearer true value than the opening bid) + `chooseTiedWinner`
+    (gives the cargo to whichever tied opponent it helps least, in expectation over their possible
+    cards). `decide` takes `collectBids` **and** `collectRunoffBids` — A2's `BotRunner` wires both to
+    the pending auction.
 - **Track C — multi-game platform:** turn the site into a games room, Container as the first registered
   game (`GameModule` interface + registry). Roadmapped only. **Do Track A first** — C0/C1 touch the same
   backend files (`app.ts`, `repository.ts`, `lobbies.ts`) that A1/A2 need.
