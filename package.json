@@ -11,6 +11,7 @@
   "scripts": {
     "test": "pnpm -r test",
     "test:engine": "pnpm --filter @container/engine test",
+    "test:bot": "pnpm --filter @container/bot test",
     "test:backend": "pnpm --filter @container/backend test",
     "test:e2e": "pnpm --filter @container/ui test:e2e",
     "typecheck": "pnpm -r typecheck",

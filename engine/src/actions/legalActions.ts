@@ -45,10 +45,13 @@ export function legalActions(state: GameState): Action[] {
     return actions;
   }
 
+  // Needs a factory whose color the supply can still fill — otherwise there is nothing to produce
+  // and offering PRODUCE would hand the caller an action that always throws.
   if (
     player.factories.length > 0 &&
     player.money >= UNION_WAGE &&
-    player.factoryStore.length < player.factoryLimit
+    player.factoryStore.length < player.factoryLimit &&
+    player.factories.some((factory) => state.supply.containers[factory.color] > 0)
   ) {
     actions.push({ type: 'PRODUCE' });
   }

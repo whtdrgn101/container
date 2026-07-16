@@ -192,17 +192,80 @@ real project. The engine's **purity + serializability** is the key enabler: bots
 
 | # | Step | Delivers | Size |
 |---|------|----------|------|
-| A0 | Bot harness | `Bot = (view, legalActions) → action`; headless self-play driver; hardened legal-move generator | M |
-| A1 | Greedy heuristic bot | Playable **single-player vs AI**; scoring-card-aware production/pricing/delivery; EV-based auction bids | M–L |
-| A2 | Difficulty tiers + auction modeling | Easy/Normal/Hard; opponent-hand estimation; basic bluff/counter-bluff | L |
-| A3 | Search-based bot (ISMCTS) | Information-Set Monte-Carlo Tree Search with determinization over hidden info, using engine sim | L |
-| A4 | Self-play tuning | Calibrate difficulty & heuristics from batch self-play results | M |
+| A0 | ✅ `@container/bot` + greedy bot + self-play | `decide(view, playerId) → Action`, `bidFor(...)`; headless self-play driver proves the brain with no server | M–L |
+| A1 | Delivery auction as coordination state | Pending auction outside the engine; each opponent bids from **their own device**. Unblocks bot deliveries **and** closes the secret-bid leak | L |
+| A2 | Bot seats end-to-end | Backend `BotRunner`; hotseat **"add AI player"**; lobby **"assign seat to AI"** | M–L |
+| A3 | Difficulty tiers + auction modeling | Easy/Normal/Hard; opponent-card estimation; basic bluff/counter-bluff | L |
+| A4 | Search-based bot (ISMCTS) | Information-Set Monte-Carlo Tree Search with determinization over hidden info, using engine sim | L |
+| A5 | Self-play tuning | Calibrate difficulty & heuristics from batch self-play results | M |
 
-- **Prerequisite (A0):** a solid **legal-action generator** and a **per-player "view"** of state
-  (what a bot/player may see — its own hand/card hidden from others). Both are also needed by the UI
-  and by online play, so build A0's view model with Track B in mind.
-- **Why ISMCTS (A3):** it's the standard fit for hidden-info, auction/trick games; the deterministic
-  engine lets it roll out thousands of sampled games cheaply.
+**Decisions taken at Track A kickoff:**
+
+- **Bots run server-side.** A backend `BotRunner` watches games and applies actions for bot seats, so
+  hotseat and remote play use *one* implementation and a game keeps moving even with no browser open.
+  The UI stays a dumb observer — it never drives a bot.
+- **Bots live in a new `@container/bot` package**, a sibling of `engine` that depends on it and exports
+  TS source the same way (`exports: "./src/index.ts"`). It gets its **own ~90% coverage gate** so
+  heuristic tuning doesn't fight the engine's 100% bar. The split is deliberate: **engine = rules,
+  bot = opinions.** No bot code enters `engine/`.
+- **Bots decide from a `GameView`, not a `GameState`** — `decide(viewFor(state, botId), botId)`. Feeding
+  the bot the redacted view makes cheating *structurally impossible* rather than a matter of discipline.
+  (`legalActions` never reads scoring cards, so the bot casts its view for move enumeration exactly as
+  the UI already does.)
+- **Bot-ness is not engine state.** Which seats are bots is coordination state, like lobbies — it lives
+  in the backend (a `bots` column on `games`, a member `kind` in `lobbies`), never in `GameState`. The
+  engine must not learn what a bot is.
+
+- **Prerequisite (A0) — ✅ already delivered by B1:** the per-player view model (`viewFor`) and the
+  legal-action generator both exist. A0 is therefore just the bot package itself.
+
+- **⚠️ The blocker A1 exists to solve.** `DELIVER` is a **single atomic action carrying every
+  opponent's bid** (`{ type:'DELIVER', bids: Record<playerId, number> }`); the engine has no pending-
+  auction state, and today the human deliverer types *all* the secret bids on their own screen. That
+  breaks in both directions once a seat is a bot:
+  - **Human delivers, bot bids** — solvable inside A2: the backend merges bot bids into the `DELIVER`
+    before `applyAction`, so the bot's bid never passes through the deliverer's client.
+  - **Bot delivers, humans bid** — *not* solvable that way. The bot cannot invent human bids, and no
+    client owns the prompt. This needs a **pending delivery auction**: the backend records "delivery
+    open", each human client bids from its own device, and once every bid is in the backend fills the
+    bot seats and submits one `DELIVER`. That's coordination state *outside* the engine — precisely
+    the shape `lobbies.ts` already established, so it's a pattern we have, not a new one.
+
+  A1 is sequenced **before** A2 because of this, and it pays for itself independently: routing bids
+  per-device is exactly the fix for the "secret bids are entered on the active player's screen"
+  caveat still logged against B2. Ship A1 and human-only games get better even if no bot ever runs.
+
+- ✅ **A0 — `@container/bot` (greedy bot + self-play driver).** New workspace package (90% coverage
+  gate, 81 tests). Public API: `decide(view, playerId, { collectBids })`, `bidFor(view, bidderId)`,
+  `wantsBuyout`, `playSelfPlay(state)`. Structure mirrors the engine's conventions — one policy file
+  per concern (`policies/{pricing,economy,trade,voyage,bank,rank}.ts`) plus `valuation.ts`.
+  - **Parameter completion is where the strategy lives.** `legalActions` returns five of its twelve
+    actions as bare *markers* (PRODUCE, REPRICE, both purchases, CALL_BANK) that `applyAction` throws
+    on; `rank()` completes them, and deciding *what price / what bid / what to buy* is the policy.
+  - **Valuation delegates to the engine's own `finalScoring`** rather than re-deriving it. This is
+    load-bearing, not purity theatre: the discard rule means a container's marginal value is *not*
+    its face value and can be **negative** (a second white flips white to your discard, turning a $10
+    container into −$4). A bot valuing by `card.values[color]` would systematically overbid.
+  - **Auction estimates use public info properly.** Scoring *areas* and cash are public — only cards
+    are secret — so `expectedAuctionBid` values cargo against every card an opponent *could* hold
+    (excluding the bot's own), averages, and caps by their actual money. A flat per-container average
+    was measured ~5× too high.
+  - **Self-play is the real test.** It drives thousands of live engine actions per run; any illegal or
+    unparameterized action makes `applyAction` throw. It caught the bug below.
+  - **⚠️ Tuning found (and fixed) a chain-starvation bug:** scored naively, each *hop* of the delivery
+    run (dock → buy → ocean → island) ranks below simply producing again, so ships never sailed — a
+    5-player game ran 52 turns with **zero deliveries** while still "completing" on the supply clock.
+    Fixed by making a loaded ship outrank routine production. Now 6.8 deliveries/game at 5p. The
+    lesson generalizes to A3/A4: *a greedy bot cannot see a multi-action payoff*, so any long chain
+    needs its scores tied to the goal, not the hop.
+  - **Known, deferred to A5:** `RESALE_PER_CONTAINER = 3` is calibrated from measured self-play, not
+    derived. And self-play at **5 players shows a seat bias** — p1 won 5/5 games across varied deals
+    (3p/4p spread normally). Worth investigating before trusting difficulty tiers.
+- **Why ISMCTS (A4):** it's the standard fit for hidden-info, auction/trick games; the deterministic
+  engine lets it roll out thousands of sampled games cheaply. Note the bot holds a **redacted view**,
+  so determinization means sampling the opponents' unseen scoring cards from `SCORING_CARDS` minus its
+  own — the bot must reconstruct a plausible `GameState` to simulate, since a `GameView` isn't
+  feedable back into the engine.
 
 ## Track B — Online multiplayer (independent; can start after Slice 4+)
 
@@ -273,11 +336,81 @@ formalizes "what each player is allowed to see," which A0 also needs.
 
 ---
 
+## Track C — Multi-game platform (turn the site into a games room)
+
+Today the whole stack is Container-shaped: `games`/`lobbies` tables assume one ruleset, `POST /games`
+takes Container's `NewPlayer[]`, the UI's `App.tsx` renders one board. The goal of Track C is a site
+where the family picks a game from a list and plays it, with **Container as the first registered game**
+rather than the only one.
+
+The good news: the seams are already in the right places. The engine is a pure `state + action → state`
+library with a serializable state, `viewFor` is a generic redaction hook, `GameHub` fans out opaque
+state, and lobbies already live outside the engine. Track C mostly *names* those seams as an interface
+and makes everything above them generic.
+
+| # | Step | Delivers | Size |
+|---|------|----------|------|
+| C0 | `GameModule` interface + registry | One typed contract every game implements; Container re-registered through it. No behaviour change | M |
+| C1 | Generic persistence + routing | `game_type` on `games`/`lobbies`; repos and REST routes stop importing `@container/engine` directly | L |
+| C2 | UI shell | Game picker, per-game lazy-loaded boards, generic lobby/landing; Container's board becomes one plugin | M–L |
+| C3 | Second game | Proves the seams are real — the only honest test of the abstraction | L |
+| C4 | Cross-game polish | Per-game rules blurbs, shared results screen, per-game bot registration | M |
+
+**The `GameModule` seam (C0)** is the whole design. Something close to:
+
+```ts
+interface GameModule<S, A> {
+  readonly id: string;                    // 'container'
+  readonly name: string;                  // 'Container'
+  readonly minPlayers: number; readonly maxPlayers: number;
+  createGame(opts: { id: string; players: { name: string }[]; rng: () => number }): S;
+  applyAction(state: S, playerId: string, action: A): S;   // throws GameError
+  legalActions(state: S): A[];
+  viewFor(state: S, viewer: Viewer): unknown;
+  parseAction(raw: unknown): A;           // today's app.ts parseAction, per game
+  summarize(state: S): GameSummary;       // today's listActive projection
+  bot?: (view: unknown, playerId: string) => A;   // Track A plugs in here
+}
+```
+
+Everything the backend does per-request is already one of those methods — C0 is mostly *moving* code,
+not writing it.
+
+**The hard parts, named honestly:**
+
+- **`GameError` → HTTP mapping** is currently Container's `GameErrorCode` enum baked into `app.ts`.
+  It needs to become a game-agnostic contract (a shared `GameError` base with a `kind` of
+  `not-found | invalid | illegal-move`, mapping to 404/400/409) or every new game re-teaches the API
+  its error codes.
+- **Action validation.** `POST /games/:id/actions` today validates `action.type` against a hardcoded
+  13-value Fastify JSON-schema enum. That can't stay — either each module contributes a JSON schema, or
+  the route accepts opaque JSON and delegates all validation to `module.parseAction`. Prefer the latter;
+  it keeps the contract small.
+- **Randomness stays injected.** Container's scoring-card shuffle lives in the backend
+  (`newGameFromNames`). The registry must keep passing `rng` in so every engine stays pure and
+  deterministic — do not let a module reach for `Math.random`.
+- **Generic typing vs. the UI's free shared types.** The UI currently gets `GameState`/`Color` for free
+  by aliasing the engine source. A registry of `GameModule<unknown, unknown>` erases that. The fix is a
+  typed per-game client module on the UI side, so the shell is generic but each board stays fully typed
+  against its own engine — **don't let `unknown` leak into board components.**
+- **Migration.** Existing rows have no `game_type`. Backfill to `'container'`; the column is
+  `NOT NULL DEFAULT 'container'` and nothing breaks.
+
+**Sequencing note:** C0/C1 touch `app.ts`, `repository.ts`, and `lobbies.ts` — the *same* files Track A
+needs for the `BotRunner` and the pending auction. Doing both at once means avoidable merge pain, so
+**finish Track A (at least A0–A2) before starting C1**, or accept the rework. C0 alone is a safe,
+additive refactor that can land any time.
+
+---
+
 ## Pacing & credits
 
 - **One slice per session** is a good default. Each ends with green tests and a working demo, so it's
   a clean checkpoint to commit and pause.
-- The **L** slices (5, 6, A2, A3, B2) each have a noted seam — split them if you want a shorter run.
+- The **L** slices (5, 6, A1, A3, A4, B2, C1, C3) each have a noted seam — split them if you want a
+  shorter run.
 - **Before starting a slice,** check your remaining plan usage so you don't land mid-slice. If usage
-  looks tight, pick an **M/S** item (e.g. Slice 7 is smaller than 5/6; A0/A4 are lighter than A2/A3).
-- Suggested order: **1 → 2 → 3 → 4 → (5 and 6 in either order) → 7 → 8**, then Track A and/or B.
+  looks tight, pick an **M/S** item (e.g. Slice 7 is smaller than 5/6; A0/A5 are lighter than A1/A4).
+- Suggested order: **1 → 2 → 3 → 4 → (5 and 6 in either order) → 7 → 8** ✅, then **Track A (A0 → A1 →
+  A2)**, then Track C. Track A before Track C is deliberate: they touch the same backend files, and a
+  working bot is a better forcing function for the `GameModule` seam than an imagined second game.

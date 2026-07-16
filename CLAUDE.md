@@ -48,6 +48,7 @@ A fuller mechanic-by-mechanic breakdown lives in the rulebook; capture edge case
 ```
 container/
 ├── engine/     @container/engine  — pure, deterministic rules core (NO I/O, NO randomness)
+├── bot/        @container/bot     — AI players; pure policies over a redacted GameView
 ├── backend/    @container/backend — Fastify REST API; persists state to SQLite
 ├── ui/         @container/ui      — React + Tailwind + shadcn; talks to the API
 └── reference_material/            — the rulebook PDF
@@ -77,6 +78,30 @@ Both consumers transpile it directly:
 
 `engine` also has a real `build` (`tsc -p tsconfig.build.json` → `dist/`) used for typecheck/
 distribution; consumers may switch to `dist` later if we ever publish.
+
+### The bot package (`@container/bot`, Track A)
+
+**Engine = rules, bot = opinions.** The engine says what is *legal*; the bot only says what is *wise*.
+No bot code goes in `engine/`, and the engine must never learn what a bot is. A bot is not
+authoritative — it just produces an `Action` that the engine validates like any human's move.
+
+- **Bots decide from a `GameView`, never a `GameState`:** `decide(viewFor(state, botId), botId)`. Taking
+  the redacted view makes cheating *structurally impossible* rather than a matter of discipline;
+  `selfOf()` enforces the other half (the bot's own card must be visible, or the caller passed the
+  wrong view). **Never hand a bot a full `GameState`.**
+- **Coverage gate is 90%, not 100%** (deliberate — see `bot/vitest.config.ts`). Heuristic weights get
+  retuned constantly, and a 100% bar on judgement calls buys churn, not correctness. What must stay
+  covered: every decision is legal, every policy reachable.
+- **Layout** mirrors the engine's conventions: one policy per concern in `policies/`, barrels re-export
+  only, tests in `src/tests/`. Adding a policy = a `rank*` function + a `rank.ts` case + a test.
+- **`legalActions` markers are not playable.** Five of twelve actions come back as bare markers that
+  `applyAction` throws on; completing them is `rank()`'s job and *is* the strategy.
+- **Value containers with `gainFrom`, never `card.values[color]`** — the discard rule makes marginal
+  value differ from face value, and it can be **negative**.
+- **Self-play (`playSelfPlay`) is the package's real test** — it drives thousands of live engine actions,
+  so any illegal action throws. Keep it passing for all of 3–5 players.
+- **Greedy bots cannot see multi-action payoffs.** The delivery run is 4+ actions; score long chains
+  against the *goal*, not the hop, or ships never leave port (this actually happened — see ROADMAP A0).
 
 ### Engine module layout
 
@@ -165,6 +190,7 @@ pnpm install                # bootstrap the workspace
 # Tests
 pnpm test                   # every workspace's tests
 pnpm test:engine            # engine unit tests + 100% coverage gate
+pnpm test:bot               # bot unit tests + self-play games + 90% coverage gate
 pnpm test:backend           # backend integration tests (Fastify inject + :memory: sqlite)
 pnpm test:e2e               # Playwright (auto-starts API + UI); needs: pnpm --filter @container/ui exec playwright install chromium
 pnpm typecheck              # strict typecheck across all packages
@@ -302,8 +328,23 @@ check plan usage between sessions). Summary:
   aria-labels. Visual-regression baselines: `ui/e2e/visual.spec.ts` (board only — deterministic at
   start; snapshots are per-OS `-darwin`, regenerate with `--update-snapshots` on other OS/CI). Art is
   **original** — do not reproduce any published game's specific artwork.
-- **Track A — AI play** and **Track B — online multiplayer:** independent tracks after the core
-  game is playable. The authoritative, serializable engine makes both additive (see `ROADMAP.md`).
+- **Track A / A0 ✅ (bot harness + greedy bot + self-play).** New `@container/bot` package (see "The bot
+  package" above). `decide(view, playerId, { collectBids })` returns a fully parameterized, legal
+  `Action`; `bidFor(view, bidderId)` is a seat's sealed delivery bid; `playSelfPlay(state)` runs a whole
+  game with every seat botted, each deciding from its own `viewFor` projection. Pure and deterministic —
+  no I/O, no randomness — so a failing game always reproduces. **Not yet wired to the backend or UI:**
+  A1 (pending delivery auction) then A2 (`BotRunner` + bot seats) do that.
+- **⚠️ A1 blocks bots taking seats.** `DELIVER` is a *single atomic action carrying every opponent's
+  bid*, and the engine has no pending-auction state — today the human deliverer types all the secret
+  bids on their own screen. When a **bot delivers, humans must bid**, and no client owns that prompt,
+  so bids need collecting *outside* the engine (the shape `lobbies.ts` already established). `decide`
+  therefore throws unless given a `collectBids` resolver. This also fixes the standing B2 caveat that
+  secret bids are entered on the active player's screen.
+- **Track C — multi-game platform:** turn the site into a games room, Container as the first registered
+  game (`GameModule` interface + registry). Roadmapped only. **Do Track A first** — C0/C1 touch the same
+  backend files (`app.ts`, `repository.ts`, `lobbies.ts`) that A1/A2 need.
+- **Track B — online multiplayer:** independent track. The authoritative, serializable engine makes all
+  of these additive (see `ROADMAP.md`).
 
 ## Decisions & assumptions log
 
@@ -312,6 +353,14 @@ check plan usage between sessions). Summary:
 - **Container colors:** `white, red, green, blue, yellow` (from rulebook scoring cards).
 - **"Player on your right"** (Produce union wage) is modeled as the **next seat index**
   `(seat + 1) % n`. Confirm against physical table convention if it ever matters for scoring.
+- **Produce is "as many as you are able to"** (rulebook pg. 9), which shrinks the run rather than
+  blocking it. A factory whose color the supply has run out of simply **idles**, and the other
+  factories still produce; `capacity = min(producible colors, storage room)`. You may not
+  under-produce below that. Only when *every* factory color is exhausted does Produce throw
+  `OUT_OF_SUPPLY`, and `legalActions` omits it there. (Previously the engine demanded exactly one per
+  factory, which made Produce *impossible* — not smaller — the moment any single color ran out, while
+  `legalActions` still offered it. Since exhausting the supply is the end-game trigger, that hit every
+  late game and every player, not just bots.)
 - **Factory storage limit = 2 × factories**; **harbor limit = 1 × warehouses** (rulebook pg. 5).
   Starting player: 1 factory (dealt color), 1 warehouse, 1 matching container, $20, 2 bluff cards.
 - **Package manager is pnpm** (corepack couldn't symlink into `/usr/local/bin`; pnpm was

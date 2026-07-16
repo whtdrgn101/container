@@ -87,6 +87,39 @@ describe('legalActions', () => {
     expect(types(state)).not.toContain('PRODUCE');
   });
 
+  it('omits PRODUCE when the supply cannot fill any of your factory colors', () => {
+    // Offering an action that always throws is worse than omitting it: it drives the UI's
+    // enable/disable, so the button appeared and then errored on click.
+    const state = makeGame(
+      [
+        makePlayer({ id: 'p1', factories: [{ id: 'p1-f1', color: 'white' }] }),
+        makePlayer({ id: 'p2' }),
+        makePlayer({ id: 'p3' }),
+      ],
+      { supply: makeSupply({ containers: { white: 0, red: 10, green: 10, blue: 10, yellow: 10 } }) },
+    );
+    expect(types(state)).not.toContain('PRODUCE');
+  });
+
+  it('still offers PRODUCE when only some factory colors are exhausted', () => {
+    const state = makeGame(
+      [
+        makePlayer({
+          id: 'p1',
+          factories: [
+            { id: 'p1-f1', color: 'white' },
+            { id: 'p1-f2', color: 'red' },
+          ],
+          factoryLimit: 4,
+        }),
+        makePlayer({ id: 'p2' }),
+        makePlayer({ id: 'p3' }),
+      ],
+      { supply: makeSupply({ containers: { white: 0, red: 10, green: 10, blue: 10, yellow: 10 } }) },
+    );
+    expect(types(state)).toContain('PRODUCE');
+  });
+
   it('omits factory options at the factory limit but still allows produce/warehouse', () => {
     const p1 = makePlayer({
       id: 'p1',

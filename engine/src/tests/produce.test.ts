@@ -29,11 +29,53 @@ describe('produce', () => {
     expect(next.supply.containers.white).toBe(9 - 1);
   });
 
-  it('throws OUT_OF_SUPPLY when the produced color is exhausted', () => {
+  it('throws OUT_OF_SUPPLY when every factory color is exhausted', () => {
     const state = makeGame([makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], {
       supply: makeSupply({ containers: { white: 0, red: 10, green: 10, blue: 10, yellow: 10 } }),
     });
-    expectError(() => produce(state, 'p1'), 'OUT_OF_SUPPLY'); // p1's factory is white
+    expectError(() => produce(state, 'p1'), 'OUT_OF_SUPPLY'); // p1's only factory is white
+  });
+
+  // Rulebook pg. 9: "You must produce as many containers as you are able to." An exhausted color is
+  // one you are not able to produce, so that factory idles and the others still run. Producing
+  // exactly one-per-factory used to be mandatory, which made Produce *impossible* (not merely
+  // smaller) as soon as any one of your colors ran out — and since exhausting the supply is the
+  // end-game trigger, that hit every late game.
+  it('skips an exhausted color and produces the rest', () => {
+    const producer = makePlayer({
+      id: 'p1',
+      factories: [
+        { id: 'p1-f1', color: 'white' },
+        { id: 'p1-f2', color: 'red' },
+      ],
+      factoryLimit: 4,
+    });
+    const state = makeGame([producer, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], {
+      supply: makeSupply({ containers: { white: 0, red: 10, green: 10, blue: 10, yellow: 10 } }),
+    });
+    const next = produce(state, 'p1');
+    expect(getPlayer(next, 'p1').factoryStore).toEqual([sc('red', 2)]);
+    expect(next.supply.containers.red).toBe(9);
+  });
+
+  it('sizes an explicit selection to what the supply can actually fill', () => {
+    const producer = makePlayer({
+      id: 'p1',
+      factories: [
+        { id: 'p1-f1', color: 'white' },
+        { id: 'p1-f2', color: 'red' },
+      ],
+      factoryLimit: 4,
+    });
+    const state = makeGame([producer, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], {
+      supply: makeSupply({ containers: { white: 0, red: 10, green: 10, blue: 10, yellow: 10 } }),
+    });
+    // Only red is producible, so a one-container run is the full run — not an under-production.
+    expect(getPlayer(produce(state, 'p1', [sc('red', 5)]), 'p1').factoryStore).toEqual([sc('red', 5)]);
+    // Asking for the exhausted color still fails, rather than silently substituting.
+    expectError(() => produce(state, 'p1', [sc('white', 5)]), 'OUT_OF_SUPPLY');
+    // And you still cannot under-produce what the supply *can* fill.
+    expectError(() => produce(state, 'p1', []), 'INVALID_SELECTION');
   });
 
   it('places produced containers into the chosen lots', () => {
