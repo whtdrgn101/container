@@ -229,6 +229,11 @@ swallowed by the SPA fallback.
   primary correctness guarantee.
 - **Backend:** integration tests via `app.inject` against an in-memory SQLite DB — covers HTTP
   contract, validation, persistence, and error mapping.
+- **Playwright runs at `workers: 4`, deliberately.** The default (6 × 2 projects) resets **Vite's dev
+  WS proxy** under load, which strands a page without live state and times the spec out. It is a
+  dev-server limit, not a product bug — the backend serves everything cleanly, and production has no
+  Vite. If specs start flaking with "waiting for <testid>" 30s timeouts, check the worker count before
+  hunting a race.
 - **UI:** Playwright e2e for real user flows, plus a **responsive** spec asserting layout
   reflow (cards stack on mobile, row on desktop) and **no horizontal overflow** at 320px.
   Runs on desktop + mobile Chromium projects.
@@ -389,6 +394,16 @@ check plan usage between sessions). Summary:
   - **Synchronous throughout** (engine + SQLite are), so routes tick then re-read the game to reply.
   - **UI:** gate every new action affordance on `canDrive`, which now also excludes AI seats; and keep
     bot seats out of `mySeatIds` (bid prompts) and the resume list.
+
+- **UX — activity feed + home link ✅.** `ui/src/components/GameLog.tsx` renders `GameState.log` as a
+  running feed at the bottom of the board (newest first, 🤖 for bot seats, End-turn filtered out).
+  **Everything the engine logs is public by construction** — `viewFor` passes `log` through untouched,
+  so it is already on the wire — and the one real secret, a *losing* delivery bid, is deliberately
+  never recorded (guarded by exact-payload tests in `deliver.test.ts`). **If a new mechanic ever logs
+  something hidden, redact it in `record()`/`viewFor`, never in the UI** — the client gets the log
+  either way, so hiding it there would hide nothing. The header title is a link home while in a
+  game/lobby (`home-link`); leaving is safe and needs no confirm, since the game persists server-side
+  (bots keep playing) and is rejoinable from "Games in progress".
 
 - **Track C — multi-game platform:** turn the site into a games room, Container as the first registered
   game (`GameModule` interface + registry). Roadmapped only. **Do Track A first** — C0/C1 touch the same

@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BoardMap } from '@/components/BoardMap';
+import { GameLog } from '@/components/GameLog';
 import { ContainerSvg } from '@/components/art/Container';
 import { cn } from '@/lib/utils';
 import * as api from '@/lib/api';
@@ -509,7 +510,27 @@ export default function App() {
     <div className="min-h-screen">
       <header className="border-b">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-3">
-          <h1 className="text-lg font-bold tracking-tight sm:text-xl">Container</h1>
+          <h1 className="text-lg font-bold tracking-tight sm:text-xl">
+            {game || lobby ? (
+              // Only a link when there's somewhere to go back to. Leaving is safe and needs no
+              // confirmation: the game lives on the server, so it keeps running (bots included) and
+              // reappears under "Games in progress" to rejoin.
+              <button
+                type="button"
+                data-testid="home-link"
+                onClick={resetToLanding}
+                title="Back to the lobby — this game keeps going; rejoin it any time from the home screen"
+                // Underline + pointer, not a color shift: `text-primary` is nearly the same shade as
+                // the heading in both themes, so a color-only hover was invisible and the link
+                // undiscoverable.
+                className="cursor-pointer rounded underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span aria-hidden>←</span> Container
+              </button>
+            ) : (
+              'Container'
+            )}
+          </h1>
           {game && (
             <div className="flex items-center gap-3">
               <button
@@ -1426,6 +1447,12 @@ export default function App() {
               );
             })}
             </section>
+
+            {/*
+              Running feed of what everyone has done. Safe to render straight from `game.log`: the
+              engine only records public information, and never a losing delivery bid (see GameLog).
+            */}
+            <GameLog log={game.log} players={game.players} botIds={botIds} />
           </>
         ) : lobby ? (
           <Card className="mx-auto max-w-md" data-testid="lobby">

@@ -9,6 +9,13 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 1 : 0,
+  // Cap parallelism. The default (half the CPUs — 6 on a 12-core machine, ×2 projects) overwhelms
+  // the **Vite dev server's WebSocket proxy**, which resets connections under that many concurrent
+  // browser contexts ("[vite] ws proxy socket error: read ECONNRESET"). The dropped socket leaves a
+  // page without live state and the spec times out — a dev-tooling limit, not a product one: the
+  // backend serves every request fine (no 4xx/5xx, no errors logged), and the production container
+  // has no Vite at all (it serves ui/dist directly). 4 is green and costs ~3s over the flaky default.
+  workers: 4,
   reporter: isCI ? 'github' : 'list',
   use: {
     baseURL: BASE_URL,

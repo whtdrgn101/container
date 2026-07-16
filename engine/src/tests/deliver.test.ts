@@ -30,6 +30,32 @@ describe('deliver', () => {
   // Rulebook pg. 16: "If there is still a tie after a runoff auction, the player delivering
   // containers chooses which tied bidder wins." The engine used to hand the cargo to the earliest
   // seat, which quietly decided a real strategic choice on the deliverer's behalf.
+  // The move log is public — `viewFor` passes it to every client untouched — so what goes in it is a
+  // privacy decision, not just bookkeeping. Only the *winning* bid is recorded; the losing bids were
+  // sealed and are returned to hand, so they must never be written down. Asserting the payload
+  // exactly (rather than a subset) is the guard: adding `bids` here would fail this test.
+  it('records only the winning bid — losing bids never reach the public log', () => {
+    const state = three(atIsland(['red']), makePlayer({ id: 'p2', money: 10 }), makePlayer({ id: 'p3', money: 10 }));
+    const next = deliver(state, 'p1', { bids: { p2: 7, p3: 3 } });
+    expect(next.log.at(-1)).toEqual({
+      seq: 1,
+      type: 'DELIVER',
+      playerId: 'p1',
+      payload: { winnerId: 'p2', winningBid: 7, buyout: false, containers: ['red'] },
+    });
+  });
+
+  it('records only the price on a buyout, not who bid what', () => {
+    const state = three(atIsland(['red']), makePlayer({ id: 'p2', money: 10 }), makePlayer({ id: 'p3', money: 10 }));
+    const next = deliver(state, 'p1', { bids: { p2: 6, p3: 2 }, buyout: true });
+    expect(next.log.at(-1)!.payload).toEqual({
+      winnerId: 'p1',
+      winningBid: 6,
+      buyout: true,
+      containers: ['red'],
+    });
+  });
+
   it('demands the deliverer break a tie that a runoff did not settle', () => {
     const state = three(atIsland(['green']), makePlayer({ id: 'p2', money: 10 }), makePlayer({ id: 'p3', money: 10 }));
     expectError(() => deliver(state, 'p1', { bids: { p2: 4, p3: 4 } }), 'CHOICE_REQUIRED');

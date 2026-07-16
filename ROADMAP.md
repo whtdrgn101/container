@@ -79,6 +79,11 @@ How we get from the current vertical slice to a complete, faithful game, then to
   colored-square chip; a `BoardMap` panel shows all ships on an ocean/island/bank/harbor board with
   click-to-sail; motion + a11y pass (reduced-motion-aware); visual-regression baselines per viewport.
   34 e2e green (desktop + mobile).
+- ✅ **UX — activity feed + home link:** a running "Activity" log at the bottom of the board narrates
+  every move in plain English (newest first, 🤖 for AI seats), so you can see what the other players
+  actually did. Safe to render straight from `GameState.log`: the engine only ever records public
+  information — losing delivery bids are never written down, which engine tests now pin by asserting
+  the `DELIVER` payload exactly. The header title doubles as a link back to the lobby.
 - ⏭️ **Optional next:** Track A (AI) · Track B (online).
 
 > **Convention going forward:** new engine mechanics are added as `actions/<name>.ts` + a matching
