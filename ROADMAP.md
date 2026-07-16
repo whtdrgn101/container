@@ -196,7 +196,7 @@ real project. The engine's **purity + serializability** is the key enabler: bots
 | A0 | ✅ `@container/bot` + greedy bot + self-play | `decide(view, playerId) → Action`, `bidFor(...)`; headless self-play driver proves the brain with no server | M–L |
 | A1a | ✅ Delivery auction as coordination state | Pending auction outside the engine; each opponent bids from **their own device**, then the deliverer accepts or buys out. Unblocks bot deliveries **and** closes the secret-bid leak | L |
 | A1b | ✅ Runoff + deliverer's tie choice | Tie → runoff round (tied players add cash); still tied → the deliverer **chooses** the winner (pg. 16), replacing the engine's earliest-seat simplification | M |
-| A2 | Bot seats end-to-end | Backend `BotRunner`; hotseat **"add AI player"**; lobby **"assign seat to AI"** | M–L |
+| A2 | ✅ Bot seats end-to-end | Backend `BotRunner`; hotseat **"add AI player"**; lobby **"assign seat to AI"** | M–L |
 | A3 | Difficulty tiers + auction modeling | Easy/Normal/Hard; opponent-card estimation; basic bluff/counter-bluff | L |
 | A4 | Search-based bot (ISMCTS) | Information-Set Monte-Carlo Tree Search with determinization over hidden info, using engine sim | L |
 | A5 | Self-play tuning | Calibrate difficulty & heuristics from batch self-play results | M |
@@ -315,6 +315,35 @@ real project. The engine's **purity + serializability** is the key enabler: bots
     which is correct: that's exactly the case the rulebook gives the deliverer.
   - Engine 202 tests (100%), bot 94, backend 79, e2e 52 — incl. specs for the runoff round and for a
     deliverer awarding a level tie to the *later* seat (proving it's a choice, not seat order).
+- ✅ **A2 — bot seats end-to-end. The AI is playable.** `BotRunner` (`backend/src/botRunner.ts`) plays
+  every AI seat forward after any change, stopping the moment a human is on the clock.
+  - **Bot-ness is coordination state, not engine state.** A `game_bots` table (`bots.ts`) — a separate
+    table, not a column, so `CREATE TABLE IF NOT EXISTS` upgrades a live database with no migration.
+    It rides *beside* the game (`{ game, bots }`, and `bots` on the WS state message), never inside
+    `GameState`; a test asserts the engine state never contains the word.
+  - **The runner has no special powers.** It builds actions with the same `@container/bot` policies
+    self-play uses, hands them to the same `applyAction` a human's move goes through, and bids through
+    the same `applyBid` the REST route uses — which was extracted from the route for exactly this, so
+    there is one implementation of what a bid means. It decides from `viewFor(state, botId)`, so it
+    cannot see an opponent's card either.
+  - **Synchronous by design:** the engine and SQLite both are, so a route ticks and then simply reads
+    the game back. A human's `END_TURN` returns with the bots' turns already played.
+  - **⚠️ `tick` runs on read as well as write** (`GET /games/:id`, `GET .../auction`, WS subscribe).
+    Bot turns are normally driven by whatever mutation preceded them — but *nothing mutates while it's
+    already a bot's move*. After a restart the AI would sit there forever and **no human could unstick
+    it, because it isn't their turn.** Ticking on read makes that self-healing.
+  - **Delivery auctions compose with A1 for free:** the runner fills bot bids, bots take their own
+    runoff round, and a bot deliverer resolves its own auction (`wantsBuyout` + `chooseTiedWinner`).
+    A bot never resolves a *human's* delivery — the call stays theirs.
+  - **UI:** per-seat 🤖 toggles on the hotseat quick-start, **"Add an AI player"** in the lobby, 🤖
+    badges on bot player cards, and AI seats excluded from `mySeatIds`/`canDrive` (so a person is never
+    asked to take a bot's turn or bid) and from the **resume** list (which would put a second driver on
+    the seat *and* show a human the bot's secret card — `GameSummary.bots` closes that).
+  - Backend 90 tests (incl. an all-bot game playing itself to a scored finish), e2e 60 (incl. an
+    all-AI table finishing through the real UI).
+  - **Known:** difficulty is uniform — every bot is the A0 greedy policy (A3 adds tiers). Bots play
+    instantly with no "thinking" pause, which reads as abrupt at a shared screen; worth a small delay.
+
 - **Why ISMCTS (A4):** it's the standard fit for hidden-info, auction/trick games; the deterministic
   engine lets it roll out thousands of sampled games cheaply. Note the bot holds a **redacted view**,
   so determinization means sampling the opponents' unseen scoring cards from `SCORING_CARDS` minus its

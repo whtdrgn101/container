@@ -1,6 +1,7 @@
 import { deliveryOutcome, legalActions } from '@container/engine';
 import type { Action, GameState, GameView } from '@container/engine';
 import { chooseTiedWinner, wantsBuyout } from './bid';
+import { contextFor } from './context';
 import { BotError } from './errors';
 import { rank } from './policies/rank';
 import type { Candidate, Ctx, DecideOptions } from './types';
@@ -72,7 +73,7 @@ export function decide(view: GameView, playerId: string, options: DecideOptions 
     throw new BotError(`It is not bot seat "${playerId}"'s turn (active seat is "${active?.id ?? 'none'}")`);
   }
 
-  const ctx: Ctx = { view, me, opponents: view.players.filter((player) => player.id !== playerId) };
+  const ctx = contextFor(view, playerId);
 
   // Safe cast: `legalActions` enumerates moves and never reads a scoring card, so a redacted view
   // produces the same list as the full state. (The UI relies on this too.) Keeping the cast here,

@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@container/bot": "workspace:*",
     "@container/engine": "workspace:*",
     "@fastify/static": "^10.1.0",
     "@fastify/websocket": "^11.3.0",

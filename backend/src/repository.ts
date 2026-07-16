@@ -12,6 +12,8 @@ export interface GameSummary {
   status: GameState['status'];
   activePlayerId: string | null;
   players: { id: string; name: string }[];
+  /** Seats an AI holds — so the resume list never offers you a seat the server already plays. */
+  bots: string[];
 }
 
 interface MoveRow {
@@ -49,6 +51,15 @@ export class GameRepository {
     const rows = this.db
       .prepare(`SELECT state FROM games ORDER BY updated_at DESC LIMIT ?`)
       .all(limit) as GameRow[];
+    const botRows = this.db.prepare(`SELECT game_id, player_id FROM game_bots`).all() as {
+      game_id: string;
+      player_id: string;
+    }[];
+    const botsByGame = new Map<string, string[]>();
+    for (const row of botRows) {
+      botsByGame.set(row.game_id, [...(botsByGame.get(row.game_id) ?? []), row.player_id]);
+    }
+
     return rows
       .map((row) => JSON.parse(row.state) as GameState)
       .filter((state) => state.status === 'active')
@@ -58,6 +69,7 @@ export class GameRepository {
         status: state.status,
         activePlayerId: state.players[state.activePlayerIndex]?.id ?? null,
         players: state.players.map((player) => ({ id: player.id, name: player.name })),
+        bots: botsByGame.get(state.id) ?? [],
       }));
   }
 

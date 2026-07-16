@@ -18,6 +18,11 @@ export interface Sendable {
 export interface StateMessage {
   readonly type: 'state';
   readonly game: ReturnType<typeof viewFor>;
+  /**
+   * Seats an AI holds. Rides alongside the game rather than inside it: bot-ness is coordination
+   * state, not a rule, so it never enters `GameState` (see `bots.ts`).
+   */
+  readonly bots: readonly string[];
 }
 
 interface Subscriber {
@@ -30,10 +35,10 @@ const WS_OPEN = 1; // WebSocket.OPEN readyState
 
 const activeId = (state: GameState): string | null => state.players[state.activePlayerIndex]?.id ?? null;
 
-function project(state: GameState, viewerId: Viewer): StateMessage {
+function project(state: GameState, viewerId: Viewer, bots: readonly string[]): StateMessage {
   // A null viewer follows whoever is active (a shared hotseat screen shows the current player); a
   // seat list projects for exactly those seats; an empty list is a spectator (sees no cards).
-  return { type: 'state', game: viewFor(state, viewerId ?? activeId(state)) };
+  return { type: 'state', game: viewFor(state, viewerId ?? activeId(state)), bots };
 }
 
 export class GameHub {
@@ -57,9 +62,9 @@ export class GameHub {
   }
 
   /** Send a single socket the current state (the initial sync sent right after it connects). */
-  sendState(socket: Sendable, state: GameState, viewerId: Viewer): void {
+  sendState(socket: Sendable, state: GameState, viewerId: Viewer, bots: readonly string[] = []): void {
     if (socket.readyState !== WS_OPEN) return;
-    socket.send(JSON.stringify(project(state, viewerId)));
+    socket.send(JSON.stringify(project(state, viewerId, bots)));
   }
 
   /**
@@ -79,7 +84,7 @@ export class GameHub {
   }
 
   /** Push new state to every subscriber of a game, each projected for its own seat. */
-  broadcast(gameId: string, state: GameState): void {
-    this.broadcastEach(gameId, (viewerId) => project(state, viewerId));
+  broadcast(gameId: string, state: GameState, bots: readonly string[] = []): void {
+    this.broadcastEach(gameId, (viewerId) => project(state, viewerId, bots));
   }
 }

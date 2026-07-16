@@ -8,17 +8,16 @@ import type { Action, Color, District, GameState, NewPlayer, ShipLocation, Store
 import type { DeliveryAuction } from './auctions';
 import {
   AuctionRepository,
-  allBidsIn,
-  allRunoffBidsIn,
+  applyBid,
   auctionIsDue,
   auctionViewFor,
-  biddersFor,
-  openAuctionFor,
-  tiedForLead,
+  syncAuction as syncAuctionFor,
 } from './auctions';
+import { BotRepository } from './bots';
+import { BotRunner } from './botRunner';
 import type { DB } from './db';
 import { GameHub } from './hub';
-import type { Lobby } from './lobbies';
+import type { Lobby, LobbyMember } from './lobbies';
 import { LobbyRepository } from './lobbies';
 import { GameRepository } from './repository';
 
@@ -29,8 +28,11 @@ export interface AppOptions {
   staticDir?: string;
 }
 
+/** `NewPlayer` plus a per-seat AI flag. `bot` is stripped before the engine ever sees the seat. */
+type NewSeat = NewPlayer & { bot?: boolean };
+
 interface CreateGameBody {
-  players: NewPlayer[];
+  players: NewSeat[];
 }
 
 interface RawContainer {
@@ -196,6 +198,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
   const repo = new GameRepository(options.db);
   const lobbies = new LobbyRepository(options.db);
   const auctions = new AuctionRepository(options.db);
+  const botSeats = new BotRepository(options.db);
   const hub = new GameHub();
 
   /**
@@ -216,26 +219,24 @@ export function buildApp(options: AppOptions): FastifyInstance {
     }));
 
   /**
-   * Keep the pending auction in step with the game: open one whenever a ship is at Container Island
-   * with cargo, and make sure none lingers otherwise. The engine owns the rule (`auctionIsDue` →
-   * `mustDeliver`); this only mirrors it.
-   *
-   * Called on **read as well as write**, deliberately. Deriving the auction from the game state
-   * rather than trusting a row to have been written makes it self-healing: a game that reached the
-   * island before this feature shipped (a live game mid-upgrade) or any state restored without an
-   * auction row would otherwise wedge at the island forever, with no way to resolve the delivery.
+   * Which seats an AI holds. Travels alongside every game payload rather than inside `GameState`:
+   * bot-ness is coordination state, and the engine must never learn what a bot is.
    */
-  const syncAuction = (state: GameState): DeliveryAuction | null => {
-    if (!auctionIsDue(state)) {
-      if (auctions.get(state.id)) auctions.clear(state.id);
-      return null;
-    }
-    const existing = auctions.get(state.id);
-    if (existing && existing.delivererId === activeId(state)) return existing;
-    const fresh = openAuctionFor(state);
-    auctions.save(fresh);
-    return fresh;
+  const botsOf = (gameId: string) => botSeats.listForGame(gameId);
+
+  /** Broadcast new state, then the auction — bots included so clients can label the seats. */
+  const pushGame = (gameId: string, state: GameState, auction: DeliveryAuction | null) => {
+    hub.broadcast(gameId, state, botsOf(gameId));
+    pushAuction(gameId, auction, state);
   };
+
+  // Plays the AI's seats forward after any change, until a human is on the clock again. Synchronous,
+  // so a route can simply re-read the game afterwards and reply with the post-bot state.
+  const botRunner = new BotRunner(repo, botSeats, auctions, (state, auction) =>
+    pushGame(state.id, state, auction),
+  );
+
+  const syncAuction = (state: GameState) => syncAuctionFor(auctions, state);
 
   app.register(fastifyWebsocket);
 
@@ -258,9 +259,10 @@ export function buildApp(options: AppOptions): FastifyInstance {
           request.query.viewer !== undefined ? request.query.viewer.split(',').filter(Boolean) : null;
         const unsubscribe = hub.subscribe(request.params.id, socket, viewer);
         socket.on('close', unsubscribe);
+        botRunner.tick(request.params.id); // a watching client is enough to drive stalled bot turns
         // Send the first snapshot on the next tick, after the open handshake settles, so a client
         // that attaches its message handler right after connecting never misses it.
-        setImmediate(() => hub.sendState(socket, state, viewer));
+        setImmediate(() => hub.sendState(socket, state, viewer, botsOf(request.params.id)));
       },
     );
   });
@@ -281,6 +283,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
                 properties: {
                   name: { type: 'string', minLength: 1 },
                   startingColor: { type: 'string' },
+                  bot: { type: 'boolean' },
                 },
               },
             },
@@ -292,7 +295,16 @@ export function buildApp(options: AppOptions): FastifyInstance {
       try {
         const state = newGameFromNames(request.body.players.map((player) => player.name));
         repo.create(state);
-        return reply.code(201).send({ game: viewFor(state, activeId(state)) });
+
+        // Seat i is always player `p{i+1}` (see createGame), so a seat's bot flag maps straight to
+        // an id. Recorded outside the game state — the engine never learns which seats are bots.
+        const botIds = state.players.filter((_, seat) => request.body.players[seat]?.bot === true).map((p) => p.id);
+        if (botIds.length > 0) botSeats.setForGame(state.id, botIds);
+
+        // A bot in seat 1 should already have played by the time the creator sees the board.
+        botRunner.tick(state.id);
+        const started = repo.get(state.id) ?? state;
+        return reply.code(201).send({ game: viewFor(started, activeId(started)), bots: botsOf(state.id) });
       } catch (error) {
         return sendGameError(reply, error);
       }
@@ -303,12 +315,18 @@ export function buildApp(options: AppOptions): FastifyInstance {
   app.get('/games', async () => ({ games: repo.listActive() }));
 
   app.get<{ Params: { id: string }; Querystring: { viewer?: string } }>('/games/:id', async (request, reply) => {
-    const state = repo.get(request.params.id);
-    if (!state) return notFound(reply, request.params.id);
+    if (!repo.get(request.params.id)) return notFound(reply, request.params.id);
+    // Looking at a game is enough to drive it. Bot turns are normally played by whatever mutation
+    // preceded them, but nothing mutates while it is *already* a bot's move — after a restart, or a
+    // game seeded any other way, the AI would sit there forever and no human could unstick it,
+    // because it isn't their turn. Ticking on read makes that self-healing; it's a no-op with no
+    // bots, or when a human is on the clock.
+    botRunner.tick(request.params.id);
+    const state = repo.get(request.params.id)!;
     // No `?viewer` ⇒ follow the active player (hotseat). `?viewer=p1,p3` ⇒ those seats; `?viewer=` ⇒ none.
     const viewer =
       request.query.viewer !== undefined ? request.query.viewer.split(',').filter(Boolean) : activeId(state);
-    return reply.send({ game: viewFor(state, viewer) });
+    return reply.send({ game: viewFor(state, viewer), bots: botsOf(request.params.id) });
   });
 
   app.post<{ Params: { id: string }; Body: ActionBody; Querystring: { viewer?: string } }>(
@@ -389,14 +407,17 @@ export function buildApp(options: AppOptions): FastifyInstance {
       try {
         const next = applyAction(state, request.body.playerId, action);
         repo.update(next);
-        const auction = syncAuction(next);
-        hub.broadcast(request.params.id, next); // push the new state to every connected client
-        pushAuction(request.params.id, auction, next);
+        pushGame(request.params.id, next, syncAuction(next)); // tell every connected client
+        // Let the AI take any seats that are now on the clock, before we reply — so the caller gets
+        // back the state as it stands once the bots have finished, not a snapshot mid-round.
+        botRunner.tick(request.params.id);
+        // Read back rather than replying with `next`: the bots may have played several turns since.
+        const settled = repo.get(request.params.id) ?? next;
         // Project the reply for the acting client's own seats (not the active player), so ending a
         // turn never leaks the next player's card. No `?viewer` ⇒ follow the active player (hotseat).
         const viewer =
-          request.query.viewer !== undefined ? request.query.viewer.split(',').filter(Boolean) : activeId(next);
-        return reply.send({ game: viewFor(next, viewer) });
+          request.query.viewer !== undefined ? request.query.viewer.split(',').filter(Boolean) : activeId(settled);
+        return reply.send({ game: viewFor(settled, viewer), bots: botsOf(request.params.id) });
       } catch (error) {
         return sendGameError(reply, error);
       }
@@ -416,8 +437,9 @@ export function buildApp(options: AppOptions): FastifyInstance {
   app.get<{ Params: { id: string }; Querystring: { viewer?: string } }>(
     '/games/:id/auction',
     async (request, reply) => {
-      const state = repo.get(request.params.id);
-      if (!state) return notFound(reply, request.params.id);
+      if (!repo.get(request.params.id)) return notFound(reply, request.params.id);
+      botRunner.tick(request.params.id); // same self-healing as GET /games/:id
+      const state = repo.get(request.params.id)!;
       const auction = syncAuction(state);
       if (!auction) return reply.send({ auction: null });
       const viewer = request.query.viewer ? request.query.viewer : null;
@@ -446,53 +468,26 @@ export function buildApp(options: AppOptions): FastifyInstance {
 
       const auction = syncAuction(state);
       if (!auction) return auctionConflict(reply, 'NO_OPEN_AUCTION', 'No delivery auction is open');
-      if (auction.phase === 'decision') {
-        return auctionConflict(reply, 'BIDDING_CLOSED', 'Every bid is already in');
-      }
 
       const { playerId, bid } = request.body;
-      const inRunoff = auction.phase === 'runoff';
-      // In a runoff only the tied players bid again (pg. 16); everyone else is out.
-      const owing = inRunoff ? tiedForLead(auction, state) : biddersFor(state, auction.delivererId);
-      if (!owing.includes(playerId)) {
-        return auctionConflict(
-          reply,
-          'NOT_A_BIDDER',
-          inRunoff
-            ? `Player "${playerId}" is not tied for the lead and does not bid in the runoff`
-            : `Player "${playerId}" is not bidding in this auction`,
-        );
-      }
-      const round = inRunoff ? auction.runoffBids : auction.bids;
-      if (round[playerId] !== undefined) {
-        // Bids go facedown and stay there (pg. 15) — no taking one back once committed.
-        return auctionConflict(reply, 'ALREADY_BID', `Player "${playerId}" has already bid`);
-      }
-      const bidder = state.players.find((player) => player.id === playerId)!;
-      // A runoff bid is *added* to the opening bid without taking it back, so it's the total that
-      // has to be affordable (pg. 16).
-      const committed = inRunoff ? (auction.bids[playerId] ?? 0) + bid : bid;
-      if (committed > bidder.money) {
-        return auctionConflict(reply, 'INSUFFICIENT_FUNDS', `Player "${playerId}" cannot bid $${committed}`);
-      }
+      // `applyBid` is the one implementation of what a bid means — the BotRunner places bids through
+      // it too, so a bot is held to exactly the rules a human is.
+      const outcome = applyBid(auction, state, playerId, bid);
+      if (!outcome.ok) return auctionConflict(reply, outcome.code, outcome.message);
 
-      // The reveal is what makes the bids simultaneous: nobody's amount is visible until the last
-      // opponent has committed, so bidding early costs you nothing and bidding late tells you nothing.
-      let next: DeliveryAuction;
-      if (inRunoff) {
-        next = { ...auction, runoffBids: { ...auction.runoffBids, [playerId]: bid } };
-        if (allRunoffBidsIn(next, state)) next = { ...next, phase: 'decision' };
-      } else {
-        next = { ...auction, bids: { ...auction.bids, [playerId]: bid } };
-        if (allBidsIn(next, state)) {
-          // Level at the top → a runoff decides it; otherwise straight to the deliverer.
-          next = { ...next, phase: tiedForLead(next, state).length > 1 ? 'runoff' : 'decision' };
-        }
-      }
-      auctions.save(next);
-      pushAuction(request.params.id, next, state);
+      auctions.save(outcome.auction);
+      pushAuction(request.params.id, outcome.auction, state);
+      // This bid may be the one the AI seats were waiting on — let them answer before we reply.
+      botRunner.tick(request.params.id);
 
-      return reply.send({ auction: auctionViewFor(next, state, playerId) });
+      const settled = repo.get(request.params.id) ?? state;
+      const current = auctions.get(request.params.id);
+      if (!current) {
+        // The bots finished the auction outright (they were the only ones left to act).
+        return reply.send({ auction: null });
+      }
+      return reply.send({ auction: auctionViewFor(current, settled, playerId) });
+
     },
   );
 
@@ -548,12 +543,13 @@ export function buildApp(options: AppOptions): FastifyInstance {
         auctions.clear(request.params.id);
 
         // DELIVER ends the turn, so the next player is up and no auction is open.
-        hub.broadcast(request.params.id, next);
-        pushAuction(request.params.id, null, next);
+        pushGame(request.params.id, next, null);
+        botRunner.tick(request.params.id);
 
+        const settled = repo.get(request.params.id) ?? next;
         const viewer =
-          request.query.viewer !== undefined ? request.query.viewer.split(',').filter(Boolean) : activeId(next);
-        return reply.send({ game: viewFor(next, viewer) });
+          request.query.viewer !== undefined ? request.query.viewer.split(',').filter(Boolean) : activeId(settled);
+        return reply.send({ game: viewFor(settled, viewer), bots: botsOf(request.params.id) });
       } catch (error) {
         return sendGameError(reply, error);
       }
@@ -596,9 +592,17 @@ export function buildApp(options: AppOptions): FastifyInstance {
     return reply.send({ lobby });
   });
 
-  app.post<{ Params: { id: string }; Body: { name: string } }>(
+  app.post<{ Params: { id: string }; Body: { name: string; bot?: boolean } }>(
     '/lobbies/:id/join',
-    { schema: { body: { type: 'object', required: ['name'], properties: { name: { type: 'string', minLength: 1 } } } } },
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['name'],
+          properties: { name: { type: 'string', minLength: 1 }, bot: { type: 'boolean' } },
+        },
+      },
+    },
     async (request, reply) => {
       const lobby = lobbies.get(request.params.id);
       if (!lobby) return lobbyNotFound(reply, request.params.id);
@@ -609,7 +613,8 @@ export function buildApp(options: AppOptions): FastifyInstance {
       if (seat === -1) {
         return reply.code(409).send({ error: { code: 'LOBBY_FULL', message: 'All seats are taken' } });
       }
-      const members = lobby.members.map((member, i) => (i === seat ? request.body.name.trim() : member));
+      const claimed: LobbyMember = { name: request.body.name.trim(), bot: request.body.bot === true };
+      const members = lobby.members.map((member, i) => (i === seat ? claimed : member));
       const updated: Lobby = { ...lobby, members };
       lobbies.update(updated);
       return reply.send({ lobby: updated, seat });
@@ -626,10 +631,20 @@ export function buildApp(options: AppOptions): FastifyInstance {
       return reply.code(409).send({ error: { code: 'LOBBY_NOT_READY', message: 'Every seat must be filled first' } });
     }
     try {
-      const state = newGameFromNames(lobby.members as string[]);
+      const members = lobby.members as LobbyMember[];
+      const state = newGameFromNames(members.map((member) => member.name));
       repo.create(state);
+
+      // Lobby seat i → player `p{i+1}` (createGame assigns ids by seat), so a seat's bot flag maps
+      // straight to a player id.
+      const botIds = state.players.filter((_, seat) => members[seat]?.bot === true).map((player) => player.id);
+      if (botIds.length > 0) botSeats.setForGame(state.id, botIds);
       lobbies.update({ ...lobby, status: 'started', gameId: state.id });
-      return reply.code(201).send({ game: viewFor(state, activeId(state)) });
+
+      // A bot in an early seat should have played before anyone reaches the board.
+      botRunner.tick(state.id);
+      const started = repo.get(state.id) ?? state;
+      return reply.code(201).send({ game: viewFor(started, activeId(started)), bots: botsOf(state.id) });
     } catch (error) {
       return sendGameError(reply, error);
     }

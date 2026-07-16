@@ -7,7 +7,7 @@ export default defineConfig({
     // tell Vitest to transform it rather than treat it as an external dep.
     server: {
       deps: {
-        inline: [/@container\/engine/],
+        inline: [/@container\/(engine|bot)/],
       },
     },
   },

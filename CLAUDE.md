@@ -49,7 +49,7 @@ A fuller mechanic-by-mechanic breakdown lives in the rulebook; capture edge case
 container/
 ├── engine/     @container/engine  — pure, deterministic rules core (NO I/O, NO randomness)
 ├── bot/        @container/bot     — AI players; pure policies over a redacted GameView
-├── backend/    @container/backend — Fastify REST API; persists state to SQLite
+├── backend/    @container/backend — Fastify REST API; persists to SQLite; runs the AI (BotRunner)
 ├── ui/         @container/ui      — React + Tailwind + shadcn; talks to the API
 └── reference_material/            — the rulebook PDF
 ```
@@ -59,8 +59,8 @@ Moves always go over REST; the backend then **pushes** the new state to all conn
 WebSocket (`GameHub`), each projected per-viewer via `viewFor`. The socket is push-only (never a move channel).
 
 **Coordination state lives outside the engine.** Anything that is *not* a rule — pre-game lobbies
-(`lobbies.ts`), pending delivery auctions (`auctions.ts`), and later which seats are bots — is backend
-state with its own table and its own per-viewer projection. The engine stays a pure `state + action →
+(`lobbies.ts`), pending delivery auctions (`auctions.ts`), and which seats are bots (`bots.ts`) — is
+backend state with its own table and its own per-viewer projection. The engine stays a pure `state + action →
 state` library that knows nothing about rooms, sealed bids, or bots. Reach for this pattern before
 reaching into the engine.
 
@@ -374,6 +374,22 @@ check plan usage between sessions). Summary:
     (gives the cargo to whichever tied opponent it helps least, in expectation over their possible
     cards). `decide` takes `collectBids` **and** `collectRunoffBids` — A2's `BotRunner` wires both to
     the pending auction.
+- **Track A / A2 ✅ (bot seats end-to-end).** `BotRunner` (`backend/src/botRunner.ts`) plays AI seats
+  forward after any change, stopping when a human is on the clock. **Bots run server-side**, so hotseat
+  and remote use one implementation and a game moves with no browser open.
+  - **Which seats are bots is coordination state** (`game_bots` table, `bots.ts`) and rides *beside*
+    the game — `{ game, bots }` on REST, `bots` on the WS state message. **Never put it in
+    `GameState`**; the engine must not learn what a bot is.
+  - **The runner has no special powers:** same `@container/bot` policies as self-play, same
+    `applyAction`, same `applyBid` as the REST route, and it decides from `viewFor(state, botId)`.
+    When adding bot behaviour, keep it that way — a bot must not do what a player couldn't.
+  - **⚠️ `tick` runs on read too** (`GET /games/:id`, `GET .../auction`, WS subscribe), not just on
+    mutations. Nothing mutates while it's *already* a bot's turn, so after a restart the game would
+    wedge with no human able to unstick it. Keep the read-path ticks.
+  - **Synchronous throughout** (engine + SQLite are), so routes tick then re-read the game to reply.
+  - **UI:** gate every new action affordance on `canDrive`, which now also excludes AI seats; and keep
+    bot seats out of `mySeatIds` (bid prompts) and the resume list.
+
 - **Track C — multi-game platform:** turn the site into a games room, Container as the first registered
   game (`GameModule` interface + registry). Roadmapped only. **Do Track A first** — C0/C1 touch the same
   backend files (`app.ts`, `repository.ts`, `lobbies.ts`) that A1/A2 need.

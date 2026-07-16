@@ -8,8 +8,8 @@ import type {
   StoredContainer,
   Supply,
 } from '@container/engine';
+import { contextFor } from '../context';
 import type { Ctx } from '../types';
-import { selfOf } from '../valuation';
 
 /** Shorthand for a stored container ({ color, price }). */
 export const sc = (color: Color, price: number): StoredContainer => ({ color, price });
@@ -82,11 +82,4 @@ export function newGame(playerCount = 3): GameState {
 export const viewOf = (state: GameState, playerId: string): GameView => viewFor(state, playerId);
 
 /** Build the policy context for a seat, the same way `decide` does. */
-export function ctxFor(state: GameState, playerId: string): Ctx {
-  const view = viewFor(state, playerId);
-  return {
-    view,
-    me: selfOf(view, playerId),
-    opponents: view.players.filter((player) => player.id !== playerId),
-  };
-}
+export const ctxFor = (state: GameState, playerId: string): Ctx => contextFor(viewFor(state, playerId), playerId);

@@ -10,6 +10,9 @@ importers:
 
   backend:
     dependencies:
+      '@container/bot':
+        specifier: workspace:*
+        version: link:../bot
       '@container/engine':
         specifier: workspace:*
         version: link:../engine

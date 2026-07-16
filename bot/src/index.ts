@@ -9,6 +9,7 @@
  * an opponent's secret scoring card.
  */
 export { decide } from './decide';
+export { contextFor } from './context';
 export { bidFor, chooseTiedWinner, runoffBidFor, wantsBuyout } from './bid';
 export { playSelfPlay } from './selfPlay';
 export { BotError } from './errors';

@@ -156,6 +156,74 @@ export function auctionViewFor(
   };
 }
 
+/** Either the auction that results from a bid, or why it was refused. */
+export type BidOutcome =
+  | { readonly ok: true; readonly auction: DeliveryAuction }
+  | { readonly ok: false; readonly code: string; readonly message: string };
+
+/**
+ * Place one seat's bid and advance the phase machine — the single implementation of "what a bid
+ * means", shared by the REST route and the `BotRunner`. A bot bids through exactly the same rules a
+ * human does, including the affordability check, so a bot can't do anything a player couldn't.
+ *
+ * Pure: returns the next auction rather than saving it, so the caller owns persistence.
+ */
+export function applyBid(
+  auction: DeliveryAuction,
+  state: GameState,
+  playerId: string,
+  bid: number,
+): BidOutcome {
+  if (auction.phase === 'decision') {
+    return { ok: false, code: 'BIDDING_CLOSED', message: 'Every bid is already in' };
+  }
+
+  const inRunoff = auction.phase === 'runoff';
+  // In a runoff only the tied players bid again (pg. 16); everyone else is out.
+  const owing = inRunoff ? tiedForLead(auction, state) : biddersFor(state, auction.delivererId);
+  if (!owing.includes(playerId)) {
+    return {
+      ok: false,
+      code: 'NOT_A_BIDDER',
+      message: inRunoff
+        ? `Player "${playerId}" is not tied for the lead and does not bid in the runoff`
+        : `Player "${playerId}" is not bidding in this auction`,
+    };
+  }
+
+  const round = inRunoff ? auction.runoffBids : auction.bids;
+  if (round[playerId] !== undefined) {
+    // Bids go facedown and stay there (pg. 15) — no taking one back once committed.
+    return { ok: false, code: 'ALREADY_BID', message: `Player "${playerId}" has already bid` };
+  }
+
+  const bidder = state.players.find((player) => player.id === playerId);
+  if (!bidder) {
+    return { ok: false, code: 'NOT_A_BIDDER', message: `Player "${playerId}" is not in this game` };
+  }
+  // A runoff bid is *added* to the opening bid without taking it back, so it's the total that has to
+  // be affordable (pg. 16).
+  const committed = inRunoff ? (auction.bids[playerId] ?? 0) + bid : bid;
+  if (committed > bidder.money) {
+    return { ok: false, code: 'INSUFFICIENT_FUNDS', message: `Player "${playerId}" cannot bid $${committed}` };
+  }
+
+  // The reveal is what makes the bids simultaneous: nobody's amount is visible until the last
+  // opponent has committed, so bidding early costs you nothing and bidding late tells you nothing.
+  if (inRunoff) {
+    let next: DeliveryAuction = { ...auction, runoffBids: { ...auction.runoffBids, [playerId]: bid } };
+    if (allRunoffBidsIn(next, state)) next = { ...next, phase: 'decision' };
+    return { ok: true, auction: next };
+  }
+
+  let next: DeliveryAuction = { ...auction, bids: { ...auction.bids, [playerId]: bid } };
+  if (allBidsIn(next, state)) {
+    // Level at the top → a runoff decides it; otherwise straight to the deliverer.
+    next = { ...next, phase: tiedForLead(next, state).length > 1 ? 'runoff' : 'decision' };
+  }
+  return { ok: true, auction: next };
+}
+
 interface AuctionRow {
   data: string;
 }
@@ -186,4 +254,27 @@ export class AuctionRepository {
   clear(gameId: string): void {
     this.db.prepare(`DELETE FROM delivery_auctions WHERE game_id = ?`).run(gameId);
   }
+}
+
+/**
+ * Keep the pending auction in step with the game: open one whenever a ship is at Container Island
+ * with cargo, and make sure none lingers otherwise. The engine owns the rule (`auctionIsDue` →
+ * `mustDeliver`); this only mirrors it.
+ *
+ * Called on **read as well as write**, deliberately. Deriving the auction from the game state rather
+ * than trusting a row to have been written makes it self-healing: a game that reached the island
+ * before this feature shipped (a live game mid-upgrade) or any state restored without an auction row
+ * would otherwise wedge at the island forever, with no way to resolve the delivery.
+ */
+export function syncAuction(auctions: AuctionRepository, state: GameState): DeliveryAuction | null {
+  if (!auctionIsDue(state)) {
+    if (auctions.get(state.id)) auctions.clear(state.id);
+    return null;
+  }
+  const active = state.players[state.activePlayerIndex]!;
+  const existing = auctions.get(state.id);
+  if (existing && existing.delivererId === active.id) return existing;
+  const fresh = openAuctionFor(state);
+  auctions.save(fresh);
+  return fresh;
 }

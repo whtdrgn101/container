@@ -49,6 +49,17 @@ CREATE TABLE IF NOT EXISTS delivery_auctions (
   updated_at TEXT NOT NULL,
   FOREIGN KEY (game_id) REFERENCES games(id)
 );
+
+-- Which seats an AI drives (Track A2). Coordination state, like lobbies and auctions: the engine
+-- knows nothing about bots, and a bot's move is just an ordinary action it validates.
+-- A separate table rather than a games column on purpose: CREATE TABLE IF NOT EXISTS needs no
+-- migration, so an already-deployed database picks this up by simply starting the new build.
+CREATE TABLE IF NOT EXISTS game_bots (
+  game_id   TEXT NOT NULL,
+  player_id TEXT NOT NULL,
+  PRIMARY KEY (game_id, player_id),
+  FOREIGN KEY (game_id) REFERENCES games(id)
+);
 `;
 
 /** Open (or create) a SQLite database and ensure the schema exists. Defaults to in-memory. */

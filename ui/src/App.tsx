@@ -31,6 +31,8 @@ const COLOR_HEX: Record<Color, string> = {
 
 /** Prefilled seat names. The first MIN_PLAYERS are the default game; extras fill in as seats are added. */
 const NAME_POOL = ['Ann', 'Bob', 'Cid', 'Dan', 'Eve'];
+/** Names for AI seats, so a table of bots is still readable at a glance. */
+const BOT_NAMES = ['Robo', 'Circuit', 'Widget', 'Bolt', 'Chip'];
 const DEFAULT_NAMES = NAME_POOL.slice(0, MIN_PLAYERS);
 const LOT_LABELS = ['I', 'II', 'III'];
 
@@ -134,7 +136,13 @@ function StoredChip({
 
 export default function App() {
   const [game, setGame] = useState<GameView | null>(null);
+  // Seats an AI plays. Travels beside the game rather than inside it (the engine knows nothing about
+  // bots), so it's tracked separately and refreshed from every payload the server sends.
+  const [botIds, setBotIds] = useState<string[]>([]);
   const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
+  // Hotseat seats handed to the AI, by seat index. The bots play themselves server-side, so the
+  // person at the shared screen only ever takes the turns of the seats they kept.
+  const [seatIsBot, setSeatIsBot] = useState<boolean[]>(() => DEFAULT_NAMES.map(() => false));
   const [produceLot, setProduceLot] = useState<number>(2);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -184,13 +192,20 @@ export default function App() {
     }
   }
 
-  async function run(work: () => Promise<GameView>) {
-    await guard(async () => setGame(await work()));
+  /** Apply a game payload from the server: the state plus which seats the AI holds. */
+  function applyPayload(payload: api.GamePayload) {
+    setGame(payload.game);
+    setBotIds(payload.bots);
+  }
+
+  async function run(work: () => Promise<api.GamePayload>) {
+    await guard(async () => applyPayload(await work()));
   }
 
   /** Reset everything and return to the landing screen. */
   function resetToLanding() {
     setGame(null);
+    setBotIds([]);
     setLobby(null);
     setMySeats([]);
     setControlledIds(null);
@@ -209,7 +224,7 @@ export default function App() {
     const mine = await api.getGame(id, viewerFor(ids));
     setControlledIds(ids);
     setLobby(null);
-    setGame(mine);
+    applyPayload(mine);
   }
 
   /** Enter a code that may be a lobby or a started game, and route to the right screen. */
@@ -226,7 +241,7 @@ export default function App() {
       } catch {
         // Not a lobby code — fall back to a direct game id (a bare join controls every seat).
         setControlledIds(null);
-        setGame(await api.getGame(code));
+        applyPayload(await api.getGame(code));
       }
     });
   }
@@ -254,7 +269,7 @@ export default function App() {
     await guard(async () => {
       const mine = await api.getGame(gameId, playerId);
       setControlledIds([playerId]);
-      setGame(mine);
+      applyPayload(mine);
     });
   }
 
@@ -269,6 +284,19 @@ export default function App() {
     });
   }
 
+  /**
+   * Fill the next empty seat with an AI. Deliberately *not* added to `mySeats`: the bot plays itself
+   * server-side, so claiming it would only make this client think it had a turn to take.
+   */
+  async function addBotSeat() {
+    if (!lobby) return;
+    const taken = lobby.members.filter((member) => member !== null).length;
+    await guard(async () => {
+      const { lobby: updated } = await api.joinLobby(lobby.id, BOT_NAMES[taken % BOT_NAMES.length]!, true);
+      setLobby(updated);
+    });
+  }
+
   /** Start the current (full) lobby's game, entering it bound to this client's claimed seats. */
   async function startLobbyGame() {
     if (!lobby) return;
@@ -276,7 +304,7 @@ export default function App() {
     const seats = mySeats;
     await guard(async () => {
       const started = await api.startLobby(id);
-      await enterGameAs(started.id, seats);
+      await enterGameAs(started.game.id, seats);
     });
   }
 
@@ -289,7 +317,10 @@ export default function App() {
     if (!gameId) return;
     return api.subscribeGame(
       gameId,
-      (pushed) => setGame((prev) => (prev && prev.id === pushed.id && pushed.version >= prev.version ? pushed : prev)),
+      (pushed, pushedBots) => {
+        setGame((prev) => (prev && prev.id === pushed.id && pushed.version >= prev.version ? pushed : prev));
+        setBotIds(pushedBots);
+      },
       streamViewer,
       setAuction,
     );
@@ -367,7 +398,12 @@ export default function App() {
   const activePlayer = game ? game.players[game.activePlayerIndex] : undefined;
   // This client may drive the game only when it controls the active seat (or controls all seats, in
   // hotseat). This is what binds the window to the seat you joined as and locks other players' turns.
-  const canDrive = !controlledIds || (!!activePlayer && controlledIds.includes(activePlayer.id));
+  // Never offer to act for an AI seat: the server plays those, and a click here would be a second
+  // player at the same seat. In practice a bot has already moved by the time we render, but a
+  // dropped push shouldn't hand its turn to a human.
+  const activeIsBot = !!activePlayer && botIds.includes(activePlayer.id);
+  const canDrive =
+    !activeIsBot && (!controlledIds || (!!activePlayer && controlledIds.includes(activePlayer.id)));
   const myNames =
     controlledIds && game ? game.players.filter((p) => controlledIds.includes(p.id)).map((p) => p.name) : null;
 
@@ -377,7 +413,7 @@ export default function App() {
     myNames && myNames.length > 0
       ? myNames.join(' & ')
       : lobby && mySeats.length > 0
-        ? mySeats.map((seat) => lobby.members[seat]).filter(Boolean).join(' & ')
+        ? mySeats.map((seat) => lobby.members[seat]?.name).filter(Boolean).join(' & ')
         : null;
   useEffect(() => {
     document.title = tabName ? `Container [${tabName}]` : 'Container';
@@ -389,8 +425,9 @@ export default function App() {
     !!activePlayer && activePlayer.ship.location.kind === 'island' && activePlayer.ship.cargo.length > 0;
 
   // Which seats does this client answer for? Hotseat (`null`) drives every seat, so it must collect
-  // every opponent's bid — one at a time, behind a pass-the-device gate.
-  const mySeatIds = controlledIds ?? game?.players.map((p) => p.id) ?? [];
+  // every opponent's bid — one at a time, behind a pass-the-device gate. AI seats are never ours:
+  // they bid and play themselves server-side, so prompting for them would deadlock the screen.
+  const mySeatIds = (controlledIds ?? game?.players.map((p) => p.id) ?? []).filter((id) => !botIds.includes(id));
   const iAmDeliverer = !!auction && mySeatIds.includes(auction.delivererId);
   /** My seats that still owe a bid, in seat order. */
   const seatsStillToBid = auction
@@ -429,10 +466,11 @@ export default function App() {
     setBidDraft(0);
     void run(async () => {
       await api.placeBid(game.id, playerId, amount);
-      // Refresh from the server rather than trusting the local echo: the auction may have just
-      // flipped to `decision` if this was the last bid.
-      setAuction(await api.getAuction(game.id, controlledIds?.length === 1 ? controlledIds[0] : undefined));
-      return game;
+      // Re-read rather than trusting the local echo: this bid may have been the last one (flipping
+      // the auction to `decision`), and any AI seats will have answered inside that request too.
+      const seat = controlledIds?.length === 1 ? controlledIds[0] : undefined;
+      setAuction(await api.getAuction(game.id, seat));
+      return await api.getGame(game.id, streamViewer);
     });
   }
 
@@ -1089,7 +1127,15 @@ export default function App() {
                   className={cn(isActive && 'ring-2 ring-ring')}
                 >
                   <CardHeader className="flex-row items-center justify-between">
-                    <CardTitle>{player.name}</CardTitle>
+                    <CardTitle className="flex items-center gap-1.5">
+                      {/* Say who's a machine: an unlabelled AI opponent is just a confusing human. */}
+                      {botIds.includes(player.id) && (
+                        <span data-testid={`bot-badge-${player.id}`} title="Played by the AI" aria-label="Played by the AI">
+                          🤖
+                        </span>
+                      )}
+                      {player.name}
+                    </CardTitle>
                     <div className="flex items-center gap-2">
                       {player.loans > 0 && (
                         <span
@@ -1414,7 +1460,7 @@ export default function App() {
                   >
                     <span className="text-muted-foreground">Seat {i + 1}</span>
                     <span className={member ? 'font-medium' : 'text-muted-foreground'}>
-                      {member ?? 'Empty'}
+                      {member ? `${member.bot ? '🤖 ' : ''}${member.name}` : 'Empty'}
                       {mySeats.includes(i) ? ' (you)' : ''}
                     </span>
                   </li>
@@ -1435,6 +1481,19 @@ export default function App() {
                     Take a seat
                   </Button>
                 </div>
+              )}
+
+              {/* Fill the rest of the table with AI rather than waiting for people to show up. */}
+              {lobby.members.some((member) => member === null) && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  data-testid="add-bot-seat"
+                  disabled={busy}
+                  onClick={() => void addBotSeat()}
+                >
+                  🤖 Add an AI player
+                </Button>
               )}
 
               <Button
@@ -1478,7 +1537,7 @@ export default function App() {
                   />
                   <ul className="space-y-2">
                     {openLobbies.map((open) => {
-                      const taken = open.members.filter((m): m is string => m !== null);
+                      const taken = open.members.filter((m): m is api.LobbyMember => m !== null);
                       return (
                         <li
                           key={open.id}
@@ -1488,7 +1547,8 @@ export default function App() {
                           <div className="min-w-0">
                             <div className="font-mono text-xs text-muted-foreground">{open.id.slice(0, 8)}</div>
                             <div className="truncate text-xs text-muted-foreground">
-                              {taken.length}/{open.seats} players{taken.length ? ` · ${taken.join(', ')}` : ''}
+                              {taken.length}/{open.seats} players
+                              {taken.length ? ` · ${taken.map((m) => (m.bot ? `🤖 ${m.name}` : m.name)).join(', ')}` : ''}
                             </div>
                           </div>
                           <Button
@@ -1527,7 +1587,13 @@ export default function App() {
                         </div>
                         <div className="flex flex-wrap items-center gap-1">
                           <span className="mr-1 text-xs text-muted-foreground">Resume as</span>
-                          {active.players.map((player) => (
+                          {/*
+                            AI seats are not on offer: the server plays them, so "resuming" one would
+                            put a second driver at that seat — and hand a human its secret card.
+                          */}
+                          {active.players
+                            .filter((player) => !(active.bots ?? []).includes(player.id))
+                            .map((player) => (
                             <Button
                               key={player.id}
                               size="sm"
@@ -1541,7 +1607,12 @@ export default function App() {
                               {player.name}
                               {player.id === active.activePlayerId ? ' •' : ''}
                             </Button>
-                          ))}
+                            ))}
+                          {(active.bots ?? []).length > 0 && (
+                            <span className="text-xs text-muted-foreground" data-testid={`resume-bots-${active.id}`}>
+                              · 🤖 ×{(active.bots ?? []).length}
+                            </span>
+                          )}
                         </div>
                       </li>
                     ))}
@@ -1613,12 +1684,33 @@ export default function App() {
                       }
                     />
                     <Button
+                      variant={seatIsBot[index] ? 'default' : 'outline'}
+                      size="sm"
+                      aria-label={`Seat ${index + 1} is played by ${seatIsBot[index] ? 'the AI' : 'a person'}`}
+                      aria-pressed={seatIsBot[index] === true}
+                      title="Let the AI play this seat"
+                      data-testid={`toggle-bot-${index}`}
+                      disabled={busy}
+                      onClick={() =>
+                        setSeatIsBot((prev) => {
+                          const next = names.map((_, j) => prev[j] === true);
+                          next[index] = !next[index];
+                          return next;
+                        })
+                      }
+                    >
+                      🤖
+                    </Button>
+                    <Button
                       variant="ghost"
                       size="sm"
                       aria-label={`Remove seat ${index + 1}`}
                       data-testid={`remove-player-${index}`}
                       disabled={busy || names.length <= MIN_PLAYERS}
-                      onClick={() => setNames((prev) => prev.filter((_, j) => j !== index))}
+                      onClick={() => {
+                        setNames((prev) => prev.filter((_, j) => j !== index));
+                        setSeatIsBot((prev) => names.map((_, j) => prev[j] === true).filter((_, j) => j !== index));
+                      }}
                     >
                       ✕
                     </Button>
@@ -1647,7 +1739,11 @@ export default function App() {
                 className="w-full"
                 data-testid="start-game"
                 disabled={busy || names.some((name) => name.trim() === '')}
-                onClick={() => void run(() => api.createGame(names.map((name) => ({ name: name.trim() }))))}
+                onClick={() =>
+                  void run(() =>
+                    api.createGame(names.map((name, index) => ({ name: name.trim(), bot: seatIsBot[index] === true }))),
+                  )
+                }
               >
                 Start game ({names.length} player{names.length === 1 ? '' : 's'})
               </Button>

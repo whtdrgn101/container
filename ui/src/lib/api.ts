@@ -36,13 +36,28 @@ export interface DeliveryAuctionView {
   choiceRequired: string[];
 }
 
+/** A claimed lobby seat: who's in it, and whether that's a person or the AI. */
+export interface LobbyMember {
+  name: string;
+  bot: boolean;
+}
+
 /** A pre-game lobby: a shareable room whose seats players claim by name before the game starts. */
 export interface Lobby {
   id: string;
   seats: number;
-  members: (string | null)[];
+  members: (LobbyMember | null)[];
   status: 'open' | 'started';
   gameId: string | null;
+}
+
+/**
+ * A game plus the seats an AI holds. `bots` travels beside the state rather than inside it: which
+ * seats are bots is coordination state, and the engine never learns about it.
+ */
+export interface GamePayload {
+  game: GameView;
+  bots: string[];
 }
 
 /** Throw an Error carrying the server's message (used for any non-2xx response). */
@@ -52,9 +67,10 @@ async function fail(response: Response): Promise<never> {
 }
 
 // The server sends a per-viewer projection (opponents' secret scoring cards are redacted to null).
-async function unwrap(response: Response): Promise<GameView> {
+async function unwrap(response: Response): Promise<GamePayload> {
   if (!response.ok) await fail(response);
-  return ((await response.json()) as { game: GameView }).game;
+  const body = (await response.json()) as { game: GameView; bots?: string[] };
+  return { game: body.game, bots: body.bots ?? [] };
 }
 
 async function unwrapLobby(response: Response): Promise<Lobby> {
@@ -62,8 +78,11 @@ async function unwrapLobby(response: Response): Promise<Lobby> {
   return ((await response.json()) as { lobby: Lobby }).lobby;
 }
 
+/** A seat in a new game: a name, plus whether the AI should play it. */
+export type NewSeat = NewPlayer & { bot?: boolean };
+
 /** Create a new game and return its initial state. */
-export async function createGame(players: NewPlayer[]): Promise<GameView> {
+export async function createGame(players: NewSeat[]): Promise<GamePayload> {
   return unwrap(
     await fetch(`${BASE_URL}/games`, {
       method: 'POST',
@@ -82,7 +101,7 @@ export async function applyAction(
   playerId: string,
   action: Action,
   viewer?: string,
-): Promise<GameView> {
+): Promise<GamePayload> {
   const query = viewer !== undefined ? `?viewer=${encodeURIComponent(viewer)}` : '';
   return unwrap(
     await fetch(`${BASE_URL}/games/${gameId}/actions${query}`, {
@@ -97,7 +116,7 @@ export async function applyAction(
  * Fetch a game's current state by id. `viewer` is a comma-separated list of your seat ids (see only
  * those seats' hidden info); `''` is a spectator (no cards); omit it to follow the active player.
  */
-export async function getGame(gameId: string, viewer?: string): Promise<GameView> {
+export async function getGame(gameId: string, viewer?: string): Promise<GamePayload> {
   const query = viewer !== undefined ? `?viewer=${encodeURIComponent(viewer)}` : '';
   return unwrap(await fetch(`${BASE_URL}/games/${gameId}${query}`));
 }
@@ -137,7 +156,7 @@ export async function resolveAuction(
   buyout: boolean,
   viewer?: string,
   winnerId?: string,
-): Promise<GameView> {
+): Promise<GamePayload> {
   const query = viewer !== undefined ? `?viewer=${encodeURIComponent(viewer)}` : '';
   return unwrap(
     await fetch(`${BASE_URL}/games/${gameId}/auction/resolve${query}`, {
@@ -169,6 +188,8 @@ export interface GameSummary {
   status: 'active' | 'ended';
   activePlayerId: string | null;
   players: { id: string; name: string }[];
+  /** Seats an AI holds. Never offer these to resume — the server already plays them. */
+  bots: string[];
 }
 
 /** List in-progress games so a player who closed their tab can jump back into a seat. */
@@ -183,19 +204,22 @@ export async function getLobby(id: string): Promise<Lobby> {
   return unwrapLobby(await fetch(`${BASE_URL}/lobbies/${id}`));
 }
 
-/** Claim the next open seat in a lobby with `name`; returns the updated lobby and your seat index. */
-export async function joinLobby(id: string, name: string): Promise<{ lobby: Lobby; seat: number }> {
+/**
+ * Claim the next open seat in a lobby with `name`; returns the updated lobby and your seat index.
+ * Pass `bot` to hand the seat to the AI instead of a person.
+ */
+export async function joinLobby(id: string, name: string, bot = false): Promise<{ lobby: Lobby; seat: number }> {
   const response = await fetch(`${BASE_URL}/lobbies/${id}/join`, {
     method: 'POST',
     headers: JSON_HEADERS,
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, bot }),
   });
   if (!response.ok) await fail(response);
   return (await response.json()) as { lobby: Lobby; seat: number };
 }
 
 /** Start a full lobby's game and return the created game state. */
-export async function startLobby(id: string): Promise<GameView> {
+export async function startLobby(id: string): Promise<GamePayload> {
   return unwrap(await fetch(`${BASE_URL}/lobbies/${id}/start`, { method: 'POST' }));
 }
 
@@ -213,7 +237,7 @@ function streamUrl(gameId: string): string {
  */
 export function subscribeGame(
   gameId: string,
-  onState: (game: GameView) => void,
+  onState: (game: GameView, bots: string[]) => void,
   viewer?: string,
   onAuction?: (auction: DeliveryAuctionView | null) => void,
 ): () => void {
@@ -231,9 +255,10 @@ export function subscribeGame(
         const msg = JSON.parse(event.data as string) as {
           type: string;
           game: GameView;
+          bots?: string[];
           auction: DeliveryAuctionView | null;
         };
-        if (msg.type === 'state') onState(msg.game);
+        if (msg.type === 'state') onState(msg.game, msg.bots ?? []);
         else if (msg.type === 'auction') onAuction?.(msg.auction);
       } catch {
         // ignore malformed frames
