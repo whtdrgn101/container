@@ -1,11 +1,15 @@
-import { viewFor } from '@container/engine';
-import type { GameState, Viewer } from '@container/engine';
+import type { Viewer } from './games';
 
 /**
  * Real-time fan-out for game state (Track B / B2). The REST layer stays authoritative; whenever a
- * game mutates, the hub pushes the new state to every connected subscriber — each projected through
- * `viewFor` for that subscriber's own seat, so hidden info (secret scoring cards) never crosses to
- * the wrong client. This is the seam online play turns on: one game = one room, one socket = one seat.
+ * game mutates, the hub pushes the new state to every connected subscriber — each projected for that
+ * subscriber's own seat, so hidden info (secret scoring cards) never crosses to the wrong client.
+ * This is the seam online play turns on: one game = one room, one socket = one seat.
+ *
+ * **Game-agnostic (roadmap C1).** The hub knows nothing about game state, and deliberately doesn't
+ * project anything itself — it hands each subscriber's seat back to the caller and sends whatever
+ * comes out. That keeps redaction an explicit decision made by code that knows the game (through its
+ * `GameModule`), rather than something the transport does by accident with one game's rules baked in.
  */
 
 /** The minimal slice of a WebSocket the hub depends on (keeps it decoupled + trivially testable). */
@@ -17,10 +21,11 @@ export interface Sendable {
 /** The wire message pushed to clients. `type` leaves room for future kinds (chat, presence, …). */
 export interface StateMessage {
   readonly type: 'state';
-  readonly game: ReturnType<typeof viewFor>;
+  /** A `GameView` — whatever the game's own `viewFor` produced for this subscriber. */
+  readonly game: unknown;
   /**
    * Seats an AI holds. Rides alongside the game rather than inside it: bot-ness is coordination
-   * state, not a rule, so it never enters `GameState` (see `bots.ts`).
+   * state, not a rule, so it never enters a game's state (see `bots.ts`).
    */
   readonly bots: readonly string[];
 }
@@ -32,14 +37,6 @@ interface Subscriber {
 }
 
 const WS_OPEN = 1; // WebSocket.OPEN readyState
-
-const activeId = (state: GameState): string | null => state.players[state.activePlayerIndex]?.id ?? null;
-
-function project(state: GameState, viewerId: Viewer, bots: readonly string[]): StateMessage {
-  // A null viewer follows whoever is active (a shared hotseat screen shows the current player); a
-  // seat list projects for exactly those seats; an empty list is a spectator (sees no cards).
-  return { type: 'state', game: viewFor(state, viewerId ?? activeId(state)), bots };
-}
 
 export class GameHub {
   private readonly rooms = new Map<string, Set<Subscriber>>();
@@ -61,10 +58,10 @@ export class GameHub {
     return this.rooms.get(gameId)?.size ?? 0;
   }
 
-  /** Send a single socket the current state (the initial sync sent right after it connects). */
-  sendState(socket: Sendable, state: GameState, viewerId: Viewer, bots: readonly string[] = []): void {
+  /** Send one socket a message (the initial sync sent right after it connects). */
+  send(socket: Sendable, message: unknown): void {
     if (socket.readyState !== WS_OPEN) return;
-    socket.send(JSON.stringify(project(state, viewerId, bots)));
+    socket.send(JSON.stringify(message));
   }
 
   /**
@@ -81,10 +78,5 @@ export class GameHub {
       if (sub.socket.readyState !== WS_OPEN) continue;
       sub.socket.send(JSON.stringify(build(sub.viewerId)));
     }
-  }
-
-  /** Push new state to every subscriber of a game, each projected for its own seat. */
-  broadcast(gameId: string, state: GameState, bots: readonly string[] = []): void {
-    this.broadcastEach(gameId, (viewerId) => project(state, viewerId, bots));
   }
 }

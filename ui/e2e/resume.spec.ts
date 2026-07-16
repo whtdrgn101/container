@@ -26,7 +26,7 @@ test('resume an in-progress game from the home screen by picking a seat', async 
 
   // They're back in the game bound to Bob's seat: tab title, own card visible, others hidden.
   await expect(returner.getByTestId('board')).toBeVisible();
-  await expect(returner).toHaveTitle('Container [Bob]');
+  await expect(returner).toHaveTitle('Container - [Bob]');
   await expect(returner.getByTestId('identity-banner')).toContainText('Bob');
   await expect(returner.getByTestId('scoring-card-p2')).not.toContainText('Secret'); // own seat
   await expect(returner.getByTestId('scoring-card-p1')).toContainText('Secret'); // Ann's, hidden

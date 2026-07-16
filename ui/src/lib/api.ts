@@ -45,6 +45,8 @@ export interface LobbyMember {
 /** A pre-game lobby: a shareable room whose seats players claim by name before the game starts. */
 export interface Lobby {
   id: string;
+  /** Which game the room is for (roadmap C1). Always 'container' until C2 offers a picker. */
+  gameType: string;
   seats: number;
   members: (LobbyMember | null)[];
   status: 'open' | 'started';
@@ -122,6 +124,19 @@ export async function getGame(gameId: string, viewer?: string): Promise<GamePayl
 }
 
 /**
+ * Endpoints that belong to Container specifically, rather than to the games platform.
+ *
+ * The server hosts games plural (roadmap C1), so each game's own routes live under
+ * `/games/:id/<gameType>/…` — the delivery auction is Container's, not something every game has.
+ * Only this game's own endpoints go here; `/games/:id` and `/games/:id/actions` are the shared core's
+ * and stay unprefixed.
+ *
+ * Hardcoding the type is honest for now: this whole client *is* Container's board. C2 splits it into
+ * a generic shell plus a typed per-game client, and this constant is the seam that becomes.
+ */
+const gameRoute = (gameId: string, path: string) => `${BASE_URL}/games/${gameId}/container${path}`;
+
+/**
  * Fetch the open delivery auction, as seen by one `viewer` seat, or `null` if none is open.
  *
  * `viewer` is a *single* seat, not a list: bids are per-player, so a hotseat client holding every
@@ -129,14 +144,14 @@ export async function getGame(gameId: string, viewer?: string): Promise<GamePayl
  */
 export async function getAuction(gameId: string, viewer?: string): Promise<DeliveryAuctionView | null> {
   const query = viewer !== undefined ? `?viewer=${encodeURIComponent(viewer)}` : '';
-  const response = await fetch(`${BASE_URL}/games/${gameId}/auction${query}`);
+  const response = await fetch(gameRoute(gameId, `/auction${query}`));
   if (!response.ok) await fail(response);
   return ((await response.json()) as { auction: DeliveryAuctionView | null }).auction;
 }
 
 /** Place one seat's sealed bid. $0 is a legal bluff. Returns the auction as that bidder sees it. */
 export async function placeBid(gameId: string, playerId: string, bid: number): Promise<DeliveryAuctionView> {
-  const response = await fetch(`${BASE_URL}/games/${gameId}/auction/bids`, {
+  const response = await fetch(gameRoute(gameId, '/auction/bids'), {
     method: 'POST',
     headers: JSON_HEADERS,
     body: JSON.stringify({ playerId, bid }),
@@ -159,7 +174,7 @@ export async function resolveAuction(
 ): Promise<GamePayload> {
   const query = viewer !== undefined ? `?viewer=${encodeURIComponent(viewer)}` : '';
   return unwrap(
-    await fetch(`${BASE_URL}/games/${gameId}/auction/resolve${query}`, {
+    await fetch(gameRoute(gameId, `/auction/resolve${query}`), {
       method: 'POST',
       headers: JSON_HEADERS,
       body: JSON.stringify({ playerId, buyout, ...(winnerId ? { winnerId } : {}) }),
@@ -184,6 +199,8 @@ export async function listLobbies(): Promise<Lobby[]> {
 /** A secret-free summary of an in-progress game (for the home-screen "resume" list). */
 export interface GameSummary {
   id: string;
+  /** Which game this is (roadmap C1), so C2's shell knows which board to open. */
+  gameType: string;
   turn: number;
   status: 'active' | 'ended';
   activePlayerId: string | null;

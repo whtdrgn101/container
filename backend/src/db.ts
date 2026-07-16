@@ -17,7 +17,12 @@ CREATE TABLE IF NOT EXISTS games (
   -- When the game was abandoned, else NULL. A **soft delete**: the row and its move log stay for
   -- audit and replay, the game just stops being playable and drops off the in-progress list. Nothing
   -- game-specific about it, so it lives in the core rather than in any GameModule.
-  abandoned_at TEXT
+  abandoned_at TEXT,
+  -- Which GameModule owns this row (roadmap C1). The state column is an opaque blob, so without this
+  -- the server cannot tell one game's rules from another's — this column is the whole reason a second
+  -- game can exist. Defaults to 'container' so every row written before it existed backfills to the
+  -- only game there was.
+  game_type    TEXT NOT NULL DEFAULT 'container'
 );
 
 CREATE TABLE IF NOT EXISTS moves (
@@ -78,6 +83,13 @@ CREATE TABLE IF NOT EXISTS game_bots (
  */
 const ADDED_COLUMNS: readonly { readonly table: string; readonly column: string; readonly ddl: string }[] = [
   { table: 'games', column: 'abandoned_at', ddl: `ALTER TABLE games ADD COLUMN abandoned_at TEXT` },
+  // The backfill *is* the DEFAULT: SQLite stamps every existing row with 'container' as it adds the
+  // column, which is exactly right — before this column, Container was the only game there was.
+  {
+    table: 'games',
+    column: 'game_type',
+    ddl: `ALTER TABLE games ADD COLUMN game_type TEXT NOT NULL DEFAULT 'container'`,
+  },
 ];
 
 /** Bring an existing database up to the current schema. Additive only — never drops or rewrites. */

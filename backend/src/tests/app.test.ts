@@ -40,17 +40,28 @@ function act(gameId: string, playerId: string, action: Action) {
 type WsClient = Awaited<ReturnType<FastifyInstance['injectWS']>>;
 
 /** Wrap a WebSocket in a pull-based reader: `next()` resolves with the next JSON message. */
-function reader(socket: WsClient): () => Promise<StateMessage> {
-  const queue: StateMessage[] = [];
-  const pending: Array<(m: StateMessage) => void> = [];
+/**
+ * A pushed state message with its `game` typed as Container's view.
+ *
+ * The hub's `StateMessage.game` is `unknown` by design (C1 — the transport hosts any game and must
+ * not know one game's shape), so the cast belongs here: these are Container games, and this is the
+ * boundary that knows it.
+ */
+type ContainerStateMessage = Omit<StateMessage, 'game'> & { game: GameView };
+
+function reader(socket: WsClient): () => Promise<ContainerStateMessage> {
+  const queue: ContainerStateMessage[] = [];
+  const pending: Array<(m: ContainerStateMessage) => void> = [];
   socket.on('message', (raw: unknown) => {
-    const msg = JSON.parse(String(raw)) as StateMessage;
+    const msg = JSON.parse(String(raw)) as ContainerStateMessage;
     const resolve = pending.shift();
     if (resolve) resolve(msg);
     else queue.push(msg);
   });
   return () =>
-    queue.length ? Promise.resolve(queue.shift()!) : new Promise<StateMessage>((r) => pending.push(r));
+    queue.length
+      ? Promise.resolve(queue.shift()!)
+      : new Promise<ContainerStateMessage>((r) => pending.push(r));
 }
 
 describe('POST /games', () => {
@@ -578,17 +589,17 @@ const getAuction = async (gameId: string, viewer?: string) =>
   (
     await app.inject({
       method: 'GET',
-      url: `/games/${gameId}/auction${viewer ? `?viewer=${viewer}` : ''}`,
+      url: `/games/${gameId}/container/auction${viewer ? `?viewer=${viewer}` : ''}`,
     })
   ).json().auction;
 
 const bid = (gameId: string, playerId: string, amount: number) =>
-  app.inject({ method: 'POST', url: `/games/${gameId}/auction/bids`, payload: { playerId, bid: amount } });
+  app.inject({ method: 'POST', url: `/games/${gameId}/container/auction/bids`, payload: { playerId, bid: amount } });
 
 const resolve = (gameId: string, playerId: string, buyout?: boolean) =>
   app.inject({
     method: 'POST',
-    url: `/games/${gameId}/auction/resolve`,
+    url: `/games/${gameId}/container/auction/resolve`,
     payload: { playerId, ...(buyout === undefined ? {} : { buyout }) },
   });
 
@@ -609,7 +620,7 @@ describe('Delivery auctions — opening', () => {
   });
 
   it('404s for a game that does not exist', async () => {
-    const response = await app.inject({ method: 'GET', url: '/games/nope/auction' });
+    const response = await app.inject({ method: 'GET', url: '/games/nope/container/auction' });
     expect(response.statusCode).toBe(404);
     expect(response.json().error.code).toBe('GAME_NOT_FOUND');
   });
@@ -862,7 +873,7 @@ describe('Delivery auctions — live push', () => {
 
 describe('Delivery auctions — runoff and the deliverer’s tie choice (A1b, pg. 16)', () => {
   const resolveWith = (gameId: string, body: Record<string, unknown>) =>
-    app.inject({ method: 'POST', url: `/games/${gameId}/auction/resolve`, payload: body });
+    app.inject({ method: 'POST', url: `/games/${gameId}/container/auction/resolve`, payload: body });
 
   it('opens a runoff when the leaders tie, and only they bid again', async () => {
     const gameId = await startDelivery();

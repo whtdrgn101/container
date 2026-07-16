@@ -21,6 +21,16 @@ import { cn } from '@/lib/utils';
 import * as api from '@/lib/api';
 import type { GameSummary, Lobby } from '@/lib/api';
 
+/**
+ * The name of the game this client plays.
+ *
+ * Hardcoded, like `api.ts`'s `gameRoute()` and for the same reason: the server hosts games plural
+ * (roadmap C1), but this whole client *is* Container's board. C2 splits it into a generic shell plus a
+ * typed per-game client, at which point the name comes from `GET /games/catalog` and these two
+ * constants are the seam that becomes.
+ */
+const GAME_NAME = 'Container';
+
 /** Display colors for the five container types (see engine COLORS). */
 const COLOR_HEX: Record<Color, string> = {
   white: '#f8fafc',
@@ -425,17 +435,32 @@ export default function App() {
   const myNames =
     controlledIds && game ? game.players.filter((p) => controlledIds.includes(p.id)).map((p) => p.name) : null;
 
-  // Put the display name you're playing as in the tab title, so multiple windows are easy to tell
-  // apart when playtesting. Prefer your in-game seat name(s); fall back to a claimed lobby seat name.
+  // The display name you're playing as, so multiple windows are easy to tell apart when playtesting.
+  // Prefer your in-game seat name(s); fall back to a claimed lobby seat name.
   const tabName =
     myNames && myNames.length > 0
       ? myNames.join(' & ')
       : lobby && mySeats.length > 0
         ? mySeats.map((seat) => lobby.members[seat]?.name).filter(Boolean).join(' & ')
         : null;
+
+  /**
+   * What this screen is called — used for both the `<h1>` and the tab title, so they can't drift.
+   *
+   * Two parts: where you are, then who you are. Off the board you're in the **Game Hub** — the site is
+   * a games room that happens to have Container in it (Track C), and the waiting room is part of the
+   * hub rather than part of a game. On the board it's the game itself: `Container - [Tim]`.
+   *
+   * The `- [name]` suffix follows you into the waiting room (`Game Hub - [Tim]`) on purpose: telling
+   * two playtest windows apart is the whole reason the name is here, and the waiting room is exactly
+   * when you have several open. It drops off only when there's no one name to show — the landing
+   * screen, or hotseat, where every seat is yours.
+   */
+  const place = game ? GAME_NAME : 'Game Hub';
+  const heading = tabName ? `${place} - [${tabName}]` : place;
   useEffect(() => {
-    document.title = tabName ? `Container [${tabName}]` : 'Container';
-  }, [tabName]);
+    document.title = heading;
+  }, [heading]);
 
   const nextFactoryCost = activePlayer ? FACTORY_BUILD_COSTS[activePlayer.factories.length - 1] : undefined;
   const containersGone = game ? COLORS.filter((color) => game.supply.containers[color] === 0).length : 0;
@@ -527,7 +552,7 @@ export default function App() {
     <div className="min-h-screen">
       <header className="border-b">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-3">
-          <h1 className="text-lg font-bold tracking-tight sm:text-xl">
+          <h1 className="text-lg font-bold tracking-tight sm:text-xl" data-testid="page-title">
             {game || lobby ? (
               // Only a link when there's somewhere to go back to. Leaving is safe and needs no
               // confirmation: the game lives on the server, so it keeps running (bots included) and
@@ -536,16 +561,16 @@ export default function App() {
                 type="button"
                 data-testid="home-link"
                 onClick={resetToLanding}
-                title="Back to the lobby — this game keeps going; rejoin it any time from the home screen"
+                title="Back to the Game Hub — this game keeps going; rejoin it any time from the home screen"
                 // Underline + pointer, not a color shift: `text-primary` is nearly the same shade as
                 // the heading in both themes, so a color-only hover was invisible and the link
                 // undiscoverable.
                 className="cursor-pointer rounded underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span aria-hidden>←</span> Container
+                <span aria-hidden>←</span> {heading}
               </button>
             ) : (
-              'Container'
+              heading
             )}
           </h1>
           {game && (

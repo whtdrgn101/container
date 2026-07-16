@@ -17,7 +17,9 @@ test('browse an open game from the home screen and join with a display name', as
   expect(code).toBeTruthy();
   await host.getByTestId('seat-name').fill('Tim');
   await host.getByTestId('take-seat').click();
-  await expect(host).toHaveTitle('Container [Tim]'); // tab title shows who you're playing as
+  // Still in the waiting room, so it's the hub — but the name follows you, which is what makes two
+  // playtest windows tellable apart.
+  await expect(host).toHaveTitle('Game Hub - [Tim]');
 
   // Guest lands on the home screen and finds the open game in the waiting-for-players list.
   await guest.goto('/');
@@ -31,7 +33,7 @@ test('browse an open game from the home screen and join with a display name', as
   await guest.getByTestId(`join-waiting-${code}`).click();
   await expect(guest.getByTestId('lobby')).toBeVisible();
   await expect(guest.getByTestId('lobby-seats')).toContainText('Sam');
-  await expect(guest).toHaveTitle('Container [Sam]');
+  await expect(guest).toHaveTitle('Game Hub - [Sam]');
 
   // The host sees Sam appear live in the waiting room.
   await expect(host.getByTestId('lobby-seats')).toContainText('Sam');

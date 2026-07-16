@@ -66,10 +66,27 @@ WebSocket (`GameHub`), each projected per-viewer via `viewFor`. The socket is pu
 pure `state + action → state` library that knows nothing about rooms, sealed bids, or bots. Reach for
 this pattern before reaching into the engine.
 
-### The `GameModule` seam (Track C / C0)
+### The `GameModule` seam (Track C / C0 + C1)
 
 The backend hosts **games**, plural, through one contract: `backend/src/games/module.ts`. Container is
-one registered module (`games/container/`), not the only thing the server can do.
+one registered module (`games/container/`), not the only thing the server can do — and since C1 that is
+literal: two games can run side by side on one server, proven by `tests/module-seam.test.ts`.
+
+- **`games.game_type` says whose rules a row plays by.** A game's state is an opaque blob, so this
+  column is the only thing tying it to an engine. **Every route resolves its module from the row**
+  (`moduleOf(gameId)`), never from a default — that's what keeps state and rules together. Adding a
+  game is registering it; there is no other switch to flip.
+- **A game's own endpoints live under `/games/:id/<gameType>/…`** (Container's auction is
+  `/games/:id/container/auction`). A module declares paths *relative* to that. This is about
+  correctness, not tidiness: unprefixed, two games both wanting `/auction` is a boot crash, and
+  whichever registered first would be handed **every** game's requests. A scope guard also refuses any
+  row that isn't that module's type (`WRONG_GAME_TYPE`), because a prefix is just a URL anyone can type.
+- **Seat ranges, action types, errors and bots are all the module's** — `POST /lobbies {gameType}`
+  validates against *that game's* min/max, not a constant.
+- **`GameHub` is game-agnostic**: it fans out per-viewer messages and projects nothing itself, so
+  redaction stays an explicit decision made by code that knows the game.
+- **An unregistered `game_type`** (a module pulled while its rows remain) is `409 GAME_TYPE_UNAVAILABLE`,
+  and such rows are skipped by `GET /games` rather than taking the home screen down.
 
 - **The core is game-agnostic; the module owns every rule-shaped decision.** `app.ts` and
   `repository.ts` contain no Container-specific code and read **no field off a game state** — id,
@@ -86,8 +103,6 @@ one registered module (`games/container/`), not the only thing the server can do
   thing that couldn't survive a second game.
 - **Randomness is injected** (`createGame({ rng })`), never reached for inside a module. That's what
   keeps every engine pure, deterministic and replayable.
-- **⚠️ Exactly one game may be registered until C1** adds `game_type`. Without that column a row is just
-  JSON and "which module owns it?" is unanswerable, so `buildApp` throws rather than guess.
 - **The honest test is `tests/module-seam.test.ts`**, which drives a stub *counter* game through the core.
   Container's own tests pass fine even if the core is secretly hardcoded to Container — only a second
   game can tell. Keep that file working; it's the thing that caught the repository reading `state.version`.
@@ -465,8 +480,15 @@ check plan usage between sessions). Summary:
   action enum → `container/parseAction.ts`, the `GameError`→HTTP map → `container/errors.ts`, the
   `/auction/*` routes → `container/routes.ts` (via `module.routes`), `auctions.ts`/`botRunner.ts` →
   `games/container/`. `GameRepository` gained `versionOf`/`movesOf` so it reads no game field.
-  **Next: C1** — `game_type` column + backfill, `moduleFor` reads it, namespace module routes, and make
-  `GameHub` project through the module (it's the last engine import left in the core).
+- **Track C / C1 ✅ (`game_type` routing — the site can host two games).** `games.game_type`
+  (`NOT NULL DEFAULT 'container'`, so existing rows backfill as SQLite adds the column); `moduleOf`
+  reads it per request; module routes are namespaced under `/games/:id/<gameType>/` with a wrong-type
+  guard; `GameHub` no longer imports the engine; lobbies carry a `gameType` (a JSON blob, so no
+  migration — `readLobby` defaults old rows to `'container'`). `POST /games`/`POST /lobbies` take an
+  optional `gameType`, defaulting to `AppOptions.defaultGameType` so the hotseat quick-start still works.
+  **The core no longer imports `@container/engine` at all.**
+  **Next: C2** — the UI shell (game picker, per-game lazy-loaded boards). The UI is still wholly
+  Container's: `api.ts`'s `gameRoute()` hardcodes `/container`, and that constant is the seam C2 splits.
 - **Track B — online multiplayer:** independent track. The authoritative, serializable engine makes all
   of these additive (see `ROADMAP.md`).
 

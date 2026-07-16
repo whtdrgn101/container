@@ -15,6 +15,14 @@ import { pushAuction } from './push';
  * supply their own. So the auction is a short-lived record the server owns (like a lobby), and
  * exactly one `DELIVER` is applied when it resolves.
  *
+ * **Paths are relative to `/games/:id/container`** — the core registers this scope under that prefix
+ * (roadmap C1), so `/auction` here serves `GET /games/:id/container/auction`. `request.params.id` comes
+ * from the prefix. Don't write absolute paths: an unprefixed `/auction` would be handed *every* game's
+ * requests, including games these rules can't read.
+ *
+ * The core's scope guard has already established, before any handler below runs, that the game exists
+ * and is a Container game — so `gameOf` is never undefined in practice, and a state here is always ours.
+ *
  * **Every response here goes through `auctionViewFor`.** The raw `DeliveryAuction.bids` must never
  * reach a client — same rule as `viewFor` for scoring cards.
  */
@@ -35,7 +43,7 @@ export function registerAuctionRoutes(app: FastifyInstance, ctx: ModuleContext):
 
   /** The open auction for a game, projected for one seat. `{ auction: null }` when none is open. */
   app.get<{ Params: { id: string }; Querystring: { viewer?: string } }>(
-    '/games/:id/auction',
+    '/auction',
     async (request, reply) => {
       if (!gameOf(request.params.id)) return notFound(reply, request.params.id);
       ctx.bots.tick(request.params.id); // same self-healing as GET /games/:id
@@ -49,7 +57,7 @@ export function registerAuctionRoutes(app: FastifyInstance, ctx: ModuleContext):
 
   /** Place one seat's sealed bid. $0 is a legal bluff (pg. 15), so the floor is 0, not 1. */
   app.post<{ Params: { id: string }; Body: { playerId: string; bid: number } }>(
-    '/games/:id/auction/bids',
+    '/auction/bids',
     {
       schema: {
         body: {
@@ -101,7 +109,7 @@ export function registerAuctionRoutes(app: FastifyInstance, ctx: ModuleContext):
     Body: { playerId: string; buyout?: boolean; winnerId?: string };
     Querystring: { viewer?: string };
   }>(
-    '/games/:id/auction/resolve',
+    '/auction/resolve',
     {
       schema: {
         body: {

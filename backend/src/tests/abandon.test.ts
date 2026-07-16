@@ -99,7 +99,7 @@ describe('abandoning a game', () => {
     const id = await createGame();
     await app.inject({ method: 'POST', url: `/games/${id}/abandon` });
 
-    for (const url of [`/games/${id}/auction/bids`, `/games/${id}/auction/resolve`]) {
+    for (const url of [`/games/${id}/container/auction/bids`, `/games/${id}/container/auction/resolve`]) {
       const response = await app.inject({ method: 'POST', url, payload: { playerId: 'p2', bid: 1 } });
       expect(response.statusCode, url).toBe(409);
       expect(response.json().error.code, url).toBe('GAME_ABANDONED');

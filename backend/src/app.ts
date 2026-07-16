@@ -3,13 +3,13 @@ import Fastify from 'fastify';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import fastifyWebsocket from '@fastify/websocket';
-import type { GameState, Viewer } from '@container/engine';
 import { BotRepository } from './bots';
 import type { DB } from './db';
-import { createDefaultRegistry } from './games';
-import type { AnyGameModule, BotDriver, ErrorResponse, ModuleContext } from './games';
+import { createDefaultRegistry, DEFAULT_GAME_ID } from './games';
+import type { AnyGameModule, BotDriver, ErrorResponse, ModuleContext, Viewer } from './games';
 import { GameRegistry } from './games';
 import { GameHub } from './hub';
+import type { StateMessage } from './hub';
 import type { Lobby, LobbyMember } from './lobbies';
 import { LobbyRepository } from './lobbies';
 import { GameRepository } from './repository';
@@ -24,6 +24,11 @@ export interface AppOptions {
    * can host a stub game without touching the real one.
    */
   registry?: GameRegistry;
+  /**
+   * The game a bare `POST /games` or `POST /lobbies` creates when the caller names no type.
+   * Defaults to Container, which keeps the hotseat quick-start working.
+   */
+  defaultGameType?: string;
 }
 
 /** `NewSeat` is a name plus a per-seat AI flag. `bot` is stripped before the engine ever sees the seat. */
@@ -33,6 +38,8 @@ interface NewSeat {
 }
 
 interface CreateGameBody {
+  /** Which game to deal. Omit for the server's default (keeps the hotseat quick-start working). */
+  gameType?: string;
   players: NewSeat[];
 }
 
@@ -59,29 +66,35 @@ export function buildApp(options: AppOptions): FastifyInstance {
   const hub = new GameHub();
 
   /**
-   * ⚠️ **C0 can host exactly one game, and this is why.** A `games` row is an id and a JSON blob;
-   * there is no `game_type` column yet, so persistence genuinely cannot tell two games apart. Rather
-   * than guess a module for a row — and hand one game's state to another game's rules — the core
-   * refuses to boot with an ambiguous registry. Registering a second game before C1 is a bug, and
-   * failing loudly at startup beats discovering it when someone's game is loaded by the wrong engine.
+   * Which game's rules a row plays by (roadmap C1) — read from its `game_type` column.
    *
-   * C1 adds the column, backfills it to `'container'`, and turns `moduleFor` into a real lookup. That
-   * is the one change that makes a second game possible — everything else here is already generic.
+   * This is the lookup C0 couldn't do: a `games` row is an id and an opaque blob, so without the
+   * column the server had to refuse to boot with more than one game registered rather than risk
+   * handing one game's state to another's engine. With it, hosting a second game is just registering
+   * one. **Every route resolves the module from the row, never from a default** — that's what keeps
+   * a game's state and its rules together.
+   *
+   * `undefined` for an unknown game *or* for a row whose type is no longer registered (a module
+   * removed while its games remain). Callers must handle both; the difference is what they tell the
+   * client (404 vs 409).
    */
-  const catalog = registry.list();
-  if (catalog.length !== 1) {
-    throw new Error(
-      `Exactly one game may be registered until roadmap C1 adds a game_type column (got ${catalog.length}). ` +
-        `Without it, the server cannot tell which module owns an existing game row.`,
-    );
-  }
+  const moduleOf = (gameId: string): AnyGameModule | undefined => {
+    const gameType = repo.typeOf(gameId);
+    return gameType === undefined ? undefined : registry.get(gameType);
+  };
 
-  /** Which game's rules a row plays by. Today: the only one there is. */
-  const onlyModule = registry.require(catalog[0]!.id);
-  const moduleFor = (_gameId: string): AnyGameModule => onlyModule;
+  /** Same, for the paths that can't be reached without a valid module (pushes, ticks). */
+  const moduleFor = (gameId: string): AnyGameModule => {
+    const module = moduleOf(gameId);
+    if (!module) throw new Error(`Game "${gameId}" has no registered module (type "${repo.typeOf(gameId)}")`);
+    return module;
+  };
 
-  /** The module used to *create* games, and to validate seat counts before one exists. */
-  const creationModule = onlyModule;
+  /**
+   * The game a bare `POST /games` creates when the caller names no type. Keeps the hotseat quick-start
+   * working; C2's picker sends an explicit `gameType`, and any client may already.
+   */
+  const defaultGameType = options.defaultGameType ?? DEFAULT_GAME_ID;
 
   /** Per-module AI drivers and contexts. A module's routes must tick *its own* driver, not a shared one. */
   const drivers = new Map<string, BotDriver>();
@@ -110,16 +123,23 @@ export function buildApp(options: AppOptions): FastifyInstance {
    */
   const pushGame = (gameId: string, state: unknown): void => {
     const module = moduleFor(gameId);
-    hub.broadcast(gameId, state as GameState, botSeats.listForGame(gameId));
+    // The hub is a dumb fan-out: it knows nothing about game state, so *we* say what each viewer sees.
+    hub.broadcastEach(gameId, (viewer) => stateMessage(module, gameId, state, viewer));
     module.onStateChanged?.(state, contexts.get(module.id)!);
   };
 
-  const activeIdOf = (gameId: string, state: unknown): string | null =>
-    moduleFor(gameId).summarize(state).activePlayerId;
+  /** The `{ type: 'state' }` push, projected for one subscriber. */
+  const stateMessage = (module: AnyGameModule, gameId: string, state: unknown, viewer: Viewer): StateMessage => ({
+    type: 'state',
+    // A null viewer follows whoever is active (a shared hotseat screen shows the current player); a
+    // seat list projects for exactly those seats; an empty list is a spectator (sees no cards).
+    game: module.viewFor(state, viewer ?? module.summarize(state).activePlayerId),
+    bots: botSeats.listForGame(gameId),
+  });
 
   /** `?viewer=p1,p3` ⇒ those seats; omitted ⇒ follow the active player (hotseat); `?viewer=` ⇒ none. */
-  const viewerFrom = (raw: string | undefined, gameId: string, state: unknown): Viewer =>
-    raw !== undefined ? raw.split(',').filter(Boolean) : activeIdOf(gameId, state);
+  const viewerFrom = (raw: string | undefined, module: AnyGameModule, state: unknown): Viewer =>
+    raw !== undefined ? raw.split(',').filter(Boolean) : module.summarize(state).activePlayerId;
 
   const sendError = (reply: FastifyReply, mapped: ErrorResponse) =>
     reply.code(mapped.status).send({ error: { code: mapped.code, message: mapped.message } });
@@ -146,18 +166,61 @@ export function buildApp(options: AppOptions): FastifyInstance {
       error: { code: 'GAME_ABANDONED', message: `Game "${id}" was abandoned and can no longer be played` },
     });
 
-  /** Deal a new game and record which of its seats an AI holds. */
-  const startGame = (seats: readonly NewSeat[]): unknown => {
-    const state = creationModule.createGame({
+  /**
+   * The game's `game_type` names a module this server doesn't have — someone pulled a game out of the
+   * registry while its rows remained. 409 rather than 404: the game exists, we just can't play it.
+   */
+  const unknownType = (reply: FastifyReply, id: string) =>
+    reply.code(409).send({
+      error: {
+        code: 'GAME_TYPE_UNAVAILABLE',
+        message: `Game "${id}" is a "${repo.typeOf(id)}" game, which this server does not host`,
+      },
+    });
+
+  /** You asked one game's endpoint about another game's row. 404 — that endpoint has no such game. */
+  const wrongType = (reply: FastifyReply, id: string, moduleId: string) =>
+    reply.code(404).send({
+      error: {
+        code: 'WRONG_GAME_TYPE',
+        message: `Game "${id}" is not a "${moduleId}" game`,
+      },
+    });
+
+  /**
+   * Resolve a game and the module that owns it, in one place, or reply and return null.
+   *
+   * Every route needs both, and they must come from the same row — the whole point of C1 is that a
+   * game's state and its rules are never chosen independently.
+   */
+  const load = (reply: FastifyReply, id: string): { state: unknown; module: AnyGameModule } | null => {
+    const state = repo.get(id);
+    if (state === undefined) {
+      void notFound(reply, id);
+      return null;
+    }
+    const module = moduleOf(id);
+    if (!module) {
+      void unknownType(reply, id);
+      return null;
+    }
+    return { state, module };
+  };
+
+  /** Deal a new game of one type and record which of its seats an AI holds. */
+  const startGame = (module: AnyGameModule, seats: readonly NewSeat[]): unknown => {
+    const state = module.createGame({
       id: randomUUID(),
       players: seats.map((seat) => ({ name: seat.name })),
       // Randomness is injected, never reached for inside a module — that is what keeps every engine
       // pure, deterministic and replayable.
       rng: Math.random,
     });
-    repo.create(creationModule, state);
+    // Stamps `game_type` from the module, which is what lets every later request find its way back
+    // to these rules.
+    repo.create(module, state);
 
-    const { id: gameId, players } = creationModule.summarize(state);
+    const { id: gameId, players } = module.summarize(state);
     // Seat i is always the i-th player (see createGame), so a seat's bot flag maps straight to an id.
     // Recorded outside the game state — the engine never learns which seats are bots.
     const botIds = players.filter((_, seat) => seats[seat]?.bot === true).map((player) => player.id);
@@ -169,8 +232,8 @@ export function buildApp(options: AppOptions): FastifyInstance {
   };
 
   /** The `{ game, bots }` payload every state-returning route replies with. */
-  const gamePayload = (gameId: string, state: unknown, viewer: Viewer) => ({
-    game: moduleFor(gameId).viewFor(state, viewer),
+  const gamePayload = (module: AnyGameModule, gameId: string, state: unknown, viewer: Viewer) => ({
+    game: module.viewFor(state, viewer),
     bots: botSeats.listForGame(gameId),
   });
 
@@ -211,7 +274,8 @@ export function buildApp(options: AppOptions): FastifyInstance {
       { websocket: true },
       (socket, request) => {
         const state = repo.get(request.params.id);
-        if (!state) {
+        const module = moduleOf(request.params.id);
+        if (state === undefined || !module) {
           socket.close(1008, `No game with id "${request.params.id}"`);
           return;
         }
@@ -223,10 +287,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
         tick(request.params.id); // a watching client is enough to drive stalled bot turns
         // Send the first snapshot on the next tick, after the open handshake settles, so a client
         // that attaches its message handler right after connecting never misses it.
-        // The hub still projects with the engine's own `viewFor`; making it module-driven is C1.
-        setImmediate(() =>
-          hub.sendState(socket, state as GameState, viewer, botSeats.listForGame(request.params.id)),
-        );
+        setImmediate(() => hub.send(socket, stateMessage(module, request.params.id, state, viewer)));
       },
     );
   });
@@ -239,6 +300,9 @@ export function buildApp(options: AppOptions): FastifyInstance {
           type: 'object',
           required: ['players'],
           properties: {
+            // Which game to deal. Optional: a bare POST still starts the default (the hotseat
+            // quick-start posts no type), while C2's picker names one explicitly.
+            gameType: { type: 'string', minLength: 1 },
             players: {
               type: 'array',
               items: {
@@ -256,19 +320,28 @@ export function buildApp(options: AppOptions): FastifyInstance {
       },
     },
     async (request, reply) => {
+      const gameType = request.body.gameType ?? defaultGameType;
+      const module = registry.get(gameType);
+      if (!module) {
+        return reply.code(400).send({
+          error: { code: 'UNKNOWN_GAME_TYPE', message: `This server does not host a game called "${gameType}"` },
+        });
+      }
       try {
-        const started = startGame(request.body.players);
-        const gameId = creationModule.summarize(started).id;
-        return reply.code(201).send(gamePayload(gameId, started, activeIdOf(gameId, started)));
+        const started = startGame(module, request.body.players);
+        const gameId = module.summarize(started).id;
+        return reply
+          .code(201)
+          .send(gamePayload(module, gameId, started, module.summarize(started).activePlayerId));
       } catch (error) {
-        return sendGameError(reply, creationModule, error);
+        return sendGameError(reply, module, error);
       }
     },
   );
 
   // In-progress games, for the home-screen "resume" list. Summaries only — no secret scoring cards.
   // Abandoned games are excluded — that's what abandoning one is for.
-  app.get('/games', async () => ({ games: repo.listActive((id) => moduleFor(id)) }));
+  app.get('/games', async () => ({ games: repo.listActive((gameType) => registry.get(gameType)) }));
 
   /**
    * Abandon a game: close out something nobody intends to finish, so it stops cluttering the resume
@@ -295,16 +368,19 @@ export function buildApp(options: AppOptions): FastifyInstance {
   });
 
   app.get<{ Params: { id: string }; Querystring: { viewer?: string } }>('/games/:id', async (request, reply) => {
-    if (!repo.get(request.params.id)) return notFound(reply, request.params.id);
+    const loaded = load(reply, request.params.id);
+    if (!loaded) return reply;
     // Looking at a game is enough to drive it. Bot turns are normally played by whatever mutation
     // preceded them, but nothing mutates while it is *already* a bot's move — after a restart, or a
     // game seeded any other way, the AI would sit there forever and no human could unstick it,
     // because it isn't their turn. Ticking on read makes that self-healing; it's a no-op with no
     // bots, or when a human is on the clock.
     tick(request.params.id);
+    // Re-read: the bots may have moved it on since `load`.
     const state = repo.get(request.params.id)!;
+    const { module } = loaded;
     return reply.send({
-      ...gamePayload(request.params.id, state, viewerFrom(request.query.viewer, request.params.id, state)),
+      ...gamePayload(module, request.params.id, state, viewerFrom(request.query.viewer, module, state)),
       // Readable but not playable — say so, so a client that holds a link can show it rather than
       // offering moves that will only 409.
       ...(repo.isAbandoned(request.params.id) ? { abandoned: true } : {}),
@@ -328,12 +404,10 @@ export function buildApp(options: AppOptions): FastifyInstance {
       },
     },
     async (request, reply) => {
-      const state = repo.get(request.params.id);
-      if (!state) return notFound(reply, request.params.id);
-      // Checked before the module is consulted: an abandoned game is out of play whatever the action
-      // is, and no game should have to know what abandonment means.
-      if (repo.isAbandoned(request.params.id)) return abandoned(reply, request.params.id);
-      const module = moduleFor(request.params.id);
+      // Abandonment is already refused by the preHandler above, before we get here.
+      const loaded = load(reply, request.params.id);
+      if (!loaded) return reply;
+      const { state, module } = loaded;
 
       const parsed = module.parseAction(request.body.action);
       if (!parsed.ok) return badRequest(reply, parsed.message);
@@ -355,7 +429,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
         // Project the reply for the acting client's own seats (not the active player), so ending a
         // turn never leaks the next player's card. No `?viewer` ⇒ follow the active player (hotseat).
         return reply.send(
-          gamePayload(request.params.id, settled, viewerFrom(request.query.viewer, request.params.id, settled)),
+          gamePayload(module, request.params.id, settled, viewerFrom(request.query.viewer, module, settled)),
         );
       } catch (error) {
         return sendGameError(reply, module, error);
@@ -365,10 +439,6 @@ export function buildApp(options: AppOptions): FastifyInstance {
 
   // Give every registered game its context, its AI driver, and its own endpoints — Container's
   // delivery auction being the one that exists. The core knows nothing about what they do.
-  //
-  // ⚠️ Module routes share one URL space, so two games both claiming `/games/:id/auction` would be a
-  // Fastify duplicate-route crash at boot (loud, not silent — good). Namespacing them is C1's job,
-  // once `game_type` exists to namespace by.
   for (const info of registry.list()) {
     const module = registry.require(info.id);
     const ctx: ModuleContext = {
@@ -389,7 +459,34 @@ export function buildApp(options: AppOptions): FastifyInstance {
     contexts.set(module.id, ctx);
     const driver = module.createBotDriver?.(ctx);
     if (driver) drivers.set(module.id, driver);
-    module.routes?.(app, ctx);
+
+    /**
+     * Each game's routes live under `/games/:id/<gameType>/…`, so a module declares paths relative to
+     * that (Container's `routes.ts` registers `/auction`, serving `/games/:id/container/auction`).
+     *
+     * Namespacing is about **correctness, not just collisions**. Unprefixed, two games both wanting an
+     * `/auction` endpoint would be a Fastify duplicate-route crash at boot — but worse, whichever
+     * registered first would then be handed *every* game's auction requests, including games it has no
+     * business interpreting. Auctions are common in board games; this is a when-not-if problem.
+     *
+     * The guard closes the other half: a prefix is just a URL, and nothing stops a client asking for
+     * `/games/<a-chess-game>/container/auction`. Refusing anything whose row isn't this module's type
+     * means a module can only ever be handed its own states — the same guarantee `moduleFor` gives the
+     * core routes.
+     */
+    app.register(
+      async (scope) => {
+        scope.addHook('preHandler', async (request, reply) => {
+          const gameId = (request.params as { id?: string }).id;
+          if (gameId === undefined) return;
+          const state = repo.get(gameId);
+          if (state === undefined) return notFound(reply, gameId);
+          if (repo.typeOf(gameId) !== module.id) return wrongType(reply, gameId, module.id);
+        });
+        module.routes?.(scope, ctx);
+      },
+      { prefix: `/games/:id/${module.id}` },
+    );
   }
 
   // --- Lobbies: create an empty room, join by code with a name, start when every seat is filled ---
@@ -397,11 +494,26 @@ export function buildApp(options: AppOptions): FastifyInstance {
   const lobbyNotFound = (reply: FastifyReply, id: string) =>
     reply.code(404).send({ error: { code: 'LOBBY_NOT_FOUND', message: `No lobby with id "${id}"` } });
 
-  app.post<{ Body: { seats?: number } }>(
+  app.post<{ Body: { seats?: number; gameType?: string } }>(
     '/lobbies',
-    { schema: { body: { type: 'object', properties: { seats: { type: 'number' } } } } },
+    {
+      schema: {
+        body: {
+          type: 'object',
+          properties: { seats: { type: 'number' }, gameType: { type: 'string', minLength: 1 } },
+        },
+      },
+    },
     async (request, reply) => {
-      const { minPlayers, maxPlayers } = creationModule;
+      const gameType = request.body?.gameType ?? defaultGameType;
+      const module = registry.get(gameType);
+      if (!module) {
+        return reply.code(400).send({
+          error: { code: 'UNKNOWN_GAME_TYPE', message: `This server does not host a game called "${gameType}"` },
+        });
+      }
+      // The seat range is the *chosen game's*, not a constant — Container's 3–5 is Container's rule.
+      const { minPlayers, maxPlayers } = module;
       const seats = request.body?.seats ?? minPlayers;
       if (!Number.isInteger(seats) || seats < minPlayers || seats > maxPlayers) {
         return reply
@@ -410,6 +522,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       }
       const lobby: Lobby = {
         id: randomUUID(),
+        gameType,
         seats,
         members: Array.from({ length: seats }, () => null),
         status: 'open',
@@ -467,14 +580,27 @@ export function buildApp(options: AppOptions): FastifyInstance {
     if (lobby.members.some((member) => member === null)) {
       return reply.code(409).send({ error: { code: 'LOBBY_NOT_READY', message: 'Every seat must be filled first' } });
     }
+    // The lobby chose its game when it was created; a module removed since then is the one way this
+    // can fail, and it should say so rather than deal the wrong game.
+    const module = registry.get(lobby.gameType);
+    if (!module) {
+      return reply.code(409).send({
+        error: {
+          code: 'GAME_TYPE_UNAVAILABLE',
+          message: `This lobby is for "${lobby.gameType}", which this server does not host`,
+        },
+      });
+    }
     try {
       const members = lobby.members as LobbyMember[];
-      const started = startGame(members.map((member) => ({ name: member.name, bot: member.bot })));
-      const gameId = creationModule.summarize(started).id;
+      const started = startGame(module, members.map((member) => ({ name: member.name, bot: member.bot })));
+      const gameId = module.summarize(started).id;
       lobbies.update({ ...lobby, status: 'started', gameId });
-      return reply.code(201).send(gamePayload(gameId, started, activeIdOf(gameId, started)));
+      return reply
+        .code(201)
+        .send(gamePayload(module, gameId, started, module.summarize(started).activePlayerId));
     } catch (error) {
-      return sendGameError(reply, creationModule, error);
+      return sendGameError(reply, module, error);
     }
   });
 

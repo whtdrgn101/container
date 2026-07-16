@@ -447,7 +447,7 @@ and makes everything above them generic.
 | # | Step | Delivers | Size |
 |---|------|----------|------|
 | C0 | ✅ `GameModule` interface + registry | One typed contract every game implements; Container re-registered through it. No behaviour change | M |
-| C1 | `game_type` routing | The column, the backfill, `moduleFor`, namespaced module routes, a generic `GameHub` | M |
+| C1 | ✅ `game_type` routing | The column, the backfill, `moduleFor`, namespaced module routes, a generic `GameHub` | M |
 | C2 | UI shell | Game picker, per-game lazy-loaded boards, generic lobby/landing; Container's board becomes one plugin | M–L |
 | C3 | Second game | Proves the seams are real — the only honest test of the abstraction | L |
 | C4 | Cross-game polish | Per-game rules blurbs, shared results screen, per-game bot registration | M |
@@ -514,25 +514,40 @@ hosts a **non-Container stub game** through the core. That second file is the on
 Container tests pass just as well if the core is secretly hardcoded to Container, which is the exact
 thing C0 undid.
 
-### C1 — what's actually left
+### ✅ C1 — `game_type` routing (shipped)
 
-Smaller than planned, because C0 absorbed the persistence generalization:
+**The server can now host two games at once**, which is the thing C0 had to refuse. Proven by
+`module-seam.test.ts`, which registers Container *and* a stub counter game and drives both.
 
-- **The column.** `game_type` on `games`/`lobbies`, `NOT NULL DEFAULT 'container'`; existing rows
-  backfill to `'container'` and nothing breaks.
-- **`moduleFor(gameId)`** reads it, replacing today's deliberate one-game throw in `app.ts`. This is
-  *the* change that lets a second game exist — everything above it is already generic.
-- **Namespace module routes.** Two games both claiming `/games/:id/auction` is a Fastify duplicate-route
-  crash at boot (loud, at least). Namespace by `game_type` once it exists.
-- **`GameHub` still imports the engine's `viewFor`** and computes the active player itself; it should
-  project through the module instead. It's the last engine import in the core outside `games/container/`.
-- **Generic typing vs. the UI's free shared types.** Unchanged and still true: the UI gets
-  `GameState`/`Color` free by aliasing the engine source, and a generic shell erases that. The fix is a
-  typed per-game client module on the UI side — **don't let `unknown` leak into board components.**
+- **The column.** `games.game_type`, `NOT NULL DEFAULT 'container'`. The DEFAULT *is* the backfill —
+  SQLite stamps every existing row as it adds the column. Verified against the real dev database: 271
+  pre-C1 games, all backfilled, oldest still loads and plays.
+- **`moduleOf(gameId)`** reads it; every route resolves its module from the row, never from a default.
+  The C0 one-game throw is gone.
+- **Module routes are namespaced** under `/games/:id/<gameType>/` (Container's auction is now
+  `/games/:id/container/auction`; modules declare relative paths). Plus a scope guard —
+  `404 WRONG_GAME_TYPE` — because a prefix is only a URL, and nothing else stops a client asking one
+  game's endpoint about another game's row.
+- **`GameHub` is generic**: it fans out per-viewer messages and projects nothing. **The core now
+  imports `@container/engine` nowhere at all.**
+- **Lobbies carry a `gameType`** — free, since a lobby is a JSON blob; `readLobby` defaults pre-C1 rows
+  to `'container'`, the same tolerant-read trick already used for pre-A2 members. Seat ranges come from
+  the chosen module (`POST /lobbies {gameType, seats}`), not a constant.
+- **Unregistered type** (a module pulled while its rows remain) → `409 GAME_TYPE_UNAVAILABLE`, and such
+  rows are skipped by `GET /games` rather than crashing the home screen.
+
+**Breaking change:** `/games/:id/auction*` moved to `/games/:id/container/auction*`. A single-deploy
+home server, so this was taken rather than aliased — but a client mid-auction across the deploy would
+have to reload.
+
+**Still true, and now C2's problem — generic typing vs. the UI's free shared types.** The UI gets
+`GameState`/`Color` free by aliasing the engine source, and a generic shell erases that. The fix is a
+typed per-game client module on the UI side — **don't let `unknown` leak into board components.**
+`api.ts`'s `gameRoute()` (which hardcodes `/container`) is the seam that becomes.
 
 **Sequencing note (resolved):** C0/C1 touch `app.ts`, `repository.ts`, and `lobbies.ts` — the *same*
-files Track A needed for the `BotRunner` and the pending auction, so Track A went first. With A0–A2
-shipped, C1 is unblocked. A3–A5 are almost entirely inside `bot/`, so they no longer conflict.
+files Track A needed for the `BotRunner` and the pending auction, so Track A went first. A3–A5 are
+almost entirely inside `bot/`, so they no longer conflict.
 
 ---
 

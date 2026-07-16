@@ -14,7 +14,9 @@ export interface LobbyMember {
 
 export interface Lobby {
   readonly id: string;
-  /** Number of seats (player count), 3–5. */
+  /** Which game this room is for — a registered `GameModule` id (roadmap C1). */
+  readonly gameType: string;
+  /** Number of seats (player count), within that game's own min/max. */
   readonly seats: number;
   /** Claimed seat, or `null` for an empty one. Length always equals `seats`. */
   readonly members: readonly (LobbyMember | null)[];
@@ -35,10 +37,17 @@ const readMember = (raw: unknown): LobbyMember | null => {
   return { name: String(member.name ?? ''), bot: member.bot === true };
 };
 
-/** Parse a stored row into a Lobby, normalizing any pre-A2 member shape. */
+/**
+ * Parse a stored row into a Lobby, normalizing any pre-A2 member shape and any pre-C1 row that
+ * predates lobbies naming their game.
+ *
+ * Lobbies are a JSON blob rather than columns, so `gameType` needed no migration — but the same thing
+ * that makes it free makes this default load-bearing: an open lobby written by the previous deploy
+ * has no `gameType`, and Container was the only game there was.
+ */
 const readLobby = (json: string): Lobby => {
   const stored = JSON.parse(json) as Lobby;
-  return { ...stored, members: stored.members.map(readMember) };
+  return { ...stored, gameType: stored.gameType ?? 'container', members: stored.members.map(readMember) };
 };
 
 interface LobbyRow {

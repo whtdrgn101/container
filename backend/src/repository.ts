@@ -4,6 +4,7 @@ import type { AnyGameModule, GameSummary, MoveRecord } from './games';
 interface GameRow {
   id: string;
   state: string;
+  game_type: string;
 }
 
 /**
@@ -13,6 +14,8 @@ interface GameRow {
 export type GameListing = GameSummary & {
   /** Seats an AI holds — so the resume list never offers you a seat the server already plays. */
   bots: string[];
+  /** Which game this is, so a generic client knows which board to open (roadmap C2). */
+  gameType: string;
 };
 
 interface MoveRow {
@@ -33,17 +36,31 @@ interface MoveRow {
 export class GameRepository {
   constructor(private readonly db: DB) {}
 
-  /** Insert a brand-new game (and any moves already in its log). */
+  /** Insert a brand-new game (and any moves already in its log), stamped with the module that owns it. */
   create(module: AnyGameModule, state: unknown): void {
     const insertGame = this.db.prepare(
-      `INSERT INTO games (id, state, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO games (id, state, version, created_at, updated_at, game_type) VALUES (?, ?, ?, ?, ?, ?)`,
     );
     const now = new Date().toISOString();
     const tx = this.db.transaction((s: unknown) => {
-      insertGame.run(module.summarize(s).id, JSON.stringify(s), module.versionOf(s), now, now);
+      insertGame.run(module.summarize(s).id, JSON.stringify(s), module.versionOf(s), now, now, module.id);
       this.persistMoves(module, s, now);
     });
     tx(state);
+  }
+
+  /**
+   * Which `GameModule` owns this row, or undefined if there is no such game.
+   *
+   * The answer to the question C0 couldn't ask. `state` is an opaque blob, so this column is the only
+   * thing that says whose rules it plays by — and handing one game's state to another game's engine
+   * is precisely what it exists to prevent.
+   */
+  typeOf(id: string): string | undefined {
+    const row = this.db.prepare(`SELECT game_type FROM games WHERE id = ?`).get(id) as
+      | { game_type: string }
+      | undefined;
+    return row?.game_type;
   }
 
   /**
@@ -83,15 +100,21 @@ export class GameRepository {
   /**
    * Secret-free summaries of in-progress games (most-recently-updated first), for the resume list.
    *
-   * `moduleFor` resolves which game's rules a row plays by; the module renders the summary, because
-   * only it knows the shape of its own state. **Whatever it returns goes on the wire to anyone**, so
-   * a module's `summarize` must never include hidden information.
+   * Takes a resolver keyed by **game type**, not game id: the type comes back with each row, so this
+   * stays one query rather than a lookup per game. The module renders the summary, because only it
+   * knows the shape of its own state. **Whatever it returns goes on the wire to anyone**, so a
+   * module's `summarize` must never include hidden information.
+   *
+   * A row whose `game_type` is no longer registered is skipped rather than thrown on — pulling a game
+   * out of the registry shouldn't take the whole home screen down with it.
    */
-  listActive(moduleFor: (gameId: string) => AnyGameModule, limit = 50): GameListing[] {
+  listActive(moduleOfType: (gameType: string) => AnyGameModule | undefined, limit = 50): GameListing[] {
     // Abandoned games are filtered in SQL, before the limit — otherwise a run of abandoned games
     // would eat the page and hide live ones from the resume list.
     const rows = this.db
-      .prepare(`SELECT id, state FROM games WHERE abandoned_at IS NULL ORDER BY updated_at DESC LIMIT ?`)
+      .prepare(
+        `SELECT id, state, game_type FROM games WHERE abandoned_at IS NULL ORDER BY updated_at DESC LIMIT ?`,
+      )
       .all(limit) as GameRow[];
     const botRows = this.db.prepare(`SELECT game_id, player_id FROM game_bots`).all() as {
       game_id: string;
@@ -102,10 +125,12 @@ export class GameRepository {
       botsByGame.set(row.game_id, [...(botsByGame.get(row.game_id) ?? []), row.player_id]);
     }
 
-    // The row's id (not the state's) resolves the module: it's the column C1 will join `game_type`
-    // to, and it's the only thing here we can read without knowing a game's shape.
     return rows
-      .map((row) => moduleFor(row.id).summarize(JSON.parse(row.state)))
+      .map((row) => {
+        const module = moduleOfType(row.game_type);
+        return module ? { ...module.summarize(JSON.parse(row.state)), gameType: row.game_type } : null;
+      })
+      .filter((summary) => summary !== null)
       .filter((summary) => summary.status === 'active')
       .map((summary) => ({ ...summary, bots: botsByGame.get(summary.id) ?? [] }));
   }
