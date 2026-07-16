@@ -50,6 +50,8 @@ container/
 ├── engine/     @container/engine  — pure, deterministic rules core (NO I/O, NO randomness)
 ├── bot/        @container/bot     — AI players; pure policies over a redacted GameView
 ├── backend/    @container/backend — Fastify REST API; persists to SQLite; runs the AI (BotRunner)
+│   └── src/games/                 — the GameModule seam: module.ts (contract), registry.ts,
+│                                    container/ (Container as one registered game)
 ├── ui/         @container/ui      — React + Tailwind + shadcn; talks to the API
 └── reference_material/            — the rulebook PDF
 ```
@@ -59,10 +61,36 @@ Moves always go over REST; the backend then **pushes** the new state to all conn
 WebSocket (`GameHub`), each projected per-viewer via `viewFor`. The socket is push-only (never a move channel).
 
 **Coordination state lives outside the engine.** Anything that is *not* a rule — pre-game lobbies
-(`lobbies.ts`), pending delivery auctions (`auctions.ts`), and which seats are bots (`bots.ts`) — is
-backend state with its own table and its own per-viewer projection. The engine stays a pure `state + action →
-state` library that knows nothing about rooms, sealed bids, or bots. Reach for this pattern before
-reaching into the engine.
+(`lobbies.ts`), pending delivery auctions (`games/container/auctions.ts`), and which seats are bots
+(`bots.ts`) — is backend state with its own table and its own per-viewer projection. The engine stays a
+pure `state + action → state` library that knows nothing about rooms, sealed bids, or bots. Reach for
+this pattern before reaching into the engine.
+
+### The `GameModule` seam (Track C / C0)
+
+The backend hosts **games**, plural, through one contract: `backend/src/games/module.ts`. Container is
+one registered module (`games/container/`), not the only thing the server can do.
+
+- **The core is game-agnostic; the module owns every rule-shaped decision.** `app.ts` and
+  `repository.ts` contain no Container-specific code and read **no field off a game state** — id,
+  version, move log, summary and projection all come from the module. **When adding backend behaviour,
+  ask which side it belongs on.** If it needs to know what a container or a bid is, it goes in
+  `games/container/`.
+- **`games/module.ts` must never import a game.** It is the contract. `registry.ts` is the lookup.
+- **A game's own weirdness goes behind `routes` / `pendingStep` / `onStateChanged` / `createBotDriver`**,
+  not into the core. Container's delivery auction is the whole reason those hooks exist. We deliberately
+  did **not** build a generic sealed-bid framework off one example — if a second game needs the same
+  shape, extract it *then*.
+- **`POST /games/:id/actions` takes opaque JSON.** Fastify validates only `{ playerId, action: object }`;
+  **all** action validation is `module.parseAction`. Don't re-add a `type` enum to the route — that's the
+  thing that couldn't survive a second game.
+- **Randomness is injected** (`createGame({ rng })`), never reached for inside a module. That's what
+  keeps every engine pure, deterministic and replayable.
+- **⚠️ Exactly one game may be registered until C1** adds `game_type`. Without that column a row is just
+  JSON and "which module owns it?" is unanswerable, so `buildApp` throws rather than guess.
+- **The honest test is `tests/module-seam.test.ts`**, which drives a stub *counter* game through the core.
+  Container's own tests pass fine even if the core is secretly hardcoded to Container — only a second
+  game can tell. Keep that file working; it's the thing that caught the repository reading `state.version`.
 
 The **engine is the single source of truth** for rules. It is a pure function library:
 `state + action → new state` (or throws a typed `GameError`). It has no dates, no random,
@@ -347,7 +375,7 @@ check plan usage between sessions). Summary:
   A1 (pending delivery auction) then A2 (`BotRunner` + bot seats) do that.
 - **Track A / A1a ✅ (delivery auction as coordination state).** `DELIVER` is a *single atomic action
   carrying every opponent's bid*, and the engine still has no pending-auction state — **keep it that
-  way.** The half-finished auction lives in `backend/src/auctions.ts` (`delivery_auctions` table),
+  way.** The half-finished auction lives in `backend/src/games/container/auctions.ts` (`delivery_auctions` table),
   the same "coordination state outside the engine" pattern as `lobbies.ts`.
   - **Bids are secret server-side.** `auctionViewFor(auction, state, viewer)` reveals *that* a seat has
     bid but never *what*, until every opponent has committed (`phase: 'bidding' → 'decision'`). **Any
@@ -379,7 +407,7 @@ check plan usage between sessions). Summary:
     (gives the cargo to whichever tied opponent it helps least, in expectation over their possible
     cards). `decide` takes `collectBids` **and** `collectRunoffBids` — A2's `BotRunner` wires both to
     the pending auction.
-- **Track A / A2 ✅ (bot seats end-to-end).** `BotRunner` (`backend/src/botRunner.ts`) plays AI seats
+- **Track A / A2 ✅ (bot seats end-to-end).** `BotRunner` (`backend/src/games/container/botRunner.ts`) plays AI seats
   forward after any change, stopping when a human is on the clock. **Bots run server-side**, so hotseat
   and remote use one implementation and a game moves with no browser open.
   - **Which seats are bots is coordination state** (`game_bots` table, `bots.ts`) and rides *beside*
@@ -405,9 +433,40 @@ check plan usage between sessions). Summary:
   game/lobby (`home-link`); leaving is safe and needs no confirm, since the game persists server-side
   (bots keep playing) and is rejoinable from "Games in progress".
 
-- **Track C — multi-game platform:** turn the site into a games room, Container as the first registered
-  game (`GameModule` interface + registry). Roadmapped only. **Do Track A first** — C0/C1 touch the same
-  backend files (`app.ts`, `repository.ts`, `lobbies.ts`) that A1/A2 need.
+- **Abandon a game ✅ (soft delete).** `POST /games/:id/abandon` closes out a game nobody means to
+  finish; the home screen's in-progress card has an **Abandon game** button behind a two-step inline
+  confirm (`abandon-<id>` → `abandon-yes-<id>` / `abandon-no-<id>`; the row drops optimistically since
+  the list only polls every 3s).
+  - **Soft, not hard:** an `abandoned_at` timestamp on `games`. The row and its move log survive, and
+    the game stays **readable** (`GET` returns it with `abandoned: true`) — it just can't be played.
+    `GET /games` filters it out **in SQL**, so abandoned games can't eat the `LIMIT 50` page.
+  - **Not scored, deliberately.** `status: 'ended'` means the game reached its real end and
+    `finalScoring` ran. An abandoned game has no legitimate winner, and inventing one would make
+    `results`/`winnerIds` lie about a game nobody finished.
+  - **409 `GAME_ABANDONED`, never 404** — the game exists and you may still look at it.
+  - **⚠️ The gate is a `preHandler` hook in `app.ts`, above every route.** It must be, for two reasons:
+    Fastify binds hooks to routes *at registration time* (move it down and it silently stops covering
+    the routes it skipped), and **modules register their own mutating endpoints** (Container's
+    `/auction/bids`, `/auction/resolve`) which would otherwise sail past a check that only `/actions`
+    did. `tick()` is gated too — bots run server-side and are ticked **on reads**, so an ungated
+    abandoned game would keep playing itself forever.
+  - **Game-agnostic on purpose:** abandoning needs to know nothing about containers or bids, so it
+    lives entirely in the core and every future game gets it free. No `GameModule` hook. If a change
+    here ever needs `@container/engine`, it's on the wrong side of the C0 seam.
+  - **⚠️ Adding a column needs a real migration.** `CREATE TABLE IF NOT EXISTS` does **not** alter an
+    existing table — every earlier schema change was a whole new table, which is why this never came
+    up. `db.ts`'s `ADDED_COLUMNS` + `addMissingColumns()` runs `ALTER TABLE` on open, guarded by
+    `PRAGMA table_info`. **Put new columns there, not just in the schema string**, or an already-
+    deployed database (the point of the `/data` volume) never gets them.
+- **Track C / C0 ✅ (`GameModule` interface + registry).** The site is now a games *room* with Container
+  registered into it — see "The `GameModule` seam" above for the working rules. Pure refactor: the 90
+  existing backend tests, 204 engine tests and 70 e2e specs all pass untouched. What moved:
+  `newGameFromNames` → `container/createGame.ts` (rng injected), `parseAction` + the route's 13-value
+  action enum → `container/parseAction.ts`, the `GameError`→HTTP map → `container/errors.ts`, the
+  `/auction/*` routes → `container/routes.ts` (via `module.routes`), `auctions.ts`/`botRunner.ts` →
+  `games/container/`. `GameRepository` gained `versionOf`/`movesOf` so it reads no game field.
+  **Next: C1** — `game_type` column + backfill, `moduleFor` reads it, namespace module routes, and make
+  `GameHub` project through the module (it's the last engine import left in the core).
 - **Track B — online multiplayer:** independent track. The authoritative, serializable engine makes all
   of these additive (see `ROADMAP.md`).
 

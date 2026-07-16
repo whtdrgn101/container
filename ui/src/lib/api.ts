@@ -199,6 +199,18 @@ export async function listActiveGames(): Promise<GameSummary[]> {
   return ((await response.json()) as { games: GameSummary[] }).games;
 }
 
+/**
+ * Abandon a game nobody intends to finish, so it stops cluttering the in-progress list.
+ *
+ * A soft delete server-side: the game and its history survive and stay readable, it just can't be
+ * played on any more and its bots stop. It is **not** scored — an unfinished game has no winner.
+ * Idempotent, so a double-click is harmless.
+ */
+export async function abandonGame(gameId: string): Promise<void> {
+  const response = await fetch(`${BASE_URL}/games/${gameId}/abandon`, { method: 'POST' });
+  if (!response.ok) await fail(response);
+}
+
 /** Fetch a lobby by code, or throw if it doesn't exist. */
 export async function getLobby(id: string): Promise<Lobby> {
   return unwrapLobby(await fetch(`${BASE_URL}/lobbies/${id}`));

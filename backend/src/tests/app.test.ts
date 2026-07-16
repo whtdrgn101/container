@@ -6,6 +6,7 @@ import { createGame } from '@container/engine';
 import { buildApp } from '../app';
 import { createDatabase } from '../db';
 import type { DB } from '../db';
+import { containerModule } from '../games';
 import type { StateMessage } from '../hub';
 import { GameRepository } from '../repository';
 
@@ -567,7 +568,7 @@ async function startDelivery(cargo: ('red' | 'blue' | 'white' | 'green' | 'yello
       seat === 0 ? { ...player, ship: { location: { kind: 'ocean' as const }, cargo } } : player,
     ),
   };
-  new GameRepository(db).create(state);
+  new GameRepository(db).create(containerModule, state);
   const sailed = await act(state.id, 'p1', { type: 'SAIL', to: { kind: 'island' } });
   expect(sailed.statusCode).toBe(200);
   return state.id;
@@ -790,7 +791,7 @@ describe('Delivery auctions — off-turn loans (pg. 16)', () => {
         return seat === 1 ? { ...player, money: 0 } : player;
       }),
     };
-    new GameRepository(db).create(state);
+    new GameRepository(db).create(containerModule, state);
     await act(state.id, 'p1', { type: 'SAIL', to: { kind: 'island' } });
 
     // Broke, and it is not p2's turn — but a loan is legal at any time.
@@ -918,7 +919,7 @@ describe('Delivery auctions — runoff and the deliverer’s tie choice (A1b, pg
         seat === 0 ? { ...player, ship: { location: { kind: 'ocean' as const }, cargo: ['red' as const] } } : player,
       ),
     };
-    new GameRepository(db).create(state);
+    new GameRepository(db).create(containerModule, state);
     await act(state.id, 'p1', { type: 'SAIL', to: { kind: 'island' } });
 
     await bid(state.id, 'p2', 5);
@@ -1129,7 +1130,7 @@ describe('Bot seats — delivery auctions', () => {
           : player,
       ),
     };
-    new GameRepository(db).create(state);
+    new GameRepository(db).create(containerModule, state);
     db.prepare('INSERT INTO game_bots (game_id, player_id) VALUES (?, ?)').run(state.id, 'p2');
     db.prepare('INSERT INTO game_bots (game_id, player_id) VALUES (?, ?)').run(state.id, 'p3');
     return state.id;
@@ -1162,7 +1163,7 @@ describe('Bot seats — delivery auctions', () => {
         seat === 1 ? { ...player, ship: { location: { kind: 'ocean' as const }, cargo: ['red' as const] } } : player,
       ),
     };
-    new GameRepository(db).create(state);
+    new GameRepository(db).create(containerModule, state);
     db.prepare('INSERT INTO game_bots (game_id, player_id) VALUES (?, ?)').run(state.id, 'p2');
 
     // The bot sails in on its own turn, opening the auction and pinning itself there.

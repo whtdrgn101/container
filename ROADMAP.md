@@ -84,6 +84,13 @@ How we get from the current vertical slice to a complete, faithful game, then to
   actually did. Safe to render straight from `GameState.log`: the engine only ever records public
   information — losing delivery bids are never written down, which engine tests now pin by asserting
   the `DELIVER` payload exactly. The header title doubles as a link back to the lobby.
+- ✅ **UX — abandon a game (soft delete):** an **Abandon game** button on the home screen's
+  "Games in progress" card (two-step confirm) closes out a game nobody intends to finish. Soft:
+  `games.abandoned_at` is stamped, the row and move log survive, the game stays readable but is out of
+  play (409 `GAME_ABANDONED`) and its bots stop. **Not scored** — an unfinished game has no winner.
+  Built entirely in the game-agnostic core, which is the first real proof the C0 seam pays: a platform
+  feature that needs no `GameModule` hook and works for every future game. See CLAUDE.md → "Abandon a
+  game" for the `preHandler` gate and the migration rule.
 - ⏭️ **Optional next:** Track A (AI) · Track B (online).
 
 > **Convention going forward:** new engine mechanics are added as `actions/<name>.ts` + a matching
@@ -269,7 +276,7 @@ real project. The engine's **purity + serializability** is the key enabler: bots
     derived. And self-play at **5 players shows a seat bias** — p1 won 5/5 games across varied deals
     (3p/4p spread normally). Worth investigating before trusting difficulty tiers.
 
-- ✅ **A1a — the delivery auction is now real coordination state.** `backend/src/auctions.ts` holds a
+- ✅ **A1a — the delivery auction is now real coordination state.** `backend/src/games/container/auctions.ts` holds a
   `DeliveryAuction` (`gameId`, `delivererId`, `cargo`, `phase`, secret `bids`) in a
   `delivery_auctions` table, exactly the shape `lobbies.ts` established. The engine gained nothing but
   an exported `mustDeliver` — it still has no concept of a half-finished auction, and must not.
@@ -320,7 +327,7 @@ real project. The engine's **purity + serializability** is the key enabler: bots
     which is correct: that's exactly the case the rulebook gives the deliverer.
   - Engine 202 tests (100%), bot 94, backend 79, e2e 52 — incl. specs for the runoff round and for a
     deliverer awarding a level tie to the *later* seat (proving it's a choice, not seat order).
-- ✅ **A2 — bot seats end-to-end. The AI is playable.** `BotRunner` (`backend/src/botRunner.ts`) plays
+- ✅ **A2 — bot seats end-to-end. The AI is playable.** `BotRunner` (`backend/src/games/container/botRunner.ts`) plays
   every AI seat forward after any change, stopping the moment a human is on the clock.
   - **Bot-ness is coordination state, not engine state.** A `game_bots` table (`bots.ts`) — a separate
     table, not a column, so `CREATE TABLE IF NOT EXISTS` upgrades a live database with no migration.
@@ -439,56 +446,93 @@ and makes everything above them generic.
 
 | # | Step | Delivers | Size |
 |---|------|----------|------|
-| C0 | `GameModule` interface + registry | One typed contract every game implements; Container re-registered through it. No behaviour change | M |
-| C1 | Generic persistence + routing | `game_type` on `games`/`lobbies`; repos and REST routes stop importing `@container/engine` directly | L |
+| C0 | ✅ `GameModule` interface + registry | One typed contract every game implements; Container re-registered through it. No behaviour change | M |
+| C1 | `game_type` routing | The column, the backfill, `moduleFor`, namespaced module routes, a generic `GameHub` | M |
 | C2 | UI shell | Game picker, per-game lazy-loaded boards, generic lobby/landing; Container's board becomes one plugin | M–L |
 | C3 | Second game | Proves the seams are real — the only honest test of the abstraction | L |
 | C4 | Cross-game polish | Per-game rules blurbs, shared results screen, per-game bot registration | M |
 
-**The `GameModule` seam (C0)** is the whole design. Something close to:
+### ✅ C0 — the `GameModule` seam (shipped)
+
+`backend/src/games/`: `module.ts` (the contract), `registry.ts` (the lookup), `container/` (Container as
+one module — `auctions.ts` and `botRunner.ts` moved here). The backend core (`app.ts`, `repository.ts`)
+no longer contains a single Container-specific decision.
 
 ```ts
 interface GameModule<S, A> {
-  readonly id: string;                    // 'container'
-  readonly name: string;                  // 'Container'
+  readonly id: string; readonly name: string;
   readonly minPlayers: number; readonly maxPlayers: number;
   createGame(opts: { id: string; players: { name: string }[]; rng: () => number }): S;
-  applyAction(state: S, playerId: string, action: A): S;   // throws GameError
-  legalActions(state: S): A[];
+  applyAction(state: S, playerId: string, action: A): S;
+  legalActions(state: S, playerId?: string): readonly A[];
   viewFor(state: S, viewer: Viewer): unknown;
-  parseAction(raw: unknown): A;           // today's app.ts parseAction, per game
-  summarize(state: S): GameSummary;       // today's listActive projection
-  bot?: (view: unknown, playerId: string) => A;   // Track A plugs in here
+  parseAction(raw: unknown): ParseResult<A>;   // validates; the route does none
+  summarize(state: S): GameSummary;            // the listActive projection
+  versionOf(state: S): number;                 // ─┬─ what a `games` row needs,
+  movesOf(state: S): readonly MoveRecord[];    // ─┘  so the repo reads no fields
+  mapError(error: unknown): ErrorResponse | null;
+  pendingStep?(state: S, action: A): ErrorResponse | null;  // "that action is mine"
+  routes?(app: FastifyInstance, ctx: ModuleContext): void;  // a game's own endpoints
+  onStateChanged?(state: S, ctx: ModuleContext): void;      // a game's own pushes
+  createBotDriver?(ctx: ModuleContext): BotDriver;
 }
 ```
 
-Everything the backend does per-request is already one of those methods — C0 is mostly *moving* code,
-not writing it.
+**The sketch this replaces was written before A1a/A2 and had no slot for the delivery auction** — sealed
+bids, own table, own redaction rule, own WS message, own three endpoints, ~a third of `app.ts`. The four
+hooks that aren't in the original (`routes`, `pendingStep`, `onStateChanged`, `createBotDriver`) exist to
+hold exactly that.
 
-**The hard parts, named honestly:**
+**Decision: we did not invent a generic "sealed multi-seat input" framework.** An abstraction designed
+off one example fits one game and no others. Instead a module gets somewhere to put its own weirdness:
+`routes` registers endpoints the core knows nothing about, `pendingStep` says "that action belongs to a
+flow of mine, refuse it at `/actions`". Container's auction stays Container-shaped — it just lives inside
+the Container module. **If C3's second game needs the same thing, that is when the shape is real enough
+to extract.** Don't extract it sooner.
 
-- **`GameError` → HTTP mapping** is currently Container's `GameErrorCode` enum baked into `app.ts`.
-  It needs to become a game-agnostic contract (a shared `GameError` base with a `kind` of
-  `not-found | invalid | illegal-move`, mapping to 404/400/409) or every new game re-teaches the API
-  its error codes.
-- **Action validation.** `POST /games/:id/actions` today validates `action.type` against a hardcoded
-  13-value Fastify JSON-schema enum. That can't stay — either each module contributes a JSON schema, or
-  the route accepts opaque JSON and delegates all validation to `module.parseAction`. Prefer the latter;
-  it keeps the contract small.
-- **Randomness stays injected.** Container's scoring-card shuffle lives in the backend
-  (`newGameFromNames`). The registry must keep passing `rng` in so every engine stays pure and
-  deterministic — do not let a module reach for `Math.random`.
-- **Generic typing vs. the UI's free shared types.** The UI currently gets `GameState`/`Color` for free
-  by aliasing the engine source. A registry of `GameModule<unknown, unknown>` erases that. The fix is a
-  typed per-game client module on the UI side, so the shell is generic but each board stays fully typed
-  against its own engine — **don't let `unknown` leak into board components.**
-- **Migration.** Existing rows have no `game_type`. Backfill to `'container'`; the column is
-  `NOT NULL DEFAULT 'container'` and nothing breaks.
+**How the hard parts landed:**
 
-**Sequencing note:** C0/C1 touch `app.ts`, `repository.ts`, and `lobbies.ts` — the *same* files Track A
-needs for the `BotRunner` and the pending auction. Doing both at once means avoidable merge pain, so
-**finish Track A (at least A0–A2) before starting C1**, or accept the rework. C0 alone is a safe,
-additive refactor that can land any time.
+- **`GameError` → HTTP** is `module.mapError(error) → { status, code, message } | null`. Each game owns
+  its own mapping; `null` means "not mine" and bubbles to a 500. No shared error base was needed.
+- **Action validation** went the way the roadmap preferred: the route's body schema is now
+  `action: { type: 'object' }` and `parseContainerAction` does **all** of it. ⚠️ The old 13-value enum
+  also checked payload *shapes* (`{color, price}` items, numeric bid maps); that work moved into
+  `parseAction`, which is no stricter and no looser than schema-plus-old-parser combined. **Fastify no
+  longer pre-validates actions — don't assume it does.**
+- **Randomness** is injected via `createGame({ rng })`; `Math.random` is passed in from `app.ts` and a
+  seeded rng in the tests, which is what makes "same rng ⇒ same deal" assertable.
+- **Persistence went further than planned.** The seam test (a stub *counter* game driven through the
+  core) failed instantly: `GameRepository` read `state.version` and `state.log` off every game. Hence
+  `versionOf`/`movesOf` — the repo now reads no field off a game state at all. That was C1's line item;
+  it was 15 lines, so it landed here.
+- **⚠️ Exactly one game may be registered until C1.** With no `game_type` column a row is just JSON, so
+  "which module owns this?" is unanswerable. `buildApp` throws rather than guess — a boot crash beats
+  loading someone's game with the wrong engine.
+
+**Tests:** `registry.test.ts` (the registry + Container's contract) and `module-seam.test.ts`, which
+hosts a **non-Container stub game** through the core. That second file is the one that matters: the
+Container tests pass just as well if the core is secretly hardcoded to Container, which is the exact
+thing C0 undid.
+
+### C1 — what's actually left
+
+Smaller than planned, because C0 absorbed the persistence generalization:
+
+- **The column.** `game_type` on `games`/`lobbies`, `NOT NULL DEFAULT 'container'`; existing rows
+  backfill to `'container'` and nothing breaks.
+- **`moduleFor(gameId)`** reads it, replacing today's deliberate one-game throw in `app.ts`. This is
+  *the* change that lets a second game exist — everything above it is already generic.
+- **Namespace module routes.** Two games both claiming `/games/:id/auction` is a Fastify duplicate-route
+  crash at boot (loud, at least). Namespace by `game_type` once it exists.
+- **`GameHub` still imports the engine's `viewFor`** and computes the active player itself; it should
+  project through the module instead. It's the last engine import in the core outside `games/container/`.
+- **Generic typing vs. the UI's free shared types.** Unchanged and still true: the UI gets
+  `GameState`/`Color` free by aliasing the engine source, and a generic shell erases that. The fix is a
+  typed per-game client module on the UI side — **don't let `unknown` leak into board components.**
+
+**Sequencing note (resolved):** C0/C1 touch `app.ts`, `repository.ts`, and `lobbies.ts` — the *same*
+files Track A needed for the `BotRunner` and the pending auction, so Track A went first. With A0–A2
+shipped, C1 is unblocked. A3–A5 are almost entirely inside `bot/`, so they no longer conflict.
 
 ---
 

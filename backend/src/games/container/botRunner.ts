@@ -1,17 +1,30 @@
 import { bidFor, chooseTiedWinner, contextFor, decide, runoffBidFor, wantsBuyout } from '@container/bot';
 import { applyAction, viewFor } from '@container/engine';
 import type { GameState } from '@container/engine';
+import type { BotRepository } from '../../bots';
 import type { AuctionRepository, DeliveryAuction } from './auctions';
 import { applyBid, biddersFor, outcomeOf, syncAuction, tiedForLead } from './auctions';
-import type { BotRepository } from './bots';
-import type { GameRepository } from './repository';
 
 /**
- * Anything the world needs to know when a bot changes the game: the new state, and the pending
- * auction (or `null`). Injected rather than reaching for the hub, so the runner stays testable
- * without a socket and knows nothing about transports.
+ * Told that a bot changed the game, so the world can be brought up to date. Injected rather than
+ * reaching for the hub, so the runner stays testable without a socket and knows nothing about
+ * transports.
+ *
+ * It takes only the state: every path below **saves the auction before notifying**, so the listener
+ * can re-derive it with `syncAuction` and there is no second copy to keep in step. (That is what the
+ * Container module's `onStateChanged` does — one auction-push implementation for bots and humans.)
  */
-export type BotChangeListener = (state: GameState, auction: DeliveryAuction | null) => void;
+export type BotChangeListener = (state: GameState) => void;
+
+/**
+ * The slice of persistence the runner needs, typed to Container. The module's `ModuleContext.games`
+ * is `unknown`-shaped (it's the shared contract); this is the same thing with the cast done once, at
+ * the boundary where we know what we wrote.
+ */
+export interface ContainerGames {
+  get(gameId: string): GameState | undefined;
+  update(state: GameState): void;
+}
 
 /**
  * Far more actions than a real run of bot turns could need. This is a runaway guard, not a budget:
@@ -34,7 +47,7 @@ const MAX_STEPS = 2000;
  */
 export class BotRunner {
   constructor(
-    private readonly repo: GameRepository,
+    private readonly repo: ContainerGames,
     private readonly bots: BotRepository,
     private readonly auctions: AuctionRepository,
     private readonly onChange: BotChangeListener,
@@ -102,11 +115,11 @@ export class BotRunner {
       const fallback = applyBid(auction, state, playerId, 0);
       if (!fallback.ok) return false;
       this.auctions.save(fallback.auction);
-      this.onChange(state, fallback.auction);
+      this.onChange(state);
       return true;
     }
     this.auctions.save(outcome.auction);
-    this.onChange(state, outcome.auction);
+    this.onChange(state);
     return true;
   }
 
@@ -130,7 +143,7 @@ export class BotRunner {
     });
     this.repo.update(next);
     this.auctions.clear(auction.gameId);
-    this.onChange(next, null);
+    this.onChange(next);
   }
 
   /** Play one ordinary bot turn action. */
@@ -138,6 +151,9 @@ export class BotRunner {
     const action = decide(viewFor(state, playerId), playerId);
     const next = applyAction(state, playerId, action);
     this.repo.update(next);
-    this.onChange(next, syncAuction(this.auctions, next));
+    // Sync before notifying: an action that docks a loaded ship at the island *opens* the auction,
+    // and the listener re-derives it from the saved row.
+    syncAuction(this.auctions, next);
+    this.onChange(next);
   }
 }

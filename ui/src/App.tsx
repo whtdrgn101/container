@@ -179,6 +179,8 @@ export default function App() {
   const [displayName, setDisplayName] = useState('');
   // In-progress games shown on the home screen, for resuming after a closed tab.
   const [activeGames, setActiveGames] = useState<GameSummary[]>([]);
+  // Which game's "Abandon game" button has been armed, if any. One at a time.
+  const [confirmingAbandon, setConfirmingAbandon] = useState<string | null>(null);
 
   /** Run async work with busy/error handling but no state assignment (for lobby flows). */
   async function guard(work: () => Promise<void>) {
@@ -271,6 +273,21 @@ export default function App() {
       const mine = await api.getGame(gameId, playerId);
       setControlledIds([playerId]);
       applyPayload(mine);
+    });
+  }
+
+  /**
+   * Abandon a game from the home screen: close out something nobody means to finish.
+   *
+   * Drops the row immediately rather than waiting for the 3s poll to notice — otherwise the game you
+   * just abandoned sits there looking live, and you click it again. The poll is still the source of
+   * truth; this only avoids the gap.
+   */
+  async function abandon(gameId: string) {
+    await guard(async () => {
+      await api.abandonGame(gameId);
+      setActiveGames((games) => games.filter((entry) => entry.id !== gameId));
+      setConfirmingAbandon(null);
     });
   }
 
@@ -1641,6 +1658,51 @@ export default function App() {
                             </span>
                           )}
                         </div>
+                        {/*
+                          Abandoning closes out a game nobody means to finish. Two steps rather than
+                          one: it's the only control here that acts on *everyone's* game, and the
+                          rest of this screen is one-click-safe. Inline rather than a modal — the
+                          project has no dialog primitive, and one button doesn't justify Radix.
+                        */}
+                        {confirmingAbandon === active.id ? (
+                          <div
+                            className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1.5"
+                            data-testid={`abandon-confirm-${active.id}`}
+                          >
+                            <span className="text-xs text-destructive">
+                              Abandon this game for everyone? It can’t be played again.
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              data-testid={`abandon-yes-${active.id}`}
+                              disabled={busy}
+                              onClick={() => void abandon(active.id)}
+                            >
+                              Abandon
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              data-testid={`abandon-no-${active.id}`}
+                              disabled={busy}
+                              onClick={() => setConfirmingAbandon(null)}
+                            >
+                              Keep
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            data-testid={`abandon-${active.id}`}
+                            disabled={busy}
+                            onClick={() => setConfirmingAbandon(active.id)}
+                            className="text-xs text-muted-foreground hover:text-destructive"
+                          >
+                            Abandon game
+                          </Button>
+                        )}
                       </li>
                     ))}
                   </ul>

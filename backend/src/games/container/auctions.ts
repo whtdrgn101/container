@@ -1,6 +1,6 @@
 import { deliveryOutcome, mustDeliver } from '@container/engine';
 import type { Color, GameState } from '@container/engine';
-import type { DB } from './db';
+import type { DB } from '../../db';
 
 /**
  * A pending delivery auction (roadmap A1). Coordination state that lives **outside** the engine, the
