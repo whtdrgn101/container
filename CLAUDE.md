@@ -58,6 +58,12 @@ container/
 Moves always go over REST; the backend then **pushes** the new state to all connected clients over a
 WebSocket (`GameHub`), each projected per-viewer via `viewFor`. The socket is push-only (never a move channel).
 
+**Coordination state lives outside the engine.** Anything that is *not* a rule — pre-game lobbies
+(`lobbies.ts`), pending delivery auctions (`auctions.ts`), and later which seats are bots — is backend
+state with its own table and its own per-viewer projection. The engine stays a pure `state + action →
+state` library that knows nothing about rooms, sealed bids, or bots. Reach for this pattern before
+reaching into the engine.
+
 The **engine is the single source of truth** for rules. It is a pure function library:
 `state + action → new state` (or throws a typed `GameError`). It has no dates, no random,
 no network, no DB. Randomness (e.g. dealing factory colors / scoring cards) is injected by
@@ -334,12 +340,27 @@ check plan usage between sessions). Summary:
   game with every seat botted, each deciding from its own `viewFor` projection. Pure and deterministic —
   no I/O, no randomness — so a failing game always reproduces. **Not yet wired to the backend or UI:**
   A1 (pending delivery auction) then A2 (`BotRunner` + bot seats) do that.
-- **⚠️ A1 blocks bots taking seats.** `DELIVER` is a *single atomic action carrying every opponent's
-  bid*, and the engine has no pending-auction state — today the human deliverer types all the secret
-  bids on their own screen. When a **bot delivers, humans must bid**, and no client owns that prompt,
-  so bids need collecting *outside* the engine (the shape `lobbies.ts` already established). `decide`
-  therefore throws unless given a `collectBids` resolver. This also fixes the standing B2 caveat that
-  secret bids are entered on the active player's screen.
+- **Track A / A1a ✅ (delivery auction as coordination state).** `DELIVER` is a *single atomic action
+  carrying every opponent's bid*, and the engine still has no pending-auction state — **keep it that
+  way.** The half-finished auction lives in `backend/src/auctions.ts` (`delivery_auctions` table),
+  the same "coordination state outside the engine" pattern as `lobbies.ts`.
+  - **Bids are secret server-side.** `auctionViewFor(auction, state, viewer)` reveals *that* a seat has
+    bid but never *what*, until every opponent has committed (`phase: 'bidding' → 'decision'`). **Any
+    new response or push carrying an auction must go through `auctionViewFor`** — the raw
+    `DeliveryAuction.bids` must never reach a client. This is the same rule as `viewFor` for cards.
+  - **Flow:** `GET /games/:id/auction?viewer=<seat>` (one seat, not a list — bids are per-player) →
+    `POST .../auction/bids` per opponent → on the last bid it flips to `decision` and reveals →
+    `POST .../auction/resolve {playerId, buyout}` applies the one `DELIVER`. Posting `DELIVER` to
+    `/actions` while an auction is due is rejected (409 `AUCTION_PENDING`).
+  - **The auction is derived from game state** (`syncAuction` on read *and* write), never trusted to a
+    stored row — that's what keeps a game that reached the island from wedging.
+  - **Off-turn loans (pg. 16):** `REQUEST_LOAN` escapes the turn check *and* `MUST_DELIVER` in
+    `applyAction`, so a broke opponent can borrow in order to bid. `legalActions(state, playerId)`
+    takes an optional seat and answers for off-turn players. Repay/Bank-load stay on-turn.
+  - **Hotseat** uses the same endpoints, prompting seats one at a time behind a pass-the-device gate.
+  - **Still simplified (A1b):** a still-tie resolves by earliest seat; the rulebook says the deliverer
+    chooses. The bot's `decide` still takes a `collectBids` resolver — A2's `BotRunner` wires it to
+    this auction.
 - **Track C — multi-game platform:** turn the site into a games room, Container as the first registered
   game (`GameModule` interface + registry). Roadmapped only. **Do Track A first** — C0/C1 touch the same
   backend files (`app.ts`, `repository.ts`, `lobbies.ts`) that A1/A2 need.

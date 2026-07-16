@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { legalActions } from '../index';
+import { legalActions, MAX_LOANS } from '../index';
 import type { Color, GameState } from '../index';
-import { makeGame, makePlayer, makeSupply, newGame, sc } from './helpers';
+import { expectError, makeGame, makePlayer, makeSupply, newGame, sc } from './helpers';
 
 const types = (state: GameState) => legalActions(state).map((a) => a.type);
 
@@ -85,6 +85,33 @@ describe('legalActions', () => {
   it('omits PRODUCE when the factory district is full', () => {
     const state = makeGame([makePlayer({ id: 'p1', factoryStore: [sc('white', 2), sc('white', 3)], factoryLimit: 2 }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
     expect(types(state)).not.toContain('PRODUCE');
+  });
+
+  describe('off-turn seats (pg. 16)', () => {
+    it('offers an off-turn player only a Bank loan', () => {
+      // Waiting players are not frozen: a loan is legal at any time, which is what lets a broke
+      // opponent afford a bid in someone else's delivery auction.
+      expect(legalActions(newGame(3), 'p2')).toEqual([{ type: 'REQUEST_LOAN' }]);
+    });
+
+    it('offers an off-turn player nothing once they are at the loan cap', () => {
+      const state = makeGame([makePlayer({ id: 'p1' }), makePlayer({ id: 'p2', loans: MAX_LOANS }), makePlayer({ id: 'p3' })]);
+      expect(legalActions(state, 'p2')).toEqual([]);
+    });
+
+    it('defaults to the active player, and naming them explicitly is the same', () => {
+      const state = newGame(3);
+      expect(legalActions(state, 'p1')).toEqual(legalActions(state));
+    });
+
+    it('offers nothing to anyone once the game has ended', () => {
+      const state = { ...newGame(3), status: 'ended' as const };
+      expect(legalActions(state, 'p2')).toEqual([]);
+    });
+
+    it('rejects an unknown player', () => {
+      expectError(() => legalActions(newGame(3), 'ghost'), 'PLAYER_NOT_FOUND');
+    });
   });
 
   it('omits PRODUCE when the supply cannot fill any of your factory colors', () => {

@@ -193,7 +193,8 @@ real project. The engine's **purity + serializability** is the key enabler: bots
 | # | Step | Delivers | Size |
 |---|------|----------|------|
 | A0 | ✅ `@container/bot` + greedy bot + self-play | `decide(view, playerId) → Action`, `bidFor(...)`; headless self-play driver proves the brain with no server | M–L |
-| A1 | Delivery auction as coordination state | Pending auction outside the engine; each opponent bids from **their own device**. Unblocks bot deliveries **and** closes the secret-bid leak | L |
+| A1a | ✅ Delivery auction as coordination state | Pending auction outside the engine; each opponent bids from **their own device**, then the deliverer accepts or buys out. Unblocks bot deliveries **and** closes the secret-bid leak | L |
+| A1b | Runoff + deliverer's tie choice | Tie → runoff round (tied players add cash); still tied → the deliverer **chooses** the winner (pg. 16), replacing the engine's earliest-seat simplification | M |
 | A2 | Bot seats end-to-end | Backend `BotRunner`; hotseat **"add AI player"**; lobby **"assign seat to AI"** | M–L |
 | A3 | Difficulty tiers + auction modeling | Easy/Normal/Hard; opponent-card estimation; basic bluff/counter-bluff | L |
 | A4 | Search-based bot (ISMCTS) | Information-Set Monte-Carlo Tree Search with determinization over hidden info, using engine sim | L |
@@ -261,6 +262,32 @@ real project. The engine's **purity + serializability** is the key enabler: bots
   - **Known, deferred to A5:** `RESALE_PER_CONTAINER = 3` is calibrated from measured self-play, not
     derived. And self-play at **5 players shows a seat bias** — p1 won 5/5 games across varied deals
     (3p/4p spread normally). Worth investigating before trusting difficulty tiers.
+
+- ✅ **A1a — the delivery auction is now real coordination state.** `backend/src/auctions.ts` holds a
+  `DeliveryAuction` (`gameId`, `delivererId`, `cargo`, `phase`, secret `bids`) in a
+  `delivery_auctions` table, exactly the shape `lobbies.ts` established. The engine gained nothing but
+  an exported `mustDeliver` — it still has no concept of a half-finished auction, and must not.
+  - **Lifecycle:** the auction is **derived from game state**, not from a row someone remembered to
+    write (`syncAuction` runs on read *and* write). A game already at Container Island when this
+    shipped — a live game mid-upgrade — heals instead of wedging with no way to resolve the delivery.
+  - **Endpoints:** `GET /games/:id/auction?viewer=<seat>`, `POST /games/:id/auction/bids
+    {playerId, bid}`, `POST /games/:id/auction/resolve {playerId, buyout}`. A `DELIVER` posted to
+    `/actions` while an auction is due is **rejected** (409 `AUCTION_PENDING`) — otherwise a client
+    could bypass the sealed bids entirely, which is the hole this closes.
+  - **The leak it fixes:** bids used to be typed on the *deliverer's* screen, so they chose whether to
+    buy out already knowing what they'd be paid. Now the server holds every bid and `auctionViewFor`
+    reveals nothing until the last opponent commits — over REST *and* the WS push. That "who has bid"
+    is public while "what they bid" is not is the whole design.
+  - **Hotseat** collects bids sequentially behind a **pass-the-device gate** ("I'm Ann — enter my
+    bid"), so one shared screen gets genuinely secret bids. Same endpoints as remote play: one path.
+  - **Off-turn loans (pg. 16) landed with it**, because the rule has nowhere else to happen: a broke
+    opponent must be able to borrow *in order to bid*. `REQUEST_LOAN` now escapes both the turn check
+    and `MUST_DELIVER`; `legalActions(state, playerId)` answers for off-turn seats. Repaying and Bank
+    loading stay on-turn ("Unlike other free actions").
+  - **Ties still resolve by earliest seat** — the engine's existing simplification, and the seam A1b
+    picks up. The UI's old inline runoff panel is gone rather than left half-wired.
+  - Covered by engine tests (195, still 100%), backend integration tests (70, incl. redaction over
+    REST and WebSocket), and 4 Playwright specs incl. the secrecy property itself.
 - **Why ISMCTS (A4):** it's the standard fit for hidden-info, auction/trick games; the deterministic
   engine lets it roll out thousands of sampled games cheaply. Note the bot holds a **redacted view**,
   so determinization means sampling the opponents' unseen scoring cards from `SCORING_CARDS` minus its

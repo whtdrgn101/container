@@ -6,6 +6,7 @@ import {
   FACTORY_BUILD_COSTS,
   FACTORY_LOT_PRICES,
   legalActions,
+  MAX_LOANS,
   MAX_PLAYERS,
   MIN_PLAYERS,
   SHIP_CAPACITY,
@@ -141,9 +142,13 @@ export default function App() {
   const [pick, setPick] = useState<{ district: 'factory' | 'harbor'; sellerId: string; indices: number[] } | null>(null);
   // Which factory color the active player has selected to build from the shared supply.
   const [buildColor, setBuildColor] = useState<Color | null>(null);
-  // Opponents' bids in a delivery auction (and runoff bids on a tie), keyed by player id.
-  const [bids, setBids] = useState<Record<string, number>>({});
-  const [runoffBids, setRunoffBids] = useState<Record<string, number>>({});
+  // The open delivery auction as *this client* may see it — the server holds the sealed bids and
+  // reveals them only once every opponent has committed (A1).
+  const [auction, setAuction] = useState<api.DeliveryAuctionView | null>(null);
+  // The bid being typed, and which seat is entering it. On a shared screen the seats bid one at a
+  // time behind a "pass the device" gate, so only one seat is ever mid-bid.
+  const [bidDraft, setBidDraft] = useState<number>(0);
+  const [bidderSeatId, setBidderSeatId] = useState<string | null>(null);
   // Per-container-lot cash bids and per-cash-lot container-count bids for Bank auctions, by lot index.
   const [bankBid, setBankBid] = useState<Record<number, number>>({});
   const [bankCount, setBankCount] = useState<Record<number, number>>({});
@@ -284,8 +289,26 @@ export default function App() {
       gameId,
       (pushed) => setGame((prev) => (prev && prev.id === pushed.id && pushed.version >= prev.version ? pushed : prev)),
       streamViewer,
+      setAuction,
     );
   }, [gameId, streamViewer]);
+
+  // The stream only pushes an auction when one *changes*, so a client that joins or reloads while
+  // one is already open would see nothing until the next bid. Re-fetch whenever the game reaches (or
+  // leaves) a delivery, which also means a dropped push can't strand the panel: the auction is
+  // derived from the game state, never only from a message we hope arrived.
+  const auctionKey = game
+    ? `${game.turn}:${game.activePlayerIndex}:${game.players[game.activePlayerIndex]?.ship.location.kind}:${
+        game.players[game.activePlayerIndex]?.ship.cargo.length ?? 0
+      }`
+    : null;
+  useEffect(() => {
+    if (!gameId) {
+      setAuction(null);
+      return;
+    }
+    void api.getAuction(gameId, controlledIds?.length === 1 ? controlledIds[0] : undefined).then(setAuction, () => {});
+  }, [gameId, auctionKey, controlledIds]);
 
   // While waiting in an open lobby, poll it so seats fill in and we transition when the host starts.
   const lobbyId = lobby?.id;
@@ -362,13 +385,16 @@ export default function App() {
   const containersGone = game ? COLORS.filter((color) => game.supply.containers[color] === 0).length : 0;
   const mustDeliverNow =
     !!activePlayer && activePlayer.ship.location.kind === 'island' && activePlayer.ship.cargo.length > 0;
-  const auctionOpponents = game && activePlayer ? game.players.filter((p) => p.id !== activePlayer.id) : [];
-  const maxBid = auctionOpponents.length > 0 ? Math.max(0, ...auctionOpponents.map((o) => bids[o.id] ?? 0)) : 0;
-  const tiedBidderIds = auctionOpponents.filter((o) => (bids[o.id] ?? 0) === maxBid).map((o) => o.id);
-  const runoffNeeded = mustDeliverNow && maxBid > 0 && tiedBidderIds.length >= 2;
-  const winningBidPreview = runoffNeeded
-    ? Math.max(0, ...tiedBidderIds.map((id) => (bids[id] ?? 0) + (runoffBids[id] ?? 0)))
-    : maxBid;
+
+  // Which seats does this client answer for? Hotseat (`null`) drives every seat, so it must collect
+  // every opponent's bid — one at a time, behind a pass-the-device gate.
+  const mySeatIds = controlledIds ?? game?.players.map((p) => p.id) ?? [];
+  const iAmDeliverer = !!auction && mySeatIds.includes(auction.delivererId);
+  /** My seats that still owe a bid, in seat order. */
+  const seatsStillToBid = auction
+    ? auction.bidders.filter((b) => !b.hasBid && mySeatIds.includes(b.playerId)).map((b) => b.playerId)
+    : [];
+  const bidsOutstanding = auction ? auction.bidders.filter((b) => !b.hasBid).length : 0;
 
   function act(playerId: string, action: Action) {
     if (!game || !canDrive) return; // only the client controlling the active seat may submit moves
@@ -390,20 +416,30 @@ export default function App() {
     });
   }
 
-  /** Resolve the delivery auction with the entered bids — accept the high bid, or buy out (ends the turn). */
-  function submitDelivery(buyout = false) {
-    if (!game || !activePlayer || !canDrive) return;
-    const action: Action = {
-      type: 'DELIVER',
-      bids,
-      ...(runoffNeeded ? { runoffBids } : {}),
-      ...(buyout ? { buyout: true } : {}),
-    };
+  /**
+   * Commit one seat's sealed bid. The amount goes straight to the server and is never held in this
+   * client's state — that is what stops the deliverer's screen from seeing it.
+   */
+  function submitBid(playerId: string) {
+    if (!game) return;
+    const amount = bidDraft;
+    setBidderSeatId(null);
+    setBidDraft(0);
+    void run(async () => {
+      await api.placeBid(game.id, playerId, amount);
+      // Refresh from the server rather than trusting the local echo: the auction may have just
+      // flipped to `decision` if this was the last bid.
+      setAuction(await api.getAuction(game.id, controlledIds?.length === 1 ? controlledIds[0] : undefined));
+      return game;
+    });
+  }
+
+  /** Deliverer only: accept the high bid (bid + matching subsidy), or buy out and keep the cargo. */
+  function resolveDelivery(buyout: boolean) {
+    if (!game || !auction) return;
     setPick(null);
     setBuildColor(null);
-    setBids({});
-    setRunoffBids({});
-    void run(() => api.applyAction(game.id, activePlayer.id, action, streamViewer));
+    void run(() => api.resolveAuction(game.id, auction.delivererId, buyout, streamViewer));
   }
 
   /** Buy every selected container from the seller in a single action. */
@@ -487,6 +523,173 @@ export default function App() {
                 </span>
               </div>
             )}
+            {/*
+              The delivery auction (A1). Deliberately top-level rather than inside the active
+              player's card: the people who need it most are the *opponents*, whose turn it isn't.
+              Each client only ever sees its own bid — the server holds the rest until the reveal.
+            */}
+            {auction && game.status === 'active' && (
+              <Card className="reveal-in mb-4 border-primary/50" data-testid="auction">
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    Delivery auction — {nameOf(game.players, auction.delivererId)} is delivering
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span>Cargo:</span>
+                    {auction.cargo.map((color, cargoIndex) => (
+                      <ContainerChip key={cargoIndex} color={color as Color} />
+                    ))}
+                  </div>
+
+                  {/* Who still owes a bid. That someone has bid is public; the amount is not. */}
+                  <div className="flex flex-wrap gap-2 text-xs" data-testid="auction-bidders">
+                    {auction.bidders.map((bidder) => (
+                      <span
+                        key={bidder.playerId}
+                        data-testid={`bidder-${bidder.playerId}`}
+                        className={cn(
+                          'rounded-full border px-2 py-0.5',
+                          bidder.hasBid ? 'border-primary/50 bg-primary/10' : 'text-muted-foreground',
+                        )}
+                      >
+                        {nameOf(game.players, bidder.playerId)} {bidder.hasBid ? '✓ bid' : '… thinking'}
+                      </span>
+                    ))}
+                  </div>
+
+                  {auction.phase === 'bidding' ? (
+                    seatsStillToBid.length > 0 ? (
+                      bidderSeatId === null ? (
+                        /*
+                          Pass-the-device gate. On a shared screen one client answers for every seat,
+                          so the bid box stays hidden until that player says they're looking — which
+                          is what makes a "secret" bid actually secret on one device.
+                        */
+                        <div className="space-y-2 rounded-md border border-dashed p-3 text-center">
+                          <p className="text-sm">
+                            {controlledIds === null ? 'Pass the device to ' : 'Your turn to bid, '}
+                            <span className="font-semibold">{nameOf(game.players, seatsStillToBid[0]!)}</span>
+                          </p>
+                          <Button
+                            size="sm"
+                            data-testid="reveal-bid-entry"
+                            disabled={busy}
+                            onClick={() => {
+                              setBidderSeatId(seatsStillToBid[0]!);
+                              setBidDraft(0);
+                            }}
+                          >
+                            I'm {nameOf(game.players, seatsStillToBid[0]!)} — enter my bid
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2 rounded-md border p-3">
+                          <label className="flex items-center justify-between gap-2 text-sm">
+                            <span className="font-medium">{nameOf(game.players, bidderSeatId)}'s secret bid</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={game.players.find((p) => p.id === bidderSeatId)?.money ?? 0}
+                              autoFocus
+                              data-testid="bid-input"
+                              className="w-24 rounded-md border bg-background px-2 py-1 text-right text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              value={bidDraft}
+                              onChange={(event) => setBidDraft(Math.max(0, Math.floor(Number(event.target.value) || 0)))}
+                            />
+                          </label>
+                          <p className="text-xs text-muted-foreground">
+                            $0 is a legal bluff. Nobody sees this until everyone has bid.
+                          </p>
+                          <Button
+                            size="sm"
+                            className="w-full"
+                            data-testid="submit-bid"
+                            disabled={busy}
+                            onClick={() => submitBid(bidderSeatId)}
+                          >
+                            Place sealed bid
+                          </Button>
+                        </div>
+                      )
+                    ) : (
+                      <p className="text-sm text-muted-foreground" data-testid="auction-waiting">
+                        {iAmDeliverer
+                          ? `Waiting for ${bidsOutstanding} opponent${bidsOutstanding === 1 ? '' : 's'} to bid…`
+                          : 'Bid placed. Waiting for the other players…'}
+                      </p>
+                    )
+                  ) : (
+                    <div className="space-y-3" data-testid="auction-reveal">
+                      {/* Every bid is in, so revealing them all at once keeps the bidding simultaneous. */}
+                      <div className="space-y-1">
+                        {auction.bidders.map((bidder) => {
+                          const amount = auction.revealed?.[bidder.playerId] ?? 0;
+                          return (
+                            <div
+                              key={bidder.playerId}
+                              data-testid={`revealed-${bidder.playerId}`}
+                              className={cn(
+                                'flex justify-between rounded px-2 py-1 text-sm',
+                                amount === auction.winningBid && 'bg-primary/10 font-medium',
+                              )}
+                            >
+                              <span>{nameOf(game.players, bidder.playerId)}</span>
+                              <span className="tabular-nums">${amount}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {iAmDeliverer ? (
+                        <div className="flex gap-2">
+                          <Button size="sm" className="flex-1" data-testid="deliver" disabled={busy} onClick={() => resolveDelivery(false)}>
+                            Deliver (earn ${(auction.winningBid ?? 0) * 2})
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1"
+                            data-testid="buyout"
+                            disabled={busy}
+                            onClick={() => resolveDelivery(true)}
+                          >
+                            Buy out (${auction.winningBid ?? 0})
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Waiting for {nameOf(game.players, auction.delivererId)} to accept or buy out…
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/*
+                    Loans are the one action legal on someone else's turn (pg. 16) — precisely so a
+                    broke player can afford to bid. Without this the rule has nowhere to happen.
+                  */}
+                  {auction.phase === 'bidding' &&
+                    seatsStillToBid.length > 0 &&
+                    (game.players.find((p) => p.id === seatsStillToBid[0]!)?.loans ?? 0) < MAX_LOANS && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="w-full text-xs"
+                        data-testid="auction-loan"
+                        disabled={busy}
+                        onClick={() => {
+                          const seat = seatsStillToBid[0]!;
+                          void run(() => api.applyAction(game.id, seat, { type: 'REQUEST_LOAN' }, streamViewer));
+                        }}
+                      >
+                        Short on cash? Take a $10 Bank loan
+                      </Button>
+                    )}
+                </CardContent>
+              </Card>
+            )}
+
             {game.status === 'ended' && (
               <Card className="reveal-in mb-4" data-testid="results">
                 <CardHeader>
@@ -969,80 +1172,7 @@ export default function App() {
                       </div>
                     )}
 
-                    {isActive &&
-                      canDrive &&
-                      (mustDeliverNow ? (
-                        <div className="reveal-in space-y-2 border-t pt-3" data-testid="auction">
-                          <div className="text-sm font-medium">Delivery auction</div>
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            <span>Cargo:</span>
-                            {active.ship.cargo.map((color, cargoIndex) => (
-                              <ContainerChip key={cargoIndex} color={color} />
-                            ))}
-                          </div>
-                          <p className="text-xs text-muted-foreground">Each opponent secretly bids cash ($0 allowed).</p>
-                          {game.players
-                            .filter((opp) => opp.id !== active.id)
-                            .map((opp) => (
-                              <label key={opp.id} className="flex items-center justify-between gap-2 text-sm">
-                                <span>{opp.name}</span>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  data-testid={`bid-${opp.id}`}
-                                  className="w-20 rounded-md border bg-background px-2 py-1 text-right text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                  value={bids[opp.id] ?? 0}
-                                  onChange={(event) =>
-                                    setBids((prev) => ({
-                                      ...prev,
-                                      [opp.id]: Math.max(0, Math.floor(Number(event.target.value) || 0)),
-                                    }))
-                                  }
-                                />
-                              </label>
-                            ))}
-                          {runoffNeeded && (
-                            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2" data-testid="runoff">
-                              <div className="mb-1 text-xs font-medium text-destructive">
-                                Tie at ${maxBid} — runoff! Tied players add cash:
-                              </div>
-                              {tiedBidderIds.map((id) => (
-                                <label key={id} className="flex items-center justify-between gap-2 text-sm">
-                                  <span>{nameOf(game.players, id)} +</span>
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    data-testid={`runoff-${id}`}
-                                    className="w-20 rounded-md border bg-background px-2 py-1 text-right text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                    value={runoffBids[id] ?? 0}
-                                    onChange={(event) =>
-                                      setRunoffBids((prev) => ({
-                                        ...prev,
-                                        [id]: Math.max(0, Math.floor(Number(event.target.value) || 0)),
-                                      }))
-                                    }
-                                  />
-                                </label>
-                              ))}
-                            </div>
-                          )}
-                          <div className="flex gap-2">
-                            <Button size="sm" className="flex-1" data-testid="deliver" disabled={busy} onClick={() => submitDelivery(false)}>
-                              Deliver
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="flex-1"
-                              data-testid="buyout"
-                              disabled={busy}
-                              onClick={() => submitDelivery(true)}
-                            >
-                              Buy out (${winningBidPreview})
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
+                    {isActive && canDrive && !mustDeliverNow && (
                         <div className="space-y-2 border-t pt-3" data-testid="controls">
                         <div>
                           <div className="mb-1 text-xs text-muted-foreground">Produce into lot</div>
@@ -1165,7 +1295,7 @@ export default function App() {
                           End turn
                         </Button>
                         </div>
-                      ))}
+                    )}
                   </CardContent>
                 </Card>
               );

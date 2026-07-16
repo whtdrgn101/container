@@ -2,14 +2,19 @@ import { once } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { Action, GameState, GameView } from '@container/engine';
+import { createGame } from '@container/engine';
 import { buildApp } from '../app';
 import { createDatabase } from '../db';
+import type { DB } from '../db';
 import type { StateMessage } from '../hub';
+import { GameRepository } from '../repository';
 
 let app: FastifyInstance;
+let db: DB;
 
 beforeEach(async () => {
-  app = buildApp({ db: createDatabase(':memory:') });
+  db = createDatabase(':memory:');
+  app = buildApp({ db });
   await app.ready(); // load plugins (registers @fastify/websocket's injectWS + upgrade handler)
 });
 
@@ -540,5 +545,316 @@ describe('Lobbies (pre-game seat claiming)', () => {
     const missing = await join('does-not-exist', 'Z');
     expect(missing.statusCode).toBe(404);
     expect(missing.json().error.code).toBe('LOBBY_NOT_FOUND');
+  });
+});
+
+// --- Delivery auctions (A1) -------------------------------------------------------------------
+//
+// The rule these tests exist to protect: a bid is secret until *every* opponent has committed. That
+// was impossible before — the deliverer typed all the bids on their own screen, so they chose
+// whether to buy out already knowing what they'd be paid.
+
+/**
+ * Seed a game whose deliverer is one hop from Container Island with cargo aboard, then sail in.
+ * Sailing (rather than writing the auction row directly) is what a real client does, so this covers
+ * the trigger as well as the auction.
+ */
+async function startDelivery(cargo: ('red' | 'blue' | 'white' | 'green' | 'yellow')[] = ['red', 'blue']) {
+  const base = createGame({ id: 'auction-game', players: [{ name: 'Ann' }, { name: 'Bob' }, { name: 'Cid' }] });
+  const state: GameState = {
+    ...base,
+    players: base.players.map((player, seat) =>
+      seat === 0 ? { ...player, ship: { location: { kind: 'ocean' as const }, cargo } } : player,
+    ),
+  };
+  new GameRepository(db).create(state);
+  const sailed = await act(state.id, 'p1', { type: 'SAIL', to: { kind: 'island' } });
+  expect(sailed.statusCode).toBe(200);
+  return state.id;
+}
+
+const getAuction = async (gameId: string, viewer?: string) =>
+  (
+    await app.inject({
+      method: 'GET',
+      url: `/games/${gameId}/auction${viewer ? `?viewer=${viewer}` : ''}`,
+    })
+  ).json().auction;
+
+const bid = (gameId: string, playerId: string, amount: number) =>
+  app.inject({ method: 'POST', url: `/games/${gameId}/auction/bids`, payload: { playerId, bid: amount } });
+
+const resolve = (gameId: string, playerId: string, buyout?: boolean) =>
+  app.inject({
+    method: 'POST',
+    url: `/games/${gameId}/auction/resolve`,
+    payload: { playerId, ...(buyout === undefined ? {} : { buyout }) },
+  });
+
+describe('Delivery auctions — opening', () => {
+  it('opens automatically when a loaded ship reaches the island', async () => {
+    const gameId = await startDelivery();
+    const auction = await getAuction(gameId);
+    expect(auction).toMatchObject({ delivererId: 'p1', phase: 'bidding', cargo: ['red', 'blue'] });
+    expect(auction.bidders).toEqual([
+      { playerId: 'p2', hasBid: false },
+      { playerId: 'p3', hasBid: false },
+    ]);
+  });
+
+  it('reports no auction for a game that is not delivering', async () => {
+    const game = await createThreePlayerGame();
+    expect(await getAuction(game.id)).toBeNull();
+  });
+
+  it('404s for a game that does not exist', async () => {
+    const response = await app.inject({ method: 'GET', url: '/games/nope/auction' });
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.code).toBe('GAME_NOT_FOUND');
+  });
+
+  it('heals a game that reached the island without an auction row', async () => {
+    // A live game upgraded mid-delivery has no auction row. Deriving the auction from the game state
+    // rather than trusting the row keeps it from wedging at the island with no way to resolve.
+    const gameId = await startDelivery();
+    db.prepare('DELETE FROM delivery_auctions WHERE game_id = ?').run(gameId);
+    expect(await getAuction(gameId)).toMatchObject({ delivererId: 'p1', phase: 'bidding' });
+  });
+});
+
+describe('Delivery auctions — sealed bids', () => {
+  it('hides every bid until the last opponent has committed', async () => {
+    const gameId = await startDelivery();
+    expect((await bid(gameId, 'p2', 4)).statusCode).toBe(200);
+
+    // p3 has not bid yet, so nothing is revealed — not to p3, and above all not to the deliverer.
+    const toDeliverer = await getAuction(gameId, 'p1');
+    expect(toDeliverer.phase).toBe('bidding');
+    expect(toDeliverer.revealed).toBeNull();
+    expect(toDeliverer.winningBid).toBeNull();
+    expect(toDeliverer.bidders).toEqual([
+      { playerId: 'p2', hasBid: true }, // *that* they bid is public; what they bid is not
+      { playerId: 'p3', hasBid: false },
+    ]);
+    expect(JSON.stringify(toDeliverer)).not.toContain('4');
+
+    const toRival = await getAuction(gameId, 'p3');
+    expect(toRival.revealed).toBeNull();
+    expect(toRival.yourBid).toBeNull();
+  });
+
+  it('shows a bidder their own bid but never anyone else’s', async () => {
+    const gameId = await startDelivery();
+    await bid(gameId, 'p2', 4);
+    expect((await getAuction(gameId, 'p2')).yourBid).toBe(4);
+    expect((await getAuction(gameId, 'p3')).yourBid).toBeNull();
+  });
+
+  it('reveals every bid once all are in, and flips to the deliverer’s decision', async () => {
+    const gameId = await startDelivery();
+    await bid(gameId, 'p2', 4);
+    await bid(gameId, 'p3', 7);
+
+    const auction = await getAuction(gameId, 'p1');
+    expect(auction.phase).toBe('decision');
+    expect(auction.revealed).toEqual({ p2: 4, p3: 7 });
+    expect(auction.winningBid).toBe(7);
+  });
+
+  it('accepts a $0 bluff', async () => {
+    // pg. 15: "They may use $0 bluff cards." $0 is a bid, not an abstention.
+    const gameId = await startDelivery();
+    expect((await bid(gameId, 'p2', 0)).statusCode).toBe(200);
+    expect((await getAuction(gameId, 'p2')).yourBid).toBe(0);
+  });
+
+  it('rejects a bid beyond the bidder’s cash', async () => {
+    const gameId = await startDelivery();
+    const response = await bid(gameId, 'p2', 999);
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('INSUFFICIENT_FUNDS');
+  });
+
+  it('rejects a negative bid', async () => {
+    const gameId = await startDelivery();
+    expect((await bid(gameId, 'p2', -1)).statusCode).toBe(400);
+  });
+
+  it('rejects the deliverer bidding in their own auction', async () => {
+    const gameId = await startDelivery();
+    const response = await bid(gameId, 'p1', 3);
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('NOT_A_BIDDER');
+  });
+
+  it('rejects a second bid from the same player', async () => {
+    const gameId = await startDelivery();
+    await bid(gameId, 'p2', 4);
+    const response = await bid(gameId, 'p2', 5);
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('ALREADY_BID');
+  });
+
+  it('rejects bids once bidding has closed', async () => {
+    const gameId = await startDelivery();
+    await bid(gameId, 'p2', 4);
+    await bid(gameId, 'p3', 1);
+    const response = await bid(gameId, 'p2', 9);
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('BIDDING_CLOSED');
+  });
+
+  it('rejects bidding when no auction is open', async () => {
+    const game = await createThreePlayerGame();
+    const response = await bid(game.id, 'p2', 1);
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('NO_OPEN_AUCTION');
+  });
+});
+
+describe('Delivery auctions — resolution', () => {
+  it('accepting pays the deliverer the bid plus a matching subsidy and ships the cargo', async () => {
+    const gameId = await startDelivery();
+    await bid(gameId, 'p2', 4);
+    await bid(gameId, 'p3', 7);
+
+    const response = await resolve(gameId, 'p1');
+    expect(response.statusCode).toBe(200);
+    const game = response.json().game as GameView;
+
+    // p3 wins at $7: pays $7, takes the cargo. p1 collects $7 + $7 subsidy.
+    expect(game.players[2]!.scoringArea).toEqual(['red', 'blue']);
+    expect(game.players[2]!.money).toBe(20 - 7);
+    expect(game.players[0]!.money).toBe(20 + 14);
+    expect(game.players[0]!.ship.cargo).toEqual([]);
+    // The delivery ends the turn (pg. 15), and the auction is done.
+    expect(game.activePlayerIndex).toBe(1);
+    expect(await getAuction(gameId)).toBeNull();
+  });
+
+  it('buying out pays the Bank and keeps the cargo, with no subsidy', async () => {
+    const gameId = await startDelivery();
+    await bid(gameId, 'p2', 4);
+    await bid(gameId, 'p3', 1);
+
+    const game = (await resolve(gameId, 'p1', true)).json().game as GameView;
+    expect(game.players[0]!.scoringArea).toEqual(['red', 'blue']);
+    expect(game.players[0]!.money).toBe(20 - 4); // paid the winning bid, earned no subsidy
+    expect(game.players[1]!.money).toBe(20); // the high bidder's bid is returned
+  });
+
+  it('rejects resolution before every opponent has bid', async () => {
+    const gameId = await startDelivery();
+    await bid(gameId, 'p2', 4);
+    const response = await resolve(gameId, 'p1');
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('BIDDING_OPEN');
+  });
+
+  it('rejects anyone but the deliverer resolving', async () => {
+    const gameId = await startDelivery();
+    await bid(gameId, 'p2', 4);
+    await bid(gameId, 'p3', 7);
+    const response = await resolve(gameId, 'p2');
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('NOT_THE_DELIVERER');
+  });
+
+  it('rejects resolving when no auction is open', async () => {
+    const game = await createThreePlayerGame();
+    const response = await resolve(game.id, 'p1');
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('NO_OPEN_AUCTION');
+  });
+});
+
+describe('Delivery auctions — no bypassing the sealed bids', () => {
+  it('refuses a DELIVER posted straight to /actions while an auction is due', async () => {
+    // Without this, a client could skip the auction and submit bids it invented — or, worse, the
+    // deliverer's own client could resolve using bids it had already seen.
+    const gameId = await startDelivery();
+    const response = await act(gameId, 'p1', { type: 'DELIVER', bids: { p2: 0, p3: 0 } });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('AUCTION_PENDING');
+  });
+});
+
+describe('Delivery auctions — off-turn loans (pg. 16)', () => {
+  it('lets a broke opponent borrow mid-auction and then bid', async () => {
+    // The rulebook's worked example: "Red starts a delivery auction. Blue takes a loan before bidding."
+    const base = createGame({ id: 'loan-game', players: [{ name: 'Ann' }, { name: 'Bob' }, { name: 'Cid' }] });
+    const state: GameState = {
+      ...base,
+      players: base.players.map((player, seat) => {
+        if (seat === 0) return { ...player, ship: { location: { kind: 'ocean' as const }, cargo: ['red' as const] } };
+        return seat === 1 ? { ...player, money: 0 } : player;
+      }),
+    };
+    new GameRepository(db).create(state);
+    await act(state.id, 'p1', { type: 'SAIL', to: { kind: 'island' } });
+
+    // Broke, and it is not p2's turn — but a loan is legal at any time.
+    expect((await bid(state.id, 'p2', 5)).statusCode).toBe(409);
+    const loan = await act(state.id, 'p2', { type: 'REQUEST_LOAN' });
+    expect(loan.statusCode).toBe(200);
+    expect((await bid(state.id, 'p2', 5)).statusCode).toBe(200);
+  });
+
+  it('still refuses an off-turn action that is not a loan', async () => {
+    const gameId = await startDelivery();
+    const response = await act(gameId, 'p2', { type: 'PRODUCE' });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('NOT_YOUR_TURN');
+  });
+});
+
+describe('Delivery auctions — live push', () => {
+  it('pushes the auction to every seat, redacted per client', async () => {
+    const gameId = await startDelivery();
+
+    const delivererSocket = await app.injectWS(`/games/${gameId}/stream?viewer=p1`);
+    const bidderSocket = await app.injectWS(`/games/${gameId}/stream?viewer=p2`);
+    const nextDeliverer = reader(delivererSocket as never);
+    const nextBidder = reader(bidderSocket as never);
+    await nextDeliverer(); // initial state snapshot
+    await nextBidder();
+
+    await bid(gameId, 'p2', 6);
+
+    // Both clients learn p2 has bid; neither is told the amount — least of all the deliverer, who
+    // must choose whether to buy out without knowing what they'd be paid.
+    const pushedToDeliverer = (await nextDeliverer()) as unknown as { type: string; auction: Record<string, unknown> };
+    expect(pushedToDeliverer.type).toBe('auction');
+    expect(pushedToDeliverer.auction.revealed).toBeNull();
+    expect(JSON.stringify(pushedToDeliverer.auction)).not.toContain('6');
+
+    const pushedToBidder = (await nextBidder()) as unknown as { type: string; auction: Record<string, unknown> };
+    expect(pushedToBidder.auction.yourBid).toBe(6); // you may always see your own bid
+
+    delivererSocket.terminate();
+    bidderSocket.terminate();
+  });
+
+  it('pushes the reveal once the last bid lands, then clears on resolve', async () => {
+    const gameId = await startDelivery();
+    const socket = await app.injectWS(`/games/${gameId}/stream?viewer=p1`);
+    const next = reader(socket as never);
+    await next(); // initial snapshot
+
+    await bid(gameId, 'p2', 2);
+    await next(); // auction push (still bidding)
+    await bid(gameId, 'p3', 5);
+
+    const revealPush = (await next()) as unknown as { auction: Record<string, unknown> };
+    expect(revealPush.auction.phase).toBe('decision');
+    expect(revealPush.auction.revealed).toEqual({ p2: 2, p3: 5 });
+
+    await resolve(gameId, 'p1');
+    await next(); // the resolving state broadcast
+    const cleared = (await next()) as unknown as { type: string; auction: unknown };
+    expect(cleared.type).toBe('auction');
+    expect(cleared.auction).toBeNull();
+
+    socket.terminate();
   });
 });

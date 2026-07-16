@@ -62,13 +62,24 @@ export class GameHub {
     socket.send(JSON.stringify(project(state, viewerId)));
   }
 
-  /** Push new state to every subscriber of a game, each projected for its own seat. */
-  broadcast(gameId: string, state: GameState): void {
+  /**
+   * Push a per-viewer message to every subscriber of a game. `build` is called once per socket with
+   * that socket's seat(s), so the caller decides what each client is allowed to see.
+   *
+   * The hub deliberately knows nothing about *what* is being sent — that keeps redaction the
+   * caller's explicit job rather than something the transport does by accident.
+   */
+  broadcastEach(gameId: string, build: (viewerId: Viewer) => unknown): void {
     const room = this.rooms.get(gameId);
     if (!room) return;
     for (const sub of room) {
       if (sub.socket.readyState !== WS_OPEN) continue;
-      sub.socket.send(JSON.stringify(project(state, sub.viewerId)));
+      sub.socket.send(JSON.stringify(build(sub.viewerId)));
     }
+  }
+
+  /** Push new state to every subscriber of a game, each projected for its own seat. */
+  broadcast(gameId: string, state: GameState): void {
+    this.broadcastEach(gameId, (viewerId) => project(state, viewerId));
   }
 }

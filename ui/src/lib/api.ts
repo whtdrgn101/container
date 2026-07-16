@@ -10,6 +10,25 @@ interface ApiError {
 
 const JSON_HEADERS = { 'content-type': 'application/json' };
 
+/**
+ * A pending delivery auction, as this client is allowed to see it (A1).
+ *
+ * The server keeps the bids; this projection carries only what the viewer may know. During
+ * `bidding` you can see *that* an opponent has bid but never *what* — including if you're the
+ * deliverer, which is the point: you choose whether to buy out without knowing what you'd be paid.
+ * `revealed` fills in only once every opponent has committed.
+ */
+export interface DeliveryAuctionView {
+  gameId: string;
+  delivererId: string;
+  cargo: string[];
+  phase: 'bidding' | 'decision';
+  bidders: { playerId: string; hasBid: boolean }[];
+  yourBid: number | null;
+  revealed: Record<string, number> | null;
+  winningBid: number | null;
+}
+
 /** A pre-game lobby: a shareable room whose seats players claim by name before the game starts. */
 export interface Lobby {
   id: string;
@@ -76,6 +95,47 @@ export async function getGame(gameId: string, viewer?: string): Promise<GameView
   return unwrap(await fetch(`${BASE_URL}/games/${gameId}${query}`));
 }
 
+/**
+ * Fetch the open delivery auction, as seen by one `viewer` seat, or `null` if none is open.
+ *
+ * `viewer` is a *single* seat, not a list: bids are per-player, so a hotseat client holding every
+ * seat asks once per player as it prompts them.
+ */
+export async function getAuction(gameId: string, viewer?: string): Promise<DeliveryAuctionView | null> {
+  const query = viewer !== undefined ? `?viewer=${encodeURIComponent(viewer)}` : '';
+  const response = await fetch(`${BASE_URL}/games/${gameId}/auction${query}`);
+  if (!response.ok) await fail(response);
+  return ((await response.json()) as { auction: DeliveryAuctionView | null }).auction;
+}
+
+/** Place one seat's sealed bid. $0 is a legal bluff. Returns the auction as that bidder sees it. */
+export async function placeBid(gameId: string, playerId: string, bid: number): Promise<DeliveryAuctionView> {
+  const response = await fetch(`${BASE_URL}/games/${gameId}/auction/bids`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ playerId, bid }),
+  });
+  if (!response.ok) await fail(response);
+  return ((await response.json()) as { auction: DeliveryAuctionView }).auction;
+}
+
+/** Deliverer only: accept the high bid, or `buyout` to pay the Bank and keep the containers. */
+export async function resolveAuction(
+  gameId: string,
+  playerId: string,
+  buyout: boolean,
+  viewer?: string,
+): Promise<GameView> {
+  const query = viewer !== undefined ? `?viewer=${encodeURIComponent(viewer)}` : '';
+  return unwrap(
+    await fetch(`${BASE_URL}/games/${gameId}/auction/resolve${query}`, {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ playerId, buyout }),
+    }),
+  );
+}
+
 /** Create an empty lobby with `seats` unclaimed seats and return it (its id is the shareable code). */
 export async function createLobby(seats: number): Promise<Lobby> {
   return unwrapLobby(
@@ -134,11 +194,17 @@ function streamUrl(gameId: string): string {
 }
 
 /**
- * Subscribe to a game's live updates over WebSocket. Calls `onState` with each pushed projection.
+ * Subscribe to a game's live updates over WebSocket. Calls `onState` with each pushed projection,
+ * and `onAuction` when a delivery auction opens, gains a bid, reveals, or closes (`null`).
  * Reconnects automatically with a short backoff. Returns a function that permanently closes the
  * subscription (call it on unmount / when leaving the game).
  */
-export function subscribeGame(gameId: string, onState: (game: GameView) => void, viewer?: string): () => void {
+export function subscribeGame(
+  gameId: string,
+  onState: (game: GameView) => void,
+  viewer?: string,
+  onAuction?: (auction: DeliveryAuctionView | null) => void,
+): () => void {
   let socket: WebSocket | null = null;
   let closed = false;
   let retry: ReturnType<typeof setTimeout> | undefined;
@@ -150,8 +216,13 @@ export function subscribeGame(gameId: string, onState: (game: GameView) => void,
     socket = ws;
     ws.onmessage = (event) => {
       try {
-        const msg = JSON.parse(event.data as string) as { type: string; game: GameView };
+        const msg = JSON.parse(event.data as string) as {
+          type: string;
+          game: GameView;
+          auction: DeliveryAuctionView | null;
+        };
         if (msg.type === 'state') onState(msg.game);
+        else if (msg.type === 'auction') onAuction?.(msg.auction);
       } catch {
         // ignore malformed frames
       }

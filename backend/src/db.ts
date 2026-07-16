@@ -35,6 +35,20 @@ CREATE TABLE IF NOT EXISTS lobbies (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+
+-- Pending delivery auctions: sealed bids collected from each player before the engine's single
+-- atomic DELIVER action can be built. Coordination state (like lobbies), not engine state — at most
+-- one open auction per game, deleted the moment it resolves. Persisted so an auction survives a
+-- restart mid-bidding rather than wedging the game at Container Island.
+-- NOTE: the data column holds SECRET bids. Never serve this row to a client unprojected; every
+-- response must go through auctionViewFor, which hides bids until all opponents have committed.
+CREATE TABLE IF NOT EXISTS delivery_auctions (
+  game_id    TEXT PRIMARY KEY,
+  data       TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (game_id) REFERENCES games(id)
+);
 `;
 
 /** Open (or create) a SQLite database and ensure the schema exists. Defaults to in-memory. */

@@ -64,6 +64,9 @@ export {
   factoryPurchase,
   harborPurchase,
   deliver,
+  // Whether the active player is pinned at the island owing a delivery auction. The backend needs
+  // this to know when to open a pending auction (A1); the bot re-derives its own turn from it.
+  mustDeliver,
   requestLoan,
   repayLoan,
   callBank,

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 // Play the chain up to the delivery auction: Ann sells to Bob's ship, Bob sails it to the island.
-// Leaves the page showing Bob's auction panel (no bids entered yet).
+// Leaves the page showing the open auction, with no bids placed yet.
 async function reachAuction(page: Page) {
   await page.goto('/');
   await page.getByTestId('start-game').click();
@@ -31,20 +31,58 @@ async function reachAuction(page: Page) {
   await expect(page.getByTestId('auction')).toBeVisible();
 }
 
+/**
+ * Enter one seat's sealed bid on a shared screen: take the device, type the amount, commit.
+ * The seats are prompted in order, so this always answers for the next one still to bid.
+ */
+async function bidAs(page: Page, amount: string) {
+  await page.getByTestId('reveal-bid-entry').click();
+  await page.getByTestId('bid-input').fill(amount);
+  await page.getByTestId('submit-bid').click();
+}
+
+test('bids stay secret until every opponent has committed', async ({ page }) => {
+  // The whole point of routing bids through the server (A1). Previously the deliverer typed every
+  // bid on their own screen, so they chose whether to buy out already knowing what they'd be paid.
+  await reachAuction(page);
+
+  await expect(page.getByTestId('bidder-p1')).toContainText('thinking');
+  await bidAs(page, '3'); // Ann
+
+  // Ann has committed. That she bid is public; the amount is nowhere on the page, and there is no
+  // Deliver button yet because the auction has not reached the reveal.
+  await expect(page.getByTestId('bidder-p1')).toContainText('bid');
+  await expect(page.getByTestId('bidder-p3')).toContainText('thinking');
+  await expect(page.getByTestId('auction-reveal')).toHaveCount(0);
+  await expect(page.getByTestId('deliver')).toHaveCount(0);
+  await expect(page.getByTestId('auction')).not.toContainText('$3');
+
+  await bidAs(page, '0'); // Cid bluffs $0
+
+  // Everyone has bid, so everything is revealed at once and Bob may now decide.
+  await expect(page.getByTestId('auction-reveal')).toBeVisible();
+  await expect(page.getByTestId('revealed-p1')).toContainText('$3');
+  await expect(page.getByTestId('revealed-p3')).toContainText('$0');
+  await expect(page.getByTestId('deliver')).toBeVisible();
+});
+
 test('deliver: the highest bidder wins the cargo into their scoring area', async ({ page }) => {
   await reachAuction(page);
-  await page.getByTestId('bid-p1').fill('3'); // Ann bids $3, Cid $0
+  await bidAs(page, '3'); // Ann bids $3
+  await bidAs(page, '0'); // Cid bids $0
   await page.getByTestId('deliver').click();
 
   await expect(page.getByTestId('scoring-p1').locator('span[title]')).toHaveCount(1);
   await expect(page.getByTestId('money-p1')).toHaveText('$17'); // Ann paid her $3 bid
   await expect(page.getByTestId('money-p2')).toHaveText('$26'); // Bob: $3 bid + $3 subsidy
   await expect(page.getByTestId('turn-info')).toContainText('Cid');
+  await expect(page.getByTestId('auction')).toHaveCount(0); // the auction is over
 });
 
 test('buyout: the deliverer keeps the cargo and no bidder pays', async ({ page }) => {
   await reachAuction(page);
-  await page.getByTestId('bid-p1').fill('3');
+  await bidAs(page, '3');
+  await bidAs(page, '0');
   await expect(page.getByTestId('buyout')).toContainText('$3');
   await page.getByTestId('buyout').click();
 
@@ -54,16 +92,15 @@ test('buyout: the deliverer keeps the cargo and no bidder pays', async ({ page }
   await expect(page.getByTestId('turn-info')).toContainText('Cid');
 });
 
-test('runoff: a tie opens a runoff and the higher total wins', async ({ page }) => {
+test('a broke opponent can take a loan mid-auction so they can still bid', async ({ page }) => {
+  // Rulebook pg. 16: a loan is legal during another player's turn, "even during delivery auctions",
+  // precisely so being out of cash never locks you out of bidding.
   await reachAuction(page);
-  await page.getByTestId('bid-p1').fill('2'); // Ann and Cid tie at $2
-  await page.getByTestId('bid-p3').fill('2');
-  await expect(page.getByTestId('runoff')).toBeVisible();
+  await expect(page.getByTestId('auction-loan')).toBeVisible();
+  await page.getByTestId('auction-loan').click();
 
-  await page.getByTestId('runoff-p1').fill('1'); // Ann adds $1 → total $3
-  await page.getByTestId('deliver').click();
-
-  await expect(page.getByTestId('scoring-p1').locator('span[title]')).toHaveCount(1);
-  await expect(page.getByTestId('money-p1')).toHaveText('$17'); // Ann paid her $3 total
-  await expect(page.getByTestId('money-p2')).toHaveText('$26'); // Bob: $3 + $3 subsidy
+  await expect(page.getByTestId('money-p1')).toHaveText('$30'); // Ann borrowed $10 off-turn
+  await bidAs(page, '25'); // and can now bid beyond her original $20
+  await bidAs(page, '0');
+  await expect(page.getByTestId('revealed-p1')).toContainText('$25');
 });

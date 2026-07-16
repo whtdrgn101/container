@@ -4,7 +4,9 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import fastifyWebsocket from '@fastify/websocket';
 import { applyAction, COLORS, createGame, GameError, MAX_PLAYERS, MIN_PLAYERS, SCORING_CARDS, viewFor } from '@container/engine';
-import type { Action, Color, District, GameState, NewPlayer, ShipLocation, StoredContainer } from '@container/engine';
+import type { Action, Color, District, GameState, NewPlayer, ShipLocation, StoredContainer, Viewer } from '@container/engine';
+import type { DeliveryAuction } from './auctions';
+import { AuctionRepository, allBidsIn, auctionIsDue, auctionViewFor, biddersFor, openAuctionFor } from './auctions';
 import type { DB } from './db';
 import { GameHub } from './hub';
 import type { Lobby } from './lobbies';
@@ -184,7 +186,47 @@ export function buildApp(options: AppOptions): FastifyInstance {
   const app = Fastify({ logger: options.logger ?? false });
   const repo = new GameRepository(options.db);
   const lobbies = new LobbyRepository(options.db);
+  const auctions = new AuctionRepository(options.db);
   const hub = new GameHub();
+
+  /**
+   * The single seat an auction projection is "for". A client bound to one seat (`?viewer=p2`) sees
+   * its own bid; one holding several (or hotseat's `null`, which drives them all) gets `null` and
+   * asks per-seat via `GET /games/:id/auction?viewer=<seat>` as it prompts each player in turn.
+   */
+  const primarySeat = (viewer: Viewer): string | null => {
+    if (typeof viewer === 'string') return viewer;
+    return Array.isArray(viewer) && viewer.length === 1 ? viewer[0]! : null;
+  };
+
+  /** Push the auction (or its absence) to every client, each seeing only what it may. */
+  const pushAuction = (gameId: string, auction: DeliveryAuction | null, state: GameState) =>
+    hub.broadcastEach(gameId, (viewer) => ({
+      type: 'auction',
+      auction: auction ? auctionViewFor(auction, state, primarySeat(viewer)) : null,
+    }));
+
+  /**
+   * Keep the pending auction in step with the game: open one whenever a ship is at Container Island
+   * with cargo, and make sure none lingers otherwise. The engine owns the rule (`auctionIsDue` →
+   * `mustDeliver`); this only mirrors it.
+   *
+   * Called on **read as well as write**, deliberately. Deriving the auction from the game state
+   * rather than trusting a row to have been written makes it self-healing: a game that reached the
+   * island before this feature shipped (a live game mid-upgrade) or any state restored without an
+   * auction row would otherwise wedge at the island forever, with no way to resolve the delivery.
+   */
+  const syncAuction = (state: GameState): DeliveryAuction | null => {
+    if (!auctionIsDue(state)) {
+      if (auctions.get(state.id)) auctions.clear(state.id);
+      return null;
+    }
+    const existing = auctions.get(state.id);
+    if (existing && existing.delivererId === activeId(state)) return existing;
+    const fresh = openAuctionFor(state);
+    auctions.save(fresh);
+    return fresh;
+  };
 
   app.register(fastifyWebsocket);
 
@@ -323,12 +365,151 @@ export function buildApp(options: AppOptions): FastifyInstance {
       const action = parseAction(reply, request.body.action);
       if (!action) return reply; // parseAction already sent a 400
 
+      // A pending auction owns the DELIVER: its sealed bids live server-side and are revealed only
+      // once everyone has committed. Letting a client post its own DELIVER here would hand the
+      // deliverer every opponent's bid before choosing whether to buy out — the exact leak A1 closes.
+      if (action.type === 'DELIVER' && auctionIsDue(state)) {
+        return reply.code(409).send({
+          error: {
+            code: 'AUCTION_PENDING',
+            message: 'Resolve the delivery auction via POST /games/:id/auction/resolve',
+          },
+        });
+      }
+
       try {
         const next = applyAction(state, request.body.playerId, action);
         repo.update(next);
+        const auction = syncAuction(next);
         hub.broadcast(request.params.id, next); // push the new state to every connected client
+        pushAuction(request.params.id, auction, next);
         // Project the reply for the acting client's own seats (not the active player), so ending a
         // turn never leaks the next player's card. No `?viewer` ⇒ follow the active player (hotseat).
+        const viewer =
+          request.query.viewer !== undefined ? request.query.viewer.split(',').filter(Boolean) : activeId(next);
+        return reply.send({ game: viewFor(next, viewer) });
+      } catch (error) {
+        return sendGameError(reply, error);
+      }
+    },
+  );
+
+  // --- Delivery auctions: sealed bids from each device, then the deliverer accepts or buys out ---
+  //
+  // Why these live outside `POST /actions`: the engine's DELIVER needs every opponent's bid at once,
+  // but bids are secret and only each player can supply their own. So the auction is a short-lived
+  // record the server owns (like a lobby), and exactly one DELIVER is applied when it resolves.
+
+  const auctionConflict = (reply: FastifyReply, code: string, message: string) =>
+    reply.code(409).send({ error: { code, message } });
+
+  /** The open auction for a game, projected for one seat. `{ auction: null }` when none is open. */
+  app.get<{ Params: { id: string }; Querystring: { viewer?: string } }>(
+    '/games/:id/auction',
+    async (request, reply) => {
+      const state = repo.get(request.params.id);
+      if (!state) return notFound(reply, request.params.id);
+      const auction = syncAuction(state);
+      if (!auction) return reply.send({ auction: null });
+      const viewer = request.query.viewer ? request.query.viewer : null;
+      return reply.send({ auction: auctionViewFor(auction, state, viewer) });
+    },
+  );
+
+  /** Place one seat's sealed bid. $0 is a legal bluff (pg. 15), so the floor is 0, not 1. */
+  app.post<{ Params: { id: string }; Body: { playerId: string; bid: number } }>(
+    '/games/:id/auction/bids',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['playerId', 'bid'],
+          properties: {
+            playerId: { type: 'string', minLength: 1 },
+            bid: { type: 'integer', minimum: 0 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const state = repo.get(request.params.id);
+      if (!state) return notFound(reply, request.params.id);
+
+      const auction = syncAuction(state);
+      if (!auction) return auctionConflict(reply, 'NO_OPEN_AUCTION', 'No delivery auction is open');
+      if (auction.phase !== 'bidding') {
+        return auctionConflict(reply, 'BIDDING_CLOSED', 'Every bid is already in');
+      }
+
+      const { playerId, bid } = request.body;
+      if (!biddersFor(state, auction.delivererId).includes(playerId)) {
+        return auctionConflict(reply, 'NOT_A_BIDDER', `Player "${playerId}" is not bidding in this auction`);
+      }
+      if (auction.bids[playerId] !== undefined) {
+        // Bids go facedown and stay there (pg. 15) — no taking one back once committed.
+        return auctionConflict(reply, 'ALREADY_BID', `Player "${playerId}" has already bid`);
+      }
+      const bidder = state.players.find((player) => player.id === playerId)!;
+      if (bid > bidder.money) {
+        return auctionConflict(reply, 'INSUFFICIENT_FUNDS', `Player "${playerId}" cannot bid $${bid}`);
+      }
+
+      const withBid: DeliveryAuction = { ...auction, bids: { ...auction.bids, [playerId]: bid } };
+      // The reveal is what makes the bids simultaneous: nobody's amount is visible until the last
+      // opponent has committed, so bidding early costs you nothing and bidding late tells you nothing.
+      const next: DeliveryAuction = allBidsIn(withBid, state) ? { ...withBid, phase: 'decision' } : withBid;
+      auctions.save(next);
+      pushAuction(request.params.id, next, state);
+
+      return reply.send({ auction: auctionViewFor(next, state, playerId) });
+    },
+  );
+
+  /**
+   * The deliverer resolves the auction: accept the high bid (collecting it plus a matching
+   * government subsidy) or buy out (pay the Bank, keep the containers). This is the one place a
+   * DELIVER reaches the engine.
+   */
+  app.post<{ Params: { id: string }; Body: { playerId: string; buyout?: boolean }; Querystring: { viewer?: string } }>(
+    '/games/:id/auction/resolve',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['playerId'],
+          properties: {
+            playerId: { type: 'string', minLength: 1 },
+            buyout: { type: 'boolean' },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const state = repo.get(request.params.id);
+      if (!state) return notFound(reply, request.params.id);
+
+      const auction = syncAuction(state);
+      if (!auction) return auctionConflict(reply, 'NO_OPEN_AUCTION', 'No delivery auction is open');
+      if (auction.phase !== 'decision') {
+        return auctionConflict(reply, 'BIDDING_OPEN', 'Not every opponent has bid yet');
+      }
+      if (request.body.playerId !== auction.delivererId) {
+        return auctionConflict(reply, 'NOT_THE_DELIVERER', 'Only the deliverer resolves the auction');
+      }
+
+      try {
+        const next = applyAction(state, auction.delivererId, {
+          type: 'DELIVER',
+          bids: auction.bids,
+          ...(request.body.buyout ? { buyout: true } : {}),
+        });
+        repo.update(next);
+        auctions.clear(request.params.id);
+
+        // DELIVER ends the turn, so the next player is up and no auction is open.
+        hub.broadcast(request.params.id, next);
+        pushAuction(request.params.id, null, next);
+
         const viewer =
           request.query.viewer !== undefined ? request.query.viewer.split(',').filter(Boolean) : activeId(next);
         return reply.send({ game: viewFor(next, viewer) });

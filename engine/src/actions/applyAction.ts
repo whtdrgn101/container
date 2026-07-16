@@ -24,6 +24,16 @@ export function applyAction(state: GameState, playerId: string, action: Action):
     throw new GameError('GAME_OVER', 'The game has ended');
   }
   const seat = seatOf(state, playerId);
+
+  // Requesting a Bank loan is the one action that escapes turn order entirely (rulebook pg. 16):
+  // "you can request a loan ... at any time during the game. Unlike other free actions, you can do
+  // this during other players' turns (even during delivery auctions)." The rulebook's own example is
+  // a player taking a loan so they can afford to bid in someone else's delivery auction — so this
+  // must also bypass the MUST_DELIVER gate below, not just the turn check.
+  if (action.type === 'REQUEST_LOAN') {
+    return requestLoan(state, playerId);
+  }
+
   if (seat !== state.activePlayerIndex) {
     throw new GameError('NOT_YOUR_TURN', `It is not player "${playerId}"'s turn`);
   }
@@ -45,10 +55,9 @@ export function applyAction(state: GameState, playerId: string, action: Action):
     return deliver(state, playerId, action.bids, action.runoffBids, action.buyout);
   }
 
-  // Loans and loading the ship at the Bank are free actions — no action point, no end of turn.
-  if (action.type === 'REQUEST_LOAN') {
-    return requestLoan(state, playerId);
-  }
+  // Repaying and loading the ship at the Bank are free actions — no action point, no end of turn.
+  // Unlike REQUEST_LOAN above, these are only free *on your own turn* (pg. 16: "Unlike other free
+  // actions", and pg. 15: no free actions at all once a delivery auction has ended).
   if (action.type === 'REPAY_LOAN') {
     return repayLoan(state, playerId);
   }

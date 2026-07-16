@@ -10,24 +10,35 @@ import {
   WAREHOUSE_BUILD_COSTS,
 } from '../core';
 import type { GameState } from '../core';
+import { seatOf } from '../internal';
 import type { Action } from './action';
 import { mustDeliver } from './deliver';
 
 /**
- * Enumerate the actions the active player may legally take right now. Drives the UI (enable/disable)
- * and, later, AI search. END_TURN is always available on your turn. PRODUCE and REPRICE are returned
- * as markers (without placements/arrangement) — the caller supplies those.
+ * Enumerate the actions a player may legally take right now. Drives the UI (enable/disable), the
+ * bot, and later AI search. END_TURN is always available on your turn. PRODUCE and REPRICE are
+ * returned as markers (without placements/arrangement) — the caller supplies those.
+ *
+ * `playerId` defaults to the active player. Pass an **off-turn** seat to ask what that player may do
+ * while waiting: only a Bank loan, which is legal at any time (rulebook pg. 16) — including while
+ * they decide what to bid in someone else's delivery auction.
  */
-export function legalActions(state: GameState): Action[] {
+export function legalActions(state: GameState, playerId?: string): Action[] {
   if (state.status === 'ended') {
     return [];
   }
+  const active = state.players[state.activePlayerIndex]!;
+  const player = playerId === undefined ? active : state.players[seatOf(state, playerId)]!;
+
+  if (player.id !== active.id) {
+    return player.loans < MAX_LOANS ? [{ type: 'REQUEST_LOAN' }] : [];
+  }
+
   // At the island with cargo, the only legal move is to resolve the delivery auction.
   if (mustDeliver(state)) {
     return [{ type: 'DELIVER' }];
   }
 
-  const player = state.players[state.activePlayerIndex]!;
   const actions: Action[] = [{ type: 'END_TURN' }];
 
   // Loans are free actions — available even with no action points left.
