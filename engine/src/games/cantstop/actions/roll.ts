@@ -30,10 +30,10 @@ export function roll(
 
   const rolled: CantStopState = { ...state, dice };
   if (legalSelections(rolled).length > 0) {
-    return record(state, 'ROLL', playerId, { phase: 'selecting', dice }, { dice });
+    return record(state, 'ROLL', playerId, { phase: 'selecting', dice, rollsThisTurn: state.rollsThisTurn + 1 }, { dice });
   }
 
-  // Blown it: discard the turn's runners and pass to the next seat.
+  // Blown it: discard the turn's runners and pass to the next seat (whose roll count starts fresh).
   const players = state.players.length;
   return record(
     state,
@@ -43,6 +43,7 @@ export function roll(
       runners: {},
       dice: null,
       phase: 'rolling',
+      rollsThisTurn: 0,
       activePlayerIndex: (state.activePlayerIndex + 1) % players,
       turn: state.turn + 1,
     },

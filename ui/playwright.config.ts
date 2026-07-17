@@ -28,13 +28,13 @@ export default defineConfig({
   // Playwright boots both the API and the UI dev server (which proxies /api → API).
   webServer: [
     {
-      command: 'pnpm --filter @container/backend start',
+      command: 'pnpm --filter @game-hub/backend start',
       url: 'http://127.0.0.1:3001/health',
       reuseExistingServer: !isCI,
       env: { DATABASE_PATH: ':memory:', PORT: '3001', HOST: '127.0.0.1' },
     },
     {
-      command: 'pnpm --filter @container/ui dev',
+      command: 'pnpm --filter @game-hub/ui dev',
       url: BASE_URL,
       reuseExistingServer: !isCI,
     },

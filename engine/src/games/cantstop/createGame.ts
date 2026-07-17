@@ -40,6 +40,7 @@ export function createGame(options: CreateGameOptions): CantStopState {
     claimed: {},
     runners: {},
     phase: 'rolling',
+    rollsThisTurn: 0,
     dice: null,
     status: 'active',
     winnerIds: [],

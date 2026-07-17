@@ -15,7 +15,7 @@ import type { GamePayload, Lobby } from '@/lib/api';
  * and **knows nothing about any game's rules**. A game's state is opaque here; the registry picks a
  * board by `gameType` and that board is the only thing that can read it.
  *
- * **Nothing in `shell/`, `hooks/` or this file may import `@container/engine`.** If you need a rule,
+ * **Nothing in `shell/`, `hooks/` or this file may import `@game-hub/engine`.** If you need a rule,
  * a colour, a piece or a seat count, it belongs in `games/<game>/` — the seat range on the landing
  * screen comes from `GET /games/catalog` for exactly this reason. A test enforces the import ban.
  */

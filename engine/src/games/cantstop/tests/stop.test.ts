@@ -4,12 +4,13 @@ import { makeState, expectError } from './helpers';
 
 describe('stop', () => {
   it('banks runners into permanent progress and passes the turn', () => {
-    const state = makeState({ runners: { 3: 1, 7: 2 } });
+    const state = makeState({ runners: { 3: 1, 7: 2 }, rollsThisTurn: 3 });
     const next = stop(state, 'p1');
     expect(next.players[0]!.progress).toEqual({ 3: 1, 7: 2 });
     expect(next.runners).toEqual({});
     expect(next.activePlayerIndex).toBe(1);
     expect(next.turn).toBe(2);
+    expect(next.rollsThisTurn).toBe(0); // the next seat starts fresh
     expect(next.claimed).toEqual({});
     expect(next.log.at(-1)).toEqual({ seq: 1, type: 'STOP', playerId: 'p1' });
   });

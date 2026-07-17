@@ -3,7 +3,7 @@
  *
  * Mirrors the backend's split exactly: this file is the core (games, lobbies, the live stream), and a
  * game's own endpoints live in its own client (`games/container/api.ts`, serving
- * `/games/:id/container/…`). Nothing here may import `@container/engine` or know what a container,
+ * `/games/:id/container/…`). Nothing here may import `@game-hub/engine` or know what a container,
  * a bid or a scoring card is.
  *
  * **A game's state is `unknown` here on purpose.** Only the game's own board can read it, so every

@@ -1,4 +1,4 @@
-import { GameError } from '@container/engine/cantstop';
+import { GameError } from '@game-hub/engine/cantstop';
 import type { ErrorResponse } from '../module';
 
 /**

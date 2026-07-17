@@ -4,8 +4,8 @@ import {
   MAX_PLAYERS,
   MIN_PLAYERS,
   viewFor,
-} from '@container/engine/container';
-import type { Action, GameState, Viewer } from '@container/engine/container';
+} from '@game-hub/engine/container';
+import type { Action, GameState, Viewer } from '@game-hub/engine/container';
 import type { BotDriver, GameModule, GameSummary, ModuleContext } from '../module';
 import { AuctionRepository, auctionIsDue } from './auctions';
 import { BotRunner } from './botRunner';

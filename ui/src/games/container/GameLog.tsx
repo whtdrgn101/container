@@ -1,4 +1,4 @@
-import type { Color, MoveRecord, PlayerView, ShipLocation } from '@container/engine/container';
+import type { Color, MoveRecord, PlayerView, ShipLocation } from '@game-hub/engine/container';
 
 /**
  * The running activity feed (bottom of the board).

@@ -1,3 +1,5 @@
+import { legalSelections } from '@game-hub/engine/cantstop';
+import type { CantStopState } from '@game-hub/engine/cantstop';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../app';
@@ -167,5 +169,86 @@ describe('Can\'t Stop over REST', () => {
     expect(win.json().game.status).toBe('ended');
     expect(win.json().game.winnerIds).toEqual(['p1']);
     expect(win.json().game.claimed).toEqual({ 2: 'p1', 12: 'p1', 3: 'p1' });
+  });
+});
+
+/** A real PRNG (mulberry32) so an all-bot game actually advances through varied rolls. */
+function mulberry32(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+describe('Can\'t Stop AI seats', () => {
+  let db: DB;
+  let app: FastifyInstance;
+
+  beforeEach(async () => {
+    db = createDatabase();
+    // A proper seeded generator, so the bots' rolls vary and the game reaches a real finish.
+    app = buildApp({ db, rng: mulberry32(0xc0ffee) });
+    await app.ready();
+  });
+
+  afterEach(async () => {
+    await app.close();
+    db.close();
+  });
+
+  it('plays an all-bot game to a finish on its own (server-side, no client)', async () => {
+    // Creating the game ticks the bots forward; with no human ever on the clock, the runner plays the
+    // whole game out synchronously — the same way Container's all-bot game does.
+    const response = await app.inject({
+      method: 'POST',
+      url: '/games',
+      payload: { gameType: 'cantstop', players: [{ name: 'Ann', bot: true }, { name: 'Bob', bot: true }] },
+    });
+    expect(response.statusCode).toBe(201);
+
+    const game = response.json().game;
+    expect(game.status).toBe('ended');
+    expect(game.winnerIds).toHaveLength(1);
+    const winner = game.winnerIds[0];
+    const claims = Object.values(game.claimed).filter((id) => id === winner).length;
+    expect(claims).toBeGreaterThanOrEqual(3);
+    // The bots ran server-side, so both seats are recorded as AI.
+    expect(response.json().bots).toEqual(['p1', 'p2']);
+  });
+
+  it('lets a bot take its turn and hands back to a waiting human', async () => {
+    // p1 is a person, p2 a bot. p1 opens a column and stops; the bot then plays its whole turn
+    // server-side and the turn returns to p1.
+    const created = await app.inject({
+      method: 'POST',
+      url: '/games',
+      payload: { gameType: 'cantstop', players: [{ name: 'Human' }, { name: 'Bot', bot: true }] },
+    });
+    expect(created.json().bots).toEqual(['p2']);
+    const id = created.json().game.id as string;
+
+    const rolled = await app.inject({ method: 'POST', url: `/games/${id}/cantstop/roll`, payload: { playerId: 'p1' } });
+    // Take a real legal pairing for whatever the server rolled (the engine is the authority on which).
+    const columns = legalSelections(rolled.json().game as CantStopState)[0]!;
+    await app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId: 'p1', action: { type: 'SELECT', columns } },
+    });
+    const stopped = await app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId: 'p1', action: { type: 'STOP' } },
+    });
+
+    // p1 stopped → the bot played its whole turn server-side → the turn is back on the human (p1),
+    // unless the bot somehow won outright (it can't in a single turn from an empty board).
+    const settled = stopped.json().game;
+    expect(settled.status).toBe('active');
+    expect(settled.activePlayerIndex).toBe(0);
   });
 });

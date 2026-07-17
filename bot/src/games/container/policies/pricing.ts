@@ -1,4 +1,4 @@
-import type { District, StoredContainer } from '@container/engine/container';
+import type { District, StoredContainer } from '@game-hub/engine/container';
 import type { Ctx } from '../types';
 
 /** Below this much cash the bot prices to move stock fast; above it, it prices for margin. */

@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import type { GameView } from '@container/engine/container';
+import type { GameView } from '@game-hub/engine/container';
 import type { GameClient } from '../types';
 import { GAME_TYPE } from './api';
 import { ContainerStatus } from './Status';

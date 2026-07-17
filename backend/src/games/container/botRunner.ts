@@ -1,6 +1,6 @@
-import { bidFor, chooseTiedWinner, contextFor, decide, runoffBidFor, wantsBuyout } from '@container/bot';
-import { applyAction, viewFor } from '@container/engine/container';
-import type { GameState } from '@container/engine/container';
+import { bidFor, chooseTiedWinner, contextFor, decide, runoffBidFor, wantsBuyout } from '@game-hub/bot/container';
+import { applyAction, viewFor } from '@game-hub/engine/container';
+import type { GameState } from '@game-hub/engine/container';
 import type { BotRepository } from '../../bots';
 import type { AuctionRepository, DeliveryAuction } from './auctions';
 import { applyBid, biddersFor, outcomeOf, syncAuction, tiedForLead } from './auctions';
@@ -40,7 +40,7 @@ const MAX_STEPS = 2000;
  * until it's a human's move again — synchronously, because the engine and SQLite both are, so a
  * caller can simply read the game back afterwards and reply with it.
  *
- * The runner has no special powers. It builds actions with the same `@container/bot` policies used
+ * The runner has no special powers. It builds actions with the same `@game-hub/bot` policies used
  * in self-play, hands them to the same `applyAction` a human's move goes through, and bids through
  * the same `applyBid` the REST route uses. A bot cannot do anything a player at the table couldn't —
  * and it decides from `viewFor(state, botId)`, so it cannot see an opponent's card either.

@@ -9,12 +9,12 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       // Consume the engine as source so Vite transpiles it (shared types + logic). One alias per
-      // subpath — the engine is a per-game platform now, with no bare `@container/engine` entry.
-      '@container/engine/kernel': fileURLToPath(new URL('../engine/src/kernel/index.ts', import.meta.url)),
-      '@container/engine/container': fileURLToPath(
+      // subpath — the engine is a per-game platform now, with no bare `@game-hub/engine` entry.
+      '@game-hub/engine/kernel': fileURLToPath(new URL('../engine/src/kernel/index.ts', import.meta.url)),
+      '@game-hub/engine/container': fileURLToPath(
         new URL('../engine/src/games/container/index.ts', import.meta.url),
       ),
-      '@container/engine/cantstop': fileURLToPath(
+      '@game-hub/engine/cantstop': fileURLToPath(
         new URL('../engine/src/games/cantstop/index.ts', import.meta.url),
       ),
     },

@@ -1,4 +1,4 @@
-import type { Action, Color, GameView, PlayerState, PlayerView } from '@container/engine/container';
+import type { Action, Color, GameView, PlayerState, PlayerView } from '@game-hub/engine/container';
 
 /**
  * Resolves every opponent's sealed bid when a bot must run a delivery auction.

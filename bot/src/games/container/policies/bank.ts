@@ -1,4 +1,4 @@
-import type { Action } from '@container/engine/container';
+import type { Action } from '@game-hub/engine/container';
 import type { Candidate, Ctx } from '../types';
 import { expectedAuctionBid } from '../valuation';
 

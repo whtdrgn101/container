@@ -1,5 +1,5 @@
 {
-  "name": "@container/backend",
+  "name": "@game-hub/backend",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,8 +13,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@container/bot": "workspace:*",
-    "@container/engine": "workspace:*",
+    "@game-hub/bot": "workspace:*",
+    "@game-hub/engine": "workspace:*",
     "@fastify/static": "^10.1.0",
     "@fastify/websocket": "^11.3.0",
     "better-sqlite3": "^11.8.0",

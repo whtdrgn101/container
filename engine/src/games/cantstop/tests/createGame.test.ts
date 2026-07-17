@@ -15,6 +15,7 @@ describe('createGame', () => {
       claimed: {},
       runners: {},
       phase: 'rolling',
+      rollsThisTurn: 0,
       dice: null,
       status: 'active',
       winnerIds: [],

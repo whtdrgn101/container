@@ -1,8 +1,8 @@
 {
-  "name": "container-monorepo",
+  "name": "game-hub-monorepo",
   "version": "0.0.0",
   "private": true,
-  "description": "Digital version of the board game Container — TypeScript monorepo (shared engine + REST API + React UI).",
+  "description": "Game Hub — a self-hosted board-game platform. TypeScript monorepo: a shared engine, a Fastify REST API over SQLite, and a React UI. Container and Can't Stop are the games built on it.",
   "license": "BSD-3-Clause",
   "engines": {
     "node": ">=22"
@@ -10,16 +10,13 @@
   "packageManager": "pnpm@11.13.0",
   "scripts": {
     "test": "pnpm -r test",
-    "test:engine": "pnpm --filter @container/engine test",
-    "test:bot": "pnpm --filter @container/bot test",
-    "test:backend": "pnpm --filter @container/backend test",
-    "test:e2e": "pnpm --filter @container/ui test:e2e",
+    "test:engine": "pnpm --filter @game-hub/engine test",
+    "test:bot": "pnpm --filter @game-hub/bot test",
+    "test:backend": "pnpm --filter @game-hub/backend test",
+    "test:e2e": "pnpm --filter @game-hub/ui test:e2e",
     "typecheck": "pnpm -r typecheck",
     "build": "pnpm -r build",
-    "dev:backend": "pnpm --filter @container/backend dev",
-    "dev:ui": "pnpm --filter @container/ui dev"
-  },
-  "dependencies": {
-    "22": "^0.0.0"
+    "dev:backend": "pnpm --filter @game-hub/backend dev",
+    "dev:ui": "pnpm --filter @game-hub/ui dev"
   }
 }

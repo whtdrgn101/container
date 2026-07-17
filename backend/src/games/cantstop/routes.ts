@@ -1,7 +1,8 @@
-import { applyAction, DICE_COUNT, DIE_FACES, viewFor } from '@container/engine/cantstop';
-import type { CantStopState, Viewer } from '@container/engine/cantstop';
+import { applyAction, viewFor } from '@game-hub/engine/cantstop';
+import type { CantStopState, Viewer } from '@game-hub/engine/cantstop';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ModuleContext } from '../module';
+import { rollFourDice } from './dice';
 import { mapCantStopError } from './errors';
 
 /**
@@ -26,12 +27,6 @@ export function registerCantStopRoutes(app: FastifyInstance, ctx: ModuleContext)
   const viewerFrom = (raw: string | undefined, state: CantStopState): Viewer =>
     raw !== undefined ? raw.split(',').filter(Boolean) : (state.players[state.activePlayerIndex]?.id ?? null);
 
-  /** Four independent dice from the injected generator. The one place Can't Stop's randomness lives. */
-  const rollDice = (): [number, number, number, number] => {
-    const die = () => Math.floor(ctx.rng() * DIE_FACES) + 1;
-    return Array.from({ length: DICE_COUNT }, die) as [number, number, number, number];
-  };
-
   app.post<{ Params: { id: string }; Body: { playerId: string }; Querystring: { viewer?: string } }>(
     '/roll',
     {
@@ -48,7 +43,7 @@ export function registerCantStopRoutes(app: FastifyInstance, ctx: ModuleContext)
       if (!state) return notFound(reply, request.params.id);
 
       try {
-        const next = applyAction(state, request.body.playerId, { type: 'ROLL', dice: rollDice() });
+        const next = applyAction(state, request.body.playerId, { type: 'ROLL', dice: rollFourDice(ctx.rng) });
         ctx.games.update(next);
         ctx.pushGame(request.params.id, next); // tell every connected client
         ctx.bots.tick(request.params.id); // no-op today (Can't Stop has no bots yet), harmless

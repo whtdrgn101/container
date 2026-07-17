@@ -1,5 +1,5 @@
-import { COLORS, SCORING_CARDS, finalScoring } from '@container/engine/container';
-import type { Color, GameView, PlayerState, PlayerView } from '@container/engine/container';
+import { COLORS, SCORING_CARDS, finalScoring } from '@game-hub/engine/container';
+import type { Color, GameView, PlayerState, PlayerView } from '@game-hub/engine/container';
 import { BotError } from './errors';
 import type { Ctx } from './types';
 

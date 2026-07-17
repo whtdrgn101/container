@@ -20,14 +20,24 @@ test('pick Can\'t Stop and play a turn: roll, choose a pairing, stop', async ({ 
   // The eleven columns are drawn (7 is the tall middle one).
   await expect(page.getByTestId('column-7')).toBeVisible();
 
+  // Before rolling: no rolls taken, and all three markers are free.
+  await expect(page.getByTestId('roll-count')).toHaveText('0');
+  await expect(page.getByTestId('marker-free')).toHaveCount(3);
+  await expect(page.getByTestId('marker-used')).toHaveCount(0);
+
   // Roll the dice server-side; the board moves into the pairing choice and shows the four dice.
   await page.getByTestId('cantstop-roll').click();
   await expect(page.getByTestId('die-0')).toBeVisible();
+  // One roll taken now.
+  await expect(page.getByTestId('roll-count')).toHaveText('1');
 
   // Pick whichever pairing came up.
   const pairing = page.locator('[data-testid^="cantstop-select-"]').first();
   await expect(pairing).toBeVisible();
   await pairing.click();
+
+  // A pairing places at least one runner, so at least one marker is now in play.
+  await expect(page.getByTestId('marker-used').first()).toBeVisible();
 
   // A runner is now on the board and banking is offered; stop to end the turn.
   const stop = page.getByTestId('cantstop-stop');
@@ -37,4 +47,22 @@ test('pick Can\'t Stop and play a turn: roll, choose a pairing, stop', async ({ 
   // The turn passed and the board is still live.
   await expect(page.getByTestId('board')).toBeVisible();
   await expect(page.getByTestId('cantstop-roll')).toBeVisible();
+});
+
+test('a Can\'t Stop game with an AI seat plays the bot\'s turn automatically', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('pick-game-cantstop').click();
+  // Hand seat 2 to the AI, then start.
+  await page.getByTestId('toggle-bot-1').click();
+  await page.getByTestId('start-game').click();
+  await expect(page.getByTestId('board')).toBeVisible();
+
+  // Play the human's turn: roll, choose a pairing, stop.
+  await page.getByTestId('cantstop-roll').click();
+  await page.locator('[data-testid^="cantstop-select-"]').first().click();
+  await page.getByTestId('cantstop-stop').click();
+
+  // The bot seat took its whole turn server-side, so the board comes back with a roll available for the
+  // next human seat — the person is never asked to act for the AI.
+  await expect(page.getByTestId('cantstop-roll')).toBeEnabled();
 });

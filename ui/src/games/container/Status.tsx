@@ -1,4 +1,4 @@
-import type { GameView } from '@container/engine/container';
+import type { GameView } from '@game-hub/engine/container';
 
 /**
  * Container's header status line: whose turn it is and what's left of it.

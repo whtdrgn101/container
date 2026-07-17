@@ -34,12 +34,12 @@ test('the shell imports no game engine', () => {
     .filter((path) => {
       const source = readFileSync(path, 'utf8');
       // Match real imports only — these files *talk about* the rule in their comments. Catches every
-      // engine subpath (`@container/engine/container`, `/cantstop`, `/kernel`), not just the old bare id.
-      return /^\s*import\s[^;]*from\s+'@container\/engine(\/[^']*)?'/m.test(source);
+      // engine subpath (`@game-hub/engine/container`, `/cantstop`, `/kernel`), not just the old bare id.
+      return /^\s*import\s[^;]*from\s+'@game-hub\/engine(\/[^']*)?'/m.test(source);
     })
     .map((path) => path.slice(SRC.length + 1));
 
-  expect(offenders, 'shell files must not import @container/engine — move the need into games/<game>/').toEqual([]);
+  expect(offenders, 'shell files must not import @game-hub/engine — move the need into games/<game>/').toEqual([]);
 });
 
 test('only the registry reaches into a game', () => {

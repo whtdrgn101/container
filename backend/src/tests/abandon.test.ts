@@ -15,7 +15,7 @@ import { GameRepository } from '../repository';
  *
  * Note what is *not* here: any Container knowledge. Abandonment is a platform concern — it needs to
  * know nothing about containers, bids or seats — so it lives entirely in the game-agnostic core and
- * every future game gets it for free. If a test here ever needs `@container/engine`, that's a sign
+ * every future game gets it for free. If a test here ever needs `@game-hub/engine`, that's a sign
  * the feature leaked into the wrong side of the C0 seam.
  */
 describe('abandoning a game', () => {

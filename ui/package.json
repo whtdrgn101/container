@@ -1,5 +1,5 @@
 {
-  "name": "@container/ui",
+  "name": "@game-hub/ui",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@container/engine": "workspace:*",
+    "@game-hub/engine": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.469.0",

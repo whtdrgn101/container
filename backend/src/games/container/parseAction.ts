@@ -1,5 +1,5 @@
-import { COLORS } from '@container/engine/container';
-import type { Action, Color, District, ShipLocation, StoredContainer } from '@container/engine/container';
+import { COLORS } from '@game-hub/engine/container';
+import type { Action, Color, District, ShipLocation, StoredContainer } from '@game-hub/engine/container';
 import type { ParseResult } from '../module';
 
 /**

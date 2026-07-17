@@ -1,4 +1,4 @@
-import type { CantStopView } from '@container/engine/cantstop';
+import type { CantStopView } from '@game-hub/engine/cantstop';
 
 /**
  * Can't Stop's header status line: whose turn it is and what they owe. Fills the shell header's

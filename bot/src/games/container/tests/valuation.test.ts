@@ -1,4 +1,4 @@
-import { SCORING_CARDS, viewFor } from '@container/engine/container';
+import { SCORING_CARDS, viewFor } from '@game-hub/engine/container';
 import { describe, expect, it } from 'vitest';
 import { BotError } from '../errors';
 import { AVERAGE_COLOR_VALUE, expectedAuctionBid, gainFrom, islandScore, selfOf } from '../valuation';

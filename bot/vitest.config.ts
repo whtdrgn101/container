@@ -3,18 +3,17 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
-    // `@container/engine` ships TypeScript source, so Vitest must transform it across the
+    // `@game-hub/engine` ships TypeScript source, so Vitest must transform it across the
     // workspace boundary (same arrangement as the backend).
-    server: { deps: { inline: [/@container\/engine/] } },
+    server: { deps: { inline: [/@game-hub\/engine/] } },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
       include: ['src/**/*.ts'],
       exclude: [
-        'src/tests/**', // test files + shared helpers
-        'src/index.ts', // public barrel
-        'src/**/index.ts', // folder barrels
-        'src/types.ts', // compile-time only (options/context interfaces)
+        'src/**/tests/**', // test files + shared helpers (per-game tests/ folders)
+        'src/**/index.ts', // public + folder barrels (kernel, each game, policies)
+        'src/games/*/types.ts', // compile-time only (each game's options/context interfaces)
       ],
       // Deliberately 90%, not the engine's 100%. The engine encodes rules — every branch is a rule
       // and deserves a test. The bot encodes *opinions*: heuristic weights get retuned constantly

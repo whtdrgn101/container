@@ -1,14 +1,15 @@
 {
-  "name": "@container/bot",
+  "name": "@game-hub/bot",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "AI players for Container. Pure decision policies over a redacted GameView — engine = rules, bot = opinions.",
+  "description": "AI players. Pure decision policies over a GameView — engine = rules, bot = opinions. A per-game platform: each game's bot has its own subpath (`@game-hub/bot/<game>`) over a tiny shared kernel. No `.` default — no game is privileged.",
   "license": "BSD-3-Clause",
   "exports": {
-    ".": "./src/index.ts"
+    "./kernel": "./src/kernel/index.ts",
+    "./container": "./src/games/container/index.ts",
+    "./cantstop": "./src/games/cantstop/index.ts"
   },
-  "types": "./src/index.ts",
   "scripts": {
     "test": "vitest run --coverage",
     "test:watch": "vitest",
@@ -16,7 +17,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@container/engine": "workspace:*"
+    "@game-hub/engine": "workspace:*"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^3.2.4",

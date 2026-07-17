@@ -1,4 +1,4 @@
-import { SCORING_CARDS, applyAction } from '@container/engine/container';
+import { SCORING_CARDS, applyAction } from '@game-hub/engine/container';
 import { describe, expect, it } from 'vitest';
 import { rank } from '../policies/rank';
 import { affordableContainers, producePlacements, repriceArrangement } from '../policies/pricing';

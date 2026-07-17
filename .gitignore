@@ -29,7 +29,7 @@ blob-report/
 !.env.example
 
 # Reference material (large / copyrighted — kept locally, not committed)
-reference_material/*.pdf
+reference_materials/*.pdf
 
 # OS / editor
 .DS_Store

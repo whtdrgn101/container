@@ -1,4 +1,4 @@
-import type { GameView, PlayerView } from '@container/engine/container';
+import type { GameView, PlayerView } from '@game-hub/engine/container';
 import { cn } from '@/lib/utils';
 
 export interface IdentityBannerProps {

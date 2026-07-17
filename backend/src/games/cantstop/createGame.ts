@@ -1,5 +1,5 @@
-import { createGame } from '@container/engine/cantstop';
-import type { CantStopState } from '@container/engine/cantstop';
+import { createGame } from '@game-hub/engine/cantstop';
+import type { CantStopState } from '@game-hub/engine/cantstop';
 
 /**
  * Deal a fresh Can't Stop game. Unlike Container there is no setup randomness — the dice are rolled

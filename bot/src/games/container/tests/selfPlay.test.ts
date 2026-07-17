@@ -1,4 +1,4 @@
-import { MAX_PLAYERS, MIN_PLAYERS, viewFor } from '@container/engine/container';
+import { MAX_PLAYERS, MIN_PLAYERS, viewFor } from '@game-hub/engine/container';
 import { describe, expect, it } from 'vitest';
 
 import { playSelfPlay } from '../selfPlay';

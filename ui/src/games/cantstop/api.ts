@@ -1,4 +1,4 @@
-import type { Action, CantStopView } from '@container/engine/cantstop';
+import type { Action, CantStopView } from '@game-hub/engine/cantstop';
 import { BASE_URL, JSON_HEADERS, applyAction, getGame, unwrap } from '@/lib/api';
 import type { GamePayload } from '@/lib/api';
 

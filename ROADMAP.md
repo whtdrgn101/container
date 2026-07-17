@@ -7,7 +7,7 @@ game, and the higher-level "which games, and what's left of them" view. Game-spe
 | Game | Status | Roadmap |
 |------|--------|---------|
 | **Container** | core game complete; AI A0–A2 shipped, A3–A5 remain | [`engine/src/games/container/ROADMAP.md`](engine/src/games/container/ROADMAP.md) |
-| **Can't Stop** | playable end-to-end (C3); a bot is the main thing left | [`engine/src/games/cantstop/ROADMAP.md`](engine/src/games/cantstop/ROADMAP.md) |
+| **Can't Stop** | playable end-to-end (C3) **with an AI** (CS1); art/a11y polish + variants remain | [`engine/src/games/cantstop/ROADMAP.md`](engine/src/games/cantstop/ROADMAP.md) |
 
 Adding a game is **additive** — implement the seams, register, done. See CLAUDE.md → "Building a new
 game" for the recipe.
@@ -93,7 +93,7 @@ second game (the stub, and now Can't Stop) can tell.
 'container'`, so existing rows backfill as SQLite adds the column); `moduleOf(gameId)` reads it and every
 route resolves its module from the row, **never from a default**. Module routes are namespaced under
 `/games/:id/<gameType>/` with a `404 WRONG_GAME_TYPE` scope guard. `GameHub` is generic — **the core
-imports `@container/engine` nowhere.** Lobbies carry a `gameType`; unregistered types →
+imports `@game-hub/engine` nowhere.** Lobbies carry a `gameType`; unregistered types →
 `409 GAME_TYPE_UNAVAILABLE` and are skipped by `GET /games`.
 
 ### ✅ C2 — UI shell (shipped)
@@ -102,7 +102,7 @@ imports `@container/engine` nowhere.** Lobbies carry a `gameType`; unregistered 
 (its own chunk), the landing screen reads seat bounds from `GET /games/catalog`, and `gameType` on every
 payload lets the shell pick a board. The transport is generic (`subscribeGame` forwards non-state frames
 to the board verbatim); the header status line is a plugin slot. **`e2e/architecture.spec.ts` enforces the
-seam** — no `@container/engine/*` outside `games/<game>/`, and only the registry may name a game. Pure
+seam** — no `@game-hub/engine/*` outside `games/<game>/`, and only the registry may name a game. Pure
 refactor: all e2e passed unchanged.
 
 ### ✅ C3 — a second game: Can't Stop (shipped)
@@ -112,7 +112,7 @@ unlike it (**no hidden information**, **per-turn randomness**). Full write-up in
 [Can't Stop's roadmap](engine/src/games/cantstop/ROADMAP.md); the platform-shaped outcomes:
 
 - **The engine became a per-game platform.** `engine/src/` is now `kernel/` (GameError, MoveRecord,
-  Viewer) + `games/{container,cantstop}/`, exported by **subpath** (`@container/engine/<game>`, no `.`
+  Viewer) + `games/{container,cantstop}/`, exported by **subpath** (`@game-hub/engine/<game>`, no `.`
   default — no privileged game). Pure refactor of Container (its 204 tests moved untouched); the package is
   **250 tests at 100% across both games**. See CLAUDE.md → "How the shared engine is consumed" and
   "Building a new game".
@@ -126,29 +126,29 @@ unlike it (**no hidden information**, **per-turn randomness**). Full write-up in
 
 ### C4 — Cross-game polish (next)
 
-Per-game rules blurbs on the landing/board, a shared results/winner screen abstraction (both games declare
-a winner differently today), and **per-game bot registration** surfaced consistently. Depends in part on
-the bot reorg below.
+Per-game rules blurbs on the landing/board, and a shared results/winner screen abstraction (both games
+declare a winner differently today). Per-game bot registration already works (see the bot platform below),
+so this is now mostly UI-consistency polish.
 
 ---
 
-## Bot platform — per-game bots (enables Can't Stop's AI)
+## ✅ Bot platform — per-game bots (shipped, with Can't Stop's AI)
 
-Container's bot (`@container/bot`) is the only AI, and the package is **Container-shaped and flat** —
-exactly where the engine and backend were before C3. To let a second game have a bot, reorganize it the
-same way (this is the prerequisite for Can't Stop's CS1):
+`@game-hub/bot` was Container-shaped and flat — exactly where the engine and backend were before C3 — so
+it was reorganized the same way to let a second game have a bot, and Can't Stop's AI (CS1) landed on top.
 
-- **Reorganize `@container/bot` per game**, mirroring the engine's C3 split: `bot/src/kernel/` (any
-  genuinely shared bot primitives — keep it tiny, resist abstracting off one example) + `bot/src/games/
-  {container,cantstop}/`, with **subpath exports** (`@container/bot/container`, `@container/bot/cantstop`).
-  Container's `botRunner` switches `@container/bot` → `@container/bot/container`; the ~94 bot tests move
-  untouched (pure refactor, like the engine reorg). Keep the 90% gate per game.
-- **⚠️ Don't assume redaction.** Container's bot decides from a redacted `GameView`; Can't Stop's view is
-  the whole state (nothing hidden). The shared kernel must accommodate a game with no secrets rather than
-  bake in scoring-card assumptions.
-- **Then each game registers its own `createBotDriver`** on its backend module (Container already does;
-  Can't Stop's is CS1). The bot-seat coordination state (`game_bots`, the hotseat 🤖 toggles, the lobby
-  "assign to AI") is already game-agnostic, so a new game's bot lights up those affordances for free.
+- ✅ **Reorganized `@game-hub/bot` per game**, mirroring the engine's C3 split: `bot/src/kernel/` (just
+  `BotError` — kept deliberately tiny) + `bot/src/games/{container,cantstop}/`, with **subpath exports**
+  (`@game-hub/bot/container`, `@game-hub/bot/cantstop`; no `.` default). Container's `botRunner` switched
+  `@game-hub/bot` → `@game-hub/bot/container`; its ~94 bot tests moved untouched (pure refactor, like the
+  engine reorg). 90% gate per game.
+- ✅ **The kernel doesn't assume redaction.** Container's bot decides from a redacted `GameView`; Can't
+  Stop's view is the whole state (nothing hidden). The shared kernel accommodates a game with no secrets
+  rather than baking in scoring-card assumptions — the counter-example that kept it honest.
+- ✅ **Each game registers its own `createBotDriver`** on its backend module (Container and now Can't Stop).
+  The bot-seat coordination state (`game_bots`, the hotseat 🤖 toggles, the lobby "assign to AI") is
+  game-agnostic, so Can't Stop's bot lit up those affordances for free. Full CS1 write-up in
+  [Can't Stop's roadmap](engine/src/games/cantstop/ROADMAP.md).
 
 Container's own AI ladder (A3 difficulty tiers, A4 ISMCTS, A5 tuning) lives in
 [Container's roadmap](engine/src/games/container/ROADMAP.md).
@@ -206,6 +206,7 @@ Built in the core, so **every game gets them free** — the real payoff of the C
   and pause.
 - **Before starting a slice,** check remaining plan usage so you don't land mid-slice; if tight, pick an
   **M/S** item.
-- **Suggested next order:** the **bot reorg** (per-game bot packages), then **Can't Stop CS1** (its AI) —
-  the same "reorganize the platform, then use it" rhythm that C3 followed for the engine. Container's
-  A3–A5 and the platform's C4/B3 are independent and can follow in any order.
+- **Suggested next order:** the bot reorg and **Can't Stop CS1** (its AI) are **done** — the same
+  "reorganize the platform, then use it" rhythm C3 followed for the engine. Open work is independent and
+  can go in any order: **C4** (cross-game polish), **Can't Stop CS2/CS3** (art + variants), Container's
+  **A3–A5** (difficulty/search), and **B3** (accounts).

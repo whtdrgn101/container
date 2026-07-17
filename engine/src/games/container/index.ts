@@ -1,4 +1,4 @@
-// Public API of @container/engine. Consumers (backend, ui) import only from here.
+// Public API of @game-hub/engine. Consumers (backend, ui) import only from here.
 
 // Domain types
 export { COLORS } from './core';

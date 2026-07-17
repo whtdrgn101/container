@@ -1,4 +1,4 @@
-import { ACTIONS_PER_TURN, SCORING_CARDS, STARTING_MONEY, createGame, viewFor } from '@container/engine/container';
+import { ACTIONS_PER_TURN, SCORING_CARDS, STARTING_MONEY, createGame, viewFor } from '@game-hub/engine/container';
 import type {
   BankState,
   Color,
@@ -7,7 +7,7 @@ import type {
   PlayerState,
   StoredContainer,
   Supply,
-} from '@container/engine/container';
+} from '@game-hub/engine/container';
 import { contextFor } from '../context';
 import type { Ctx } from '../types';
 

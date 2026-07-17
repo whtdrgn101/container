@@ -1,4 +1,4 @@
-import type { Action } from '@container/engine/cantstop';
+import type { Action } from '@game-hub/engine/cantstop';
 import type { ParseResult } from '../module';
 
 /**

@@ -1,5 +1,5 @@
-import { SCORING_CARDS, applyAction, legalActions, viewFor } from '@container/engine/container';
-import type { GameState } from '@container/engine/container';
+import { SCORING_CARDS, applyAction, legalActions, viewFor } from '@game-hub/engine/container';
+import type { GameState } from '@game-hub/engine/container';
 import { describe, expect, it, vi } from 'vitest';
 import { decide } from '../decide';
 import { BotError } from '../errors';

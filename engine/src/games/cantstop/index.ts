@@ -1,4 +1,4 @@
-// Public API of @container/engine/cantstop. Consumers (backend, ui) import only from here.
+// Public API of @game-hub/engine/cantstop. Consumers (backend, ui) import only from here.
 
 // Domain types
 export type { Action, ActionType } from './actions';

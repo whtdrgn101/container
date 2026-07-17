@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import type { CantStopView } from '@container/engine/cantstop';
+import type { CantStopView } from '@game-hub/engine/cantstop';
 import type { GameClient } from '../types';
 import { GAME_TYPE } from './api';
 import { CantStopStatus } from './Status';

@@ -1,9 +1,9 @@
 {
-  "name": "@container/engine",
+  "name": "@game-hub/engine",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Pure, deterministic game engines. No I/O, no randomness — the single source of truth for game rules. A per-game platform: each game has its own subpath (`@container/engine/<game>`) over a small shared `@container/engine/kernel`. No `.` entry on purpose — no game is a privileged default.",
+  "description": "Pure, deterministic game engines. No I/O, no randomness — the single source of truth for game rules. A per-game platform: each game has its own subpath (`@game-hub/engine/<game>`) over a small shared `@game-hub/engine/kernel`. No `.` entry on purpose — no game is a privileged default.",
   "license": "BSD-3-Clause",
   "exports": {
     "./kernel": "./src/kernel/index.ts",

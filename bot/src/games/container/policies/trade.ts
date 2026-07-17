@@ -1,5 +1,5 @@
-import { SHIP_CAPACITY } from '@container/engine/container';
-import type { Action } from '@container/engine/container';
+import { SHIP_CAPACITY } from '@game-hub/engine/container';
+import type { Action } from '@game-hub/engine/container';
 import type { Candidate, Ctx } from '../types';
 import { RESALE_PER_CONTAINER } from '../valuation';
 import { affordableContainers, harborAskingPrice } from './pricing';

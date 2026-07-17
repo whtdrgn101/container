@@ -1,6 +1,7 @@
-import { applyAction, legalActions, MAX_PLAYERS, MIN_PLAYERS, viewFor } from '@container/engine/cantstop';
-import type { Action, CantStopState, Viewer } from '@container/engine/cantstop';
-import type { GameModule, GameSummary } from '../module';
+import { applyAction, legalActions, MAX_PLAYERS, MIN_PLAYERS, viewFor } from '@game-hub/engine/cantstop';
+import type { Action, CantStopState, Viewer } from '@game-hub/engine/cantstop';
+import type { BotDriver, GameModule, GameSummary, ModuleContext } from '../module';
+import { CantStopBotRunner } from './botRunner';
 import { newCantStopGame } from './createGame';
 import { mapCantStopError } from './errors';
 import { parseCantStopAction } from './parseAction';
@@ -44,8 +45,18 @@ export const cantStopModule: GameModule<CantStopState, Action> = {
 
   mapError: (error) => mapCantStopError(error),
 
-  // The dice-roll endpoint — the one thing that isn't a plain `/actions` move. No bots, no pending
-  // multi-seat step, no side-channel to push, so `pendingStep`/`onStateChanged`/`createBotDriver` are
-  // all deliberately omitted.
+  // The dice-roll endpoint — the one thing that isn't a plain `/actions` move. No pending multi-seat
+  // step and no side-channel to push, so `pendingStep`/`onStateChanged` stay omitted.
   routes: (app, ctx) => registerCantStopRoutes(app, ctx),
+
+  // AI seats (CS1). The runner draws its dice from the same injected `ctx.rng` the roll route uses.
+  createBotDriver: (ctx: ModuleContext): BotDriver =>
+    new CantStopBotRunner(
+      // The one cast: `ModuleContext.games` is opaque by contract, and this is the boundary where we
+      // know the state came from Can't Stop's own `createGame`.
+      { get: (id) => ctx.games.get(id) as CantStopState | undefined, update: (state) => ctx.games.update(state) },
+      ctx.botSeats,
+      ctx.rng,
+      (state) => ctx.pushGame(state.id, state),
+    ),
 };

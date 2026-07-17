@@ -1,22 +1,29 @@
-# CLAUDE.md — Container (digital board game)
+# CLAUDE.md — Game Hub (self-hosted board-game platform)
 
 Context and working agreement for this repo. Read this first.
 
 ## What we're building
 
-A faithful digital version of the board game **Container (10th Anniversary Edition)**.
-This is a learning project: the owner is an experienced software engineer who wants
-**good engineering practices** throughout — clean separation of concerns, strong typing,
-and high test coverage.
+**Game Hub** — a self-hosted board-game platform (a "games room") that hosts *multiple* games behind
+shared engine/backend/UI seams. Two games are built on it today:
+
+- **Container** (10th Anniversary Edition) — the first game; a 3–5 player economic supply-chain game.
+- **Can't Stop** — the second game; a 2–4 player push-your-luck dice game (added as roadmap C3, the
+  honest test that the platform seams generalize).
+
+This is a learning project: the owner is an experienced software engineer who wants **good engineering
+practices** throughout — clean separation of concerns, strong typing, and high test coverage. Note the
+naming split: the **platform** is "Game Hub" (the npm scope is `@game-hub/*`); **Container** is one game
+*on* it (id `container`, under `games/container/`), not the platform itself. Don't conflate them.
 
 Non-negotiables set at kickoff:
 
-- **100% unit-test coverage of the game engine** (mechanics). Enforced by a coverage gate.
+- **100% unit-test coverage of each game engine** (mechanics). Enforced by a coverage gate.
 - The UI has automated tests via **Playwright**, including **responsive regression** tests
   from desktop down to mobile widths.
-- Monorepo with separate `ui/` and `backend/` (plus a shared `engine/`).
+- Monorepo with separate `ui/` and `backend/` (plus a shared `engine/`), each organized per-game.
 
-## The game (rules summary)
+## The games — Container (rules summary)
 
 Authoritative source: `reference_materials/Container_Rulebook_v8.pdf` (20 pages). Read it
 before implementing any mechanic — do not implement rules from memory.
@@ -47,16 +54,16 @@ A fuller mechanic-by-mechanic breakdown lives in the rulebook; capture edge case
 
 ```
 container/
-├── engine/     @container/engine  — pure, deterministic rules cores (NO I/O, NO randomness)
+├── engine/     @game-hub/engine  — pure, deterministic rules cores (NO I/O, NO randomness)
 │   └── src/                        — a per-game platform, mirroring the backend/UI:
 │       ├── kernel/                 — the tiny shared kernel: GameError, MoveRecord, Viewer
 │       └── games/                  — one folder per game (container/, cantstop/), each its own
-│                                     subpath export `@container/engine/<game>`
-├── bot/        @container/bot     — AI players; pure policies over a redacted GameView (Container)
-├── backend/    @container/backend — Fastify REST API; persists to SQLite; runs the AI (BotRunner)
+│                                     subpath export `@game-hub/engine/<game>`
+├── bot/        @game-hub/bot     — AI players; pure policies over a redacted GameView (Container)
+├── backend/    @game-hub/backend — Fastify REST API; persists to SQLite; runs the AI (BotRunner)
 │   └── src/games/                 — the GameModule seam: module.ts (contract), registry.ts,
 │                                    container/ + cantstop/ (each a registered game)
-├── ui/         @container/ui      — React + Tailwind + shadcn; talks to the API
+├── ui/         @game-hub/ui      — React + Tailwind + shadcn; talks to the API
 │   └── src/
 │       ├── App.tsx                — the Game Hub shell: routing + seat binding (knows no game)
 │       ├── shell/                 — Header, Landing, WaitingRoom (generic)
@@ -122,7 +129,7 @@ The UI mirrors the backend split. `App.tsx` is the **Game Hub shell**: landing, 
 seat binding, and the transport. A game plugs in a **board**; the shell renders it and never reads a
 game's state.
 
-- **⚠️ Nothing outside `ui/src/games/<game>/` may import `@container/engine`** — and
+- **⚠️ Nothing outside `ui/src/games/<game>/` may import `@game-hub/engine`** — and
   `e2e/architecture.spec.ts` fails the build if it does. This is the rule most likely to be undone by
   accident (someone needs `COLORS` in a shell file, adds one import, and the games room is quietly a
   Container app again). If shell code seems to need a rule, a colour, a piece or a seat count, the
@@ -161,13 +168,13 @@ opponents** later (both just drive the same engine).
 
 ### How the shared engine is consumed
 
-`@container/engine` exports **TypeScript source** (not a build), and is a **per-game platform**:
+`@game-hub/engine` exports **TypeScript source** (not a build), and is a **per-game platform**:
 there is deliberately **no `.` entry**. Consumers import a specific game's surface by subpath —
-`@container/engine/container`, `@container/engine/cantstop` — over a tiny shared
-`@container/engine/kernel`. No game is a privileged default, mirroring the backend rule "resolve the
+`@game-hub/engine/container`, `@game-hub/engine/cantstop` — over a tiny shared
+`@game-hub/engine/kernel`. No game is a privileged default, mirroring the backend rule "resolve the
 module from the row, never a default". Both consumers transpile the TS source directly:
 
-- **backend** — `tsx` (dev/prod-start) and Vitest (`server.deps.inline: [/@container\/engine/]`)
+- **backend** — `tsx` (dev/prod-start) and Vitest (`server.deps.inline: [/@game-hub\/engine/]`)
   transform the TS source across the workspace boundary; the subpath `exports` map resolves each game.
 - **ui** — `vite.config.ts` has **one alias per subpath** (`/container`, `/cantstop`, `/kernel`) →
   the matching `engine/src/…` file, so Vite bundles it as project source. This also gives the
@@ -182,27 +189,35 @@ share. Each game keeps its **own** `record()`, state types, constants and `viewF
 extract a shared `record`/state off two examples — same discipline as not building a sealed-bid
 framework off one. If a third game makes a shape genuinely common, extract it *then*.
 
-### The bot package (`@container/bot`, Track A)
+### The bot package (`@game-hub/bot`, per-game like the engine)
 
 **Engine = rules, bot = opinions.** The engine says what is *legal*; the bot only says what is *wise*.
 No bot code goes in `engine/`, and the engine must never learn what a bot is. A bot is not
 authoritative — it just produces an `Action` that the engine validates like any human's move.
 
+- **Per-game, like the engine and backend.** `bot/src/games/<game>/` (Container, Can't Stop) over a tiny
+  `bot/src/kernel/` (just `BotError`), exported by **subpath** — `@game-hub/bot/container`,
+  `@game-hub/bot/cantstop`, no `.` default. Each game's backend module wires its own bot through
+  `createBotDriver`. The bullets below split into a general rule and each game's specifics.
 - **Bots decide from a `GameView`, never a `GameState`:** `decide(viewFor(state, botId), botId)`. Taking
-  the redacted view makes cheating *structurally impossible* rather than a matter of discipline;
-  `selfOf()` enforces the other half (the bot's own card must be visible, or the caller passed the
-  wrong view). **Never hand a bot a full `GameState`.**
-- **Coverage gate is 90%, not 100%** (deliberate — see `bot/vitest.config.ts`). Heuristic weights get
-  retuned constantly, and a 100% bar on judgement calls buys churn, not correctness. What must stay
-  covered: every decision is legal, every policy reachable.
-- **Layout** mirrors the engine's conventions: one policy per concern in `policies/`, barrels re-export
-  only, tests in `src/tests/`. Adding a policy = a `rank*` function + a `rank.ts` case + a test.
-- **`legalActions` markers are not playable.** Five of twelve actions come back as bare markers that
-  `applyAction` throws on; completing them is `rank()`'s job and *is* the strategy.
-- **Value containers with `gainFrom`, never `card.values[color]`** — the discard rule makes marginal
-  value differ from face value, and it can be **negative**.
-- **Self-play (`playSelfPlay`) is the package's real test** — it drives thousands of live engine actions,
-  so any illegal action throws. Keep it passing for all of 3–5 players.
+  the redacted view makes cheating *structurally impossible* rather than a matter of discipline. For
+  Container, `selfOf()` enforces the other half (the bot's own card must be visible). **Can't Stop hides
+  nothing**, so its view *is* the whole state and the redaction is a no-op — the shared kernel must not
+  assume redaction. **Never hand a bot more than a player's view.**
+- **Coverage gate is 90%, not 100%** (deliberate — see `bot/vitest.config.ts`, per game). Heuristic
+  weights get retuned constantly, and a 100% bar on judgement calls buys churn, not correctness. What
+  must stay covered: every decision is legal, every policy reachable.
+- **Layout** mirrors the engine's conventions: Container splits opinions one-per-concern in
+  `games/container/policies/`; Can't Stop's whole risk model is `games/cantstop/policy.ts`. Barrels
+  re-export only; tests live in `games/<game>/tests/`.
+- **⚠️ Randomness the bot can't invent is injected by the caller** — Container's `collectBids` (sealed
+  opponent bids), Can't Stop's `rollDice` (server-side dice, since the bot can't roll). `decide` throws a
+  `BotError` if the caller didn't supply it. Self-play seeds it; the backend runner fills it from `ctx.rng`.
+- **Container specifics:** `legalActions` returns 5 of 12 actions as bare *markers* `applyAction` throws
+  on — completing them is `rank()`'s job and *is* the strategy; and value containers with `gainFrom`,
+  never `card.values[color]` (the discard rule makes marginal value differ from face value, even negative).
+- **Self-play (`playSelfPlay`) is each bot's real test** — it drives thousands of live engine actions, so
+  any illegal action throws. Keep it passing (Container 3–5 players; Can't Stop 2–4, seeded rng).
 - **Greedy bots cannot see multi-action payoffs.** The delivery run is 4+ actions; score long chains
   against the *goal*, not the hop, or ships never leave port (this actually happened — see ROADMAP A0).
 
@@ -211,7 +226,7 @@ authoritative — it just produces an `Action` that the engine validates like an
 The engine hosts **one folder per game** under `engine/src/games/<game>/`, over the shared
 `engine/src/kernel/`. Each game is organized into small, single-responsibility modules (SRP) with
 barrel files; its public API is defined solely by its own `index.ts`, exported as
-`@container/engine/<game>`. Consumers import that subpath, never deep paths.
+`@game-hub/engine/<game>`. Consumers import that subpath, never deep paths.
 
 ```
 engine/src/
@@ -221,7 +236,7 @@ engine/src/
     viewer.ts         # Viewer (type-only)
     index.ts
   games/
-    container/        # Container — see below; exported as @container/engine/container
+    container/        # Container — see below; exported as @game-hub/engine/container
     cantstop/         # Can't Stop — the worked second game
       index.ts        # THE game's public API (the only thing consumers import)
       createGame.ts   # game setup (deterministic; Can't Stop needs no setup rng)
@@ -283,7 +298,7 @@ the game knows this" rule. To add a game `foo`:
 3. **UI** — `ui/src/games/foo/` implementing `GameClient` (a **lazy** `Board`, a cheap non-lazy
    `Status`), its own `api.ts` (pin `lib/api.ts`'s generic `unknown` back to `foo`'s view type; put
    `foo`'s own endpoints here), and `cantstopClient`-style registration in `games/registry.ts` (the
-   one cast). **No shell file may import `@container/engine/*`** — `e2e/architecture.spec.ts` enforces
+   one cast). **No shell file may import `@game-hub/engine/*`** — `e2e/architecture.spec.ts` enforces
    it. The landing picker activates automatically once two games are registered.
 4. **Tests** — 100% engine coverage for `foo`; a backend suite that plays it over REST (seed
    `AppOptions.rng` for deterministic rolls) and asserts it coexists with the other games; an
@@ -339,16 +354,16 @@ pnpm test                   # every workspace's tests
 pnpm test:engine            # engine unit tests + 100% coverage gate
 pnpm test:bot               # bot unit tests + self-play games + 90% coverage gate
 pnpm test:backend           # backend integration tests (Fastify inject + :memory: sqlite)
-pnpm test:e2e               # Playwright (auto-starts API + UI); needs: pnpm --filter @container/ui exec playwright install chromium
+pnpm test:e2e               # Playwright (auto-starts API + UI); needs: pnpm --filter @game-hub/ui exec playwright install chromium
 pnpm typecheck              # strict typecheck across all packages
 
 # Dev (run both in separate terminals)
 pnpm dev:backend            # API on :3001
 pnpm dev:ui                 # UI on :5173 (proxies /api → :3001)
 
-# Production container (single image serves UI + API on one port; SQLite on a volume)
-docker build -t container-game:latest .
-docker run -d -p 8080:3001 -v container-game-data:/data container-game:latest  # → http://host:8080
+# Production image (single image serves UI + API on one port; SQLite on a volume)
+docker build -t game-hub:latest .
+docker run -d -p 8080:3001 -v game-hub-game-data:/data game-hub:latest  # → http://host:8080
 ```
 
 ## Deployment (home server / Portainer)
@@ -357,7 +372,7 @@ A single Docker image serves the built UI **and** the API on one port (`Dockerfi
 build UI + native SQLite, then a slim Node runtime). The backend serves `ui/dist` as static files when
 `UI_DIST` is set and falls back to `index.html` for non-API GETs (SPA); in a production build the UI's
 API base is same-origin (`import.meta.env.PROD ? '' : '/api'`), so there's no CORS/proxy. Games persist
-to `DATABASE_PATH` (default `/data/container.sqlite`) — mount `/data` to a volume so they survive
+to `DATABASE_PATH` (default `/data/game-hub.sqlite`) — mount `/data` to a volume so they survive
 restarts/updates. `docker-compose.yml` maps host `8080` → container `3001`; **[`DEPLOY.md`](./DEPLOY.md)**
 has Portainer stack instructions. No auth (trusted-LAN use). When adding a top-level API route, update
 the `setNotFoundHandler` allowlist regex in `app.ts` (`/^\/(games|lobbies|health)\b/`) so it isn't
@@ -488,7 +503,7 @@ sessions). The Container summary below is retained for context; the per-game roa
   aria-labels. Visual-regression baselines: `ui/e2e/visual.spec.ts` (board only — deterministic at
   start; snapshots are per-OS `-darwin`, regenerate with `--update-snapshots` on other OS/CI). Art is
   **original** — do not reproduce any published game's specific artwork.
-- **Track A / A0 ✅ (bot harness + greedy bot + self-play).** New `@container/bot` package (see "The bot
+- **Track A / A0 ✅ (bot harness + greedy bot + self-play).** New `@game-hub/bot` package (see "The bot
   package" above). `decide(view, playerId, { collectBids })` returns a fully parameterized, legal
   `Action`; `bidFor(view, bidderId)` is a seat's sealed delivery bid; `playSelfPlay(state)` runs a whole
   game with every seat botted, each deciding from its own `viewFor` projection. Pure and deterministic —
@@ -534,7 +549,7 @@ sessions). The Container summary below is retained for context; the per-game roa
   - **Which seats are bots is coordination state** (`game_bots` table, `bots.ts`) and rides *beside*
     the game — `{ game, bots }` on REST, `bots` on the WS state message. **Never put it in
     `GameState`**; the engine must not learn what a bot is.
-  - **The runner has no special powers:** same `@container/bot` policies as self-play, same
+  - **The runner has no special powers:** same `@game-hub/bot` policies as self-play, same
     `applyAction`, same `applyBid` as the REST route, and it decides from `viewFor(state, botId)`.
     When adding bot behaviour, keep it that way — a bot must not do what a player couldn't.
   - **⚠️ `tick` runs on read too** (`GET /games/:id`, `GET .../auction`, WS subscribe), not just on
@@ -573,7 +588,7 @@ sessions). The Container summary below is retained for context; the per-game roa
     abandoned game would keep playing itself forever.
   - **Game-agnostic on purpose:** abandoning needs to know nothing about containers or bids, so it
     lives entirely in the core and every future game gets it free. No `GameModule` hook. If a change
-    here ever needs `@container/engine`, it's on the wrong side of the C0 seam.
+    here ever needs `@game-hub/engine`, it's on the wrong side of the C0 seam.
   - **⚠️ Adding a column needs a real migration.** `CREATE TABLE IF NOT EXISTS` does **not** alter an
     existing table — every earlier schema change was a whole new table, which is why this never came
     up. `db.ts`'s `ADDED_COLUMNS` + `addMissingColumns()` runs `ALTER TABLE` on open, guarded by
@@ -592,7 +607,7 @@ sessions). The Container summary below is retained for context; the per-game roa
   guard; `GameHub` no longer imports the engine; lobbies carry a `gameType` (a JSON blob, so no
   migration — `readLobby` defaults old rows to `'container'`). `POST /games`/`POST /lobbies` take an
   optional `gameType`, defaulting to `AppOptions.defaultGameType` so the hotseat quick-start still works.
-  **The core no longer imports `@container/engine` at all.**
+  **The core no longer imports `@game-hub/engine` at all.**
 - **Track C / C2 ✅ (UI shell — the site is a games room).** `App.tsx` went from **1895 lines to 364**
   and no longer knows what Container is; no file in `ui/src` is over ~380. See "The `GameClient` seam"
   above for the working rules. The board is a lazy plugin (its own 41 kB chunk), the landing screen
@@ -605,7 +620,7 @@ sessions). The Container summary below is retained for context; the per-game roa
   columns** wins. Deliberately unlike Container: **no hidden information** (so `viewFor` is a no-op) but
   **per-turn randomness** (the dice), which is what stretched the seam.
   - **The engine became a per-game platform.** `engine/src/` now has `kernel/` (GameError, MoveRecord,
-    Viewer) + `games/{container,cantstop}/`, exported by **subpath** (`@container/engine/<game>`, no
+    Viewer) + `games/{container,cantstop}/`, exported by **subpath** (`@game-hub/engine/<game>`, no
     `.` default). Pure refactor of Container — its 204 tests moved untouched; the package is now 250
     tests at **100% coverage across both games**. See "How the shared engine is consumed" + "Building a
     new game".

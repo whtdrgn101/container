@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { Action, Color, GameState, GameView, StoredContainer } from '@container/engine/container';
-import { COLORS, FACTORY_BUILD_COSTS, legalActions } from '@container/engine/container';
+import type { Action, Color, GameState, GameView, StoredContainer } from '@game-hub/engine/container';
+import { COLORS, FACTORY_BUILD_COSTS, legalActions } from '@game-hub/engine/container';
 import type { BoardProps } from '../types';
 import * as containerApi from './api';
 import type { DeliveryAuctionView } from './api';
@@ -21,7 +21,7 @@ import { SupplyPanel } from './panels/SupplyPanel';
  * **Everything Container knows lives at or below this file.** The shell owns navigation, the lobby,
  * seat binding and the transport; it hands this component an opaque state it never reads. Here the
  * state is pinned back to `GameView` and the engine is in scope again. If shell code ever needs to
- * import `@container/engine`, something belongs on this side of the seam instead.
+ * import `@game-hub/engine`, something belongs on this side of the seam instead.
  *
  * All Container-only UI state is held here rather than in the shell: which containers are selected to
  * buy, the bid being typed, Bank auction drafts. None of it means anything to another game.

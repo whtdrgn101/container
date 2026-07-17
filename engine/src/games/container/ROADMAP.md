@@ -77,12 +77,12 @@ pre-C3 monolithic `ROADMAP.md`); the Status list above is the working summary.
 
 Container has hidden information (secret scoring cards, sealed auction bids) and bluffing, so AI is a
 real project. The engine's **purity + serializability** is the key enabler: bots can *simulate* freely.
-Container's bot lives in `bot/` (`@container/bot`); the **per-game reorganization** of that package (so a
+Container's bot lives in `bot/` (`@game-hub/bot`); the **per-game reorganization** of that package (so a
 second game can have its own bot) is a platform item in the top-level roadmap.
 
 | # | Step | Delivers | Size |
 |---|------|----------|------|
-| A0 | ✅ `@container/bot` + greedy bot + self-play | `decide(view, playerId) → Action`, `bidFor(...)`; headless self-play proves the brain with no server | M–L |
+| A0 | ✅ `@game-hub/bot` + greedy bot + self-play | `decide(view, playerId) → Action`, `bidFor(...)`; headless self-play proves the brain with no server | M–L |
 | A1a | ✅ Delivery auction as coordination state | Pending auction outside the engine; each opponent bids from **their own device** | L |
 | A1b | ✅ Runoff + deliverer's tie choice | Tie → runoff round; still tied → the deliverer **chooses** (pg. 16) | M |
 | A2 | ✅ Bot seats end-to-end | Backend `BotRunner`; hotseat "add AI player"; lobby "assign seat to AI" | M–L |
@@ -95,7 +95,7 @@ second game can have its own bot) is a platform item in the top-level roadmap.
 - **Bots run server-side.** A backend `BotRunner` watches games and applies actions for bot seats, so
   hotseat and remote play use *one* implementation and a game keeps moving with no browser open. The UI
   stays a dumb observer — it never drives a bot.
-- **Bots live in `@container/bot`**, a sibling of `engine` with its **own ~90% coverage gate** so
+- **Bots live in `@game-hub/bot`**, a sibling of `engine` with its **own ~90% coverage gate** so
   heuristic tuning doesn't fight the engine's 100% bar. **Engine = rules, bot = opinions.** No bot code
   enters `engine/`.
 - **Bots decide from a `GameView`, not a `GameState`** — `decide(viewFor(state, botId), botId)`. Feeding
@@ -127,7 +127,7 @@ second game can have its own bot) is a platform item in the top-level roadmap.
   `CHOICE_REQUIRED`. **⚠️ `deliveryOutcome(...)` is the ONE copy of the tie rule** — the backend projects
   the auction from it and the bot predicts the price with it. Never re-derive who wins.
 - ✅ **A2 — bot seats end-to-end** (`BotRunner`, `botRunner.ts`). The runner has **no special powers**:
-  same `@container/bot` policies as self-play, same `applyAction`, same `applyBid` as the REST route,
+  same `@game-hub/bot` policies as self-play, same `applyAction`, same `applyBid` as the REST route,
   deciding from `viewFor(state, botId)`. **⚠️ `tick` runs on read as well as write** so a restarted game
   can't wedge on a bot's turn with no human able to unstick it.
 

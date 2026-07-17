@@ -1,11 +1,16 @@
-# Container
+# Game Hub
 
-A digital version of the board game **Container (10th Anniversary Edition)** — a 3–5 player
-economic supply-chain game. TypeScript monorepo: a pure game **engine**, a Fastify **REST API**
-backed by SQLite, and a React + Tailwind + shadcn **UI**.
+A self-hosted **board-game platform** — a games room you host on your own machine. TypeScript
+monorepo: a pure game **engine**, a Fastify **REST API** backed by SQLite, and a React + Tailwind +
+shadcn **UI**, with each game plugged in behind shared seams.
+
+Games built on it:
+
+- **Container** (10th Anniversary Edition) — a 3–5 player economic supply-chain game.
+- **Can't Stop** — a 2–4 player push-your-luck dice game.
 
 > Learning project focused on good engineering practices: strong typing, clean separation, and
-> high test coverage (100% on the engine). See [`CLAUDE.md`](./CLAUDE.md) for the full design,
+> high test coverage (100% on each game engine). See [`CLAUDE.md`](./CLAUDE.md) for the full design,
 > conventions, and roadmap.
 
 ## Requirements
@@ -33,16 +38,16 @@ pnpm test:backend       # API integration tests (in-memory SQLite)
 pnpm typecheck          # strict typecheck, all packages
 
 # End-to-end (first run only: install the browser)
-pnpm --filter @container/ui exec playwright install chromium
+pnpm --filter @game-hub/ui exec playwright install chromium
 pnpm test:e2e           # auto-starts API + UI, runs desktop + mobile Chromium
 ```
 
 ## Layout
 
 ```
-engine/    @container/engine  — pure, deterministic rules core (100% tested)
-backend/   @container/backend — Fastify REST API + SQLite
-ui/        @container/ui      — React + Tailwind + shadcn
+engine/    @game-hub/engine  — pure, deterministic rules core (100% tested)
+backend/   @game-hub/backend — Fastify REST API + SQLite
+ui/        @game-hub/ui      — React + Tailwind + shadcn
 reference_material/           — the rulebook PDF (authoritative rules)
 ```
 

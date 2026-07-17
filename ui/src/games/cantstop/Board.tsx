@@ -1,5 +1,5 @@
-import { COLUMN_HEIGHTS, COLUMNS, legalActions } from '@container/engine/cantstop';
-import type { Action, CantStopView } from '@container/engine/cantstop';
+import { COLUMN_HEIGHTS, COLUMNS, MAX_RUNNERS, legalActions } from '@game-hub/engine/cantstop';
+import type { Action, CantStopView } from '@game-hub/engine/cantstop';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { BoardProps } from '../types';
@@ -52,6 +52,11 @@ export default function CantStopBoard({
   const canStop = options.some((a) => a.type === 'STOP');
   const canRoll = game.status === 'active' && game.phase === 'rolling';
 
+  // The three markers ("available dice combinations"): how many runners you may still place. A runner
+  // occupies a marker; the rest are free to open a new column. Shown as the marker tray on the left.
+  const usedMarkers = Object.keys(game.runners).length;
+  const availableMarkers = MAX_RUNNERS - usedMarkers;
+
   const claimsOf = (playerId: string) => Object.values(game.claimed).filter((id) => id === playerId).length;
   const winner = game.status === 'ended' ? game.players.find((p) => game.winnerIds.includes(p.id)) : undefined;
 
@@ -90,10 +95,34 @@ export default function CantStopBoard({
         ))}
       </div>
 
-      {/* The eleven columns. Wrapped so a narrow screen scrolls the track rather than the page. */}
-      <div className="overflow-x-auto">
-        <div className="flex min-w-max justify-center gap-1">
-          {COLUMNS.map((col) => {
+      {/* Marker tray (left) + the eleven columns. The tray stays fixed while the track scrolls on a
+          narrow screen. Available markers are drawn as the same empty black circles as the runners. */}
+      <div className="flex items-start gap-2">
+        <div
+          data-testid="markers-tray"
+          className="flex shrink-0 flex-col items-center gap-1.5 pt-6"
+          title={`${availableMarkers} of ${MAX_RUNNERS} markers available`}
+        >
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Markers</span>
+          {Array.from({ length: MAX_RUNNERS }, (_, i) => {
+            const used = i < usedMarkers;
+            return (
+              <span
+                key={i} // eslint-disable-line react/no-array-index-key -- fixed 3 marker slots
+                data-testid={used ? 'marker-used' : 'marker-free'}
+                aria-label={used ? 'Marker in play' : 'Marker available'}
+                className={cn(
+                  'h-4 w-4 rounded-full border-2 border-foreground',
+                  used ? 'bg-foreground' : 'bg-background',
+                )}
+              />
+            );
+          })}
+        </div>
+
+        <div className="overflow-x-auto">
+          <div className="flex min-w-max gap-1">
+            {COLUMNS.map((col) => {
             const height = COLUMN_HEIGHTS[col]!;
             const claimedBy = game.claimed[col];
             const claimedSeat = claimedBy ? game.players.findIndex((p) => p.id === claimedBy) : -1;
@@ -141,12 +170,21 @@ export default function CantStopBoard({
                 </div>
               </div>
             );
-          })}
+            })}
+          </div>
         </div>
       </div>
 
       {/* Controls: roll / choose a pairing / stop. Only the driving client sees live buttons. */}
-      <div className="rounded-lg border bg-card p-3">
+      <div className="space-y-2 rounded-lg border bg-card p-3">
+        {game.status !== 'ended' && (
+          <div className="text-center text-xs text-muted-foreground">
+            Rolls this turn:{' '}
+            <span data-testid="roll-count" className="font-semibold tabular-nums text-foreground">
+              {game.rollsThisTurn}
+            </span>
+          </div>
+        )}
         {game.status === 'ended' ? (
           <p data-testid="cantstop-winner" className="text-center font-medium text-primary">
             🏆 {winner?.name} claimed three columns and wins!

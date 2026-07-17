@@ -28,52 +28,47 @@ no-op — a useful contrast) and **per-turn randomness** (the dice).
   advance both, you must" rule, the three-runner cap, doubles, busting, banking, column claims (bumping an
   opponent's square off), and the three-column win. **Pure and deterministic** — the dice arrive as *data*
   on a `ROLL` action, never rolled inside the engine.
-- ✅ **Backend module** (`backend/src/games/cantstop/`): a registered `GameModule` with no bots, no pending
-  step, no side-channel — proving those hooks are optional. **`ROLL` is server-only**: the module's
-  `POST /games/:id/cantstop/roll` route rolls four dice from the injected **`ModuleContext.rng`** (the one
-  seam change C3 needed) and applies a pure engine action carrying them, so a client asks to roll but can
-  never choose its own dice. `parseAction`/`legalActions` refuse client `ROLL`s.
+- ✅ **Backend module** (`backend/src/games/cantstop/`): a registered `GameModule` with no pending step and
+  no side-channel — proving those hooks are optional (it later gained `createBotDriver` for the AI below).
+  **`ROLL` is server-only**: the module's `POST /games/:id/cantstop/roll` route rolls four dice from the
+  injected **`ModuleContext.rng`** (the one seam change C3 needed) and applies a pure engine action
+  carrying them, so a client asks to roll but can never choose its own dice. `parseAction`/`legalActions`
+  refuse client `ROLL`s.
 - ✅ **UI client** (`ui/src/games/cantstop/`): a lazy board (eleven columns with runners/squares/claims,
   roll / choose-a-pairing / stop controls gated on `canDrive`) plugged into the same `GameClient` seam the
-  landing picker now offers alongside Container.
+  landing picker now offers alongside Container. A left-hand **marker tray** (empty black circles = markers
+  still free) and a **roll-count** line surface the push-your-luck picture (`rollsThisTurn` is engine state).
 - ✅ **Tests:** engine 100%; a backend suite that plays a **full game to a win over REST** (seeded rng) and
   asserts Can't Stop and Container coexist; `e2e/cantstop.spec.ts` picks it from the hub and plays a turn.
 
+## ✅ CS1 — Can't Stop AI (shipped)
+
+Can't Stop now has AI seats — enjoyable solo or below the ideal player count. It first needed a home, so
+the platform's **per-game bot reorg** shipped first (mirror of the engine's C3 split: `bot/src/kernel/` +
+`bot/src/games/{container,cantstop}/`, subpath exports `@game-hub/bot/<game>`; Container's ~94 bot tests
+moved untouched). That reorg is logged in the top-level roadmap. Then the Can't Stop bot itself:
+
+- **`decide(view, playerId)`** returns `SELECT` (the best legal pairing) or, in the rolling phase,
+  roll-again vs `STOP`. It decides from a `CantStopView`, which is the whole state (nothing redacted) —
+  the shared bot kernel doesn't assume redaction, which was the point of keeping it tiny.
+- **⚠️ The bot cannot roll itself — rolling is server-only.** So rolling is injected: `decide` returns a
+  `ROLL` action whose dice come from an `options.rollDice` callback (the same `collectBids`-style contract
+  Container uses), and it throws a `BotError` without one. Self-play seeds that callback from a PRNG; the
+  backend `CantStopBotRunner` fills it from `ctx.rng` (via the shared `rollFourDice` the `/roll` route
+  uses), so a bot rolls exactly as a person does. `BotDriver.tick` plays bot seats forward until a human is
+  on the clock — much simpler than Container's (no auction).
+- **The strategy is a pure risk model:** `bustProbability` (exact, over all 6⁴ rolls via the engine's own
+  `legalSelections`), an EV-based `shouldRoll` (push while `(1−p)·EXPECTED_ADVANCE > p·steps-at-risk`; take
+  the win when a third column is in reach), and a claim-seeking `pickPairing`. All weights are tunable — a
+  good later target for a probability-optimal policy.
+- **Self-play** drives 2/3/4-player games to completion (deterministic per seed) — the real test that every
+  decision is legal. **90% coverage gate**, like Container's bot; the package is **115 tests**.
+- **Wired end-to-end:** the module registers `createBotDriver`; the hotseat 🤖 toggles and lobby "assign
+  seat to AI" light up for free, with bot seats excluded from `canDrive`/resume. Backend tests: an all-bot
+  game plays itself to a finish server-side, and a bot takes its turn and hands back to a waiting human. A
+  UI e2e confirms a Can't Stop game with an AI seat plays the bot's turn automatically.
+
 ## Remaining to finish
-
-Ordered by value. **CS1 (a bot) is the headline** — Can't Stop is otherwise complete, and a bot makes it
-enjoyable solo or with fewer than the ideal player count.
-
-### CS1 — Can't Stop AI  · **M** · depends on the platform bot reorg
-
-A Can't Stop bot is far simpler than Container's — it's a **pure risk model with no hidden information to
-reason about** — but it needs a home. The `@container/bot` package is Container-shaped today, so the first
-step is the platform's **per-game bot reorganization** (mirror the engine's C3 split: `bot/src/kernel/` +
-`bot/src/games/{container,cantstop}/`, subpath exports). That item lives in the top-level roadmap; CS1
-depends on it.
-
-Once there's a `bot/src/games/cantstop/`:
-
-- **`decide(view, playerId)` returns an intent** — `SELECT` (which legal pairing) or, in the rolling
-  phase, roll-again vs `STOP`. It decides from a `CantStopView`, which is the whole state (nothing is
-  redacted), so no `viewFor` cleverness is needed — a pleasant contrast to Container that the reorg's
-  shared kernel should accommodate without assuming redaction.
-- **⚠️ The bot cannot roll itself — rolling is server-only.** So the intent is *"roll"*, and the backend
-  driver executes it by rolling from `ctx.rng` (the same route logic) and applying the `ROLL` action. The
-  Can't Stop `BotDriver.tick` loop: on the bot's turn, if `selecting` → apply the chosen `SELECT`; if
-  `rolling` → either roll (server generates dice, engine busts or opens a choice) or `STOP`. Wire it via
-  the module's `createBotDriver` (omitted today) + a `game_bots`-backed runner, reusing the existing
-  bot-seat coordination state — a bot must not do what a player couldn't.
-- **The strategy is the stop/continue decision.** The core heuristic: keep rolling while the expected gain
-  outweighs the **bust probability** given which columns your runners occupy (a runner on 7 is safe to
-  push; runners on 2/12 bust often), how close each is to its top, and how many columns you've already
-  claimed. Pairing choice favors progress on tall/likely columns and finishing a near-complete column.
-  Cheap to compute exactly (11 columns, 3 runners), and a good later target for measuring against a
-  probability-optimal policy.
-- **Self-play** drives whole games with every seat botted (as Container's does), which is the real test
-  that every decision is legal. **Coverage gate 90%**, like Container's bot.
-- **UI:** the hotseat 🤖 toggles and lobby "assign seat to AI" already exist platform-side; once the module
-  registers a bot driver, Can't Stop gets them for free. Keep bot seats out of `canDrive`/resume.
 
 ### CS2 — Visual & a11y polish  · **S–M**
 

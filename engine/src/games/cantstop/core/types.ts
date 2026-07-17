@@ -36,6 +36,12 @@ export interface CantStopState {
   readonly runners: Readonly<Record<number, number>>;
   /** `rolling`: may roll again (or stop, if runners are out). `selecting`: must pick a pairing for `dice`. */
   readonly phase: Phase;
+  /**
+   * How many times the active seat has rolled *this turn* (a successful roll increments it; it resets
+   * to 0 whenever the turn passes — on a bust or a stop). Not rules-load-bearing (rolling is unlimited
+   * until you bust or stop) — it's the push-your-luck picture the UI surfaces.
+   */
+  readonly rollsThisTurn: number;
   /** The four dice awaiting a SELECT, or `null` in the `rolling` phase. */
   readonly dice: readonly [number, number, number, number] | null;
   readonly status: 'active' | 'ended';

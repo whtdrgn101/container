@@ -1,4 +1,4 @@
-import type { GameView } from '@container/engine/container';
+import type { GameView } from '@game-hub/engine/container';
 import type { Ctx } from './types';
 import { selfOf } from './valuation';
 

@@ -1,5 +1,5 @@
-import { deliveryOutcome, mustDeliver } from '@container/engine/container';
-import type { Color, GameState } from '@container/engine/container';
+import { deliveryOutcome, mustDeliver } from '@game-hub/engine/container';
+import type { Color, GameState } from '@game-hub/engine/container';
 import type { DB } from '../../db';
 
 /**

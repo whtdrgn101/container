@@ -1,7 +1,7 @@
 /**
- * `@container/bot` — AI players for Container. THE public API; consumers import only from here.
+ * `@game-hub/bot` — AI players for Container. THE public API; consumers import only from here.
  *
- * The split from `@container/engine` is deliberate: the **engine owns the rules** (what is legal),
+ * The split from `@game-hub/engine` is deliberate: the **engine owns the rules** (what is legal),
  * this package owns the **opinions** (what is wise). Nothing here is authoritative — a bot only ever
  * produces an `Action` that the engine then validates like any human's move.
  *
