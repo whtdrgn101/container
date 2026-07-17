@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { BoardProps } from '../types';
 import * as cantstopApi from './api';
+import { Die } from './art/Die';
 
 /** A colour per seat, by index. Can't Stop's squares are player-coloured (rulebook "Set Up"). */
 const SEAT_COLORS = ['bg-rose-500', 'bg-sky-500', 'bg-amber-500', 'bg-emerald-500'] as const;
@@ -95,12 +96,13 @@ export default function CantStopBoard({
         ))}
       </div>
 
-      {/* Marker tray (left) + the eleven columns. The tray stays fixed while the track scrolls on a
-          narrow screen. Available markers are drawn as the same empty black circles as the runners. */}
-      <div className="flex items-start gap-2">
+      {/* Marker tray (left) + the eleven columns, bottom-aligned so the taller middle columns form a
+          mountain silhouette (7 is the peak) — Can't Stop's climb, drawn without any published artwork.
+          The tray and track sit at the base; the track scrolls within itself on a narrow screen. */}
+      <div className="flex items-end gap-2">
         <div
           data-testid="markers-tray"
-          className="flex shrink-0 flex-col items-center gap-1.5 pt-6"
+          className="flex shrink-0 flex-col items-center gap-1.5"
           title={`${availableMarkers} of ${MAX_RUNNERS} markers available`}
         >
           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Markers</span>
@@ -120,15 +122,27 @@ export default function CantStopBoard({
           })}
         </div>
 
-        <div className="overflow-x-auto">
-          <div className="flex min-w-max gap-1">
+        <div className="overflow-x-auto" role="group" aria-label="Column board — first to claim three columns wins">
+          <div className="flex min-w-max items-end gap-1">
             {COLUMNS.map((col) => {
             const height = COLUMN_HEIGHTS[col]!;
             const claimedBy = game.claimed[col];
             const claimedSeat = claimedBy ? game.players.findIndex((p) => p.id === claimedBy) : -1;
+            const runnerAt = game.runners[col];
             const levels = Array.from({ length: height }, (_, i) => height - i); // top → bottom
+            const label = claimedBy
+              ? `Column ${col}, won by ${game.players[claimedSeat]?.name}`
+              : runnerAt
+                ? `Column ${col}, runner at ${runnerAt} of ${height}`
+                : `Column ${col}, ${height} to the top`;
             return (
-              <div key={col} data-testid={`column-${col}`} className="flex flex-col items-center gap-1">
+              <div
+                key={col}
+                data-testid={`column-${col}`}
+                role="img"
+                aria-label={label}
+                className="flex flex-col items-center gap-1"
+              >
                 <div
                   className={cn(
                     'flex h-5 w-6 items-center justify-center rounded text-[11px] font-semibold tabular-nums',
@@ -157,12 +171,14 @@ export default function CantStopBoard({
                         {runnerHere && (
                           <span
                             data-testid={`runner-${col}`}
-                            className="h-2.5 w-2.5 rounded-full border-2 border-foreground bg-background"
+                            className="reveal-in h-2.5 w-2.5 rounded-full border-2 border-foreground bg-background"
                             aria-label={`Runner in column ${col}`}
                           />
                         )}
+                        {/* Banked progress is the rulebook's player-coloured *squares* — distinct from
+                            the round temporary runners above. */}
                         {squares.map(({ seat }) => (
-                          <span key={seat} className={cn('h-2 w-2 rounded-full', seatColor(seat))} aria-hidden />
+                          <span key={seat} className={cn('h-2 w-2 rounded-[2px]', seatColor(seat))} aria-hidden />
                         ))}
                       </div>
                     );
@@ -186,19 +202,19 @@ export default function CantStopBoard({
           </div>
         )}
         {game.status === 'ended' ? (
-          <p data-testid="cantstop-winner" className="text-center font-medium text-primary">
+          <p data-testid="cantstop-winner" className="reveal-in text-center font-medium text-primary">
             🏆 {winner?.name} claimed three columns and wins!
           </p>
         ) : !canDrive ? (
           <p className="text-center text-sm text-muted-foreground">Waiting for {active?.name ?? 'the other player'}…</p>
         ) : game.phase === 'selecting' ? (
           <div className="space-y-2">
-            <div className="flex items-center justify-center gap-2">
+            <div className="reveal-in flex items-center justify-center gap-2">
               <span className="text-sm text-muted-foreground">You rolled</span>
               {(game.dice ?? []).map((die, i) => (
                 // eslint-disable-next-line react/no-array-index-key -- dice are positional
-                <span key={i} data-testid={`die-${i}`} className="flex h-7 w-7 items-center justify-center rounded border bg-background font-semibold tabular-nums">
-                  {die}
+                <span key={i} data-testid={`die-${i}`} className="inline-block h-8 w-8">
+                  <Die value={die} />
                 </span>
               ))}
             </div>

@@ -7,7 +7,7 @@ game, and the higher-level "which games, and what's left of them" view. Game-spe
 | Game | Status | Roadmap |
 |------|--------|---------|
 | **Container** | core game complete; AI A0–A2 shipped, A3–A5 remain | [`engine/src/games/container/ROADMAP.md`](engine/src/games/container/ROADMAP.md) |
-| **Can't Stop** | playable end-to-end (C3) **with an AI** (CS1); art/a11y polish + variants remain | [`engine/src/games/cantstop/ROADMAP.md`](engine/src/games/cantstop/ROADMAP.md) |
+| **Can't Stop** | complete: playable, AI (CS1) + art/a11y polish (CS2) shipped; only optional variants (CS3) remain | [`engine/src/games/cantstop/ROADMAP.md`](engine/src/games/cantstop/ROADMAP.md) |
 
 Adding a game is **additive** — implement the seams, register, done. See CLAUDE.md → "Building a new
 game" for the recipe.
@@ -206,7 +206,7 @@ Built in the core, so **every game gets them free** — the real payoff of the C
   and pause.
 - **Before starting a slice,** check remaining plan usage so you don't land mid-slice; if tight, pick an
   **M/S** item.
-- **Suggested next order:** the bot reorg and **Can't Stop CS1** (its AI) are **done** — the same
-  "reorganize the platform, then use it" rhythm C3 followed for the engine. Open work is independent and
-  can go in any order: **C4** (cross-game polish), **Can't Stop CS2/CS3** (art + variants), Container's
-  **A3–A5** (difficulty/search), and **B3** (accounts).
+- **Suggested next order:** the bot reorg, **Can't Stop CS1** (its AI) and **CS2** (art/a11y polish) are
+  **done** — Can't Stop is complete bar optional variants. Open work is independent and can go in any
+  order: **C4** (cross-game polish), Container's **A3–A5** (difficulty/search), **Can't Stop CS3**
+  (variants), and **B3** (accounts).

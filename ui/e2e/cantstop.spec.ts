@@ -66,3 +66,17 @@ test('a Can\'t Stop game with an AI seat plays the bot\'s turn automatically', a
   // next human seat — the person is never asked to act for the AI.
   await expect(page.getByTestId('cantstop-roll')).toBeEnabled();
 });
+
+test('the board has no horizontal overflow at a narrow mobile width', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('pick-game-cantstop').click();
+  await page.getByTestId('start-game').click();
+  await expect(page.getByTestId('board')).toBeVisible();
+  await expect(page.getByTestId('column-7')).toBeVisible();
+
+  await page.setViewportSize({ width: 320, height: 720 });
+  // The eleven-column track scrolls within its own container, so the page itself must not overflow.
+  const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+  expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
+});

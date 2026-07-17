@@ -68,15 +68,31 @@ moved untouched). That reorg is logged in the top-level roadmap. Then the Can't 
   game plays itself to a finish server-side, and a bot takes its turn and hands back to a waiting human. A
   UI e2e confirms a Can't Stop game with an AI seat plays the bot's turn automatically.
 
+## ✅ CS2 — Visual & a11y polish (shipped)
+
+The board now matches Container's Slice 8 bar with **original** art (no reproduction of any published
+game's board):
+
+- **Mountain silhouette:** the eleven columns are bottom-aligned so the taller middle columns form a
+  pyramid (7 the peak), the number labels tracing the ridge — Can't Stop's climb, drawn from nothing but
+  the column heights.
+- **Original pip dice** (`games/cantstop/art/Die.tsx`): the four dice render as theme-aware SVG pip faces
+  instead of plain numbers.
+- **Faithful pieces:** banked progress is player-coloured **squares** (`rounded-[2px]`), visually distinct
+  from the round temporary runners — the rulebook's own "colored squares".
+- **Motion** (reduced-motion-aware, via the shared `.reveal-in` keyframe, gated on
+  `prefers-reduced-motion: no-preference`): runners fade in as they advance; the dice row and the winner
+  banner reveal on entrance.
+- **A11y:** each column is a `role="img"` with a summarizing `aria-label` ("Column 7, runner at 4 of 13" /
+  "…won by Ann"); the track is a labelled region; dice carry their value as a label. *(Deviation from the
+  sketch: Can't Stop cells aren't clickable — you act via the Roll/Select/Stop buttons — so making them
+  focusable would be an a11y anti-pattern. Labelled `role="img"` columns replace "focusable cells".)*
+- **Responsive e2e** (`e2e/cantstop.spec.ts`): no horizontal document overflow at 320px — the column track
+  scrolls within its own container, not the page. *(A pixel visual-snapshot was skipped: Playwright
+  baselines are per-OS `-darwin` and would just fail on Linux CI, as Container's already does; the
+  robust overflow assertion covers the responsive requirement.)*
+
 ## Remaining to finish
-
-### CS2 — Visual & a11y polish  · **S–M**
-
-The board is functional, not fancy (deliberately, to keep the C3 slice "simple"). To match Container's
-Slice 8 bar: **original** dice/runner/column art (no reproduction of any published game's board), motion
-on runner placement and column claims (reduced-motion-aware), focusable board cells with aria-labels, and
-a Can't Stop `e2e/` visual + responsive spec (no horizontal overflow at 320px — the eleven-column track
-already scrolls within its own container rather than the page).
 
 ### CS3 — Variants (optional)  · **S**
 
