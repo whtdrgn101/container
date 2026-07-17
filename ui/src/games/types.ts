@@ -17,6 +17,14 @@ export interface GameClient<S = unknown> {
   /** Human-readable name, for the picker and the page heading. */
   readonly name: string;
   /**
+   * A one-line description shown on the landing when this game is selected — what it is, in a sentence.
+   * Presentation content, so it lives here on the UI plugin (not the server catalog). Cheap and
+   * **non-lazy**: the landing shows it without loading the board chunk.
+   */
+  readonly blurb: string;
+  /** A few short "how to play" bullets, shown in a collapsible on the landing. Optional. */
+  readonly rules?: readonly string[];
+  /**
    * The board. **Lazy on purpose**: a games room shouldn't ship every game's board to someone who
    * opened the home screen, and Container's board pulls in the whole engine.
    */

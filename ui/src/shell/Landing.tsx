@@ -17,6 +17,10 @@ export interface LandingProps {
   readonly catalog: GameInfo[];
   /** The game a new room/table is for. */
   readonly selected: GameInfo | undefined;
+  /** The selected game's one-line description (from its UI plugin), shown under the picker. */
+  readonly selectedBlurb: string | undefined;
+  /** The selected game's short "how to play" bullets, shown in a collapsible. */
+  readonly selectedRules: readonly string[] | undefined;
   readonly onSelect: (gameType: string) => void;
 
   readonly openLobbies: Lobby[];
@@ -55,6 +59,8 @@ export interface LandingProps {
 export function Landing({
   catalog,
   selected,
+  selectedBlurb,
+  selectedRules,
   onSelect,
   openLobbies,
   activeGames,
@@ -254,9 +260,28 @@ export function Landing({
       <Card>
         <CardHeader>
           <CardTitle>New game</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            {selected ? `${selected.name} is for ${minPlayers}–${maxPlayers} players.` : 'Pick a game to play.'}
-          </p>
+          {selected ? (
+            <div className="space-y-1.5">
+              <p className="text-sm text-muted-foreground" data-testid="game-blurb">
+                <span className="font-medium text-foreground">{selected.name}</span> · {minPlayers}–{maxPlayers} players
+                {selectedBlurb ? ` — ${selectedBlurb}` : '.'}
+              </p>
+              {selectedRules && selectedRules.length > 0 && (
+                <details className="text-sm" data-testid="how-to-play">
+                  <summary className="cursor-pointer select-none text-muted-foreground hover:text-foreground">
+                    How to play
+                  </summary>
+                  <ul className="mt-1.5 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+                    {selectedRules.map((rule) => (
+                      <li key={rule}>{rule}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Pick a game to play.</p>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
           {/*

@@ -41,7 +41,7 @@ and makes everything above them generic.
 | C1 | ✅ `game_type` routing | The column, the backfill, `moduleOf`, namespaced module routes, a generic `GameHub` | M |
 | C2 | ✅ UI shell | Game picker, per-game lazy boards, generic lobby/landing; Container's board becomes one plugin | M–L |
 | C3 | ✅ Second game (Can't Stop) | Proves the seams are real — the only honest test of the abstraction | L |
-| C4 | Cross-game polish | Per-game rules blurbs, shared results screen, per-game bot registration | M |
+| C4 | ✅ Cross-game polish | Per-game rules blurbs on the landing + a shared `GameOver` results screen both games use | M |
 
 ### ✅ C0 — the `GameModule` seam (shipped)
 
@@ -124,11 +124,21 @@ unlike it (**no hidden information**, **per-turn randomness**). Full write-up in
 - **Proof it's real:** a two-games-side-by-side backend test, the picker auto-activating, and all existing
   e2e green.
 
-### C4 — Cross-game polish (next)
+### ✅ C4 — Cross-game polish (shipped)
 
-Per-game rules blurbs on the landing/board, and a shared results/winner screen abstraction (both games
-declare a winner differently today). Per-game bot registration already works (see the bot platform below),
-so this is now mostly UI-consistency polish.
+The two-game hub now feels cohesive: a game's own description on the landing, and one ending for both.
+
+- **Per-game rules blurbs.** The `GameClient` seam gained `blurb` (a one-liner) and `rules` (a few
+  how-to bullets) — presentation content, so it lives on the UI plugin, not the server catalog. The
+  landing's "New game" card shows the selected game's blurb and a collapsible **How to play**; the shell
+  reads them via `clientFor` (the sanctioned registry lookup), naming no game.
+- **Shared `GameOver` screen** (`ui/src/components/GameOver.tsx`): a generic frame — "🏁 Game over —
+  <winners> win(s)!", a slot for game-specific detail, one "New game" button back to the hub — that
+  **both games render**. Container's scoring table and Can't Stop's new final-standings list drop into it,
+  so Can't Stop's ending went from a one-line banner to a real results screen. Generic by construction
+  (names no game, imports no engine), keeping the `results`/`winner`/`new-game-end` testids the e2e rely
+  on. Every future game gets a consistent ending for free.
+- Per-game bot registration already worked (see the bot platform below), so C4 was purely UI consistency.
 
 ---
 
@@ -206,7 +216,7 @@ Built in the core, so **every game gets them free** — the real payoff of the C
   and pause.
 - **Before starting a slice,** check remaining plan usage so you don't land mid-slice; if tight, pick an
   **M/S** item.
-- **Suggested next order:** the bot reorg, **Can't Stop CS1** (its AI) and **CS2** (art/a11y polish) are
-  **done** — Can't Stop is complete bar optional variants. Open work is independent and can go in any
-  order: **C4** (cross-game polish), Container's **A3–A5** (difficulty/search), **Can't Stop CS3**
-  (variants), and **B3** (accounts).
+- **Suggested next order:** the bot reorg, **Can't Stop CS1/CS2** (AI + polish) and **C4** (cross-game
+  polish) are **done** — Can't Stop is complete bar optional variants, and the platform's Track C is fully
+  shipped. Open work is independent and can go in any order: Container's **A3–A5** (difficulty/search),
+  **Can't Stop CS3** (variants), and **B3** (accounts) — none essential for home/LAN play.

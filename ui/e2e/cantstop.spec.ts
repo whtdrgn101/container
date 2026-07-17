@@ -67,6 +67,20 @@ test('a Can\'t Stop game with an AI seat plays the bot\'s turn automatically', a
   await expect(page.getByTestId('cantstop-roll')).toBeEnabled();
 });
 
+test('the landing shows a per-game blurb and a how-to-play (C4)', async ({ page }) => {
+  await page.goto('/');
+  // Default selection is the first hosted game (Container).
+  await expect(page.getByTestId('game-blurb')).toContainText('Container');
+
+  // Picking Can't Stop swaps in its blurb and its own rules.
+  await page.getByTestId('pick-game-cantstop').click();
+  await expect(page.getByTestId('game-blurb')).toContainText('push-your-luck');
+
+  await page.getByTestId('how-to-play').locator('summary').click();
+  await expect(page.getByTestId('how-to-play').getByRole('listitem').first()).toBeVisible();
+  await expect(page.getByTestId('how-to-play')).toContainText('bust');
+});
+
 test('the board has no horizontal overflow at a narrow mobile width', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('pick-game-cantstop').click();

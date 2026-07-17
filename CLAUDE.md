@@ -296,10 +296,12 @@ the game knows this" rule. To add a game `foo`:
    - Optional hooks: `pendingStep` (refuse a `/actions` move owned by a flow of yours),
      `onStateChanged` (push a side-channel), `createBotDriver` (AI seats). Can't Stop omits all three.
 3. **UI** — `ui/src/games/foo/` implementing `GameClient` (a **lazy** `Board`, a cheap non-lazy
-   `Status`), its own `api.ts` (pin `lib/api.ts`'s generic `unknown` back to `foo`'s view type; put
-   `foo`'s own endpoints here), and `cantstopClient`-style registration in `games/registry.ts` (the
-   one cast). **No shell file may import `@game-hub/engine/*`** — `e2e/architecture.spec.ts` enforces
-   it. The landing picker activates automatically once two games are registered.
+   `Status`, a one-line `blurb` + short `rules` bullets for the landing — C4), its own `api.ts` (pin
+   `lib/api.ts`'s generic `unknown` back to `foo`'s view type; put `foo`'s own endpoints here), and
+   `cantstopClient`-style registration in `games/registry.ts` (the one cast). Render `foo`'s end screen
+   with the shared `components/GameOver` frame so every game ends the same way. **No shell file may
+   import `@game-hub/engine/*`** — `e2e/architecture.spec.ts` enforces it. The landing picker activates
+   automatically once two games are registered.
 4. **Tests** — 100% engine coverage for `foo`; a backend suite that plays it over REST (seed
    `AppOptions.rng` for deterministic rolls) and asserts it coexists with the other games; an
    `e2e/foo.spec.ts` that picks it and plays a turn. Keep every existing suite green.

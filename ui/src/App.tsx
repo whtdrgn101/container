@@ -58,6 +58,9 @@ export default function App() {
 
   // Default the new-game form to the first game the server offers, once we know what that is.
   const selected = catalog.find((entry) => entry.id === gameType) ?? catalog[0];
+  // The selected game's UI plugin, for its landing blurb/rules. Via the registry (the sanctioned
+  // lookup), so the shell shows a game's description without naming or importing the game itself.
+  const selectedClient = selected ? clientFor(selected.id) : undefined;
   useEffect(() => {
     if (!selected) return;
     setGameType((current) => current ?? selected.id);
@@ -348,6 +351,8 @@ export default function App() {
           <Landing
             catalog={catalog}
             selected={selected}
+            selectedBlurb={selectedClient?.blurb}
+            selectedRules={selectedClient?.rules}
             onSelect={setGameType}
             openLobbies={openLobbies}
             activeGames={activeGames}

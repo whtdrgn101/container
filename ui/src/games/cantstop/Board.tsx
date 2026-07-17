@@ -1,6 +1,7 @@
 import { COLUMN_HEIGHTS, COLUMNS, MAX_RUNNERS, legalActions } from '@game-hub/engine/cantstop';
 import type { Action, CantStopView } from '@game-hub/engine/cantstop';
 import { Button } from '@/components/ui/button';
+import { GameOver } from '@/components/GameOver';
 import { cn } from '@/lib/utils';
 import type { BoardProps } from '../types';
 import * as cantstopApi from './api';
@@ -27,6 +28,7 @@ export default function CantStopBoard({
   busy,
   guard,
   onPayload,
+  onLeave,
 }: BoardProps<CantStopView>) {
   const active = game.players[game.activePlayerIndex];
   // Same seat-binding rule as Container: drive only when this client controls the active seat (or
@@ -69,6 +71,36 @@ export default function CantStopBoard({
 
   return (
     <div data-testid="board" className="space-y-4">
+      {game.status === 'ended' && (
+        <GameOver
+          winnerNames={game.winnerIds.map((id) => game.players.find((p) => p.id === id)?.name ?? id)}
+          onNewGame={onLeave}
+        >
+          {/* Final standings: columns each player claimed, most first, winner crowned. */}
+          <ul className="space-y-1 text-sm">
+            {[...game.players]
+              .map((player) => ({ player, claims: claimsOf(player.id) }))
+              .sort((a, b) => b.claims - a.claims)
+              .map(({ player, claims }) => {
+                const won = game.winnerIds.includes(player.id);
+                return (
+                  <li
+                    key={player.id}
+                    data-testid={`standing-${player.id}`}
+                    className={cn('flex items-center justify-between border-b py-1', won && 'font-semibold')}
+                  >
+                    <span>
+                      {player.name}
+                      {won ? ' 👑' : ''}
+                    </span>
+                    <span className="tabular-nums text-muted-foreground">{claims}/3 columns</span>
+                  </li>
+                );
+              })}
+          </ul>
+        </GameOver>
+      )}
+
       <div
         data-testid="identity-banner"
         className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-sm"
@@ -191,21 +223,17 @@ export default function CantStopBoard({
         </div>
       </div>
 
-      {/* Controls: roll / choose a pairing / stop. Only the driving client sees live buttons. */}
+      {/* Controls: roll / choose a pairing / stop. Hidden once the game ends — the shared GameOver
+          screen above takes over. Only the driving client sees live buttons. */}
+      {game.status !== 'ended' && (
       <div className="space-y-2 rounded-lg border bg-card p-3">
-        {game.status !== 'ended' && (
-          <div className="text-center text-xs text-muted-foreground">
-            Rolls this turn:{' '}
-            <span data-testid="roll-count" className="font-semibold tabular-nums text-foreground">
-              {game.rollsThisTurn}
-            </span>
-          </div>
-        )}
-        {game.status === 'ended' ? (
-          <p data-testid="cantstop-winner" className="reveal-in text-center font-medium text-primary">
-            🏆 {winner?.name} claimed three columns and wins!
-          </p>
-        ) : !canDrive ? (
+        <div className="text-center text-xs text-muted-foreground">
+          Rolls this turn:{' '}
+          <span data-testid="roll-count" className="font-semibold tabular-nums text-foreground">
+            {game.rollsThisTurn}
+          </span>
+        </div>
+        {!canDrive ? (
           <p className="text-center text-sm text-muted-foreground">Waiting for {active?.name ?? 'the other player'}…</p>
         ) : game.phase === 'selecting' ? (
           <div className="space-y-2">
@@ -243,6 +271,7 @@ export default function CantStopBoard({
           </div>
         )}
       </div>
+      )}
 
       {/* A compact activity feed — the whole log is public in Can't Stop. */}
       {game.log.length > 0 && (
