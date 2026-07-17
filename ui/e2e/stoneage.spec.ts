@@ -40,3 +40,21 @@ test('SA2: reach the action phase and gather resources', async ({ page }) => {
   await page.getByTestId('gather-forest').click();
   await expect(page.getByTestId('sa-log')).toContainText('wood'); // the roll result
 });
+
+test('SA3: hunt for food', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('pick-game-stoneage').click();
+  await page.getByTestId('remove-player-2').click();
+  await page.getByTestId('start-game').click();
+  await expect(page.getByTestId('board')).toBeVisible();
+
+  const placeAll = async (place: string) => {
+    for (let i = 0; i < 4; i += 1) await page.getByTestId(`place-${place}-inc`).click();
+    await page.getByTestId(`place-${place}-go`).click();
+  };
+  await placeAll('hunt'); // Ann sends 5 to the hunt
+  await placeAll('forest'); // Bob to the forest → action phase
+
+  await page.getByTestId('gather-hunt').click();
+  await expect(page.getByTestId('sa-log')).toContainText('food');
+});

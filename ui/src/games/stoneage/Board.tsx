@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   availableToPlace,
-  isResourcePlace,
+  isGatherPlace,
   legalActions,
   PLACE_CAPACITY,
   PLACE_RESOURCE,
@@ -96,7 +96,7 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
     const who = playerName(entry.playerId);
     const p = (entry.payload ?? {}) as Record<string, unknown>;
     if (entry.type === 'PLACE') return `${who} placed ${p['count']} on ${PLACE_LABEL[p['place'] as PlaceId]}`;
-    if (entry.type === 'GATHER') return `${who} rolled ${(p['dice'] as number[])?.join('+')} → ${p['amount']} ${p['resource']}`;
+    if (entry.type === 'GATHER') return `${who} rolled ${(p['dice'] as number[])?.join('+')} → ${p['amount']} ${p['kind']}`;
     return `${who}: ${entry.type.toLowerCase()}`;
   };
 
@@ -119,7 +119,7 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
             const resource = place in PLACE_RESOURCE ? PLACE_RESOURCE[place as keyof typeof PLACE_RESOURCE] : null;
             const cap = PLACE_CAPACITY[place];
             const option = placeOptions.get(place);
-            const canGather = acting && canDrive && !!active && isResourcePlace(place) && game.placements[place][active.id] !== undefined;
+            const canGather = acting && canDrive && !!active && isGatherPlace(place) && game.placements[place][active.id] !== undefined;
             return (
               <div key={place} data-testid={`place-${place}`} className="flex flex-col rounded-md border bg-card px-3 py-2">
                 <div className="flex items-center justify-between gap-2">

@@ -72,10 +72,13 @@ playable, resting at the feeding phase until SA7.
 *(Tools — which add to the roll — arrive with SA4, since you can't own any yet. The same dice engine
 will serve the hunt in SA3.)*
 
-### SA3 — Hunt  · **S** · pg. 6
+### ✅ SA3 — Hunt (shipped)
 
-Same dice engine as SA2: roll one die per hunter + tools, take 1 food per "full 2". (Reuses the SA2
-resolver — just a different threshold and yield.)
+Reuses SA2's dice engine (pg. 6): the `GATHER` action now also resolves the **hunt** — roll one die per
+hunter, take 1 **food** per "full 2". Unifying it took only a branch in `gather` (food vs. resource, a
+`{ place, dice, amount, kind }` log payload) and generalizing the action-phase "actionable" check to
+gather places (`hasActionablePlacements` = resource places + hunt). The roll route and the UI's Gather
+button light up on the hunt for free. 100% engine coverage. *(Tools still arrive with SA4.)*
 
 ### SA4 — Tool maker  · **M** · pg. 5
 

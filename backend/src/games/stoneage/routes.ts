@@ -29,8 +29,8 @@ export function registerStoneAgeRoutes(app: FastifyInstance, ctx: ModuleContext)
           required: ['playerId', 'place'],
           properties: {
             playerId: { type: 'string', minLength: 1 },
-            // Only the four resource places are gathered by rolling; the engine validates the rest.
-            place: { type: 'string', enum: [...RESOURCE_PLACES] },
+            // The dice places: the four resource places + the hunt (food). The engine validates the rest.
+            place: { type: 'string', enum: [...RESOURCE_PLACES, 'hunt'] },
           },
         },
       },

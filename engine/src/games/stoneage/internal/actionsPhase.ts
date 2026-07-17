@@ -17,9 +17,21 @@ export function isResourcePlace(place: PlaceId): place is ResourcePlace {
   return (RESOURCE_PLACES as readonly PlaceId[]).includes(place);
 }
 
-/** Whether a player still has people on a resource place to gather. */
-export function hasResourcePlacements(state: StoneAgeState, playerId: string): boolean {
-  return RESOURCE_PLACES.some((place) => state.placements[place][playerId] !== undefined);
+/** The places resolved by rolling dice: the four resource places + the hunt (which pays food, SA3). */
+export const GATHER_PLACES: readonly PlaceId[] = [...RESOURCE_PLACES, 'hunt'];
+
+/** Type guard: is this place resolved by a dice roll (a resource place, or the hunt for food)? */
+export function isGatherPlace(place: PlaceId): place is ResourcePlace | 'hunt' {
+  return isResourcePlace(place) || place === 'hunt';
+}
+
+/**
+ * Whether a player still has people on a place with an **implemented action**. Today that's the gather
+ * places (resources + hunt); each later stage (tool maker, hut, field) adds its place here, until every
+ * placement is actionable and a turn simply ends when the board is clear.
+ */
+export function hasActionablePlacements(state: StoneAgeState, playerId: string): boolean {
+  return GATHER_PLACES.some((place) => state.placements[place][playerId] !== undefined);
 }
 
 /** Return all of a player's people — remove them from every place. */
@@ -45,7 +57,7 @@ export function enterActionPhase(state: StoneAgeState): Partial<StoneAgeState> {
   for (let i = 0; i < n; i += 1) {
     const seat = (state.startPlayerIndex + i) % n;
     const id = state.players[seat]!.id;
-    if (hasResourcePlacements({ ...state, placements }, id)) {
+    if (hasActionablePlacements({ ...state, placements }, id)) {
       return { phase: 'actions', activePlayerIndex: seat, placements };
     }
     placements = clearPlayer(placements, id);
@@ -60,14 +72,14 @@ export function enterActionPhase(state: StoneAgeState): Partial<StoneAgeState> {
  */
 export function advanceActor(state: StoneAgeState): Partial<StoneAgeState> {
   const active = state.activePlayerIndex;
-  if (hasResourcePlacements(state, state.players[active]!.id)) return {};
+  if (hasActionablePlacements(state, state.players[active]!.id)) return {};
 
   const n = state.players.length;
   let placements = clearPlayer(state.placements, state.players[active]!.id);
   for (let i = 1; i < n; i += 1) {
     const seat = (active + i) % n;
     const id = state.players[seat]!.id;
-    if (hasResourcePlacements({ ...state, placements }, id)) {
+    if (hasActionablePlacements({ ...state, placements }, id)) {
       return { activePlayerIndex: seat, placements };
     }
     placements = clearPlayer(placements, id);

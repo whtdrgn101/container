@@ -146,6 +146,26 @@ describe('Stone Age gathering (SA2)', () => {
     expect(rolled.json().game.placements.forest).toEqual({}); // people returned
   });
 
+  it('hunts for food by rolling dice (SA3)', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/games',
+      payload: { gameType: 'stoneage', players: [{ name: 'Ann' }, { name: 'Bob' }] },
+    });
+    const id = created.json().game.id as string;
+    await placeAction(id, 'p1', 'hunt', 5);
+    await placeAction(id, 'p2', 'forest', 5);
+
+    dice.enqueue([6, 6, 6, 6, 6]); // total 30, food per full 2 → 15
+    const rolled = await app.inject({
+      method: 'POST',
+      url: `/games/${id}/stoneage/roll`,
+      payload: { playerId: 'p1', place: 'hunt' },
+    });
+    expect(rolled.statusCode).toBe(200);
+    expect(rolled.json().game.players[0].food).toBe(27); // 12 starting + 15
+  });
+
   it('refuses a GATHER posted to /actions — dice are server-only', async () => {
     const created = await app.inject({
       method: 'POST',

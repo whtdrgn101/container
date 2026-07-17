@@ -1,61 +1,66 @@
 import { describe, expect, it } from 'vitest';
-import { advanceActor, enterActionPhase, hasResourcePlacements, isResourcePlace } from '../internal';
+import { advanceActor, enterActionPhase, hasActionablePlacements, isGatherPlace, isResourcePlace } from '../internal';
 import { withPlacements } from './helpers';
 
-describe('isResourcePlace / hasResourcePlacements', () => {
-  it('identifies the four gathering places', () => {
+describe('place classification', () => {
+  it('identifies resource places and gather (dice) places', () => {
     expect(isResourcePlace('forest')).toBe(true);
-    expect(isResourcePlace('river')).toBe(true);
-    expect(isResourcePlace('hunt')).toBe(false);
-    expect(isResourcePlace('toolMaker')).toBe(false);
+    expect(isResourcePlace('hunt')).toBe(false); // the hunt yields food, not a resource
+    expect(isGatherPlace('hunt')).toBe(true); // …but it still rolls dice
+    expect(isGatherPlace('river')).toBe(true);
+    expect(isGatherPlace('toolMaker')).toBe(false);
   });
 
-  it('sees whether a player has resources left to gather', () => {
-    expect(hasResourcePlacements(withPlacements({ forest: { p1: 2 } }), 'p1')).toBe(true);
-    expect(hasResourcePlacements(withPlacements({ hunt: { p1: 2 } }), 'p1')).toBe(false);
+  it('sees whether a player has an actionable placement (a gather place — resources or hunt)', () => {
+    expect(hasActionablePlacements(withPlacements({ forest: { p1: 2 } }), 'p1')).toBe(true);
+    expect(hasActionablePlacements(withPlacements({ hunt: { p1: 2 } }), 'p1')).toBe(true);
+    expect(hasActionablePlacements(withPlacements({ field: { p1: 1 } }), 'p1')).toBe(false); // not yet implemented
   });
 });
 
 describe('enterActionPhase', () => {
-  it('seats the start player when they have resources to gather', () => {
-    const state = withPlacements({ forest: { p1: 2 }, clayPit: { p2: 2 } });
-    expect(enterActionPhase(state)).toMatchObject({ phase: 'actions', activePlayerIndex: 0 });
+  it('seats the start player when they have something to do (incl. the hunt)', () => {
+    expect(enterActionPhase(withPlacements({ hunt: { p1: 3 }, forest: { p2: 2 } }))).toMatchObject({
+      phase: 'actions',
+      activePlayerIndex: 0,
+    });
   });
 
-  it('skips a start player with no resources (returning their people) to the next gatherer', () => {
-    // p1 placed only on the hunt (no resources to gather); p2 has the forest.
-    const state = withPlacements({ hunt: { p1: 3 }, forest: { p2: 2 } });
-    const change = enterActionPhase(state);
+  it('skips a start player with nothing actionable, returning their people', () => {
+    // p1 placed only on the field (no action yet); p2 has the forest.
+    const change = enterActionPhase(withPlacements({ field: { p1: 1 }, forest: { p2: 2 } }));
     expect(change).toMatchObject({ phase: 'actions', activePlayerIndex: 1 });
-    expect(change.placements!.hunt).toEqual({}); // p1's people returned
+    expect(change.placements!.field).toEqual({}); // p1's person returned
   });
 
-  it('goes straight to feeding when nobody placed on a resource place', () => {
-    const state = withPlacements({ hunt: { p1: 3 }, field: { p2: 1 } });
-    expect(enterActionPhase(state)).toMatchObject({ phase: 'feeding', activePlayerIndex: 0 });
+  it('goes straight to feeding when nobody placed on a gather place', () => {
+    expect(enterActionPhase(withPlacements({ field: { p1: 1 }, toolMaker: { p2: 1 } }))).toMatchObject({
+      phase: 'feeding',
+      activePlayerIndex: 0,
+    });
   });
 });
 
 describe('advanceActor', () => {
-  it('stays put while the active player has resources left', () => {
-    const state = withPlacements({ forest: { p1: 2 } }, { phase: 'actions', activePlayerIndex: 0 });
+  it('stays put while the active player has something to do', () => {
+    const state = withPlacements({ hunt: { p1: 2 } }, { phase: 'actions', activePlayerIndex: 0 });
     expect(advanceActor(state)).toEqual({});
   });
 
-  it('skips a player with no resources to reach the next gatherer', () => {
-    // 3 players: p1 (active) is done, p2 has none, p3 has the quarry.
+  it('skips a player with nothing actionable to reach the next one', () => {
+    // 3 players: p1 (active) is done, p2 has only the field, p3 has the quarry.
     const state = withPlacements(
-      { quarry: { p3: 2 }, hunt: { p2: 1 } },
+      { quarry: { p3: 2 }, field: { p2: 1 } },
       { phase: 'actions', activePlayerIndex: 0 },
       ['Ann', 'Bob', 'Cara'],
     );
     const change = advanceActor(state);
     expect(change.activePlayerIndex).toBe(2);
-    expect(change.placements!.hunt).toEqual({}); // p2 returned on the way past
+    expect(change.placements!.field).toEqual({}); // p2 returned on the way past
   });
 
-  it('ends the phase when no one else can gather', () => {
-    const state = withPlacements({ hunt: { p2: 1 } }, { phase: 'actions', activePlayerIndex: 0 });
+  it('ends the phase when no one else has anything to do', () => {
+    const state = withPlacements({ field: { p2: 1 } }, { phase: 'actions', activePlayerIndex: 0 });
     expect(advanceActor(state)).toMatchObject({ phase: 'feeding', activePlayerIndex: 0 });
   });
 });
