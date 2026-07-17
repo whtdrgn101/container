@@ -45,14 +45,18 @@ proof, and the foundation the mechanics slot into.
 - **Tests:** engine 100%; a backend suite (setup, coexistence, actions refused, seat bounds); an
   `e2e/stoneage.spec.ts` that picks it and renders the board.
 
-### SA1 — Placement phase  · **M** · pg. 4
+### ✅ SA1 — Placement phase (shipped)
 
-The worker-placement spine: on your turn place **1+ people on one place** (respecting capacity —
-toolMaker/field 1, hut 2 same-player, hunt unlimited-but-once-per-round, forest/clayPit/quarry/river up
-to 7 total), passing isn't allowed while a legal place exists, and you can't re-use a place you already
-placed on this round. Clockwise from the start player until nobody can place → phase becomes `actions`.
-Engine: the `PLACE` action + `legalActions` enumerating legal placements. *(2–3-player place
-restrictions, pg. 8, can ride here or as a follow-up.)*
+The worker-placement spine (pg. 4): on your turn place **1+ people on one place** (capacities —
+toolMaker/field 1, hut 2, hunt unlimited, forest/clayPit/quarry/river up to 7 total), never on a place
+you already used this round, and you must place while a legal place exists. Turn passes clockwise,
+**skipping players who are out**, until nobody can place → the phase becomes `actions` and the start
+player is up. Engine: the `PLACE` action + `internal/placement.ts` (`countRange`, `canPlace`,
+`nextPlacer`, `legalPlacements`), 100% covered. Backend `parseAction` accepts `PLACE`; the UI board is
+interactive — each place shows its occupancy and a Place button (a count stepper on the variable
+places). A full placement round is playable end-to-end (it then rests at the action phase until SA2).
+*(Deferred: the 2–3-player place restrictions on pg. 8 — SA1 uses the 4-player capacities for all
+counts.)*
 
 ### SA2 — Resource procurement + the dice engine  · **L** · pg. 6
 

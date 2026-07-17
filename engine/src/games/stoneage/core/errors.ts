@@ -6,8 +6,10 @@ export type StoneAgeErrorCode =
   | 'PLAYER_NOT_FOUND'
   | 'NOT_YOUR_TURN'
   | 'GAME_OVER'
-  // The scaffold accepts no moves yet — each action arrives in its own roadmap stage.
-  | 'NOT_IMPLEMENTED';
+  // The action doesn't fit the current phase (placement vs. actions vs. feeding).
+  | 'WRONG_PHASE'
+  // An illegal worker placement: a full/re-used place, the wrong count, or too few people (SA1).
+  | 'INVALID_PLACEMENT';
 
 /**
  * Thrown when a Stone Age action is illegal. The shared kernel `GameError` carries the code/message

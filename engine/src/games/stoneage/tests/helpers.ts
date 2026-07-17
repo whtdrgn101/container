@@ -1,6 +1,6 @@
 import { expect } from 'vitest';
 import { GameError } from '../core';
-import type { StoneAgeState } from '../core';
+import type { PlaceId, StoneAgeState } from '../core';
 import { createGame } from '../createGame';
 
 /** A fresh game with the given seat names (two by default). */
@@ -11,6 +11,20 @@ export function newGame(names: string[] = ['Ann', 'Bob']): StoneAgeState {
 /** A game with fields overridden. */
 export function makeState(overrides: Partial<StoneAgeState> = {}, names?: string[]): StoneAgeState {
   return { ...newGame(names), ...overrides };
+}
+
+/** A game with the given placements merged into the empty board (e.g. `{ forest: { p1: 3 } }`). */
+export function withPlacements(
+  placed: Partial<Record<PlaceId, Record<string, number>>>,
+  overrides: Partial<StoneAgeState> = {},
+  names?: string[],
+): StoneAgeState {
+  const base = newGame(names);
+  const placements = { ...base.placements };
+  for (const [place, byPlayer] of Object.entries(placed)) {
+    placements[place as PlaceId] = { ...byPlayer };
+  }
+  return { ...base, placements, ...overrides };
 }
 
 /** Assert that `fn` throws a GameError with the given code. */

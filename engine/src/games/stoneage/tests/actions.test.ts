@@ -1,39 +1,42 @@
 import { describe, expect, it } from 'vitest';
-import { activePlayer, seatOf } from '../internal';
 import { applyAction, legalActions } from '../actions';
 import { viewFor } from '../view';
 import { makeState, expectError } from './helpers';
 
-const place = { type: 'PLACE', place: 'forest', count: 1 } as const;
+const placeToolMaker = { type: 'PLACE', place: 'toolMaker', count: 1 } as const;
 
-describe('scaffold actions', () => {
-  it('offers no legal actions yet', () => {
-    expect(legalActions(makeState())).toEqual([]);
-    expect(legalActions(makeState(), 'p1')).toEqual([]);
+describe('applyAction', () => {
+  it('dispatches PLACE during the placement phase', () => {
+    const next = applyAction(makeState(), 'p1', placeToolMaker);
+    expect(next.placements.toolMaker).toEqual({ p1: 1 });
   });
 
-  it('refuses every action — not implemented at the scaffold', () => {
-    expectError(() => applyAction(makeState(), 'p1', place), 'NOT_IMPLEMENTED');
+  it('rejects an unknown player, an off-turn seat, and an ended game', () => {
+    expectError(() => applyAction(makeState(), 'ghost', placeToolMaker), 'PLAYER_NOT_FOUND');
+    expectError(() => applyAction(makeState(), 'p2', placeToolMaker), 'NOT_YOUR_TURN');
+    expectError(() => applyAction(makeState({ status: 'ended' }), 'p1', placeToolMaker), 'GAME_OVER');
   });
 
-  it('rejects an unknown player before refusing', () => {
-    expectError(() => applyAction(makeState(), 'ghost', place), 'PLAYER_NOT_FOUND');
-  });
-
-  it('rejects any action once the game has ended', () => {
-    expectError(() => applyAction(makeState({ status: 'ended' }), 'p1', place), 'GAME_OVER');
+  it('refuses placement outside the placement phase', () => {
+    expectError(() => applyAction(makeState({ phase: 'actions' }), 'p1', placeToolMaker), 'WRONG_PHASE');
   });
 });
 
-describe('helpers', () => {
-  it('seatOf / activePlayer', () => {
-    const state = makeState({ activePlayerIndex: 1 });
-    expect(seatOf(state, 'p2')).toBe(1);
-    expect(activePlayer(state).id).toBe('p2');
-    expectError(() => seatOf(state, 'nobody'), 'PLAYER_NOT_FOUND');
+describe('legalActions', () => {
+  it('lists the active player’s placements during the placement phase', () => {
+    expect(legalActions(makeState())).toHaveLength(28); // fresh 2-player board
+    expect(legalActions(makeState(), 'p1')).toHaveLength(28);
   });
 
-  it('viewFor passes the whole state through with a viewer note', () => {
+  it('is empty for an off-turn seat, an ended game, or a non-placement phase', () => {
+    expect(legalActions(makeState(), 'p2')).toEqual([]);
+    expect(legalActions(makeState({ status: 'ended' }))).toEqual([]);
+    expect(legalActions(makeState({ phase: 'actions' }))).toEqual([]);
+  });
+});
+
+describe('viewFor', () => {
+  it('passes the whole state through with a viewer note (near-identity)', () => {
     const state = makeState();
     expect(viewFor(state, 'p1')).toEqual({ ...state, viewerId: 'p1' });
     expect(viewFor(state, null).viewerId).toBeNull();

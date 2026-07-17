@@ -15,4 +15,9 @@ test('pick Stone Age and see the board scaffold', async ({ page }) => {
   await expect(page.getByTestId('place-forest')).toBeVisible();
   await expect(page.getByTestId('place-hunt')).toBeVisible();
   await expect(page.getByTestId('player-p1')).toBeVisible();
+
+  // SA1: place a worker on the forest and see the turn pass.
+  await expect(page.getByTestId('sa-banner')).toContainText('Your turn');
+  await page.getByTestId('place-forest-go').click();
+  await expect(page.getByTestId('place-forest')).toContainText('1/7');
 });

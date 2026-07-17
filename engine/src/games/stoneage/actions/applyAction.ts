@@ -2,18 +2,28 @@ import { GameError } from '../core';
 import type { StoneAgeState } from '../core';
 import { seatOf } from '../internal';
 import type { Action } from './action';
+import { place } from './place';
 
 /**
- * Apply an action for `playerId`. The **scaffold refuses every move** — each action is implemented in
- * its own roadmap stage. It still validates turn ownership and player existence, so the pipeline
- * (and its error mapping) is real from day one; only the mechanics are stubbed.
+ * Apply an action for `playerId`, enforcing turn order and the current phase. Throws GameError on any
+ * illegal action; never mutates the input. The single entry point for a move.
+ *
+ * Only `PLACE` exists so far (roadmap SA1); the per-place actions, feeding, buildings and cards each
+ * arrive in their own stage and add a case here.
  */
-export function applyAction(state: StoneAgeState, playerId: string, _action: Action): StoneAgeState {
+export function applyAction(state: StoneAgeState, playerId: string, action: Action): StoneAgeState {
   if (state.status === 'ended') {
     throw new GameError('GAME_OVER', 'The game has ended');
   }
-  // Resolves the seat (throws PLAYER_NOT_FOUND for an unknown id) before refusing — the same shape
-  // the real actions will have.
-  seatOf(state, playerId);
-  throw new GameError('NOT_IMPLEMENTED', 'Stone Age actions are not implemented yet (see the roadmap)');
+  if (seatOf(state, playerId) !== state.activePlayerIndex) {
+    throw new GameError('NOT_YOUR_TURN', `It is not player "${playerId}"'s turn`);
+  }
+
+  switch (action.type) {
+    case 'PLACE':
+      if (state.phase !== 'placement') {
+        throw new GameError('WRONG_PHASE', 'People can only be placed during the placement phase');
+      }
+      return place(state, playerId, action.place, action.count);
+  }
 }

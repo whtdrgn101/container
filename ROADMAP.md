@@ -8,7 +8,7 @@ game, and the higher-level "which games, and what's left of them" view. Game-spe
 |------|--------|---------|
 | **Container** | core game complete; AI A0–A2 shipped, A3–A5 remain | [`engine/src/games/container/ROADMAP.md`](engine/src/games/container/ROADMAP.md) |
 | **Can't Stop** | complete: playable, AI (CS1) + art/a11y polish (CS2) shipped; only optional variants (CS3) remain | [`engine/src/games/cantstop/ROADMAP.md`](engine/src/games/cantstop/ROADMAP.md) |
-| **Stone Age** | bootstrapped (SA0): registered + read-only board; mechanics being built one action per stage | [`engine/src/games/stoneage/ROADMAP.md`](engine/src/games/stoneage/ROADMAP.md) |
+| **Stone Age** | in progress: bootstrap (SA0) + placement phase (SA1) shipped; the per-place actions land next, one stage each | [`engine/src/games/stoneage/ROADMAP.md`](engine/src/games/stoneage/ROADMAP.md) |
 
 Adding a game is **additive** — implement the seams, register, done (proven three times now — Container,
 Can't Stop, Stone Age). See CLAUDE.md → "Building a new game" for the recipe.

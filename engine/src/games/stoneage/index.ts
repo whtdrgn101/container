@@ -35,5 +35,8 @@ export type { CreateGameOptions, NewPlayer } from './createGame';
 export { viewFor } from './view';
 export type { StoneAgeView, Viewer } from './view';
 
-// Mechanics + turn-aware entry point (inert at the scaffold)
-export { applyAction, legalActions } from './actions';
+// Placement helpers the UI reads (people still to place this round).
+export { availableToPlace, placedBy } from './internal';
+
+// Mechanics + turn-aware entry point
+export { place, applyAction, legalActions } from './actions';

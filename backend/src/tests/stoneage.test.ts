@@ -46,20 +46,38 @@ describe('Stone Age bootstrap', () => {
     ]);
   });
 
-  it('refuses actions — none are implemented yet at the scaffold', async () => {
+  it('places people over REST (SA1) and passes the turn', async () => {
     const created = await app.inject({
       method: 'POST',
       url: '/games',
       payload: { gameType: 'stoneage', players: [{ name: 'Ann' }, { name: 'Bob' }] },
     });
     const id = created.json().game.id as string;
-    const res = await app.inject({
+
+    const placed = await app.inject({
       method: 'POST',
       url: `/games/${id}/actions`,
-      payload: { playerId: 'p1', action: { type: 'PLACE', place: 'forest', count: 1 } },
+      payload: { playerId: 'p1', action: { type: 'PLACE', place: 'forest', count: 3 } },
     });
-    expect(res.statusCode).toBe(400);
-    expect(res.json().error.message).toMatch(/no playable actions yet/);
+    expect(placed.statusCode).toBe(200);
+    expect(placed.json().game.placements.forest).toEqual({ p1: 3 });
+    expect(placed.json().game.activePlayerIndex).toBe(1); // Bob is up
+
+    // Off-turn / illegal placements are refused.
+    const offTurn = await app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId: 'p1', action: { type: 'PLACE', place: 'hunt', count: 1 } },
+    });
+    expect(offTurn.statusCode).toBe(409);
+    expect(offTurn.json().error.code).toBe('NOT_YOUR_TURN');
+
+    const badPayload = await app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId: 'p2', action: { type: 'PLACE', place: 'nowhere', count: 1 } },
+    });
+    expect(badPayload.statusCode).toBe(400); // parseAction rejects an unknown place
   });
 
   it('enforces Stone Age\'s 2–4 seat range on lobbies', async () => {
