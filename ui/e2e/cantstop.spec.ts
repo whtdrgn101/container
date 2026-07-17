@@ -67,6 +67,24 @@ test('a Can\'t Stop game with an AI seat plays the bot\'s turn automatically', a
   await expect(page.getByTestId('cantstop-roll')).toBeEnabled();
 });
 
+test('rematch: finish a game and start a new one with the same players', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('pick-game-cantstop').click();
+  // An all-bot table plays itself out on create, so we land straight on the finished board.
+  await page.getByTestId('toggle-bot-0').click();
+  await page.getByTestId('toggle-bot-1').click();
+  await page.getByTestId('toggle-bot-2').click();
+  await page.getByTestId('start-game').click();
+
+  await expect(page.getByTestId('results')).toBeVisible();
+  const firstCode = (await page.getByTestId('game-code').textContent()) ?? '';
+
+  // One click restarts (hotseat drives every seat), and everyone lands in the new game.
+  await page.getByTestId('rematch').click();
+  await expect(page.getByTestId('game-code')).not.toHaveText(firstCode);
+  await expect(page.getByTestId('results')).toBeVisible(); // the new all-bot game also finishes
+});
+
 test('the landing shows a per-game blurb and a how-to-play (C4)', async ({ page }) => {
   await page.goto('/');
   // Default selection is the first hosted game (Container).

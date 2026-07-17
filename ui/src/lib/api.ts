@@ -184,6 +184,34 @@ export async function abandonGame(gameId: string): Promise<void> {
   if (!response.ok) await fail(response);
 }
 
+/** A rematch proposal for a finished game: who's agreed, and the new game's id once it starts. */
+export interface RematchInfo {
+  agreed: string[];
+  newGameId: string | null;
+}
+
+/** The current rematch proposal for a game (empty when none is open). */
+export async function getRematch(gameId: string): Promise<RematchInfo> {
+  const response = await fetch(`${BASE_URL}/games/${gameId}/rematch`);
+  if (!response.ok) await fail(response);
+  return ((await response.json()) as { rematch: RematchInfo }).rematch;
+}
+
+/**
+ * Propose or accept a rematch of a finished game. `controlledIds` is this client's own seats (`null`
+ * for hotseat). Returns the proposal — `newGameId` is set once enough players have agreed and the new
+ * game has started.
+ */
+export async function proposeRematch(gameId: string, controlledIds: string[] | null): Promise<RematchInfo> {
+  const response = await fetch(`${BASE_URL}/games/${gameId}/rematch`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ controlledIds }),
+  });
+  if (!response.ok) await fail(response);
+  return ((await response.json()) as { rematch: RematchInfo }).rematch;
+}
+
 /** Fetch a lobby by code, or throw if it doesn't exist. */
 export async function getLobby(id: string): Promise<Lobby> {
   return unwrapLobby(await fetch(`${BASE_URL}/lobbies/${id}`));

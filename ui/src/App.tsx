@@ -6,7 +6,8 @@ import { useGameTransport } from '@/hooks/useGameTransport';
 import { useHomeLists } from '@/hooks/useHomeLists';
 import { clientFor } from '@/games/registry';
 import * as api from '@/lib/api';
-import type { GamePayload, Lobby } from '@/lib/api';
+import type { GamePayload, Lobby, RematchInfo } from '@/lib/api';
+import { RematchContext } from '@/lib/rematch';
 
 /**
  * The Game Hub shell (roadmap C2).
@@ -47,6 +48,9 @@ export default function App() {
   const [joinCode, setJoinCode] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [confirmingAbandon, setConfirmingAbandon] = useState<string | null>(null);
+  // The open rematch proposal for the current (finished) game, or null. Platform state — the shell
+  // owns it and feeds the shared GameOver screen through context.
+  const [rematch, setRematch] = useState<RematchInfo | null>(null);
 
   // Hotseat (null) follows the active player; a seat-bound client streams as its own seats only.
   const viewer = controlledIds === null ? undefined : controlledIds.join(',');
@@ -258,6 +262,65 @@ export default function App() {
   const players = game ? (game as { players: { id: string; name: string }[] }).players : [];
   const myNames = controlledIds ? players.filter((p) => controlledIds.includes(p.id)).map((p) => p.name) : null;
 
+  // --- Rematch (platform: play again with the same players). The shell owns it entirely. ---
+  // Human seats are the ones this client can agree for; hotseat (null) drives them all.
+  const humanIds = players.filter((p) => !bots.includes(p.id)).map((p) => p.id);
+  const myHumanIds = (controlledIds ?? humanIds).filter((id) => humanIds.includes(id));
+
+  /** Enter the rematched game keeping our seats — the new game has the same seat structure. */
+  async function goToRematch(newId: string) {
+    applyPayload(await api.getGame(newId, viewer));
+    setRematch(null);
+  }
+
+  // Pick up any open proposal when entering (or switching) a game — a finished game may already have one.
+  useEffect(() => {
+    if (!gameId) {
+      setRematch(null);
+      return;
+    }
+    let live = true;
+    void api
+      .getRematch(gameId)
+      .then((r) => {
+        if (live) setRematch(r);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [gameId]);
+
+  // A pushed proposal (someone agreed) or start (a `newGameId`): update the button, or send everyone
+  // watching to the new game.
+  useEffect(() => {
+    if (lastMessage?.type !== 'rematch') return;
+    const r: RematchInfo = {
+      agreed: (lastMessage.agreed as string[]) ?? [],
+      newGameId: (lastMessage.newGameId as string | null) ?? null,
+    };
+    setRematch(r);
+    if (r.newGameId && r.newGameId !== gameId) void goToRematch(r.newGameId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- react to each fresh push, not to closures
+  }, [lastMessage]);
+
+  /** Propose or accept a rematch on behalf of this client's seats. */
+  async function requestRematch() {
+    if (!gameId) return;
+    await guard(async () => {
+      const r = await api.proposeRematch(gameId, controlledIds);
+      setRematch(r);
+      if (r.newGameId && r.newGameId !== gameId) await goToRematch(r.newGameId);
+    });
+  }
+
+  const rematchControls = {
+    onRematch: () => void requestRematch(),
+    busy,
+    proposed: (rematch?.agreed.length ?? 0) > 0,
+    waiting: !!rematch && rematch.newGameId === null && rematch.agreed.some((id) => myHumanIds.includes(id)),
+  };
+
   // The display name you're playing as, so multiple windows are easy to tell apart when playtesting.
   // Prefer your in-game seat name(s); fall back to a claimed lobby seat name.
   const tabName =
@@ -310,20 +373,23 @@ export default function App() {
 
         {game && gameId ? (
           client ? (
-            // Lazily fetched on first render of a board — the hub itself ships none of it.
+            // Lazily fetched on first render of a board — the hub itself ships none of it. The rematch
+            // controls reach the board's shared GameOver screen through context, not through props.
             <Suspense fallback={<p className="text-sm text-muted-foreground">Loading the board…</p>}>
-              <client.Board
-                gameId={gameId}
-                game={game}
-                bots={bots}
-                controlledIds={controlledIds}
-                viewer={viewer}
-                busy={busy}
-                guard={guard}
-                onPayload={applyPayload}
-                onLeave={resetToLanding}
-                lastMessage={lastMessage}
-              />
+              <RematchContext.Provider value={rematchControls}>
+                <client.Board
+                  gameId={gameId}
+                  game={game}
+                  bots={bots}
+                  controlledIds={controlledIds}
+                  viewer={viewer}
+                  busy={busy}
+                  guard={guard}
+                  onPayload={applyPayload}
+                  onLeave={resetToLanding}
+                  lastMessage={lastMessage}
+                />
+              </RematchContext.Provider>
             </Suspense>
           ) : (
             // The server hosts a game this build can't draw — a backend deployed ahead of the UI.

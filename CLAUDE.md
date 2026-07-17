@@ -79,10 +79,12 @@ Moves always go over REST; the backend then **pushes** the new state to all conn
 WebSocket (`GameHub`), each projected per-viewer via `viewFor`. The socket is push-only (never a move channel).
 
 **Coordination state lives outside the engine.** Anything that is *not* a rule — pre-game lobbies
-(`lobbies.ts`), pending delivery auctions (`games/container/auctions.ts`), and which seats are bots
-(`bots.ts`) — is backend state with its own table and its own per-viewer projection. The engine stays a
-pure `state + action → state` library that knows nothing about rooms, sealed bids, or bots. Reach for
-this pattern before reaching into the engine.
+(`lobbies.ts`), pending delivery auctions (`games/container/auctions.ts`), which seats are bots
+(`bots.ts`), and rematch proposals (`rematch.ts`) — is backend state with its own table and its own
+per-viewer projection. The engine stays a pure `state + action → state` library that knows nothing about
+rooms, sealed bids, bots, or rematches. Reach for this pattern before reaching into the engine.
+Game-agnostic ones (bots, abandon, rematch) live in the core with no `GameModule` hook, so every game
+gets them free.
 
 ### The `GameModule` seam (Track C / C0 + C1)
 

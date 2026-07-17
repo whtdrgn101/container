@@ -202,6 +202,14 @@ Built in the core, so **every game gets them free** — the real payoff of the C
   game has no winner. Needs **no `GameModule` hook**; the ⚠️ gate is a `preHandler` above every route (so
   it also covers modules' own mutating endpoints), and adding the column needed a real `ALTER TABLE`
   migration. See CLAUDE.md → "Abandon a game".
+- ✅ **Rematch (play again, same players):** a **Rematch** button on the shared `GameOver` screen. One
+  player proposes, **another accepts**, and a fresh game of the same type starts with the same seats and
+  bot assignments; everyone watching is pushed the new game's id and navigates to it. Coordination state
+  outside the engine (a `rematches` table, like lobbies/bots) — **game-agnostic, no `GameModule` hook**.
+  Threshold is *two distinct human seats* (a lone human vs bots, or a hotseat client driving everyone,
+  starts in one click). The shell owns it end to end and reaches the shared `GameOver` (in any board) via
+  a React context, so no game's board threads it. `409 REMATCH_NOT_READY` before the game ends; refused on
+  an abandoned game by the same `preHandler`.
 - ✅ **Deployment — single-image container:** a multi-stage `Dockerfile` builds the UI + native SQLite and
   runs one Node/Fastify process serving the web app **and** the API on one port; SQLite persists to a
   `/data` volume. `docker-compose.yml` + **[`DEPLOY.md`](./DEPLOY.md)** cover a Portainer/home-NAS deploy.

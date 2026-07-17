@@ -69,6 +69,19 @@ CREATE TABLE IF NOT EXISTS game_bots (
   PRIMARY KEY (game_id, player_id),
   FOREIGN KEY (game_id) REFERENCES games(id)
 );
+
+-- A proposed rematch of a finished game. Coordination state, game-agnostic (like lobbies/bots): when
+-- enough of the same players agree, a fresh game of the same type starts with the same seats + bot
+-- assignments. Keyed by the finished game; holds who has agreed and the new game's id once it starts.
+-- A separate table, so CREATE TABLE IF NOT EXISTS picks it up on an existing database with no migration.
+CREATE TABLE IF NOT EXISTS rematches (
+  game_id     TEXT PRIMARY KEY,
+  agreed      TEXT NOT NULL,
+  new_game_id TEXT,
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL,
+  FOREIGN KEY (game_id) REFERENCES games(id)
+);
 `;
 
 /**
