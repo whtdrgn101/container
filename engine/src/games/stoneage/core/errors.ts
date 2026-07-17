@@ -9,7 +9,9 @@ export type StoneAgeErrorCode =
   // The action doesn't fit the current phase (placement vs. actions vs. feeding).
   | 'WRONG_PHASE'
   // An illegal worker placement: a full/re-used place, the wrong count, or too few people (SA1).
-  | 'INVALID_PLACEMENT';
+  | 'INVALID_PLACEMENT'
+  // An illegal resource gather: no people on that place, or the wrong dice (SA2).
+  | 'INVALID_GATHER';
 
 /**
  * Thrown when a Stone Age action is illegal. The shared kernel `GameError` carries the code/message

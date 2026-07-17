@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   availableToPlace,
+  isResourcePlace,
   legalActions,
   PLACE_CAPACITY,
   PLACE_RESOURCE,
@@ -48,11 +49,16 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
   const activeIsBot = !!active && bots.includes(active.id);
   const canDrive = !activeIsBot && (!controlledIds || (!!active && controlledIds.includes(active.id)));
   const placing = game.phase === 'placement';
+  const acting = game.phase === 'actions';
 
   const run = (work: () => Promise<stoneageApi.StoneAgePayload>) => guard(async () => onPayload(await work()));
   const doPlace = (place: PlaceId, count: number) => {
     if (!canDrive || !active) return;
     void run(() => stoneageApi.act(gameId, active.id, { type: 'PLACE', place, count }, viewer));
+  };
+  const doGather = (place: PlaceId) => {
+    if (!canDrive || !active) return;
+    void run(() => stoneageApi.gather(gameId, active.id, place, viewer));
   };
 
   // The active player's legal placements, collapsed to a {min,max} per place.
@@ -72,13 +78,27 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
     setCounts((c) => ({ ...c, [place]: Math.max(min, Math.min(max, (c[place] ?? min) + by)) }));
 
   const remaining = active ? availableToPlace(game, active.id) : 0;
+  const waitingFor = active?.name ?? 'the next player';
   const banner = game.status === 'ended'
     ? 'Game over.'
-    : !placing
-      ? 'Placement complete — the action phase arrives in a later stage.'
-      : canDrive
+    : placing
+      ? canDrive
         ? `Your turn — place your people (${remaining} still in hand)`
-        : `Waiting for ${active?.name ?? 'the next player'} to place…`;
+        : `Waiting for ${waitingFor} to place…`
+      : acting
+        ? canDrive
+          ? 'Your turn — gather resources from your places (rolls the dice)'
+          : `Waiting for ${waitingFor} to gather…`
+        : 'Feeding phase — arrives in a later stage.';
+
+  const playerName = (id: string) => game.players.find((p) => p.id === id)?.name ?? id;
+  const describeMove = (entry: StoneAgeView['log'][number]): string => {
+    const who = playerName(entry.playerId);
+    const p = (entry.payload ?? {}) as Record<string, unknown>;
+    if (entry.type === 'PLACE') return `${who} placed ${p['count']} on ${PLACE_LABEL[p['place'] as PlaceId]}`;
+    if (entry.type === 'GATHER') return `${who} rolled ${(p['dice'] as number[])?.join('+')} → ${p['amount']} ${p['resource']}`;
+    return `${who}: ${entry.type.toLowerCase()}`;
+  };
 
   return (
     <div data-testid="board" className="space-y-4">
@@ -99,6 +119,7 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
             const resource = place in PLACE_RESOURCE ? PLACE_RESOURCE[place as keyof typeof PLACE_RESOURCE] : null;
             const cap = PLACE_CAPACITY[place];
             const option = placeOptions.get(place);
+            const canGather = acting && canDrive && !!active && isResourcePlace(place) && game.placements[place][active.id] !== undefined;
             return (
               <div key={place} data-testid={`place-${place}`} className="flex flex-col rounded-md border bg-card px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
@@ -143,6 +164,17 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
                     </Button>
                   </div>
                 )}
+                {canGather && (
+                  <Button
+                    size="sm"
+                    className="mt-2 self-end"
+                    data-testid={`gather-${place}`}
+                    disabled={busy}
+                    onClick={() => doGather(place)}
+                  >
+                    Gather
+                  </Button>
+                )}
               </div>
             );
           })}
@@ -182,6 +214,18 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
           ))}
         </div>
       </div>
+
+      {/* A compact activity feed — everything Stone Age logs is public. */}
+      {game.log.length > 0 && (
+        <ul data-testid="sa-log" className="space-y-0.5 text-xs text-muted-foreground">
+          {[...game.log]
+            .slice(-6)
+            .reverse()
+            .map((entry) => (
+              <li key={entry.seq}>{describeMove(entry)}</li>
+            ))}
+        </ul>
+      )}
     </div>
   );
 }

@@ -22,6 +22,12 @@ export const RESOURCE_VALUE: Readonly<Record<Resource, number>> = { wood: 3, bri
 /** The hunt pays 1 food per "full 2" of the dice+tools total (pg. 6). */
 export const HUNT_THRESHOLD = 2;
 
+/** Stone Age rolls six-sided dice — one per person on a place (pg. 6). */
+export const DIE_FACES = 6;
+
+/** The four places you gather resources from (all use the roll-dice engine). */
+export const RESOURCE_PLACES = ['forest', 'clayPit', 'quarry', 'river'] as const;
+
 /** The eight places people can be placed (pg. 4). */
 export const PLACES: readonly PlaceId[] = [
   'toolMaker',

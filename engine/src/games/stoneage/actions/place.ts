@@ -1,6 +1,6 @@
 import { GameError } from '../core';
 import type { PlaceId, StoneAgeState } from '../core';
-import { countRange, nextPlacer, record } from '../internal';
+import { countRange, enterActionPhase, nextPlacer, record } from '../internal';
 
 /**
  * Place `count` people on `place` for `playerId` (rulebook pg. 4, phase 1). Validates against the
@@ -24,8 +24,9 @@ export function place(state: StoneAgeState, playerId: string, placeId: PlaceId, 
   const next = nextPlacer(withPlacement, state.activePlayerIndex);
   const payload = { place: placeId, count };
   if (next === null) {
-    // Everyone is out of legal placements — the action phase begins with the start player.
-    return record(withPlacement, 'PLACE', playerId, { phase: 'actions', activePlayerIndex: state.startPlayerIndex }, payload);
+    // Everyone is out of legal placements — enter the action phase (seating the first gatherer, or
+    // going straight to feeding if nobody placed on a resource place).
+    return record(withPlacement, 'PLACE', playerId, enterActionPhase(withPlacement), payload);
   }
   return record(withPlacement, 'PLACE', playerId, { activePlayerIndex: next }, payload);
 }

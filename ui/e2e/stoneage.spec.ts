@@ -21,3 +21,22 @@ test('pick Stone Age and see the board scaffold', async ({ page }) => {
   await page.getByTestId('place-forest-go').click();
   await expect(page.getByTestId('place-forest')).toContainText('1/7');
 });
+
+test('SA2: reach the action phase and gather resources', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('pick-game-stoneage').click();
+  await page.getByTestId('remove-player-2').click(); // 2 players → a short placement round
+  await page.getByTestId('start-game').click();
+  await expect(page.getByTestId('board')).toBeVisible();
+
+  const placeAll = async (place: string) => {
+    for (let i = 0; i < 4; i += 1) await page.getByTestId(`place-${place}-inc`).click(); // 1 → 5
+    await page.getByTestId(`place-${place}-go`).click();
+  };
+  await placeAll('forest'); // Ann places 5 on the forest
+  await placeAll('clayPit'); // Bob places 5 on the clay pit → both out → action phase
+
+  await expect(page.getByTestId('sa-banner')).toContainText('gather');
+  await page.getByTestId('gather-forest').click();
+  await expect(page.getByTestId('sa-log')).toContainText('wood'); // the roll result
+});

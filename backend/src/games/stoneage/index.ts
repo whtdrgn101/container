@@ -4,6 +4,7 @@ import type { GameModule, GameSummary } from '../module';
 import { newStoneAgeGame } from './createGame';
 import { mapStoneAgeError } from './errors';
 import { parseStoneAgeAction } from './parseAction';
+import { registerStoneAgeRoutes } from './routes';
 
 /**
  * Stone Age, as a `GameModule` — the **bootstrap** (roadmap SA0). A registered, creatable, viewable
@@ -41,4 +42,7 @@ export const stoneAgeModule: GameModule<StoneAgeState, Action> = {
   movesOf: (state) => state.log,
 
   mapError: (error) => mapStoneAgeError(error),
+
+  // The resource/hunt dice roll (SA2). Server-only, drawn from the injected `ctx.rng`.
+  routes: (app, ctx) => registerStoneAgeRoutes(app, ctx),
 };

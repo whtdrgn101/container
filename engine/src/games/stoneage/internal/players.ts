@@ -14,3 +14,8 @@ export function seatOf(state: StoneAgeState, playerId: string): number {
 export function activePlayer(state: StoneAgeState): StoneAgePlayer {
   return state.players[state.activePlayerIndex]!;
 }
+
+/** Replace one player in the roster, returning a new player array. Internal. */
+export function withPlayer(state: StoneAgeState, seat: number, player: StoneAgePlayer): readonly StoneAgePlayer[] {
+  return state.players.map((current, index) => (index === seat ? player : current));
+}

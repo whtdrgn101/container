@@ -11,6 +11,8 @@ export function parseStoneAgeAction(raw: unknown): ParseResult<Action> {
   if (typeof raw !== 'object' || raw === null) return bad('An action must be an object');
   const record = raw as Record<string, unknown>;
 
+  // GATHER is server-only: the roll route builds its dice, so a client can't post one.
+  if (record['type'] === 'GATHER') return bad('GATHER is server-only — use POST /games/:id/stoneage/roll');
   if (record['type'] !== 'PLACE') return bad(`Unknown action type "${String(record['type'])}"`);
 
   const place = record['place'];

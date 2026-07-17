@@ -58,14 +58,19 @@ places). A full placement round is playable end-to-end (it then rests at the act
 *(Deferred: the 2–3-player place restrictions on pg. 8 — SA1 uses the 4-player capacities for all
 counts.)*
 
-### SA2 — Resource procurement + the dice engine  · **L** · pg. 6
+### ✅ SA2 — Resource procurement + the dice engine (shipped)
 
-The action-phase turn structure (start player uses **all** their placed people in an order of their
-choice, then the next player) and the first action: **forest / clay pit / quarry / river**. Roll one
-die per placed person, add any unused tools, and take 1 resource per "full N" (wood 3 / brick 4 / stone
-5 / gold 6). This introduces **server-side dice** (a `/roll` route drawing on `ctx.rng`, refused from
-clients — exactly Can't Stop's pattern) and the **tools spend** (each tool once per round, added to a
-roll). The shared dice+tools resolver is reused by the hunt.
+The action phase (pg. 6): the start player uses **all** their placed people, then the next player
+clockwise (`internal/actionsPhase.ts` — `enterActionPhase`, `advanceActor`; a player's turn ends when
+they've no resource places left, returning their people, → the next gatherer or → feeding). The first
+action: **forest / clay pit / quarry / river** — the `GATHER` action rolls one die per person, sums
+them, and takes 1 resource per "full N" (wood 3 / brick 4 / stone 5 / gold 6). **Server-side dice**: a
+`POST /games/:id/stoneage/roll { playerId, place }` route rolls from `ctx.rng` and applies `GATHER`
+(server-only — `parseAction` refuses it), exactly Can't Stop's pattern. UI: a **Gather** button on your
+resource places + a move log showing each roll. 100% engine coverage; a full round (place → gather) is
+playable, resting at the feeding phase until SA7.
+*(Tools — which add to the roll — arrive with SA4, since you can't own any yet. The same dice engine
+will serve the hunt in SA3.)*
 
 ### SA3 — Hunt  · **S** · pg. 6
 

@@ -2,6 +2,7 @@ import { GameError } from '../core';
 import type { StoneAgeState } from '../core';
 import { seatOf } from '../internal';
 import type { Action } from './action';
+import { gather } from './gather';
 import { place } from './place';
 
 /**
@@ -25,5 +26,10 @@ export function applyAction(state: StoneAgeState, playerId: string, action: Acti
         throw new GameError('WRONG_PHASE', 'People can only be placed during the placement phase');
       }
       return place(state, playerId, action.place, action.count);
+    case 'GATHER':
+      if (state.phase !== 'actions') {
+        throw new GameError('WRONG_PHASE', 'Resources are only gathered during the action phase');
+      }
+      return gather(state, playerId, action.place, action.dice);
   }
 }

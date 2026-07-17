@@ -13,12 +13,14 @@ export type { StoneAgeErrorCode } from './core';
 export {
   BUILDING_STACK_SIZE,
   CIV_CARD_SLOTS,
+  DIE_FACES,
   HUNT_THRESHOLD,
   MAX_PLAYERS,
   MIN_PLAYERS,
   PLACE_CAPACITY,
   PLACE_RESOURCE,
   PLACES,
+  RESOURCE_PLACES,
   RESOURCE_THRESHOLD,
   RESOURCE_VALUE,
   RESOURCES,
@@ -35,8 +37,8 @@ export type { CreateGameOptions, NewPlayer } from './createGame';
 export { viewFor } from './view';
 export type { StoneAgeView, Viewer } from './view';
 
-// Placement helpers the UI reads (people still to place this round).
-export { availableToPlace, placedBy } from './internal';
+// Helpers the UI reads (people still to place; which places a seat can gather from).
+export { availableToPlace, isResourcePlace, placedBy } from './internal';
 
-// Mechanics + turn-aware entry point
-export { place, applyAction, legalActions } from './actions';
+// Mechanics + turn-aware entry point. `gather` is server-only (the roll route builds its dice).
+export { place, gather, applyAction, legalActions } from './actions';
