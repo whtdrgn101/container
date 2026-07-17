@@ -166,6 +166,27 @@ describe('Stone Age gathering (SA2)', () => {
     expect(rolled.json().game.players[0].food).toBe(27); // 12 starting + 15
   });
 
+  it('uses a non-dice place — the field raises food production (SA6)', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/games',
+      payload: { gameType: 'stoneage', players: [{ name: 'Ann' }, { name: 'Bob' }] },
+    });
+    const id = created.json().game.id as string;
+    // A placement round that leaves Ann with a field (to use) and a hunt.
+    await placeAction(id, 'p1', 'field', 1);
+    await placeAction(id, 'p2', 'clayPit', 5);
+    await placeAction(id, 'p1', 'hunt', 4);
+
+    const used = await app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId: 'p1', action: { type: 'USE', place: 'field' } },
+    });
+    expect(used.statusCode).toBe(200);
+    expect(used.json().game.players[0].foodTrack).toBe(1);
+  });
+
   it('refuses a GATHER posted to /actions — dice are server-only', async () => {
     const created = await app.inject({
       method: 'POST',

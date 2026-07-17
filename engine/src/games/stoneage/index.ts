@@ -37,8 +37,8 @@ export type { CreateGameOptions, NewPlayer } from './createGame';
 export { viewFor } from './view';
 export type { StoneAgeView, Viewer } from './view';
 
-// Helpers the UI reads (people still to place; which places roll dice to gather).
-export { availableToPlace, isGatherPlace, isResourcePlace, placedBy } from './internal';
+// Helpers the UI reads (people still to place; which places roll dice / are used directly).
+export { availableToPlace, isGatherPlace, isResourcePlace, isUsePlace, placedBy } from './internal';
 
 // Mechanics + turn-aware entry point. `gather` is server-only (the roll route builds its dice).
-export { place, gather, applyAction, legalActions } from './actions';
+export { place, gather, use, applyAction, legalActions } from './actions';

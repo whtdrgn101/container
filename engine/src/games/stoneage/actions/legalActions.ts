@@ -1,5 +1,5 @@
 import type { StoneAgeState } from '../core';
-import { activePlayer, legalPlacements } from '../internal';
+import { activePlayer, legalPlacements, legalUses } from '../internal';
 import type { Action } from './action';
 
 /**
@@ -14,6 +14,10 @@ export function legalActions(state: StoneAgeState, playerId?: string): Action[] 
 
   if (state.phase === 'placement') {
     return legalPlacements(state, active.id);
+  }
+  if (state.phase === 'actions') {
+    // The `USE` actions (tool maker/hut/field); the dice gathers are server-only, offered by the route.
+    return legalUses(state, active.id);
   }
   return [];
 }

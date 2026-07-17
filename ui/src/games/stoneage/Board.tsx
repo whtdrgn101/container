@@ -2,6 +2,8 @@ import { useState } from 'react';
 import {
   availableToPlace,
   isGatherPlace,
+  isUsePlace,
+  placedBy,
   legalActions,
   PLACE_CAPACITY,
   PLACE_RESOURCE,
@@ -25,6 +27,8 @@ const PLACE_LABEL: Record<PlaceId, string> = {
   quarry: 'Quarry',
   river: 'River',
 };
+/** Button labels for the non-dice `USE` places. */
+const USE_LABEL: Record<string, string> = { toolMaker: 'Take tool', hut: 'Grow +1', field: 'Field +1' };
 const RESOURCE_LABEL: Record<Resource, string> = { wood: 'Wood', brick: 'Brick', stone: 'Stone', gold: 'Gold' };
 const RESOURCE_DOT: Record<Resource, string> = {
   wood: 'bg-amber-700',
@@ -32,6 +36,13 @@ const RESOURCE_DOT: Record<Resource, string> = {
   stone: 'bg-slate-400',
   gold: 'bg-yellow-400',
 };
+/** Per-seat player colours (the game's palette: red, blue, green, yellow). */
+const SEAT_COLOR = [
+  { dot: 'bg-red-500', text: 'text-red-600', ring: 'ring-red-500' },
+  { dot: 'bg-blue-500', text: 'text-blue-600', ring: 'ring-blue-500' },
+  { dot: 'bg-green-600', text: 'text-green-700', ring: 'ring-green-600' },
+  { dot: 'bg-yellow-400', text: 'text-yellow-600', ring: 'ring-yellow-500' },
+] as const;
 
 const occupancy = (place: Readonly<Record<string, number>>): number =>
   Object.values(place).reduce((sum, n) => sum + n, 0);
@@ -59,6 +70,10 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
   const doGather = (place: PlaceId) => {
     if (!canDrive || !active) return;
     void run(() => stoneageApi.gather(gameId, active.id, place, viewer));
+  };
+  const doUse = (place: PlaceId) => {
+    if (!canDrive || !active) return;
+    void run(() => stoneageApi.act(gameId, active.id, { type: 'USE', place }, viewer));
   };
 
   // The active player's legal placements, collapsed to a {min,max} per place.
@@ -92,11 +107,17 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
         : 'Feeding phase — arrives in a later stage.';
 
   const playerName = (id: string) => game.players.find((p) => p.id === id)?.name ?? id;
+  const seatColorOf = (id: string) => SEAT_COLOR[game.players.findIndex((p) => p.id === id) % SEAT_COLOR.length] ?? SEAT_COLOR[0];
   const describeMove = (entry: StoneAgeView['log'][number]): string => {
     const who = playerName(entry.playerId);
     const p = (entry.payload ?? {}) as Record<string, unknown>;
     if (entry.type === 'PLACE') return `${who} placed ${p['count']} on ${PLACE_LABEL[p['place'] as PlaceId]}`;
     if (entry.type === 'GATHER') return `${who} rolled ${(p['dice'] as number[])?.join('+')} → ${p['amount']} ${p['kind']}`;
+    if (entry.type === 'USE') {
+      const place = p['place'] as PlaceId;
+      const effect = place === 'toolMaker' ? 'took a tool' : place === 'hut' ? 'grew (+1 person)' : 'raised food production';
+      return `${who} ${effect}`;
+    }
     return `${who}: ${entry.type.toLowerCase()}`;
   };
 
@@ -119,7 +140,9 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
             const resource = place in PLACE_RESOURCE ? PLACE_RESOURCE[place as keyof typeof PLACE_RESOURCE] : null;
             const cap = PLACE_CAPACITY[place];
             const option = placeOptions.get(place);
-            const canGather = acting && canDrive && !!active && isGatherPlace(place) && game.placements[place][active.id] !== undefined;
+            const mine = !!active && game.placements[place][active.id] !== undefined;
+            const canGather = acting && canDrive && mine && isGatherPlace(place);
+            const canUse = acting && canDrive && mine && isUsePlace(place);
             return (
               <div key={place} data-testid={`place-${place}`} className="flex flex-col rounded-md border bg-card px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
@@ -136,10 +159,13 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
                 )}
                 {/* Whose people are here. */}
                 {used > 0 && (
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {Object.entries(game.placements[place])
-                      .map(([id, n]) => `${game.players.find((p) => p.id === id)?.name ?? id}×${n}`)
-                      .join(', ')}
+                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs">
+                    {Object.entries(game.placements[place]).map(([id, n]) => (
+                      <span key={id} className={cn('flex items-center gap-1 font-medium', seatColorOf(id).text)}>
+                        <span className={cn('inline-block h-2 w-2 rounded-full', seatColorOf(id).dot)} aria-hidden />
+                        {playerName(id)}×{n}
+                      </span>
+                    ))}
                   </div>
                 )}
                 {option && (
@@ -175,6 +201,17 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
                     Gather
                   </Button>
                 )}
+                {canUse && (
+                  <Button
+                    size="sm"
+                    className="mt-2 self-end"
+                    data-testid={`use-${place}`}
+                    disabled={busy}
+                    onClick={() => doUse(place)}
+                  >
+                    {USE_LABEL[place]}
+                  </Button>
+                )}
               </div>
             );
           })}
@@ -189,14 +226,23 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
             <div
               key={player.id}
               data-testid={`player-${player.id}`}
-              className={cn('rounded-lg border bg-card p-3', seat === game.activePlayerIndex && 'ring-1 ring-primary')}
+              className={cn(
+                'rounded-lg border bg-card p-3',
+                seat === game.activePlayerIndex && cn('ring-2', seatColorOf(player.id).ring),
+              )}
             >
               <div className="mb-2 flex items-center justify-between">
-                <span className="font-medium">{player.name}</span>
+                <span className={cn('flex items-center gap-1.5 font-medium', seatColorOf(player.id).text)}>
+                  <span className={cn('inline-block h-3 w-3 rounded-full', seatColorOf(player.id).dot)} aria-hidden />
+                  {player.name}
+                </span>
                 <span className="text-xs text-muted-foreground" data-testid={`score-${player.id}`}>{player.score} pts</span>
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                <span>👤 People: <span className="font-medium tabular-nums">{player.people}</span></span>
+                <span className="flex items-center gap-1">
+                  <span className={cn('inline-block h-2.5 w-2.5 rounded-full', seatColorOf(player.id).dot)} aria-hidden />
+                  People: <span className="font-medium tabular-nums">{placedBy(game, player.id)}/{player.people}</span> placed
+                </span>
                 <span>🍖 Food: <span className="font-medium tabular-nums">{player.food}</span></span>
                 <span>🌾 Food track: <span className="font-medium tabular-nums">{player.foodTrack}</span></span>
                 <span>🔨 Tools: <span className="font-medium tabular-nums">{player.tools.join(', ') || '—'}</span></span>

@@ -58,3 +58,23 @@ test('SA3: hunt for food', async ({ page }) => {
   await page.getByTestId('gather-hunt').click();
   await expect(page.getByTestId('sa-log')).toContainText('food');
 });
+
+test('SA4–6: use the field to raise food production', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('pick-game-stoneage').click();
+  await page.getByTestId('remove-player-2').click();
+  await page.getByTestId('start-game').click();
+  await expect(page.getByTestId('board')).toBeVisible();
+
+  // Ann → field (1) then hunt (rest); Bob → clay pit (all) → action phase.
+  await page.getByTestId('place-field-go').click(); // Ann places 1 on the field
+  for (let i = 0; i < 4; i += 1) await page.getByTestId('place-clayPit-inc').click(); // Bob
+  await page.getByTestId('place-clayPit-go').click();
+  for (let i = 0; i < 3; i += 1) await page.getByTestId('place-hunt-inc').click(); // Ann's remaining 4
+  await page.getByTestId('place-hunt-go').click();
+
+  // Ann uses the field — her food track goes up (the thing that was missing before).
+  await expect(page.getByTestId('player-p1')).toContainText('Food track: 0');
+  await page.getByTestId('use-field').click();
+  await expect(page.getByTestId('player-p1')).toContainText('Food track: 1');
+});

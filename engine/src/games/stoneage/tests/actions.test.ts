@@ -5,6 +5,7 @@ import { makeState, withPlacements, expectError } from './helpers';
 
 const placeToolMaker = { type: 'PLACE', place: 'toolMaker', count: 1 } as const;
 const gatherForest = { type: 'GATHER', place: 'forest', dice: [1, 1] } as const;
+const useField = { type: 'USE', place: 'field' } as const;
 
 describe('applyAction', () => {
   it('dispatches PLACE during the placement phase', () => {
@@ -12,9 +13,11 @@ describe('applyAction', () => {
     expect(next.placements.toolMaker).toEqual({ p1: 1 });
   });
 
-  it('dispatches GATHER during the action phase', () => {
-    const state = withPlacements({ forest: { p1: 2 } }, { phase: 'actions', activePlayerIndex: 0 });
-    expect(applyAction(state, 'p1', gatherForest).players[0]!.resources.wood).toBeGreaterThanOrEqual(0);
+  it('dispatches GATHER and USE during the action phase', () => {
+    const withForest = withPlacements({ forest: { p1: 2 } }, { phase: 'actions', activePlayerIndex: 0 });
+    expect(applyAction(withForest, 'p1', gatherForest).players[0]!.resources.wood).toBeGreaterThanOrEqual(0);
+    const withField = withPlacements({ field: { p1: 1 } }, { phase: 'actions', activePlayerIndex: 0 });
+    expect(applyAction(withField, 'p1', useField).players[0]!.foodTrack).toBe(1);
   });
 
   it('rejects an unknown player, an off-turn seat, and an ended game', () => {
@@ -26,19 +29,21 @@ describe('applyAction', () => {
   it('refuses each action outside its phase', () => {
     expectError(() => applyAction(makeState({ phase: 'actions' }), 'p1', placeToolMaker), 'WRONG_PHASE');
     expectError(() => applyAction(makeState(), 'p1', gatherForest), 'WRONG_PHASE'); // gather in placement phase
+    expectError(() => applyAction(makeState(), 'p1', useField), 'WRONG_PHASE'); // use in placement phase
   });
 });
 
 describe('legalActions', () => {
-  it('lists the active player’s placements during the placement phase', () => {
+  it('lists placements in the placement phase and USE actions in the action phase', () => {
     expect(legalActions(makeState())).toHaveLength(28); // fresh 2-player board
-    expect(legalActions(makeState(), 'p1')).toHaveLength(28);
+    const acting = withPlacements({ toolMaker: { p1: 1 } }, { phase: 'actions', activePlayerIndex: 0 });
+    expect(legalActions(acting)).toEqual([{ type: 'USE', place: 'toolMaker' }]);
   });
 
-  it('is empty for an off-turn seat, an ended game, or a non-placement phase', () => {
+  it('is empty for an off-turn seat, an ended game, or the feeding phase', () => {
     expect(legalActions(makeState(), 'p2')).toEqual([]);
     expect(legalActions(makeState({ status: 'ended' }))).toEqual([]);
-    expect(legalActions(makeState({ phase: 'actions' }))).toEqual([]);
+    expect(legalActions(makeState({ phase: 'feeding' }))).toEqual([]);
   });
 });
 

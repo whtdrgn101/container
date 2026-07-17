@@ -1,5 +1,6 @@
 import { PLACES, RESOURCE_PLACES } from '../core';
 import type { PlaceId, StoneAgeState } from '../core';
+import type { Action } from '../actions/action';
 
 /**
  * The action phase (rulebook pg. 6, phase 2): the start player uses **all** their placed people, then
@@ -25,13 +26,29 @@ export function isGatherPlace(place: PlaceId): place is ResourcePlace | 'hunt' {
   return isResourcePlace(place) || place === 'hunt';
 }
 
+/** The non-dice places resolved by a plain `USE`: tool maker → tool, hut → person, field → food (SA4–6). */
+export const USE_PLACES: readonly PlaceId[] = ['toolMaker', 'hut', 'field'];
+
+/** Whether a place is resolved by a plain `USE` (rather than a dice roll). */
+export function isUsePlace(place: PlaceId): boolean {
+  return USE_PLACES.includes(place);
+}
+
+/** The non-dice `USE` actions a seat can take right now (the dice gathers are server-only, not listed). */
+export function legalUses(state: StoneAgeState, playerId: string): Action[] {
+  return USE_PLACES.filter((place) => state.placements[place][playerId] !== undefined).map((place) => ({
+    type: 'USE',
+    place,
+  }));
+}
+
 /**
- * Whether a player still has people on a place with an **implemented action**. Today that's the gather
- * places (resources + hunt); each later stage (tool maker, hut, field) adds its place here, until every
- * placement is actionable and a turn simply ends when the board is clear.
+ * Whether a player still has people to resolve. Every board place now has an implemented action (dice
+ * or `USE`), so a player's turn simply ends when their board is clear. (Building/card placements land in
+ * SA9/SA10 and slot in automatically, since they'll live in `placements` too.)
  */
 export function hasActionablePlacements(state: StoneAgeState, playerId: string): boolean {
-  return GATHER_PLACES.some((place) => state.placements[place][playerId] !== undefined);
+  return PLACES.some((place) => state.placements[place][playerId] !== undefined);
 }
 
 /** Return all of a player's people — remove them from every place. */

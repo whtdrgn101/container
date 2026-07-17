@@ -80,18 +80,25 @@ hunter, take 1 **food** per "full 2". Unifying it took only a branch in `gather`
 gather places (`hasActionablePlacements` = resource places + hunt). The roll route and the UI's Gather
 button light up on the hunt for free. 100% engine coverage. *(Tools still arrive with SA4.)*
 
-### SA4 — Tool maker  · **M** · pg. 5
+### ✅ SA4–6 — The non-dice places: tool maker / hut / field (shipped)
 
-Take 1 tool. Model the tool ladder: your 1st–3rd tools are value 1; the 4th–6th upgrade the value-1s to
-2; 7th–9th to 3; 10th–12th to 4. Tools flip back to unused at round start (see SA8).
+The three "instant benefit" places (pg. 5–6) all resolve through **one** action, `USE { place }`, since
+none of them rolls dice: the person is returned and the benefit applied. Engine (`actions/use.ts`,
+`internal/tools.ts`, 100% covered):
 
-### SA5 — Hut  · **S** · pg. 6
+- **SA4 · Tool maker (pg. 5):** take 1 tool via the tool ladder (`addTool`) — your 1st–3rd tools are
+  value 1; the 4th–6th upgrade the lowest value-1 to 2, 7th–9th to 3, 10th–12th to 4 (capped at 3 tools
+  held). *(Spending tools to boost a gather roll is deferred — see notes; tools also don't yet reset per
+  round until SA8.)*
+- **SA5 · Hut (pg. 6):** gain 1 person from the supply.
+- **SA6 · Field (pg. 6):** move up the food track (+1 food produced each round end).
 
-Gain 1 person from the supply — more workers for every future round.
-
-### SA6 — Field  · **S** · pg. 6
-
-Move up the food track — +1 food produced at the end of every round.
+The action-phase "actionable" check now covers **every** place (`hasActionablePlacements = PLACES.some`),
+so a placed tool maker/hut/field is used rather than silently skipped — the bug where placing on the
+field did nothing. `legalActions` lists the `USE` options in the action phase; `parseAction` accepts
+`USE` (still refusing the server-only `GATHER`). UI: a labeled button per place (**Take tool** / **Grow
++1** / **Field +1**) beside the Gather buttons, gated on `canDrive`. Backend + e2e cover the field
+raising food production. A full place → gather/use round is playable, resting at feeding until SA7.
 
 ### SA7 — Feeding phase  · **M** · pg. 7
 
@@ -151,3 +158,6 @@ your actions well). 90% coverage gate + self-play, like the other bots.
   the deck order in SA9/SA10 if it ever matters.
 - **The state grows per stage** — add fields (building stacks, card display, per-place tool spend, dice
   awaiting a roll) when their stage needs them, exactly as Container's state did across its slices.
+- **Deferred (SA4b) — spending tools on a gather roll (pg. 6).** Tools boost a gather total, but that
+  needs a two-step roll (roll → optionally spend tools → finalize), so `GATHER` currently ignores tools.
+  Fold it in when the gather flow gains that pending step; it also depends on SA8's per-round tool reset.

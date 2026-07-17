@@ -11,7 +11,9 @@ export type StoneAgeErrorCode =
   // An illegal worker placement: a full/re-used place, the wrong count, or too few people (SA1).
   | 'INVALID_PLACEMENT'
   // An illegal resource gather: no people on that place, or the wrong dice (SA2).
-  | 'INVALID_GATHER';
+  | 'INVALID_GATHER'
+  // An illegal use of a non-dice place — tool maker / hut / field (SA4–6).
+  | 'INVALID_USE';
 
 /**
  * Thrown when a Stone Age action is illegal. The shared kernel `GameError` carries the code/message

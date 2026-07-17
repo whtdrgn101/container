@@ -4,6 +4,7 @@ import { seatOf } from '../internal';
 import type { Action } from './action';
 import { gather } from './gather';
 import { place } from './place';
+import { use } from './use';
 
 /**
  * Apply an action for `playerId`, enforcing turn order and the current phase. Throws GameError on any
@@ -31,5 +32,10 @@ export function applyAction(state: StoneAgeState, playerId: string, action: Acti
         throw new GameError('WRONG_PHASE', 'Resources are only gathered during the action phase');
       }
       return gather(state, playerId, action.place, action.dice);
+    case 'USE':
+      if (state.phase !== 'actions') {
+        throw new GameError('WRONG_PHASE', 'Places are only used during the action phase');
+      }
+      return use(state, playerId, action.place);
   }
 }

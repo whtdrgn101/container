@@ -2,4 +2,5 @@
 export * from './players';
 export * from './placement';
 export * from './actionsPhase';
+export * from './tools';
 export * from './record';
