@@ -3,9 +3,10 @@ import type { Action, PlaceId } from '@game-hub/engine/stoneage';
 import type { ParseResult } from '../module';
 
 /**
- * Validate opaque JSON into a typed Stone Age `Action`: `PLACE` (SA1) and `USE` (the non-dice places,
- * SA4–6). `GATHER` is server-only (the roll route builds its dice). Structural checks only — the engine
- * judges legality (whose turn, which place is full/wrong-kind) and answers with a `GameError`.
+ * Validate opaque JSON into a typed Stone Age `Action`: `PLACE` (SA1), `USE` (the non-dice places,
+ * SA4–6) and `FEED` (SA7). `GATHER` is server-only (the roll route builds its dice). Structural checks
+ * only — the engine judges legality (whose turn, which place is full/wrong-kind) and answers with a
+ * `GameError`.
  */
 export function parseStoneAgeAction(raw: unknown): ParseResult<Action> {
   if (typeof raw !== 'object' || raw === null) return bad('An action must be an object');
@@ -26,6 +27,11 @@ export function parseStoneAgeAction(raw: unknown): ParseResult<Action> {
     case 'USE': {
       if (!validPlace) return bad('USE requires a valid board place');
       return { ok: true, action: { type: 'USE', place: place as PlaceId } };
+    }
+    case 'FEED': {
+      const pay = record['payWithResources'];
+      if (pay !== undefined && typeof pay !== 'boolean') return bad('FEED payWithResources must be a boolean');
+      return { ok: true, action: { type: 'FEED', payWithResources: pay } };
     }
     case 'GATHER':
       return bad('GATHER is server-only — use POST /games/:id/stoneage/roll');

@@ -22,6 +22,8 @@ test('resume an in-progress game from the home screen by picking a seat', async 
   const row = returner.getByTestId(`active-game-${code}`);
   await expect(row).toBeVisible();
   await expect(row).toContainText('Ann');
+  // The row names which game it is (its game type), not just the code.
+  await expect(returner.getByTestId(`active-game-type-${code}`)).toHaveText('Container');
   await returner.getByTestId(`resume-${code}-p2`).click();
 
   // They're back in the game bound to Bob's seat: tab title, own card visible, others hidden.

@@ -41,4 +41,4 @@ export type { StoneAgeView, Viewer } from './view';
 export { availableToPlace, isGatherPlace, isResourcePlace, isUsePlace, placedBy } from './internal';
 
 // Mechanics + turn-aware entry point. `gather` is server-only (the roll route builds its dice).
-export { place, gather, use, applyAction, legalActions } from './actions';
+export { place, gather, use, feed, applyAction, legalActions } from './actions';

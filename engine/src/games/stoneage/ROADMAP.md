@@ -100,16 +100,29 @@ field did nothing. `legalActions` lists the `USE` options in the action phase; `
 +1** / **Field +1**) beside the Gather buttons, gated on `canDrive`. Backend + e2e cover the field
 raising food production. A full place → gather/use round is playable, resting at feeding until SA7.
 
-### SA7 — Feeding phase  · **M** · pg. 7
+### ✅ SA7–8 — Feeding + round transition: a full playable round loop (shipped)
 
-After the action phase: each player gains food-track production, then pays 1 food per person. Shortfall
-may be covered with resources (1 each) or costs **−10 points**. Phase transition out of the round.
+The round now closes and rolls over (pg. 7). Both landed together since feeding *is* the trigger for the
+new round. Engine (`actions/feed.ts`, `internal/feeding.ts`, 100% covered):
 
-### SA8 — Round transition  · **S** · pg. 7
+- **SA7 · Feeding (pg. 7):** the `FEED` action — take the field's food-track production first, then pay
+  1 food per person. A shortfall may be covered with resources (1 food each, **least valuable spent
+  first** so the pricier ones survive for scoring — `payWithResources`, default true); declining or being
+  unable loses **all** food and costs **−10 points** (clamped at 0). Feeding is sequential in start-player
+  order; `legalActions` offers `FEED` in the feeding phase and `parseAction` accepts it (not server-only —
+  no dice).
+- **SA8 · Round transition (pg. 7, "New round"):** once the last player feeds, `advanceFeeder` →
+  `startNewRound`: pass the start-player marker one seat left, clear the board, bump the round, and return
+  to placement with the new start player up.
 
-Close the loop: rotate the start player left, clear placements, flip used tools back, reset the
-hunt's once-per-round, advance the round. With SA1–SA7 this makes Stone Age a playable multi-round loop
-(minus buildings/cards).
+UI: a **feed panel** in the feeding phase showing need vs. food on hand, with **Feed people** (no
+shortfall), **Pay N resources** / **Take −10** (short but able), or just **Take −10** (can't cover),
+gated on `canDrive`; the move log narrates each feed. Backend + e2e play a full round and assert it rolls
+into round 2. **Stone Age is now a playable multi-round loop** (minus buildings/cards).
+
+*(Deferred to their stages: flipping used tools back to unused — SA8's tool reset waits on SA4b's
+tool-spending; the hunt's once-per-round limit — placements already clear each round; the hand-picked
+resource spend at feeding — auto lowest-value-first for now.)*
 
 ### SA9 — Buildings  · **M–L** · pg. 7 + setup pg. 3
 

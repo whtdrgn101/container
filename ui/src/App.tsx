@@ -351,7 +351,7 @@ export default function App() {
   }, [heading]);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gradient-to-b from-accent/40 via-background to-background">
       <Header
         heading={heading}
         gameId={gameId}

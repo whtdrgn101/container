@@ -3,5 +3,6 @@ export * from './action';
 export * from './place';
 export * from './gather';
 export * from './use';
+export * from './feed';
 export * from './applyAction';
 export * from './legalActions';

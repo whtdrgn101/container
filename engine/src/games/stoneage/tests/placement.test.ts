@@ -83,7 +83,7 @@ describe('legalPlacements', () => {
     // The tool maker is taken, so it drops out (28 − its one option = 27).
     const options = legalPlacements(withPlacements({ toolMaker: { p2: 1 } }), 'p1');
     expect(options).toHaveLength(27);
-    expect(options.some((a) => a.place === 'toolMaker')).toBe(false);
+    expect(options.some((a) => a.type === 'PLACE' && a.place === 'toolMaker')).toBe(false);
   });
 });
 

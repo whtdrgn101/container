@@ -91,8 +91,21 @@ export function Landing({
   const minPlayers = selected?.minPlayers ?? 1;
   const maxPlayers = selected?.maxPlayers ?? 8;
 
+  // The display name for a game type (e.g. "stoneage" → "Stone Age"), from the catalog the server
+  // returns. Falls back to the raw id if the catalog hasn't loaded or the game is unknown to this build.
+  const gameLabel = (gameType: string) => catalog.find((entry) => entry.id === gameType)?.name ?? gameType;
+
   return (
     <div className="mx-auto max-w-md space-y-4">
+      <div className="space-y-1 pb-1 text-center">
+        <h2 className="bg-gradient-to-br from-primary to-fuchsia-500 bg-clip-text text-2xl font-bold tracking-tight text-transparent">
+          Game Hub
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Self-hosted board games for your table — no accounts, just a shared code.
+        </p>
+      </div>
+
       {openLobbies.length > 0 && (
         <Card data-testid="waiting-games">
           <CardHeader>
@@ -119,11 +132,21 @@ export function Landing({
                   .filter((entry) => !entry.member.bot);
                 const hasEmptySeat = open.members.some((member) => member === null);
                 return (
-                  <li key={open.id} data-testid={`waiting-game-${open.id}`} className="space-y-2 rounded-md border px-3 py-2">
+                  <li
+                    key={open.id}
+                    data-testid={`waiting-game-${open.id}`}
+                    className="space-y-2 rounded-md border px-3 py-2 transition-shadow hover:border-primary/30 hover:shadow-sm"
+                  >
                     <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                      <span className="font-mono">{open.id.slice(0, 8)}</span>
+                      <span
+                        data-testid={`waiting-game-type-${open.id}`}
+                        className="rounded-full bg-accent px-2 py-0.5 font-medium text-accent-foreground"
+                      >
+                        {gameLabel(open.gameType)}
+                      </span>
+                      <span className="ml-auto font-mono">{open.id.slice(0, 8)}</span>
                       <span>
-                        {taken.length}/{open.seats} players
+                        · {taken.length}/{open.seats} players
                       </span>
                     </div>
                     {/*
@@ -185,10 +208,20 @@ export function Landing({
           <CardContent>
             <ul className="space-y-2">
               {activeGames.map((active) => (
-                <li key={active.id} data-testid={`active-game-${active.id}`} className="space-y-2 rounded-md border px-3 py-2">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="font-mono">{active.id.slice(0, 8)}</span>
-                    <span>Turn {active.turn}</span>
+                <li
+                  key={active.id}
+                  data-testid={`active-game-${active.id}`}
+                  className="space-y-2 rounded-md border px-3 py-2 transition-shadow hover:border-primary/30 hover:shadow-sm"
+                >
+                  <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <span
+                      data-testid={`active-game-type-${active.id}`}
+                      className="rounded-full bg-accent px-2 py-0.5 font-medium text-accent-foreground"
+                    >
+                      {gameLabel(active.gameType)}
+                    </span>
+                    <span className="ml-auto font-mono">{active.id.slice(0, 8)}</span>
+                    <span>· Turn {active.turn}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-1">
                     <span className="mr-1 text-xs text-muted-foreground">Resume as</span>

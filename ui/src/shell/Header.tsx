@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Dices } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 /**
@@ -23,9 +24,16 @@ export interface HeaderProps {
 
 export function Header({ heading, gameId, canLeave, onLeave, status }: HeaderProps) {
   return (
-    <header className="border-b">
+    <header className="sticky top-0 z-20 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-3">
-        <h1 className="text-lg font-bold tracking-tight sm:text-xl" data-testid="page-title">
+        <div className="flex items-center gap-2.5">
+          <span
+            aria-hidden
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-primary to-fuchsia-500 text-primary-foreground shadow-sm"
+          >
+            <Dices className="h-4 w-4" />
+          </span>
+          <h1 className="text-lg font-bold tracking-tight sm:text-xl" data-testid="page-title">
           {canLeave ? (
             // Only a link when there's somewhere to go back to. Leaving is safe and needs no
             // confirmation: the game lives on the server, so it keeps running (bots included) and
@@ -45,7 +53,8 @@ export function Header({ heading, gameId, canLeave, onLeave, status }: HeaderPro
           ) : (
             heading
           )}
-        </h1>
+          </h1>
+        </div>
         {gameId && (
           <div className="flex items-center gap-3">
             <button

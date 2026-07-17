@@ -78,3 +78,30 @@ test('SA4–6: use the field to raise food production', async ({ page }) => {
   await page.getByTestId('use-field').click();
   await expect(page.getByTestId('player-p1')).toContainText('Food track: 1');
 });
+
+test('SA7–8: feed everyone and roll into the next round', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('pick-game-stoneage').click();
+  await page.getByTestId('remove-player-2').click();
+  await page.getByTestId('start-game').click();
+  await expect(page.getByTestId('board')).toBeVisible();
+
+  // A quick placement round: Ann → hunt (all), Bob → forest (all) → action phase.
+  const placeAll = async (place: string) => {
+    for (let i = 0; i < 4; i += 1) await page.getByTestId(`place-${place}-inc`).click();
+    await page.getByTestId(`place-${place}-go`).click();
+  };
+  await placeAll('hunt');
+  await placeAll('forest');
+
+  // Both gather (returns their people) → feeding phase.
+  await page.getByTestId('gather-hunt').click();
+  await page.getByTestId('gather-forest').click();
+  await expect(page.getByTestId('sa-banner')).toContainText('Feeding phase');
+
+  // Feed both players (12 starting food ≥ 5 people — no shortfall) → round 2 begins.
+  await page.getByTestId('feed-go').click(); // Ann
+  await page.getByTestId('feed-go').click(); // Bob
+  await expect(page.getByTestId('turn-info')).toContainText('Round 2');
+  await expect(page.getByTestId('sa-banner')).toContainText('place your people');
+});

@@ -48,9 +48,9 @@ const occupancy = (place: Readonly<Record<string, number>>): number =>
   Object.values(place).reduce((sum, n) => sum + n, 0);
 
 /**
- * Stone Age's board. **Placement phase (roadmap SA1) is live** — on your turn you place people on the
- * board's places; the action/feeding phases and buildings/cards arrive in later stages. The board is
- * still read-only outside the placement phase.
+ * Stone Age's board. A **full round** is playable (roadmap SA1–SA8): place people, use their actions
+ * (gather / tool maker / hut / field), feed everyone, then the round rolls over. Buildings, civilization
+ * cards, game end and the AI bot arrive in later stages.
  */
 export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewer, busy, guard, onPayload }: BoardProps<StoneAgeView>) {
   // Draft count per place for the variable places (hunt / resource); fixed places ignore it.
@@ -61,6 +61,7 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
   const canDrive = !activeIsBot && (!controlledIds || (!!active && controlledIds.includes(active.id)));
   const placing = game.phase === 'placement';
   const acting = game.phase === 'actions';
+  const feedingPhase = game.phase === 'feeding';
 
   const run = (work: () => Promise<stoneageApi.StoneAgePayload>) => guard(async () => onPayload(await work()));
   const doPlace = (place: PlaceId, count: number) => {
@@ -75,6 +76,20 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
     if (!canDrive || !active) return;
     void run(() => stoneageApi.act(gameId, active.id, { type: 'USE', place }, viewer));
   };
+  const doFeed = (payWithResources: boolean) => {
+    if (!canDrive || !active) return;
+    void run(() => stoneageApi.act(gameId, active.id, { type: 'FEED', payWithResources }, viewer));
+  };
+
+  // Feeding maths for the active player (pg. 7): food-track production first, then 1 food per person.
+  const feed = active
+    ? (() => {
+        const produced = active.food + active.foodTrack;
+        const shortfall = Math.max(0, active.people - produced);
+        const resourcesOnHand = RESOURCES.reduce((sum, r) => sum + active.resources[r], 0);
+        return { produced, shortfall, canPay: resourcesOnHand >= shortfall };
+      })()
+    : { produced: 0, shortfall: 0, canPay: true };
 
   // The active player's legal placements, collapsed to a {min,max} per place.
   const placeOptions = new Map<PlaceId, { min: number; max: number }>();
@@ -104,7 +119,9 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
         ? canDrive
           ? 'Your turn — gather resources from your places (rolls the dice)'
           : `Waiting for ${waitingFor} to gather…`
-        : 'Feeding phase — arrives in a later stage.';
+        : canDrive
+          ? 'Feeding phase — feed your people (1 food each)'
+          : `Waiting for ${waitingFor} to feed…`;
 
   const playerName = (id: string) => game.players.find((p) => p.id === id)?.name ?? id;
   const seatColorOf = (id: string) => SEAT_COLOR[game.players.findIndex((p) => p.id === id) % SEAT_COLOR.length] ?? SEAT_COLOR[0];
@@ -118,6 +135,11 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
       const effect = place === 'toolMaker' ? 'took a tool' : place === 'hut' ? 'grew (+1 person)' : 'raised food production';
       return `${who} ${effect}`;
     }
+    if (entry.type === 'FEED') {
+      if (p['starved'] !== undefined) return `${who} went hungry — −${p['penalty']} points`;
+      if (p['paidResources'] !== undefined) return `${who} fed ${p['need']} people (${p['paidResources']} from resources)`;
+      return `${who} fed ${p['need']} people`;
+    }
     return `${who}: ${entry.type.toLowerCase()}`;
   };
 
@@ -130,6 +152,34 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
         <span className="font-medium">{banner}</span>
         {active && <span className="text-xs text-muted-foreground">{active.name}’s turn</span>}
       </div>
+
+      {/* Feeding phase (pg. 7): pay 1 food per person; cover any shortfall with resources or take −10. */}
+      {feedingPhase && canDrive && active && (
+        <div data-testid="feed-panel" className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-3 py-2 text-sm">
+          <span>
+            {active.name} needs <span className="font-medium tabular-nums">{active.people}</span> food · has{' '}
+            <span className="font-medium tabular-nums">{feed.produced}</span>
+            {active.foodTrack > 0 && <span className="text-muted-foreground"> (incl. +{active.foodTrack} produced)</span>}
+          </span>
+          {feed.shortfall === 0 ? (
+            <Button size="sm" className="ml-auto" data-testid="feed-go" disabled={busy} onClick={() => doFeed(true)}>
+              Feed people
+            </Button>
+          ) : (
+            <span className="ml-auto flex items-center gap-2">
+              <span className="text-destructive">short {feed.shortfall}</span>
+              {feed.canPay && (
+                <Button size="sm" data-testid="feed-go" disabled={busy} onClick={() => doFeed(true)}>
+                  Pay {feed.shortfall} resources
+                </Button>
+              )}
+              <Button size="sm" variant="outline" data-testid="feed-penalty" disabled={busy} onClick={() => doFeed(false)}>
+                Take −10
+              </Button>
+            </span>
+          )}
+        </div>
+      )}
 
       {/* The board places (pg. 4). During the placement phase the active player can place here. */}
       <div>

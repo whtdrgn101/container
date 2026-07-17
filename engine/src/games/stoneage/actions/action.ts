@@ -14,6 +14,9 @@ export type Action =
   // rolled with the injected rng by the roll route and never chosen by a client — like Can't Stop's `ROLL`.
   | { readonly type: 'GATHER'; readonly place: PlaceId; readonly dice: readonly number[] }
   // Use a non-dice place — tool maker → tool, hut → person, field → food production (SA4–6).
-  | { readonly type: 'USE'; readonly place: PlaceId };
+  | { readonly type: 'USE'; readonly place: PlaceId }
+  // Feed your people in the feeding phase (SA7). `payWithResources` (default true) covers any food
+  // shortfall with resources; false (or being unable) takes the −10 penalty instead.
+  | { readonly type: 'FEED'; readonly payWithResources?: boolean };
 
 export type ActionType = Action['type'];

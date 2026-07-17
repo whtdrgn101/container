@@ -187,6 +187,40 @@ describe('Stone Age gathering (SA2)', () => {
     expect(used.json().game.players[0].foodTrack).toBe(1);
   });
 
+  it('feeds every player and rolls into the next round (SA7–8)', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/games',
+      payload: { gameType: 'stoneage', players: [{ name: 'Ann' }, { name: 'Bob' }] },
+    });
+    const id = created.json().game.id as string;
+
+    // Placement → action phase, then both players gather (returning their people) → feeding phase.
+    await placeAction(id, 'p1', 'hunt', 5);
+    await placeAction(id, 'p2', 'forest', 5);
+    dice.enqueue([1, 1, 1, 1, 1]); // Ann's hunt
+    await app.inject({ method: 'POST', url: `/games/${id}/stoneage/roll`, payload: { playerId: 'p1', place: 'hunt' } });
+    dice.enqueue([1, 1, 1, 1, 1]); // Bob's forest
+    await app.inject({ method: 'POST', url: `/games/${id}/stoneage/roll`, payload: { playerId: 'p2', place: 'forest' } });
+
+    const feeding = await app.inject({ method: 'GET', url: `/games/${id}` });
+    expect(feeding.json().game.phase).toBe('feeding');
+
+    // Both players feed (12 starting food ≥ 5 people, so no shortfall) → the round rolls over.
+    await app.inject({ method: 'POST', url: `/games/${id}/actions`, payload: { playerId: 'p1', action: { type: 'FEED' } } });
+    const afterFeed = await app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId: 'p2', action: { type: 'FEED' } },
+    });
+    expect(afterFeed.statusCode).toBe(200);
+    const game = afterFeed.json().game;
+    expect(game.round).toBe(2);
+    expect(game.phase).toBe('placement');
+    expect(game.startPlayerIndex).toBe(1); // start marker passed one seat left
+    expect(game.players[0].food).toBe(9); // Ann: 12 + hunt floor(5/2)=2 = 14, − 5 people = 9
+  });
+
   it('refuses a GATHER posted to /actions — dice are server-only', async () => {
     const created = await app.inject({
       method: 'POST',

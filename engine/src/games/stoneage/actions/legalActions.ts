@@ -3,9 +3,9 @@ import { activePlayer, legalPlacements, legalUses } from '../internal';
 import type { Action } from './action';
 
 /**
- * The actions a seat may take right now. During the placement phase this is every legal `PLACE` for the
- * active player (one per place/count); in the other phases it's empty until those stages land.
- * `playerId` defaults to the active player; an off-turn seat gets nothing.
+ * The actions a seat may take right now: every legal `PLACE` in the placement phase, the `USE` actions
+ * in the action phase, and `FEED` in the feeding phase. `playerId` defaults to the active player; an
+ * off-turn seat gets nothing.
  */
 export function legalActions(state: StoneAgeState, playerId?: string): Action[] {
   if (state.status === 'ended') return [];
@@ -19,5 +19,6 @@ export function legalActions(state: StoneAgeState, playerId?: string): Action[] 
     // The `USE` actions (tool maker/hut/field); the dice gathers are server-only, offered by the route.
     return legalUses(state, active.id);
   }
-  return [];
+  // Feeding: the active feeder simply feeds (whether to spend resources is the action's own parameter).
+  return [{ type: 'FEED' }];
 }
