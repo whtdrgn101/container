@@ -33,8 +33,9 @@ test('the shell imports no game engine', () => {
     .filter((path) => !path.startsWith(GAME_DIR))
     .filter((path) => {
       const source = readFileSync(path, 'utf8');
-      // Match real imports only — these files *talk about* the rule in their comments.
-      return /^\s*import\s[^;]*from\s+'@container\/engine'/m.test(source);
+      // Match real imports only — these files *talk about* the rule in their comments. Catches every
+      // engine subpath (`@container/engine/container`, `/cantstop`, `/kernel`), not just the old bare id.
+      return /^\s*import\s[^;]*from\s+'@container\/engine(\/[^']*)?'/m.test(source);
     })
     .map((path) => path.slice(SRC.length + 1));
 
@@ -45,7 +46,7 @@ test('only the registry reaches into a game', () => {
   const offenders = sourceFiles(SRC)
     .filter((path) => !path.startsWith(GAME_DIR))
     .filter((path) => path !== join(SRC, 'games', 'registry.ts'))
-    .filter((path) => /^\s*import\s[^;]*from\s+'[^']*games\/container/m.test(readFileSync(path, 'utf8')))
+    .filter((path) => /^\s*import\s[^;]*from\s+'[^']*games\/(container|cantstop)\//m.test(readFileSync(path, 'utf8')))
     .map((path) => path.slice(SRC.length + 1));
 
   expect(offenders, 'only games/registry.ts may name a specific game').toEqual([]);

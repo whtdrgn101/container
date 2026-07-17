@@ -47,11 +47,15 @@ A fuller mechanic-by-mechanic breakdown lives in the rulebook; capture edge case
 
 ```
 container/
-├── engine/     @container/engine  — pure, deterministic rules core (NO I/O, NO randomness)
-├── bot/        @container/bot     — AI players; pure policies over a redacted GameView
+├── engine/     @container/engine  — pure, deterministic rules cores (NO I/O, NO randomness)
+│   └── src/                        — a per-game platform, mirroring the backend/UI:
+│       ├── kernel/                 — the tiny shared kernel: GameError, MoveRecord, Viewer
+│       └── games/                  — one folder per game (container/, cantstop/), each its own
+│                                     subpath export `@container/engine/<game>`
+├── bot/        @container/bot     — AI players; pure policies over a redacted GameView (Container)
 ├── backend/    @container/backend — Fastify REST API; persists to SQLite; runs the AI (BotRunner)
 │   └── src/games/                 — the GameModule seam: module.ts (contract), registry.ts,
-│                                    container/ (Container as one registered game)
+│                                    container/ + cantstop/ (each a registered game)
 ├── ui/         @container/ui      — React + Tailwind + shadcn; talks to the API
 │   └── src/
 │       ├── App.tsx                — the Game Hub shell: routing + seat binding (knows no game)
@@ -59,8 +63,8 @@ container/
 │       ├── hooks/                 — useGameTransport (one socket), useHomeLists
 │       ├── lib/api.ts             — the platform API client (generic)
 │       └── games/                 — the GameClient seam: types.ts, registry.ts,
-│                                    container/ (board + panels + its own api.ts)
-└── reference_material/            — the rulebook PDF
+│                                    container/ + cantstop/ (board + its own api.ts)
+└── reference_materials/           — the rulebook PDFs (Container, Can't Stop)
 ```
 
 **Data flow:** UI → REST → backend → **engine** (authoritative) → SQLite snapshot + move log.
@@ -108,8 +112,10 @@ literal: two games can run side by side on one server, proven by `tests/module-s
 - **`POST /games/:id/actions` takes opaque JSON.** Fastify validates only `{ playerId, action: object }`;
   **all** action validation is `module.parseAction`. Don't re-add a `type` enum to the route — that's the
   thing that couldn't survive a second game.
-- **Randomness is injected** (`createGame({ rng })`), never reached for inside a module. That's what
-  keeps every engine pure, deterministic and replayable.
+- **Randomness is injected**, never reached for inside a module — at setup (`createGame({ rng })`) and,
+  since C3, **per action** via `ModuleContext.rng` (Can't Stop's dice roll route draws from it and
+  applies a pure engine action carrying the result). That's what keeps every engine pure, deterministic
+  and replayable. A module reaching for `Math.random` is the bug this prevents.
 ### The `GameClient` seam — the UI side (Track C / C2)
 
 The UI mirrors the backend split. `App.tsx` is the **Game Hub shell**: landing, lobby, navigation,
@@ -155,17 +161,26 @@ opponents** later (both just drive the same engine).
 
 ### How the shared engine is consumed
 
-`@container/engine` exports **TypeScript source** (`exports: "./src/index.ts"`), not a build.
-Both consumers transpile it directly:
+`@container/engine` exports **TypeScript source** (not a build), and is a **per-game platform**:
+there is deliberately **no `.` entry**. Consumers import a specific game's surface by subpath —
+`@container/engine/container`, `@container/engine/cantstop` — over a tiny shared
+`@container/engine/kernel`. No game is a privileged default, mirroring the backend rule "resolve the
+module from the row, never a default". Both consumers transpile the TS source directly:
 
 - **backend** — `tsx` (dev/prod-start) and Vitest (`server.deps.inline: [/@container\/engine/]`)
-  transform the TS source across the workspace boundary.
-- **ui** — `vite.config.ts` aliases `@container/engine` → `../engine/src/index.ts` so Vite
-  bundles it as project source. This also gives the **frontend shared types** (`GameState`,
-  `Color`, …) for free.
+  transform the TS source across the workspace boundary; the subpath `exports` map resolves each game.
+- **ui** — `vite.config.ts` has **one alias per subpath** (`/container`, `/cantstop`, `/kernel`) →
+  the matching `engine/src/…` file, so Vite bundles it as project source. This also gives the
+  **frontend shared types** (`CantStopState`, `Color`, …) for free.
 
 `engine` also has a real `build` (`tsc -p tsconfig.build.json` → `dist/`) used for typecheck/
 distribution; consumers may switch to `dist` later if we ever publish.
+
+**The kernel is tiny on purpose** (`engine/src/kernel/`): only `GameError` (generic in its code
+union), `MoveRecord`, and `Viewer` — the primitives every game *and* the backend `GameModule` contract
+share. Each game keeps its **own** `record()`, state types, constants and `viewFor`. We did **not**
+extract a shared `record`/state off two examples — same discipline as not building a sealed-bid
+framework off one. If a third game makes a shape genuinely common, extract it *then*.
 
 ### The bot package (`@container/bot`, Track A)
 
@@ -193,43 +208,86 @@ authoritative — it just produces an `Action` that the engine validates like an
 
 ### Engine module layout
 
-The engine is organized into small, single-responsibility modules (SRP) with barrel files; the
-public API is defined solely by `engine/src/index.ts`. Consumers import only from `@container/engine`,
-never deep paths.
+The engine hosts **one folder per game** under `engine/src/games/<game>/`, over the shared
+`engine/src/kernel/`. Each game is organized into small, single-responsibility modules (SRP) with
+barrel files; its public API is defined solely by its own `index.ts`, exported as
+`@container/engine/<game>`. Consumers import that subpath, never deep paths.
 
 ```
 engine/src/
-  index.ts            # THE public API (the only thing consumers import)
-  createGame.ts       # game setup
-  core/               # foundational data/types, no game logic
-    colors.ts  constants.ts  errors.ts  types.ts  index.ts
-  internal/           # shared helpers (DRY), not part of the public API
-    players.ts        # seatOf, getPlayer, withPlayer
-    containers.ts     # colorsOf, isSubMultiset, assertValidLots
-    record.ts         # record() — the one place that bumps version + appends to the log
+  kernel/             # the tiny shared kernel (both games + the backend contract use these)
+    errors.ts         # GameError<Code> — generic base class; each game subclasses it
+    moveRecord.ts     # MoveRecord (type-only)
+    viewer.ts         # Viewer (type-only)
     index.ts
-  actions/            # ONE file per action/mechanic + the dispatcher
-    action.ts         # the Action union
-    produce.ts  build.ts  reprice.ts  endTurn.ts
-    applyAction.ts    # turn-aware dispatcher (the single entry point for a move)
-    legalActions.ts   # enumerates legal moves
-    index.ts
-  tests/              # ONE test file per piece + shared helpers
-    helpers.ts        # makeGame/makePlayer/sc/expectError/newGame (DRY test fixtures)
-    <piece>.test.ts
+  games/
+    container/        # Container — see below; exported as @container/engine/container
+    cantstop/         # Can't Stop — the worked second game
+      index.ts        # THE game's public API (the only thing consumers import)
+      createGame.ts   # game setup (deterministic; Can't Stop needs no setup rng)
+      core/           # foundational data/types, no game logic
+        constants.ts  errors.ts  types.ts  index.ts
+      internal/       # shared helpers (DRY), not part of the public API
+        players.ts    # seatOf, activePlayer, withPlayer
+        columns.ts    # legalSelections/applySelection — the pairing + must-place rules
+        record.ts     # record() — the one place that bumps version + appends to the log
+        index.ts
+      actions/        # ONE file per action/mechanic + the dispatcher
+        action.ts     # the Action union (ROLL is server-only)
+        roll.ts  select.ts  stop.ts
+        applyAction.ts  # turn-aware dispatcher (the single entry point for a move)
+        legalActions.ts # enumerates legal moves (never ROLL — the route owns it)
+        index.ts
+      tests/          # ONE test file per piece + shared helpers
+        helpers.ts    # newGame/makeState/expectError (DRY test fixtures)
+        <piece>.test.ts
 ```
 
-**Conventions (follow these when adding mechanics):**
-- **One mechanic = one file** in `actions/` + **one matching test file** in `tests/`. Reuse
-  `internal/` helpers rather than re-implementing (DRY). Never bump `version`/`log` outside `record()`.
+**Conventions (follow these when adding a mechanic to a game):**
+- **One mechanic = one file** in that game's `actions/` + **one matching test file** in `tests/`.
+  Reuse the game's `internal/` helpers rather than re-implementing (DRY). Never bump `version`/`log`
+  outside `record()`.
 - **Barrels** (`index.ts`) only re-export; they contain no logic and are excluded from coverage
-  (along with type-only files `core/types.ts`, `actions/action.ts`).
-- **Keep files small and single-responsibility** — well under any 1000-line linter threshold. If a
-  file is growing past a few hundred lines, split it.
-- Within a folder, import siblings by **direct path** (e.g. `applyAction.ts` imports `./produce`),
-  not via the folder barrel, to avoid cycles. Import across folders via the barrel (`../core`, `../internal`).
+  (along with type-only files: `games/*/core/types.ts`, `games/*/actions/action.ts`,
+  `kernel/moveRecord.ts`, `kernel/viewer.ts`). The **100% gate spans every game** in the package.
+- **Keep files small and single-responsibility** — well under any 1000-line linter threshold.
+- Within a folder, import siblings by **direct path** (e.g. `applyAction.ts` imports `./roll`), not
+  via the folder barrel, to avoid cycles. Import across folders via the barrel (`../core`,
+  `../internal`); reach the kernel by relative path (`../../kernel`).
 - Adding a new action = new `Action` variant in `action.ts` + a mechanic file + an `applyAction`
-  case + a `legalActions` branch + a public export in `src/index.ts` + a test file.
+  case + a `legalActions` branch + a public export in that game's `index.ts` + a test file.
+
+### Building a new game (the platform recipe)
+
+Container and Can't Stop are two registered games on one platform; a third is **additive**, touching
+no shared core. The seams are the same at every layer — engine, backend, UI — and each has an "only
+the game knows this" rule. To add a game `foo`:
+
+1. **Engine** — `engine/src/games/foo/` with the layout above; export its surface from
+   `index.ts`, add `"./foo": "./src/games/foo/index.ts"` to `engine/package.json`'s `exports`, and a
+   matching alias in `ui/vite.config.ts`. Subclass the kernel `GameError` for `foo`'s own error codes.
+   **The engine stays pure** — no `Date`, no `Math.random`. Randomness that a *rule* consumes (dice,
+   shuffles) comes in as **data**: model it as an action carrying the already-rolled values, or as a
+   `createGame` input, so the state function is deterministic and the 100% gate is reachable.
+2. **Backend** — `backend/src/games/foo/` implementing `GameModule<State, Action>` (`createGame`,
+   `applyAction`, `legalActions`, `viewFor`, `parseAction`, `summarize`, `versionOf`, `movesOf`,
+   `mapError`), and `.register(fooModule)` in `games/index.ts`. **`parseAction` accepts only the
+   actions a *client* may send.** A game's own endpoints (and any server-only action) go behind
+   `routes` under `/games/:id/foo/…` — never into the core, and never re-add a `type` enum to
+   `POST /actions`.
+   - **Per-turn randomness is injected via `ModuleContext.rng`** (added for Can't Stop's dice). A
+     module route rolls from `ctx.rng` and applies a pure engine action carrying the result — the
+     client only asks; it can't choose the dice. **Never reach for `Math.random` in a module.**
+   - Optional hooks: `pendingStep` (refuse a `/actions` move owned by a flow of yours),
+     `onStateChanged` (push a side-channel), `createBotDriver` (AI seats). Can't Stop omits all three.
+3. **UI** — `ui/src/games/foo/` implementing `GameClient` (a **lazy** `Board`, a cheap non-lazy
+   `Status`), its own `api.ts` (pin `lib/api.ts`'s generic `unknown` back to `foo`'s view type; put
+   `foo`'s own endpoints here), and `cantstopClient`-style registration in `games/registry.ts` (the
+   one cast). **No shell file may import `@container/engine/*`** — `e2e/architecture.spec.ts` enforces
+   it. The landing picker activates automatically once two games are registered.
+4. **Tests** — 100% engine coverage for `foo`; a backend suite that plays it over REST (seed
+   `AppOptions.rng` for deterministic rolls) and asserts it coexists with the other games; an
+   `e2e/foo.spec.ts` that picks it and plays a turn. Keep every existing suite green.
 
 ## Tech stack (and why)
 
@@ -265,10 +323,11 @@ engine/src/
   `money-<id>`, `store-count-<id>`, `produce-<id>`) — keep these stable; Playwright depends on them.
 - **shadcn components** are copied into `ui/src/components/ui` (not a dependency). Extend them
   in place.
-- **Test layout:** engine/backend **unit tests live in `src/tests/`** (e.g. `engine/src/tests/`,
-  `backend/src/tests/`), not colocated beside source. UI **Playwright specs stay in `ui/e2e/`**.
-  Vitest's `include: ['src/**/*.test.ts']` and the coverage excludes already match the nested path,
-  so no config change is needed when adding tests.
+- **Test layout:** unit tests live in a `tests/` folder, not colocated beside source — **per game**
+  in the engine (`engine/src/games/<game>/tests/`) and per package in the backend
+  (`backend/src/tests/`). UI **Playwright specs stay in `ui/e2e/`**. Vitest's
+  `include: ['src/**/*.test.ts']` and the coverage excludes (`src/**/tests/**`, barrels, type-only
+  files) already match the nested paths, so no config change is needed when adding tests.
 
 ## Commands
 
@@ -531,7 +590,28 @@ check plan usage between sessions). Summary:
   above for the working rules. The board is a lazy plugin (its own 41 kB chunk), the landing screen
   reads seat bounds from `GET /games/catalog`, and the picker appears only once two games are
   registered. Pure refactor — all 76 e2e specs passed **unchanged**, testids intact.
-  **Next: C3** — a second game, the only honest test of the abstraction.
+- **Track C / C3 ✅ (a second game — Can't Stop — proves the platform).** The honest test of the
+  C0/C1/C2 seams: a real second game running beside Container on one server. Can't Stop
+  (`reference_materials/CantStopRules.pdf`) is a push-your-luck dice game — roll 4 dice, split into two
+  sums, advance ≤3 temporary "runners", bank by stopping or lose them by busting; first to claim **3
+  columns** wins. Deliberately unlike Container: **no hidden information** (so `viewFor` is a no-op) but
+  **per-turn randomness** (the dice), which is what stretched the seam.
+  - **The engine became a per-game platform.** `engine/src/` now has `kernel/` (GameError, MoveRecord,
+    Viewer) + `games/{container,cantstop}/`, exported by **subpath** (`@container/engine/<game>`, no
+    `.` default). Pure refactor of Container — its 204 tests moved untouched; the package is now 250
+    tests at **100% coverage across both games**. See "How the shared engine is consumed" + "Building a
+    new game".
+  - **Per-turn randomness is injected via `ModuleContext.rng`** (the one seam change C3 needed). The
+    engine stays pure: `ROLL` is a server-only action carrying already-rolled dice, built by the
+    module's `/games/:id/cantstop/roll` route from `ctx.rng` and refused by `parseAction`/`legalActions`
+    — a client asks to roll but can't choose the dice. No bots, no pending step, no side-channel:
+    Can't Stop omits `createBotDriver`/`pendingStep`/`onStateChanged`, proving those hooks are optional.
+  - **UI**: a lazy Can't Stop board plugs into the same `GameClient` seam; the landing **picker**
+    activates automatically now that two games are registered. All existing e2e stayed green
+    (`e2e/cantstop.spec.ts` added); the two-games-side-by-side backend test is the real proof.
+  - **Deferred (fine for "simple"):** no Can't Stop AI, and the board is functional-not-fancy (no
+    original art like Slice 8). Both are additive later. **Next: C4** could be a Can't Stop bot, or a
+    third game to test the "extract when a shape is common" rule.
 - **Track B — online multiplayer:** independent track. The authoritative, serializable engine makes all
   of these additive (see `ROADMAP.md`).
 

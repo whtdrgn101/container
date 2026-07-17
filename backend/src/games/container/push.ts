@@ -1,4 +1,4 @@
-import type { GameState, Viewer } from '@container/engine';
+import type { GameState, Viewer } from '@container/engine/container';
 import type { ModuleContext } from '../module';
 import { AuctionRepository, auctionViewFor, syncAuction } from './auctions';
 

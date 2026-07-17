@@ -3,12 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Pure, deterministic game engine for Container. No I/O, no randomness — the single source of truth for game rules.",
+  "description": "Pure, deterministic game engines. No I/O, no randomness — the single source of truth for game rules. A per-game platform: each game has its own subpath (`@container/engine/<game>`) over a small shared `@container/engine/kernel`. No `.` entry on purpose — no game is a privileged default.",
   "license": "BSD-3-Clause",
   "exports": {
-    ".": "./src/index.ts"
+    "./kernel": "./src/kernel/index.ts",
+    "./container": "./src/games/container/index.ts",
+    "./cantstop": "./src/games/cantstop/index.ts"
   },
-  "types": "./src/index.ts",
   "scripts": {
     "test": "vitest run --coverage",
     "test:watch": "vitest",

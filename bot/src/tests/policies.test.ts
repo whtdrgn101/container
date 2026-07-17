@@ -1,4 +1,4 @@
-import { SCORING_CARDS, applyAction } from '@container/engine';
+import { SCORING_CARDS, applyAction } from '@container/engine/container';
 import { describe, expect, it } from 'vitest';
 import { rank } from '../policies/rank';
 import { affordableContainers, producePlacements, repriceArrangement } from '../policies/pricing';

@@ -1,4 +1,4 @@
-import { GameError } from '@container/engine';
+import { GameError } from '@container/engine/container';
 import type { ErrorResponse } from '../module';
 
 /**

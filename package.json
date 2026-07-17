@@ -18,5 +18,8 @@
     "build": "pnpm -r build",
     "dev:backend": "pnpm --filter @container/backend dev",
     "dev:ui": "pnpm --filter @container/ui dev"
+  },
+  "dependencies": {
+    "22": "^0.0.0"
   }
 }

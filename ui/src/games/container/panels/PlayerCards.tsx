@@ -1,4 +1,4 @@
-import type { Action, GameView } from '@container/engine';
+import type { Action, GameView } from '@container/engine/container';
 import type { BuyPick } from './PlayerCard';
 import { PlayerCard } from './PlayerCard';
 

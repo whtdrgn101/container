@@ -1,6 +1,6 @@
 import { bidFor, chooseTiedWinner, contextFor, decide, runoffBidFor, wantsBuyout } from '@container/bot';
-import { applyAction, viewFor } from '@container/engine';
-import type { GameState } from '@container/engine';
+import { applyAction, viewFor } from '@container/engine/container';
+import type { GameState } from '@container/engine/container';
 import type { BotRepository } from '../../bots';
 import type { AuctionRepository, DeliveryAuction } from './auctions';
 import { applyBid, biddersFor, outcomeOf, syncAuction, tiedForLead } from './auctions';

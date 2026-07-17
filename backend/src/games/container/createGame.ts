@@ -1,5 +1,5 @@
-import { createGame, SCORING_CARDS } from '@container/engine';
-import type { GameState } from '@container/engine';
+import { createGame, SCORING_CARDS } from '@container/engine/container';
+import type { GameState } from '@container/engine/container';
 
 /**
  * Deal a fresh Container game: shuffle the scoring deck and give each seat a secret card.

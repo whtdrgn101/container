@@ -29,6 +29,11 @@ export interface AppOptions {
    * Defaults to Container, which keeps the hotseat quick-start working.
    */
   defaultGameType?: string;
+  /**
+   * Randomness for game setup *and* for a module's per-action needs (Can't Stop's dice). Injected so
+   * a test can seed it and get a deterministic game. Defaults to `Math.random`.
+   */
+  rng?: () => number;
 }
 
 /** `NewSeat` is a name plus a per-seat AI flag. `bot` is stripped before the engine ever sees the seat. */
@@ -95,6 +100,9 @@ export function buildApp(options: AppOptions): FastifyInstance {
    * working; C2's picker sends an explicit `gameType`, and any client may already.
    */
   const defaultGameType = options.defaultGameType ?? DEFAULT_GAME_ID;
+
+  /** Injected randomness (seedable in tests). Used for setup shuffles and per-action rolls alike. */
+  const rng = options.rng ?? Math.random;
 
   /** Per-module AI drivers and contexts. A module's routes must tick *its own* driver, not a shared one. */
   const drivers = new Map<string, BotDriver>();
@@ -215,7 +223,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       players: seats.map((seat) => ({ name: seat.name })),
       // Randomness is injected, never reached for inside a module — that is what keeps every engine
       // pure, deterministic and replayable.
-      rng: Math.random,
+      rng,
     });
     // Stamps `game_type` from the module, which is what lets every later request find its way back
     // to these rules.
@@ -458,6 +466,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       },
       botSeats,
       hub,
+      rng,
       pushGame,
       // A getter, because the driver below is built *from* this context.
       get bots(): BotDriver {

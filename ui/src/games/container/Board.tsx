@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { Action, Color, GameState, GameView, StoredContainer } from '@container/engine';
-import { COLORS, FACTORY_BUILD_COSTS, legalActions } from '@container/engine';
+import type { Action, Color, GameState, GameView, StoredContainer } from '@container/engine/container';
+import { COLORS, FACTORY_BUILD_COSTS, legalActions } from '@container/engine/container';
 import type { BoardProps } from '../types';
 import * as containerApi from './api';
 import type { DeliveryAuctionView } from './api';

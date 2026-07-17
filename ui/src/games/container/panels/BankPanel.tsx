@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import type { Action, GameView, PlayerView } from '@container/engine';
+import type { Action, GameView, PlayerView } from '@container/engine/container';
 import { ContainerChip, LOT_LABELS, nameOf } from '../chips';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';

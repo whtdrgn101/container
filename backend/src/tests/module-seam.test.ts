@@ -215,9 +215,15 @@ describe('hosting two games at once', () => {
 
   const threeNames = [{ name: 'Ann' }, { name: 'Bo' }, { name: 'Cy' }];
 
-  it('lists both games in the catalog', async () => {
+  it('lists every hosted game in the catalog', async () => {
     const response = await app.inject({ method: 'GET', url: '/games/catalog' });
-    expect((response.json().games as { id: string }[]).map((g) => g.id)).toEqual(['container', 'counter']);
+    // The default registry now ships two real games (Container + Can't Stop); this test adds the
+    // counter stub on top, so all three appear side by side.
+    expect((response.json().games as { id: string }[]).map((g) => g.id)).toEqual([
+      'container',
+      'cantstop',
+      'counter',
+    ]);
   });
 
   it('deals each type from its own module, and tells them apart on read', async () => {

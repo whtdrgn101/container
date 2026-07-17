@@ -1,4 +1,4 @@
-import { MAX_PLAYERS, MIN_PLAYERS, viewFor } from '@container/engine';
+import { MAX_PLAYERS, MIN_PLAYERS, viewFor } from '@container/engine/container';
 import { describe, expect, it } from 'vitest';
 
 import { playSelfPlay } from '../selfPlay';

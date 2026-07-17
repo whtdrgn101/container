@@ -1,5 +1,5 @@
-import { deliveryOutcome, legalActions } from '@container/engine';
-import type { Action, GameState, GameView } from '@container/engine';
+import { deliveryOutcome, legalActions } from '@container/engine/container';
+import type { Action, GameState, GameView } from '@container/engine/container';
 import { chooseTiedWinner, wantsBuyout } from './bid';
 import { contextFor } from './context';
 import { BotError } from './errors';

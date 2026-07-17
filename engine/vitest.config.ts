@@ -8,11 +8,12 @@ export default defineConfig({
       reporter: ['text', 'html'],
       include: ['src/**/*.ts'],
       exclude: [
-        'src/tests/**', // test files + shared helpers
-        'src/index.ts', // public barrel
-        'src/**/index.ts', // folder barrels (core, internal, actions)
-        'src/core/types.ts', // compile-time only (interfaces/type aliases)
-        'src/actions/action.ts', // compile-time only (Action union)
+        'src/**/tests/**', // test files + shared helpers (per-game tests/ folders)
+        'src/**/index.ts', // public + folder barrels (kernel, each game, core/internal/actions)
+        'src/kernel/moveRecord.ts', // compile-time only (MoveRecord interface)
+        'src/kernel/viewer.ts', // compile-time only (Viewer type alias)
+        'src/games/*/core/types.ts', // compile-time only (each game's domain interfaces)
+        'src/games/*/actions/action.ts', // compile-time only (each game's Action union)
       ],
       thresholds: {
         statements: 100,

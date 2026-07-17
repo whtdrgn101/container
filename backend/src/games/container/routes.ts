@@ -1,6 +1,6 @@
-import { applyAction, viewFor } from '@container/engine';
+import { applyAction, viewFor } from '@container/engine/container';
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import type { GameState, Viewer } from '@container/engine';
+import type { GameState, Viewer } from '@container/engine/container';
 import type { ModuleContext } from '../module';
 import { AuctionRepository, auctionViewFor, applyBid, syncAuction } from './auctions';
 import { mapContainerError } from './errors';

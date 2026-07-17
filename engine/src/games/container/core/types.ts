@@ -1,4 +1,9 @@
 import type { Color } from './colors';
+import type { MoveRecord } from '../../../kernel';
+
+// The append-only move-log entry is a kernel primitive shared by every game; re-exported here so
+// Container's own modules keep importing it from `../core` alongside the rest of the domain types.
+export type { MoveRecord } from '../../../kernel';
 
 /** A built factory. Each factory produces one container of its color per Produce action. */
 export interface Factory {
@@ -125,14 +130,6 @@ export interface PlayerScore {
   readonly total: number;
   /** The color discarded from the scoring area (null if the scoring area was empty). */
   readonly discardedColor: Color | null;
-}
-
-/** An append-only record of an applied action, for replay/audit and the backend move log. */
-export interface MoveRecord {
-  readonly seq: number;
-  readonly type: string;
-  readonly playerId: string;
-  readonly payload?: Record<string, unknown>;
 }
 
 /** The complete, serializable state of a game. Plain data — safe to JSON round-trip. */

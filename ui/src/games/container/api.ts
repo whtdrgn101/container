@@ -1,4 +1,4 @@
-import type { Action, GameView } from '@container/engine';
+import type { Action, GameView } from '@container/engine/container';
 import { BASE_URL, JSON_HEADERS, applyAction, fail, getGame, unwrap } from '@/lib/api';
 import type { GamePayload } from '@/lib/api';
 

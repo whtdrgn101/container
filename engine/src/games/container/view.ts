@@ -6,16 +6,18 @@
 // engine. The backend applies it at every response boundary; an AI bot (Track A) can use the same
 // projection as its "view" of the game.
 
+import type { Viewer } from '../../kernel';
 import type { GameState, PlayerState, ScoringCard } from './core';
+
+// `Viewer` is a kernel primitive (every game projects against the same notion of a viewer); re-export
+// it so Container's consumers keep importing it from the engine's Container surface.
+export type { Viewer } from '../../kernel';
 
 /** A player as seen by a particular viewer: their scoring card is hidden (`null`) unless revealed. */
 export interface PlayerView extends Omit<PlayerState, 'scoringCard'> {
   /** The player's secret scoring card, or `null` when hidden from this viewer. */
   readonly scoringCard: ScoringCard | null;
 }
-
-/** Who a projection was built for: a single seat, several seats (one client holding many), or none. */
-export type Viewer = string | readonly string[] | null;
 
 /** A full game state projected for a viewer. Structurally a GameState with redacted players. */
 export interface GameView extends Omit<GameState, 'players'> {

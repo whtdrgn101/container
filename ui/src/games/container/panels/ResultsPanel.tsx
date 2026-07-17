@@ -1,4 +1,4 @@
-import type { GameView } from '@container/engine';
+import type { GameView } from '@container/engine/container';
 import { nameOf } from '../chips';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

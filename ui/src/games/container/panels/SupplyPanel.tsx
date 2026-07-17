@@ -1,6 +1,6 @@
 import { Factory as FactoryIcon, Warehouse as WarehouseIcon } from 'lucide-react';
-import type { Action, Color, GameView, PlayerView } from '@container/engine';
-import { COLORS } from '@container/engine';
+import type { Action, Color, GameView, PlayerView } from '@container/engine/container';
+import { COLORS } from '@container/engine/container';
 import { ContainerChip } from '../chips';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';

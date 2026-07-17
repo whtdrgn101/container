@@ -1,5 +1,5 @@
-import type { Color, PlayerView, ScoringCard, ShipLocation, StoredContainer } from '@container/engine';
-import { FACTORY_LOT_PRICES } from '@container/engine';
+import type { Color, PlayerView, ScoringCard, ShipLocation, StoredContainer } from '@container/engine/container';
+import { FACTORY_LOT_PRICES } from '@container/engine/container';
 import { ContainerSvg } from './art/Container';
 import { cn } from '@/lib/utils';
 

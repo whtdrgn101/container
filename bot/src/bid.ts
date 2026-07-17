@@ -1,4 +1,4 @@
-import type { Color, GameView } from '@container/engine';
+import type { Color, GameView } from '@container/engine/container';
 import { BotError } from './errors';
 import type { Ctx } from './types';
 import { BID_SHADING, RUNOFF_SHADING, expectedValueFor, gainFrom, selfOf } from './valuation';

@@ -1,4 +1,4 @@
-import type { Action, GameView, PlayerView, ShipLocation } from '@container/engine';
+import type { Action, GameView, PlayerView, ShipLocation } from '@container/engine/container';
 import { ShipSvg } from './art/Ship';
 import { cn } from '@/lib/utils';
 

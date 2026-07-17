@@ -173,6 +173,15 @@ export interface ModuleContext {
   readonly botSeats: BotRepository;
   readonly hub: GameHub;
   /**
+   * A shared source of randomness for a module that needs it *per action* — the one the platform
+   * injects at `createGame`, exposed here too. Container never touches it (its only randomness is the
+   * setup shuffle), but Can't Stop rolls dice every turn: its roll route draws them from `rng` and
+   * applies a pure engine action carrying the result, so the engine stays deterministic and the
+   * client never chooses its own dice. **A module must not reach for `Math.random` itself** — that is
+   * what keeps every engine replayable and its module testable with a seeded generator.
+   */
+  readonly rng: () => number;
+  /**
    * Broadcast new state to every connected client, each projected for its own seat(s), then run
    * `onStateChanged`. The one way to tell the world a game moved.
    */

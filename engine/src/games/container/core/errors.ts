@@ -1,3 +1,5 @@
+import { GameError as KernelGameError } from '../../../kernel';
+
 /** Machine-readable reasons an action can be rejected. The backend maps these to HTTP 4xx codes. */
 export type GameErrorCode =
   | 'INVALID_PLAYER_COUNT'
@@ -33,15 +35,9 @@ export type GameErrorCode =
   | 'GAME_OVER';
 
 /**
- * Thrown when an action is illegal given the current state. Carries a stable `code`
- * so callers (and the API layer) can branch on the reason without string-matching.
+ * Thrown when a Container action is illegal given the current state. The shared kernel `GameError`
+ * carries the `code`/`message` machinery; this subclass pins `code` to Container's own `GameErrorCode`
+ * union so a thrown code is always one Container declares. `instanceof GameError` still identifies a
+ * Container error, and (being a subclass) it is also `instanceof` the kernel error.
  */
-export class GameError extends Error {
-  readonly code: GameErrorCode;
-
-  constructor(code: GameErrorCode, message: string) {
-    super(message);
-    this.name = 'GameError';
-    this.code = code;
-  }
-}
+export class GameError extends KernelGameError<GameErrorCode> {}

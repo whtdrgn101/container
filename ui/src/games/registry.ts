@@ -1,3 +1,4 @@
+import { cantstopClient } from './cantstop';
 import { containerClient } from './container';
 import type { GameClient } from './types';
 
@@ -25,8 +26,9 @@ export type AnyGameClient = GameClient<unknown>;
  * rather than rendering a blank board.
  */
 const CLIENTS: readonly AnyGameClient[] = [
-  // The one erasure — see `AnyGameClient` for why it's needed and what keeps it sound.
+  // The one erasure per game — see `AnyGameClient` for why it's needed and what keeps it sound.
   containerClient as unknown as AnyGameClient,
+  cantstopClient as unknown as AnyGameClient,
 ];
 
 export const clientFor = (gameType: string): AnyGameClient | undefined =>

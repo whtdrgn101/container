@@ -8,8 +8,15 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
-      // Consume the engine as source so Vite transpiles it (shared types + logic).
-      '@container/engine': fileURLToPath(new URL('../engine/src/index.ts', import.meta.url)),
+      // Consume the engine as source so Vite transpiles it (shared types + logic). One alias per
+      // subpath — the engine is a per-game platform now, with no bare `@container/engine` entry.
+      '@container/engine/kernel': fileURLToPath(new URL('../engine/src/kernel/index.ts', import.meta.url)),
+      '@container/engine/container': fileURLToPath(
+        new URL('../engine/src/games/container/index.ts', import.meta.url),
+      ),
+      '@container/engine/cantstop': fileURLToPath(
+        new URL('../engine/src/games/cantstop/index.ts', import.meta.url),
+      ),
     },
   },
   server: {

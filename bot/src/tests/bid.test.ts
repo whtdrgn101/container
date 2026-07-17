@@ -1,4 +1,4 @@
-import { SCORING_CARDS } from '@container/engine';
+import { SCORING_CARDS } from '@container/engine/container';
 import { describe, expect, it } from 'vitest';
 import { bidFor, chooseTiedWinner, runoffBidFor, wantsBuyout } from '../bid';
 import { BotError } from '../errors';

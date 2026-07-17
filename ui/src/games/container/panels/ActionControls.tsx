@@ -1,6 +1,6 @@
 import { Plus, Ship as ShipIcon, Warehouse as WarehouseIcon } from 'lucide-react';
-import type { Action, PlayerView } from '@container/engine';
-import { FACTORY_LOT_PRICES } from '@container/engine';
+import type { Action, PlayerView } from '@container/engine/container';
+import { FACTORY_LOT_PRICES } from '@container/engine/container';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { sailTarget } from '../chips';

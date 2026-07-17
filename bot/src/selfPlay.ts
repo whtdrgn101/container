@@ -1,5 +1,5 @@
-import { applyAction, viewFor } from '@container/engine';
-import type { Color, GameState } from '@container/engine';
+import { applyAction, viewFor } from '@container/engine/container';
+import type { Color, GameState } from '@container/engine/container';
 import { bidFor, runoffBidFor } from './bid';
 import { decide } from './decide';
 import { BotError } from './errors';

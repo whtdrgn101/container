@@ -1,5 +1,5 @@
-import type { Color, GameView } from '@container/engine';
-import { MAX_LOANS } from '@container/engine';
+import type { Color, GameView } from '@container/engine/container';
+import { MAX_LOANS } from '@container/engine/container';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
