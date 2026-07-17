@@ -18,7 +18,7 @@ Non-negotiables set at kickoff:
 
 ## The game (rules summary)
 
-Authoritative source: `reference_material/Container_Rulebook_v8.pdf` (20 pages). Read it
+Authoritative source: `reference_materials/Container_Rulebook_v8.pdf` (20 pages). Read it
 before implementing any mechanic — do not implement rules from memory.
 
 Container is an economic supply-chain game for **3–5 players**. The twist: **you can never
@@ -381,11 +381,19 @@ swallowed by the SPA fallback.
 
 ## Roadmap
 
-The full, sliced plan lives in **[`ROADMAP.md`](./ROADMAP.md)** — read it before starting a phase.
+Roadmaps are **split** (as of C3): one **platform/engine** roadmap plus one **per game**, living in that
+game's folder. Read the relevant one before starting a phase.
 
-We build the rest of the game as **vertical slices** (engine → API → UI → tests), not big-bang
-layers. Each slice ends green and demoable, so it's a safe stopping point (and a clean place to
-check plan usage between sessions). Summary:
+- **[`ROADMAP.md`](./ROADMAP.md)** — the platform: the `GameModule`/`GameClient` seams (Track C), online
+  multiplayer (Track B), the per-game **bot reorg**, deploy, and the games index.
+- **[`engine/src/games/container/ROADMAP.md`](./engine/src/games/container/ROADMAP.md)** — Container's
+  vertical slices + its AI (Track A).
+- **[`engine/src/games/cantstop/ROADMAP.md`](./engine/src/games/cantstop/ROADMAP.md)** — Can't Stop: what
+  C3 shipped + the plan to finish it (a bot).
+
+We build each game as **vertical slices** (engine → API → UI → tests), not big-bang layers. Each slice
+ends green and demoable, so it's a safe stopping point (and a clean place to check plan usage between
+sessions). The Container summary below is retained for context; the per-game roadmaps are authoritative.
 
 - **Phase 0 — Foundation ✅** monorepo, tooling, test gates.
 - **Slice 0 — Produce ✅** architecture proof, wired end-to-end.
