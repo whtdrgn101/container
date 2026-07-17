@@ -17,6 +17,9 @@ export default defineConfig({
       '@game-hub/engine/cantstop': fileURLToPath(
         new URL('../engine/src/games/cantstop/index.ts', import.meta.url),
       ),
+      '@game-hub/engine/stoneage': fileURLToPath(
+        new URL('../engine/src/games/stoneage/index.ts', import.meta.url),
+      ),
     },
   },
   server: {

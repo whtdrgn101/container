@@ -1,5 +1,6 @@
 import { cantstopClient } from './cantstop';
 import { containerClient } from './container';
+import { stoneAgeClient } from './stoneage';
 import type { GameClient } from './types';
 
 /**
@@ -29,6 +30,7 @@ const CLIENTS: readonly AnyGameClient[] = [
   // The one erasure per game — see `AnyGameClient` for why it's needed and what keeps it sound.
   containerClient as unknown as AnyGameClient,
   cantstopClient as unknown as AnyGameClient,
+  stoneAgeClient as unknown as AnyGameClient,
 ];
 
 export const clientFor = (gameType: string): AnyGameClient | undefined =>

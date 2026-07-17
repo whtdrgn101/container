@@ -217,11 +217,12 @@ describe('hosting two games at once', () => {
 
   it('lists every hosted game in the catalog', async () => {
     const response = await app.inject({ method: 'GET', url: '/games/catalog' });
-    // The default registry now ships two real games (Container + Can't Stop); this test adds the
-    // counter stub on top, so all three appear side by side.
+    // The default registry ships the real games (Container, Can't Stop, Stone Age); this test adds the
+    // counter stub on top, so all of them appear side by side.
     expect((response.json().games as { id: string }[]).map((g) => g.id)).toEqual([
       'container',
       'cantstop',
+      'stoneage',
       'counter',
     ]);
   });

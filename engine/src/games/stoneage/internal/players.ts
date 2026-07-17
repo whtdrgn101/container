@@ -1,0 +1,16 @@
+import { GameError } from '../core';
+import type { StoneAgePlayer, StoneAgeState } from '../core';
+
+/** Locate a player's seat index, or throw PLAYER_NOT_FOUND. Internal. */
+export function seatOf(state: StoneAgeState, playerId: string): number {
+  const index = state.players.findIndex((player) => player.id === playerId);
+  if (index === -1) {
+    throw new GameError('PLAYER_NOT_FOUND', `No player with id "${playerId}"`);
+  }
+  return index;
+}
+
+/** The seat whose turn it is. */
+export function activePlayer(state: StoneAgeState): StoneAgePlayer {
+  return state.players[state.activePlayerIndex]!;
+}

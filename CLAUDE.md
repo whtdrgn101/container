@@ -5,11 +5,13 @@ Context and working agreement for this repo. Read this first.
 ## What we're building
 
 **Game Hub** — a self-hosted board-game platform (a "games room") that hosts *multiple* games behind
-shared engine/backend/UI seams. Two games are built on it today:
+shared engine/backend/UI seams. Games built on it:
 
 - **Container** (10th Anniversary Edition) — the first game; a 3–5 player economic supply-chain game.
 - **Can't Stop** — the second game; a 2–4 player push-your-luck dice game (added as roadmap C3, the
   honest test that the platform seams generalize).
+- **Stone Age** — the third game; a 2–4 player worker-placement Euro. **Bootstrapped** (registered +
+  read-only board); its mechanics are being built one action per stage — see its roadmap.
 
 This is a learning project: the owner is an experienced software engineer who wants **good engineering
 practices** throughout — clean separation of concerns, strong typing, and high test coverage. Note the

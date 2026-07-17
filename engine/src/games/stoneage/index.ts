@@ -1,0 +1,39 @@
+// Public API of @game-hub/engine/stoneage. Consumers (backend, ui) import only from here.
+// The scaffold (roadmap SA0); the surface grows one action per stage.
+
+// Domain types
+export type { Action, ActionType } from './actions';
+export type { MoveRecord, Phase, PlaceId, Resource, StoneAgePlayer, StoneAgeState } from './core';
+
+// Errors
+export { GameError } from './core';
+export type { StoneAgeErrorCode } from './core';
+
+// Constants (rulebook-sourced values used by the UI + backend seat bounds)
+export {
+  BUILDING_STACK_SIZE,
+  CIV_CARD_SLOTS,
+  HUNT_THRESHOLD,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  PLACE_CAPACITY,
+  PLACE_RESOURCE,
+  PLACES,
+  RESOURCE_THRESHOLD,
+  RESOURCE_VALUE,
+  RESOURCES,
+  STARTING_FOOD,
+  STARTING_PEOPLE,
+  STARVATION_PENALTY,
+} from './core';
+
+// Setup
+export { createGame } from './createGame';
+export type { CreateGameOptions, NewPlayer } from './createGame';
+
+// Per-player view projection (near-identity — Stone Age is a public-information Euro)
+export { viewFor } from './view';
+export type { StoneAgeView, Viewer } from './view';
+
+// Mechanics + turn-aware entry point (inert at the scaffold)
+export { applyAction, legalActions } from './actions';
