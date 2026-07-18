@@ -92,8 +92,8 @@ test('SA9: place a worker on a building, then pass on buying it', async ({ page 
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board')).toBeVisible();
 
-  // A building stack is dealt per player, showing its cost.
-  await expect(page.getByTestId('place-building1')).toContainText('Cost:');
+  // A building stack is dealt per player, showing how many tiles remain.
+  await expect(page.getByTestId('place-building1')).toContainText('left');
 
   // Ann → building 1, Bob → quarry, Ann → hunt (rest) → action phase.
   await page.getByTestId('place-building1-go').click();

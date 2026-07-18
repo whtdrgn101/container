@@ -10,9 +10,9 @@ import {
 import type { CardEffect, CardScoring, CivCard, PlaceId, Resource, StoneAgePlayer, StoneAgeView } from '@game-hub/engine/stoneage';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { ResourceIcon } from './art';
 
 const RESOURCE_LABEL: Record<Resource, string> = { wood: 'Wood', brick: 'Brick', stone: 'Stone', gold: 'Gold' };
-const RESOURCE_DOT: Record<Resource, string> = { wood: 'bg-amber-700', brick: 'bg-orange-500', stone: 'bg-slate-400', gold: 'bg-yellow-400' };
 
 /** A one-line summary of a card's immediate benefit (pg. 6). */
 const effectLabel = (effect: CardEffect): string => {
@@ -123,7 +123,7 @@ export function CardRow({ game, active, canDrive, placing, acting, pending, busy
                 <div className="mt-2 space-y-1.5 border-t pt-2">
                   {RESOURCES.filter((r) => active.resources[r] > 0).map((r) => (
                     <div key={r} className="flex items-center gap-1 text-xs">
-                      <span className={cn('inline-block h-2.5 w-2.5 rounded-sm', RESOURCE_DOT[r])} aria-hidden />
+                      <ResourceIcon resource={r} className="h-4 w-4" />
                       <span className="w-9">{RESOURCE_LABEL[r]}</span>
                       <Button size="sm" variant="outline" aria-label={`Less ${r}`} data-testid={`card-pay-${slot}-${r}-dec`} disabled={busy} onClick={() => bumpPay(slot, r, -1, active.resources[r])}>−</Button>
                       <span className="w-4 text-center tabular-nums" data-testid={`card-pay-${slot}-${r}`}>{draft[r] ?? 0}</span>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   availableToPlace,
   buildingIndex,
@@ -24,6 +24,19 @@ import { GameOver } from '@/components/GameOver';
 import type { BoardProps } from '../types';
 import * as stoneageApi from './api';
 import { CardRow } from './CardRow';
+import { FieldIcon, Hut, HuntIcon, Meeple, ResourceIcon, ToolIcon } from './art';
+
+/** The prehistoric emblem for each board place. */
+const PLACE_ICON: Record<FixedPlaceId, (props: { className?: string }) => ReactNode> = {
+  toolMaker: ToolIcon,
+  hut: Hut,
+  field: FieldIcon,
+  hunt: HuntIcon,
+  forest: (p) => <ResourceIcon resource="wood" {...p} />,
+  clayPit: (p) => <ResourceIcon resource="brick" {...p} />,
+  quarry: (p) => <ResourceIcon resource="stone" {...p} />,
+  river: (p) => <ResourceIcon resource="gold" {...p} />,
+};
 
 const PLACE_LABEL: Record<FixedPlaceId, string> = {
   toolMaker: 'Tool maker',
@@ -50,12 +63,6 @@ const costLabel = (cost: BuildingCost): string => {
 /** Button labels for the non-dice `USE` places. */
 const USE_LABEL: Record<string, string> = { toolMaker: 'Take tool', hut: 'Grow +1', field: 'Field +1' };
 const RESOURCE_LABEL: Record<Resource, string> = { wood: 'Wood', brick: 'Brick', stone: 'Stone', gold: 'Gold' };
-const RESOURCE_DOT: Record<Resource, string> = {
-  wood: 'bg-amber-700',
-  brick: 'bg-orange-500',
-  stone: 'bg-slate-400',
-  gold: 'bg-yellow-400',
-};
 /** Per-seat player colours (the game's palette: red, blue, green, yellow). */
 const SEAT_COLOR = [
   { dot: 'bg-red-500', text: 'text-red-600', ring: 'ring-red-500' },
@@ -187,6 +194,14 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
 
   const playerName = (id: string) => game.players.find((p) => p.id === id)?.name ?? id;
   const seatColorOf = (id: string) => SEAT_COLOR[game.players.findIndex((p) => p.id === id) % SEAT_COLOR.length] ?? SEAT_COLOR[0];
+  /** A row of worker figures for the people on a place, each tinted to its owner (with an SR label). */
+  const meeplesFor = (byPlayer: Readonly<Record<string, number>>) =>
+    Object.entries(byPlayer).map(([id, n]) => (
+      <span key={id} className="flex items-center gap-0.5" title={`${playerName(id)} ×${n}`}>
+        {Array.from({ length: n }, (_, k) => <Meeple key={k} className={cn('h-4 w-4 drop-shadow-sm', seatColorOf(id).text)} />)}
+        <span className="sr-only">{playerName(id)} ×{n}</span>
+      </span>
+    ));
   const describeMove = (entry: StoneAgeView['log'][number]): string => {
     const who = playerName(entry.playerId);
     const p = (entry.payload ?? {}) as Record<string, unknown>;
@@ -289,10 +304,10 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
         </div>
       )}
 
-      {/* The board places (pg. 4). During the placement phase the active player can place here. */}
-      <div>
-        <h2 className="mb-2 text-sm font-semibold">Board</h2>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {/* The board (pg. 4) — a prehistoric camp of clickable places. Placement clicks a place; the gather
+          panel floats over it during the action phase (SA13). */}
+      <div className="relative">
+        <div className="grid grid-cols-2 gap-2 rounded-xl border border-amber-900/20 bg-gradient-to-br from-[#efe3cf] to-[#e2d2b4] p-2 sm:grid-cols-4 dark:from-[#3a2f22] dark:to-[#2c241a]">
           {PLACES.map((place) => {
             const used = occupancy(game.placements[place]);
             const resource = place in PLACE_RESOURCE ? PLACE_RESOURCE[place as keyof typeof PLACE_RESOURCE] : null;
@@ -302,72 +317,64 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
             // A pending roll locks the turn, so hide the other action affordances until it's taken.
             const canGather = acting && canDrive && mine && isGatherPlace(place) && !pending;
             const canUse = acting && canDrive && mine && isUsePlace(place) && !pending;
+            const count = option ? clampedCount(place, option.min, option.max) : 0;
+            const Icon = PLACE_ICON[place];
             return (
-              <div key={place} data-testid={`place-${place}`} className="flex flex-col rounded-md border bg-card px-3 py-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium">{PLACE_LABEL[place]}</span>
+              <div
+                key={place}
+                data-testid={`place-${place}`}
+                className={cn(
+                  'relative flex flex-col overflow-hidden rounded-lg border bg-card/85 px-2.5 py-2 shadow-sm backdrop-blur-sm transition-colors',
+                  option && 'cursor-pointer ring-2 ring-primary/40 hover:ring-primary',
+                )}
+                role={option ? 'button' : undefined}
+                tabIndex={option ? 0 : undefined}
+                onClick={option ? () => doPlace(place, count) : undefined}
+                aria-label={option ? `Place ${count} on ${PLACE_LABEL[place]}` : undefined}
+              >
+                {/* Faded emblem in the corner. */}
+                <Icon className="pointer-events-none absolute -bottom-3 -right-2 h-16 w-16 opacity-10" />
+                <div className="relative flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-sm font-medium">
+                    <Icon className="h-4 w-4" />
+                    {PLACE_LABEL[place]}
+                  </span>
                   <span className="text-xs tabular-nums text-muted-foreground">
                     {used}/{cap === null ? '∞' : cap}
                   </span>
                 </div>
                 {resource && (
-                  <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className={cn('inline-block h-2.5 w-2.5 rounded-sm', RESOURCE_DOT[resource])} aria-hidden />
-                    {RESOURCE_LABEL[resource]} · per full {RESOURCE_THRESHOLD[resource]}
+                  <div className="relative mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                    <ResourceIcon resource={resource} className="h-3.5 w-3.5" />
+                    per full {RESOURCE_THRESHOLD[resource]}
                   </div>
                 )}
-                {/* Whose people are here. */}
-                {used > 0 && (
-                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs">
-                    {Object.entries(game.placements[place]).map(([id, n]) => (
-                      <span key={id} className={cn('flex items-center gap-1 font-medium', seatColorOf(id).text)}>
-                        <span className={cn('inline-block h-2 w-2 rounded-full', seatColorOf(id).dot)} aria-hidden />
-                        {playerName(id)}×{n}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                {/* Worker figures placed here. */}
+                {used > 0 && <div className="relative mt-1 flex flex-wrap items-center gap-0.5">{meeplesFor(game.placements[place])}</div>}
+
+                {/* Placement: the whole tile is clickable; a count stepper rides in the corner for the
+                    variable places. Buttons stop propagation so they don't also fire the tile's place. */}
                 {option && (
-                  <div className="mt-2 flex items-center gap-1">
+                  <div className="relative mt-2 flex items-center gap-1">
                     {option.min !== option.max && (
-                      <>
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         <Button size="sm" variant="outline" aria-label="Fewer" data-testid={`place-${place}-dec`} disabled={busy} onClick={() => bump(place, -1, option.min, option.max)}>−</Button>
-                        <span className="w-5 text-center text-xs tabular-nums" data-testid={`place-${place}-count`}>
-                          {clampedCount(place, option.min, option.max)}
-                        </span>
+                        <span className="w-5 text-center text-xs tabular-nums" data-testid={`place-${place}-count`}>{count}</span>
                         <Button size="sm" variant="outline" aria-label="More" data-testid={`place-${place}-inc`} disabled={busy} onClick={() => bump(place, 1, option.min, option.max)}>+</Button>
-                      </>
+                      </div>
                     )}
-                    <Button
-                      size="sm"
-                      className="ml-auto"
-                      data-testid={`place-${place}-go`}
-                      disabled={busy}
-                      onClick={() => doPlace(place, clampedCount(place, option.min, option.max))}
-                    >
-                      Place {clampedCount(place, option.min, option.max)}
+                    <Button size="sm" className="ml-auto" data-testid={`place-${place}-go`} disabled={busy} onClick={(e) => { e.stopPropagation(); doPlace(place, count); }}>
+                      Place {count}
                     </Button>
                   </div>
                 )}
                 {canGather && (
-                  <Button
-                    size="sm"
-                    className="mt-2 self-end"
-                    data-testid={`gather-${place}`}
-                    disabled={busy}
-                    onClick={() => doGather(place)}
-                  >
+                  <Button size="sm" className="relative mt-2 self-end" data-testid={`gather-${place}`} disabled={busy} onClick={() => doGather(place)}>
                     Gather
                   </Button>
                 )}
                 {canUse && (
-                  <Button
-                    size="sm"
-                    className="mt-2 self-end"
-                    data-testid={`use-${place}`}
-                    disabled={busy}
-                    onClick={() => doUse(place)}
-                  >
+                  <Button size="sm" className="relative mt-2 self-end" data-testid={`use-${place}`} disabled={busy} onClick={() => doUse(place)}>
                     {USE_LABEL[place]}
                   </Button>
                 )}
@@ -375,63 +382,54 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
             );
           })}
         </div>
-      </div>
 
-      {/* The gather panel (SA4b): after you roll, the dice sit here so you can add tools before taking. */}
-      {pending && gatherPreview && canDrive && active && (
-        <div data-testid="gather-panel" className="space-y-2 rounded-lg border bg-card p-3 reveal-in">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Gathering — {placeLabel(pending.place)}</span>
-            <span className="text-xs text-muted-foreground">
-              rolled {pending.dice.length} {pending.dice.length === 1 ? 'die' : 'dice'}
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-1">
-            {pending.dice.map((d, i) => (
-              // eslint-disable-next-line react/no-array-index-key -- dice are positional
-              <span key={i} data-testid={`die-${i}`} className="grid h-7 w-7 place-items-center rounded border bg-background text-sm font-semibold tabular-nums">
-                {d}
-              </span>
-            ))}
-            <span className="ml-1 text-sm text-muted-foreground">
-              = {gatherPreview.diceTotal}
-              {gatherPreview.boost > 0 && ` + ${gatherPreview.boost} tools = ${gatherPreview.total}`}
-            </span>
-          </div>
-          {active.tools.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1">
-              <span className="mr-1 text-xs text-muted-foreground">Add tools:</span>
-              {active.tools.map((value, i) => {
-                const used = active.toolsUsed[i];
-                const selected = selectedTools.includes(i);
-                return (
-                  <Button
-                    key={i}
-                    size="sm"
-                    variant={selected ? 'default' : 'outline'}
-                    data-testid={`tool-${i}`}
-                    aria-pressed={selected}
-                    disabled={busy || used}
-                    title={used ? 'Already used this round' : `Tool +${value}`}
-                    onClick={() => toggleTool(i)}
-                  >
-                    +{value}
-                    {used ? ' ·used' : ''}
-                  </Button>
-                );
-              })}
+        {/* The gather panel floats over the board during the action phase (SA13). */}
+        {pending && gatherPreview && canDrive && active && (
+          <div className="absolute inset-0 z-20 flex items-start justify-center rounded-xl bg-background/60 p-3 backdrop-blur-sm">
+            <div data-testid="gather-panel" className="reveal-in w-full max-w-md space-y-2 rounded-lg border bg-card p-3 shadow-xl">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Gathering — {placeLabel(pending.place)}</span>
+                <span className="text-xs text-muted-foreground">
+                  rolled {pending.dice.length} {pending.dice.length === 1 ? 'die' : 'dice'}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1">
+                {pending.dice.map((d, i) => (
+                  // eslint-disable-next-line react/no-array-index-key -- dice are positional
+                  <span key={i} data-testid={`die-${i}`} className="grid h-8 w-8 place-items-center rounded-md border-2 border-amber-900/30 bg-[#f6efe0] text-sm font-bold tabular-nums text-amber-950 shadow-inner">
+                    {d}
+                  </span>
+                ))}
+                <span className="ml-1 text-sm text-muted-foreground">
+                  = {gatherPreview.diceTotal}
+                  {gatherPreview.boost > 0 && ` + ${gatherPreview.boost} tools = ${gatherPreview.total}`}
+                </span>
+              </div>
+              {active.tools.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="mr-1 flex items-center gap-1 text-xs text-muted-foreground"><ToolIcon className="h-3.5 w-3.5" /> Add tools:</span>
+                  {active.tools.map((value, i) => {
+                    const toolUsed = active.toolsUsed[i];
+                    const selected = selectedTools.includes(i);
+                    return (
+                      <Button key={i} size="sm" variant={selected ? 'default' : 'outline'} data-testid={`tool-${i}`} aria-pressed={selected} disabled={busy || toolUsed} title={toolUsed ? 'Already used this round' : `Tool +${value}`} onClick={() => toggleTool(i)}>
+                        +{value}{toolUsed ? ' ·used' : ''}
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1 text-sm">
+                  →{' '}
+                  <span className="font-medium" data-testid="gather-yield">{gatherPreview.amount} {gatherPreview.kind}</span>
+                </span>
+                <Button size="sm" data-testid="take-gather" disabled={busy} onClick={() => doTake(selectedTools)}>Take</Button>
+              </div>
             </div>
-          )}
-          <div className="flex items-center justify-between">
-            <span className="text-sm">
-              → <span className="font-medium" data-testid="gather-yield">{gatherPreview.amount} {gatherPreview.kind}</span>
-            </span>
-            <Button size="sm" data-testid="take-gather" disabled={busy} onClick={() => doTake(selectedTools)}>
-              Take
-            </Button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* The building stacks (pg. 5, 7): place a worker on a stack's top tile, then buy it in the action
           phase. `?? []` keeps pre-SA9 games (created before buildings existed, no `buildings` field) from
@@ -455,17 +453,8 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
                     <span className="text-sm font-medium">Building {i + 1}</span>
                     <span className="text-xs tabular-nums text-muted-foreground">{stack.length} left</span>
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">{top ? `Cost: ${costLabel(top.cost)}` : 'empty'}</div>
-                  {occupants.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-x-2 text-xs">
-                      {occupants.map(([id, n]) => (
-                        <span key={id} className={cn('flex items-center gap-1 font-medium', seatColorOf(id).text)}>
-                          <span className={cn('inline-block h-2 w-2 rounded-full', seatColorOf(id).dot)} aria-hidden />
-                          {playerName(id)}×{n}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Hut className="h-3.5 w-3.5" /> {top ? costLabel(top.cost) : 'empty'}</div>
+                  {occupants.length > 0 && <div className="mt-1 flex flex-wrap items-center gap-0.5">{meeplesFor(game.placements[placeId] ?? {})}</div>}
                   {canPlaceHere && (
                     <Button size="sm" className="mt-2 self-end" data-testid={`place-${placeId}-go`} disabled={busy} onClick={() => doPlace(placeId, 1)}>
                       Place worker
@@ -475,7 +464,7 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
                     <div className="mt-2 space-y-1.5 border-t pt-2">
                       {RESOURCES.filter((r) => active.resources[r] > 0).map((r) => (
                         <div key={r} className="flex items-center gap-1 text-xs">
-                          <span className={cn('inline-block h-2.5 w-2.5 rounded-sm', RESOURCE_DOT[r])} aria-hidden />
+                          <ResourceIcon resource={r} className="h-4 w-4" />
                           <span className="w-9">{RESOURCE_LABEL[r]}</span>
                           <Button size="sm" variant="outline" aria-label={`Less ${r}`} data-testid={`pay-${i}-${r}-dec`} disabled={busy} onClick={() => bumpPay(i, r, -1, active.resources[r])}>−</Button>
                           <span className="w-4 text-center tabular-nums" data-testid={`pay-${i}-${r}`}>{draft[r] ?? 0}</span>
@@ -535,21 +524,21 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                 <span className="flex items-center gap-1">
-                  <span className={cn('inline-block h-2.5 w-2.5 rounded-full', seatColorOf(player.id).dot)} aria-hidden />
+                  <Meeple className={cn('h-3.5 w-3.5', seatColorOf(player.id).text)} />
                   People: <span className="font-medium tabular-nums">{placedBy(game, player.id)}/{player.people}</span> placed
                 </span>
                 <span>🍖 Food: <span className="font-medium tabular-nums">{player.food}</span></span>
-                <span>🌾 Food track: <span className="font-medium tabular-nums">{player.foodTrack}</span></span>
-                <span>🔨 Tools: <span className="font-medium tabular-nums">{player.tools.join(', ') || '—'}</span></span>
+                <span className="flex items-center gap-1"><FieldIcon className="h-3.5 w-3.5" /> Food track: <span className="font-medium tabular-nums">{player.foodTrack}</span></span>
+                <span className="flex items-center gap-1"><ToolIcon className="h-3.5 w-3.5" /> Tools: <span className="font-medium tabular-nums">{player.tools.join(', ') || '—'}</span></span>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                 {RESOURCES.map((resource) => (
                   <span key={resource} className="flex items-center gap-1">
-                    <span className={cn('inline-block h-2.5 w-2.5 rounded-sm', RESOURCE_DOT[resource])} aria-hidden />
+                    <ResourceIcon resource={resource} className="h-4 w-4" />
                     <span className="tabular-nums">{player.resources[resource]}</span>
                   </span>
                 ))}
-                <span className="text-muted-foreground">· 🃏 {player.civCards.length} · 🏠 {player.buildings}</span>
+                <span className="flex items-center gap-1 text-muted-foreground">· 🃏 {player.civCards.length} · <Hut className="h-3.5 w-3.5" /> {player.buildings}</span>
               </div>
             </div>
           ))}

@@ -221,10 +221,26 @@ The last stage (as planned): a worker-placement bot in `bot/src/games/stoneage/`
 hidden information makes valuation tractable; the hard part is the multi-phase turn (place, then order
 your actions well). 90% coverage gate + self-play, like the other bots.
 
+### ✅ SA13 — Visual: original art + a clickable board (shipped)
+
+The functional board got a prehistoric skin. **All artwork is original** (simple earthy SVG shapes —
+`games/stoneage/art/`), not a reproduction of the published game; just the same mood.
+
+- **Original SVG art:** a worker **meeple**, the four **resources** (wood log / clay brick / slate stone
+  / gold nugget), a **hut**, and place emblems (spear/tool, grain field, leaping deer for the hunt).
+  Applied across the board tiles, player boards, buildings, cards and the gather panel — colored squares
+  and emoji are gone.
+- **Clickable board:** the places sit on a warm earthy panel; each placeable tile is a click target
+  (ring-highlighted) that places the current count — the count stepper still rides in the corner for the
+  variable places. Workers show as **meeples** tinted to their owner (with SR labels for a11y).
+- **Floating gather panel:** during the action phase the roll floats *over* the board (blurred behind),
+  dice rendered as bone tiles, tools as chips, live yield → Take.
+- Verified desktop **and** mobile e2e; the `CardRow` stayed its own component.
+
+*(Deferred: a single big illustrated board map like Container's Slice 8; per-place motion.)*
+
 ### Later (optional)
 
-- **SA13 — Visual & a11y polish:** original art for resources/people/board, motion, a proper board
-  layout (match Container's Slice 8 / Can't Stop's CS2 bar).
 - **2–3-player rules** (pg. 8): restrict tool-maker/hut/field to 2 of 3, and the resource places' player
   counts — if not folded into SA1.
 
