@@ -45,6 +45,7 @@ describe('feed', () => {
     const base = feeding({ tools: [1, 2], toolsUsed: [true, true] }, { activePlayerIndex: 1, startPlayerIndex: 0 });
     const next = feed(base, 'p2');
     expect(next.players[0]!.toolsUsed).toEqual([false, false]); // tools flip back to unused (SA4b)
+    expect(next.cardDisplay).toHaveLength(4); // the card display is resupplied for the new round (SA10)
     expect(next.round).toBe(2);
     expect(next.phase).toBe('placement');
     expect(next.startPlayerIndex).toBe(1); // marker passed one seat left

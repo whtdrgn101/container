@@ -20,7 +20,10 @@ export type StoneAgeErrorCode =
   // An illegal take of a rolled gather: no pending roll, or a bad/already-used tool selection (SA4b).
   | 'INVALID_TAKE'
   // Another move was attempted while a rolled gather is waiting to be taken (SA4b).
-  | 'GATHER_PENDING';
+  | 'GATHER_PENDING'
+  // An illegal card acquisition: no person on that slot, an empty slot, or a payment that doesn't match
+  // the slot's cost / that the player can't afford (SA10).
+  | 'INVALID_CARD';
 
 /**
  * Thrown when a Stone Age action is illegal. The shared kernel `GameError` carries the code/message

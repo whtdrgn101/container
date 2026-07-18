@@ -1,7 +1,8 @@
-import { ALL_PLACES, BUILDING_PLACES, RESOURCE_PLACES } from '../core';
+import { ALL_PLACES, BUILDING_PLACES, CARD_PLACES, RESOURCE_PLACES } from '../core';
 import type { PlaceId, StoneAgeState } from '../core';
 import type { Action } from '../actions/action';
 import { buildingIndex } from './buildings';
+import { cardIndex } from './cards';
 
 /**
  * The action phase (rulebook pg. 6, phase 2): the start player uses **all** their placed people, then
@@ -52,6 +53,15 @@ export function legalBuilds(state: StoneAgeState, playerId: string): Action[] {
   return BUILDING_PLACES.filter((place) => state.placements[place][playerId] !== undefined).map((place) => ({
     type: 'BUILD',
     stack: buildingIndex(place),
+    resources: {},
+  }));
+}
+
+/** The `ACQUIRE_CARD` markers a seat has right now — one per card slot they occupy (payment is theirs). */
+export function legalCards(state: StoneAgeState, playerId: string): Action[] {
+  return CARD_PLACES.filter((place) => state.placements[place][playerId] !== undefined).map((place) => ({
+    type: 'ACQUIRE_CARD',
+    slot: cardIndex(place),
     resources: {},
   }));
 }

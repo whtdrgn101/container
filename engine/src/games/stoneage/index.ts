@@ -7,6 +7,10 @@ export type {
   Building,
   BuildingCost,
   BuildingPlaceId,
+  CardEffect,
+  CardPlaceId,
+  CardScoring,
+  CivCard,
   FixedPlaceId,
   GatherPlaceId,
   MoveRecord,
@@ -29,6 +33,10 @@ export {
   BUILDING_DECK,
   BUILDING_PLACES,
   BUILDING_STACK_SIZE,
+  CARD_COST,
+  CARD_PLACES,
+  CARD_SYMBOLS,
+  CIV_CARD_DECK,
   CIV_CARD_SLOTS,
   DIE_FACES,
   HUNT_THRESHOLD,
@@ -61,7 +69,11 @@ export {
   buildingIndex,
   buildingPaymentError,
   buildingPlaceId,
+  cardIndex,
+  cardPaymentError,
+  cardPlaceId,
   isBuildingPlace,
+  isCardPlace,
   isGatherPlace,
   isResourcePlace,
   isUsePlace,
@@ -71,4 +83,4 @@ export {
 export type { Payment } from './internal';
 
 // Mechanics + turn-aware entry point. `gather` (the roll) is server-only; `takeGather` finalizes it.
-export { place, gather, takeGather, use, build, feed, applyAction, legalActions } from './actions';
+export { place, gather, takeGather, use, build, acquireCard, feed, applyAction, legalActions } from './actions';

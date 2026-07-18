@@ -166,14 +166,29 @@ payment → take the person back, leave the tile). The deck is `playerCount` fac
 *(Deferred: an emptied stack as a **game-end trigger** — wired in SA11; the 2–3-player building rules are
 unchanged.)*
 
-### SA10 — Civilization cards  · **L** (biggest) · pg. 6 + info sheet
+### ✅ SA10a — Civilization cards: acquisition + immediate effects (shipped)
 
-The 36-card deck + 4-slot display (resupplied each round, right-to-left). Pay resources (position in
-the row adds a cost) → take the card → its **immediate top effect** (instant resource/food/tool/points/
-food-production; the roll-and-share dice cards; the choose-later cards; one-time tool cards) → keep it
-for **final scoring** (green culture symbols vs. sand-colored multipliers). Worth splitting: **SA10a**
-acquisition + immediate effects, **SA10b** the scoring data on the card backs. Deck-can't-refill is the
-other **game-end trigger**.
+Cards are **placement targets** like buildings (pg. 4, 6): each of the 4 display slots holds one worker,
+and in the action phase that worker **acquires** the card — pay its position cost, take it (immediate
+effect fires, kept for scoring), empty the slot — or **passes** (empty payment). Closely mirrors SA9.
+
+- **Engine** (100% covered): `PlaceId` gained `card1..4`; `internal/cards.ts` holds the deal/refill and
+  `cardPaymentError` (a card costs a *number* of resources — `CARD_COST` = position, **any kinds, never
+  food**) + `applyCardEffect`. `ACQUIRE_CARD { slot, resources }` acquires or (empty) declines. State
+  gained `cardDisplay` (4 slots) + `cardDeck`; **`createGame` shuffles + deals 4** and the **round
+  transition refills** (slide kept cards left to the cheap end, draw into the empty slots — pg. 7). The
+  deck (`CIV_CARD_DECK`, 36 cards: 24 green culture across 8 symbols + 12 sand multipliers) is a faithful
+  **adaptation** — the rulebook points to a separate info sheet. Immediate effects modeled:
+  resource / food / food-track / tool / points / none.
+- **Backend**: `parseAction` accepts `ACQUIRE_CARD`; a REST test buys a card for its slot cost and
+  applies the effect.
+- **UI**: a **Civilization cards** row (own component `CardRow.tsx`, to keep `Board.tsx` small) shows each
+  slot's cost, immediate effect, and scoring symbol; a **Place worker** button, and an action-phase
+  resource picker gated on `cardPaymentError` → **Take** / **Pass**.
+
+*(Deferred: **SA10b** — final scoring by the cards' `scoring` data (green symbols² + sand multipliers),
+which folds into SA11; and the fancy card types — roll-and-share, choose-later. Deck-can't-refill as a
+**game-end trigger** is wired in SA11.)*
 
 ### SA11 — Game end + final scoring  · **M** · pg. 8
 

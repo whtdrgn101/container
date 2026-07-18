@@ -1,7 +1,7 @@
 // Rulebook-sourced constants for Stone Age (reference_materials/Stone_Age_-_Rules_-_Bernd_Brunnhofer.pdf).
 // This is the bootstrap scaffold (roadmap SA0); the mechanics land one action per stage.
 
-import type { Building, BuildingPlaceId, FixedPlaceId, Resource } from './types';
+import type { Building, BuildingPlaceId, CardPlaceId, CivCard, FixedPlaceId, Resource } from './types';
 
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 4;
@@ -43,8 +43,14 @@ export const PLACES: readonly FixedPlaceId[] = [
 /** The building slots (pg. 5), one per stack — only the first `playerCount` are ever in play. */
 export const BUILDING_PLACES: readonly BuildingPlaceId[] = ['building1', 'building2', 'building3', 'building4'];
 
-/** Every place people can be placed — fixed board places + building slots. Used to init/iterate placements. */
-export const ALL_PLACES: readonly (FixedPlaceId | BuildingPlaceId)[] = [...PLACES, ...BUILDING_PLACES];
+/** The civilization-card slots (pg. 4), one per display space (SA10). */
+export const CARD_PLACES: readonly CardPlaceId[] = ['card1', 'card2', 'card3', 'card4'];
+
+/** Every place people can be placed — fixed board places + building slots + card slots. */
+export const ALL_PLACES: readonly (FixedPlaceId | BuildingPlaceId | CardPlaceId)[] = [...PLACES, ...BUILDING_PLACES, ...CARD_PLACES];
+
+/** What each card slot costs, by position (pg. 6): the leftmost is cheapest; a card gets cheaper as it ages left. */
+export const CARD_COST: readonly number[] = [1, 2, 3, 4];
 
 /** Which resource each of the four gathering places yields. */
 export const PLACE_RESOURCE: Readonly<Record<'forest' | 'clayPit' | 'quarry' | 'river', Resource>> = {
@@ -112,6 +118,57 @@ export const BUILDING_DECK: readonly Building[] = [
 
 /** The card display always shows 4 civilization cards (pg. 3, setup step 8). */
 export const CIV_CARD_SLOTS = 4;
+
+/** The eight green "culture" symbols — final scoring counts a player's *distinct* symbols, squared (pg. 8). */
+export const CARD_SYMBOLS = ['writing', 'pottery', 'art', 'music', 'medicine', 'weaving', 'transport', 'timekeeping'] as const;
+
+/**
+ * The 36-card civilization deck (pg. 6 + info sheet). The rulebook points to a separate info sheet for
+ * the exact cards, so — like `BUILDING_DECK` — this is a faithful **adaptation**: 24 green culture cards
+ * (three per symbol) each with an instant benefit, and 12 sand-coloured multiplier cards (three each of
+ * farmer / tool maker / hut builder / shaman). SA10a applies the `effect` on acquisition; SA11 scores by
+ * `scoring`. The roll-and-share and choose-later card types are deferred.
+ */
+export const CIV_CARD_DECK: readonly CivCard[] = [
+  // Green culture cards — { symbol, immediate effect }.
+  { id: 'cv01', scoring: { kind: 'green', symbol: 'writing' }, effect: { kind: 'tool' } },
+  { id: 'cv02', scoring: { kind: 'green', symbol: 'writing' }, effect: { kind: 'points', amount: 3 } },
+  { id: 'cv03', scoring: { kind: 'green', symbol: 'writing' }, effect: { kind: 'resource', resource: 'wood', amount: 2 } },
+  { id: 'cv04', scoring: { kind: 'green', symbol: 'pottery' }, effect: { kind: 'food', amount: 2 } },
+  { id: 'cv05', scoring: { kind: 'green', symbol: 'pottery' }, effect: { kind: 'foodTrack', amount: 1 } },
+  { id: 'cv06', scoring: { kind: 'green', symbol: 'pottery' }, effect: { kind: 'resource', resource: 'brick', amount: 2 } },
+  { id: 'cv07', scoring: { kind: 'green', symbol: 'art' }, effect: { kind: 'points', amount: 4 } },
+  { id: 'cv08', scoring: { kind: 'green', symbol: 'art' }, effect: { kind: 'resource', resource: 'stone', amount: 1 } },
+  { id: 'cv09', scoring: { kind: 'green', symbol: 'art' }, effect: { kind: 'tool' } },
+  { id: 'cv10', scoring: { kind: 'green', symbol: 'music' }, effect: { kind: 'food', amount: 3 } },
+  { id: 'cv11', scoring: { kind: 'green', symbol: 'music' }, effect: { kind: 'resource', resource: 'gold', amount: 1 } },
+  { id: 'cv12', scoring: { kind: 'green', symbol: 'music' }, effect: { kind: 'foodTrack', amount: 1 } },
+  { id: 'cv13', scoring: { kind: 'green', symbol: 'medicine' }, effect: { kind: 'resource', resource: 'wood', amount: 1 } },
+  { id: 'cv14', scoring: { kind: 'green', symbol: 'medicine' }, effect: { kind: 'points', amount: 3 } },
+  { id: 'cv15', scoring: { kind: 'green', symbol: 'medicine' }, effect: { kind: 'food', amount: 2 } },
+  { id: 'cv16', scoring: { kind: 'green', symbol: 'weaving' }, effect: { kind: 'tool' } },
+  { id: 'cv17', scoring: { kind: 'green', symbol: 'weaving' }, effect: { kind: 'resource', resource: 'brick', amount: 1 } },
+  { id: 'cv18', scoring: { kind: 'green', symbol: 'weaving' }, effect: { kind: 'points', amount: 4 } },
+  { id: 'cv19', scoring: { kind: 'green', symbol: 'transport' }, effect: { kind: 'foodTrack', amount: 1 } },
+  { id: 'cv20', scoring: { kind: 'green', symbol: 'transport' }, effect: { kind: 'resource', resource: 'stone', amount: 2 } },
+  { id: 'cv21', scoring: { kind: 'green', symbol: 'transport' }, effect: { kind: 'food', amount: 2 } },
+  { id: 'cv22', scoring: { kind: 'green', symbol: 'timekeeping' }, effect: { kind: 'resource', resource: 'gold', amount: 1 } },
+  { id: 'cv23', scoring: { kind: 'green', symbol: 'timekeeping' }, effect: { kind: 'tool' } },
+  { id: 'cv24', scoring: { kind: 'green', symbol: 'timekeeping' }, effect: { kind: 'points', amount: 3 } },
+  // Sand-coloured multiplier cards — { multiplier, small immediate effect }.
+  { id: 'cv25', scoring: { kind: 'farmer' }, effect: { kind: 'none' } },
+  { id: 'cv26', scoring: { kind: 'farmer' }, effect: { kind: 'food', amount: 2 } },
+  { id: 'cv27', scoring: { kind: 'farmer' }, effect: { kind: 'foodTrack', amount: 1 } },
+  { id: 'cv28', scoring: { kind: 'toolMaker' }, effect: { kind: 'tool' } },
+  { id: 'cv29', scoring: { kind: 'toolMaker' }, effect: { kind: 'none' } },
+  { id: 'cv30', scoring: { kind: 'toolMaker' }, effect: { kind: 'resource', resource: 'wood', amount: 1 } },
+  { id: 'cv31', scoring: { kind: 'builder' }, effect: { kind: 'resource', resource: 'brick', amount: 1 } },
+  { id: 'cv32', scoring: { kind: 'builder' }, effect: { kind: 'none' } },
+  { id: 'cv33', scoring: { kind: 'builder' }, effect: { kind: 'resource', resource: 'stone', amount: 1 } },
+  { id: 'cv34', scoring: { kind: 'shaman' }, effect: { kind: 'food', amount: 2 } },
+  { id: 'cv35', scoring: { kind: 'shaman' }, effect: { kind: 'none' } },
+  { id: 'cv36', scoring: { kind: 'shaman' }, effect: { kind: 'points', amount: 3 } },
+];
 
 /** Feeding shortfall you can't cover costs 10 points off the scoring track (pg. 7). */
 export const STARVATION_PENALTY = 10;

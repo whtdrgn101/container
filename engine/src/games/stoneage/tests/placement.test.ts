@@ -60,6 +60,15 @@ describe('countRange', () => {
     const base = makeState();
     expect(countRange({ ...base, buildings: [[], base.buildings[1]!] }, 'building1', 'p1')).toBeNull();
   });
+
+  it('a card slot takes exactly 1, but only while it holds a card and is unoccupied', () => {
+    expect(countRange(makeState(), 'card1', 'p1')).toEqual({ min: 1, max: 1 });
+    // Occupied by another player → full.
+    expect(countRange(withPlacements({ card1: { p2: 1 } }), 'card1', 'p1')).toBeNull();
+    // An empty display slot offers no place.
+    const base = makeState();
+    expect(countRange({ ...base, cardDisplay: [null, ...base.cardDisplay.slice(1)] }, 'card1', 'p1')).toBeNull();
+  });
 });
 
 describe('canPlace / nextPlacer', () => {
@@ -82,17 +91,17 @@ describe('legalPlacements', () => {
   it('enumerates one action per legal (place, count) for a fresh board', () => {
     const options = legalPlacements(makeState(), 'p1');
     // toolMaker(1) + field(1) + hut(1) + hunt(1..5)=5 + 4 resource places ×(1..5)=20 → 28,
-    // plus 1 per building stack (2 in a 2-player game) → 30.
-    expect(options).toHaveLength(30);
+    // plus 1 per building stack (2 in a 2-player game) + 1 per card slot (4) → 34.
+    expect(options).toHaveLength(34);
     expect(options).toContainEqual({ type: 'PLACE', place: 'hut', count: 2 });
     expect(options).toContainEqual({ type: 'PLACE', place: 'hunt', count: 5 });
     expect(options).toContainEqual({ type: 'PLACE', place: 'toolMaker', count: 1 });
   });
 
   it('skips places that are no longer available', () => {
-    // The tool maker is taken, so it drops out (30 − its one option = 29).
+    // The tool maker is taken, so it drops out (34 − its one option = 33).
     const options = legalPlacements(withPlacements({ toolMaker: { p2: 1 } }), 'p1');
-    expect(options).toHaveLength(29);
+    expect(options).toHaveLength(33);
     expect(options.some((a) => a.type === 'PLACE' && a.place === 'toolMaker')).toBe(false);
   });
 });

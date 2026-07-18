@@ -2,6 +2,7 @@ import { ALL_PLACES, PLACE_CAPACITY } from '../core';
 import type { PlaceId, StoneAgeState } from '../core';
 import type { Action } from '../actions/action';
 import { buildingIndex, isBuildingPlace } from './buildings';
+import { cardIndex, isCardPlace } from './cards';
 
 /**
  * The worker-placement rules of phase 1 (rulebook pg. 4). Capacities live in `PLACE_CAPACITY`; the
@@ -45,6 +46,12 @@ export function countRange(state: StoneAgeState, place: PlaceId, playerId: strin
   if (isBuildingPlace(place)) {
     const stack = state.buildings[buildingIndex(place)];
     if (!stack || stack.length === 0) return null;
+    return occupancy(state, place) === 0 ? { min: 1, max: 1 } : null;
+  }
+
+  // Card slots (pg. 4): exactly 1 person, but only while the slot holds a card.
+  if (isCardPlace(place)) {
+    if ((state.cardDisplay[cardIndex(place)] ?? null) === null) return null;
     return occupancy(state, place) === 0 ? { min: 1, max: 1 } : null;
   }
 

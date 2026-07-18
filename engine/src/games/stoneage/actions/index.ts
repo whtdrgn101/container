@@ -5,6 +5,7 @@ export * from './gather';
 export * from './take';
 export * from './use';
 export * from './build';
+export * from './acquireCard';
 export * from './feed';
 export * from './applyAction';
 export * from './legalActions';

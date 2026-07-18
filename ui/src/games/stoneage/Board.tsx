@@ -3,7 +3,9 @@ import {
   availableToPlace,
   buildingIndex,
   buildingPaymentError,
+  cardIndex,
   HUNT_THRESHOLD,
+  isBuildingPlace,
   isGatherPlace,
   isUsePlace,
   paymentValue,
@@ -15,11 +17,12 @@ import {
   RESOURCE_THRESHOLD,
   RESOURCES,
 } from '@game-hub/engine/stoneage';
-import type { Building, BuildingCost, FixedPlaceId, PlaceId, Resource, StoneAgeView } from '@game-hub/engine/stoneage';
+import type { Building, BuildingCost, CardPlaceId, FixedPlaceId, PlaceId, Resource, StoneAgeView } from '@game-hub/engine/stoneage';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { BoardProps } from '../types';
 import * as stoneageApi from './api';
+import { CardRow } from './CardRow';
 
 const PLACE_LABEL: Record<FixedPlaceId, string> = {
   toolMaker: 'Tool maker',
@@ -31,9 +34,12 @@ const PLACE_LABEL: Record<FixedPlaceId, string> = {
   quarry: 'Quarry',
   river: 'River',
 };
-/** A readable label for any place, including the building slots (`building1` → "Building 1"). */
-const placeLabel = (place: PlaceId): string =>
-  place in PLACE_LABEL ? PLACE_LABEL[place as FixedPlaceId] : `Building ${buildingIndex(place as 'building1') + 1}`;
+/** A readable label for any place, including the building slots and card slots. */
+const placeLabel = (place: PlaceId): string => {
+  if (place in PLACE_LABEL) return PLACE_LABEL[place as FixedPlaceId];
+  if (isBuildingPlace(place)) return `Building ${buildingIndex(place) + 1}`;
+  return `Card ${cardIndex(place as CardPlaceId) + 1}`;
+};
 /** A short cost/scoring summary for a building tile. */
 const costLabel = (cost: BuildingCost): string => {
   if (cost.kind === 'fixed') return RESOURCES.filter((r) => cost.resources[r]).map((r) => `${cost.resources[r]}× ${RESOURCE_LABEL[r]}`).join(' + ');
@@ -108,6 +114,10 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
   const doBuild = (stack: number, resources: Partial<Record<Resource, number>>) => {
     if (!canDrive || !active) return;
     void run(() => stoneageApi.act(gameId, active.id, { type: 'BUILD', stack, resources }, viewer));
+  };
+  const doAcquire = (slot: number, resources: Partial<Record<Resource, number>>) => {
+    if (!canDrive || !active) return;
+    void run(() => stoneageApi.act(gameId, active.id, { type: 'ACQUIRE_CARD', slot, resources }, viewer));
   };
   const bumpPay = (stack: number, resource: Resource, by: number, owned: number) =>
     setPay((prev) => {
@@ -198,6 +208,10 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
     if (entry.type === 'BUILD') {
       if (p['declined']) return `${who} passed on a building`;
       return `${who} built (+${p['points']} points)`;
+    }
+    if (entry.type === 'ACQUIRE_CARD') {
+      if (p['declined']) return `${who} passed on a card`;
+      return `${who} took a civilization card`;
     }
     return `${who}: ${entry.type.toLowerCase()}`;
   };
@@ -448,6 +462,21 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
           </div>
         </div>
       )}
+
+      {/* The civilization-card display (pg. 4, 6, SA10) — its own component to keep this file small. */}
+      <CardRow
+        game={game}
+        active={active}
+        canDrive={canDrive}
+        placing={placing}
+        acting={acting}
+        pending={!!pending}
+        busy={busy}
+        onPlace={(place) => doPlace(place, 1)}
+        onAcquire={doAcquire}
+        playerName={playerName}
+        seatColorOf={seatColorOf}
+      />
 
       {/* Each player's board (pg. 2). */}
       <div>

@@ -354,4 +354,34 @@ describe('Stone Age buildings (SA9)', () => {
     });
     expect(malformed.statusCode).toBe(400);
   });
+
+  it('acquires a civilization card for its slot cost and applies the effect (SA10)', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/games',
+      payload: { gameType: 'stoneage', players: [{ name: 'Ann' }, { name: 'Bob' }] },
+    });
+    const id = created.json().game.id as string;
+    // Deck order → card slot 0 is cv01 (green "writing", immediate effect: take a tool), cost 1 resource.
+    expect(created.json().game.cardDisplay[0].id).toBe('cv01');
+
+    await place(id, 'p1', 'card1', 1); // Ann → card slot 0
+    await place(id, 'p2', 'quarry', 5);
+    await place(id, 'p1', 'forest', 4); // → action phase, Ann up
+
+    // Ann gathers wood, then pays 1 wood for the card → gains a tool and keeps the card.
+    await roll(id, 'p1', 'forest');
+    await take(id, 'p1'); // all 6s → 24/3 = 8 wood
+    const got = await app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId: 'p1', action: { type: 'ACQUIRE_CARD', slot: 0, resources: { wood: 1 } } },
+    });
+    expect(got.statusCode).toBe(200);
+    const ann = got.json().game.players[0];
+    expect(ann.civCards).toEqual(['cv01']);
+    expect(ann.tools).toEqual([1]); // the card's immediate effect
+    expect(ann.resources.wood).toBe(7); // 8 − 1 paid
+    expect(got.json().game.cardDisplay[0]).toBeNull(); // slot emptied
+  });
 });

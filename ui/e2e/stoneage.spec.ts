@@ -160,3 +160,26 @@ test('SA4b: spend a tool to boost a gather roll', async ({ page }) => {
   await page.getByTestId('take-gather').click();
   await expect(page.getByTestId('sa-log')).toContainText('took');
 });
+
+test('SA10: place a worker on a card, gather a resource, and buy the card', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('pick-game-stoneage').click();
+  await page.getByTestId('remove-player-2').click();
+  await page.getByTestId('start-game').click();
+  await expect(page.getByTestId('board')).toBeVisible();
+
+  // The card display renders with 4 slots, cheapest first.
+  await expect(page.getByTestId('place-card1')).toContainText('1 res');
+
+  // Ann → card 1 + forest (rest); Bob → quarry (all) → action phase.
+  await page.getByTestId('place-card1-go').click();
+  await page.getByTestId('place-quarry-go').click(); // Bob, all 5
+  await page.getByTestId('place-forest-go').click(); // Ann's remaining 4
+
+  // Ann gathers wood (≥1 from 4 dice), then pays 1 wood for card slot 0 (cost 1).
+  await page.getByTestId('gather-forest').click();
+  await page.getByTestId('take-gather').click();
+  await page.getByTestId('card-pay-0-wood-inc').click(); // pay 1 wood
+  await page.getByTestId('acquire-0').click();
+  await expect(page.getByTestId('sa-log')).toContainText('took a civilization card');
+});

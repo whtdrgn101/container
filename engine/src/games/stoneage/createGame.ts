@@ -1,6 +1,6 @@
 import { ALL_PLACES, GameError, MAX_PLAYERS, MIN_PLAYERS, RESOURCES, STARTING_FOOD, STARTING_PEOPLE } from './core';
 import type { PlaceId, Resource, StoneAgePlayer, StoneAgeState } from './core';
-import { dealBuildings } from './internal';
+import { dealBuildings, dealCards } from './internal';
 
 /** Input for a single seat when creating a game. */
 export interface NewPlayer {
@@ -57,6 +57,8 @@ export function createGame(options: CreateGameOptions): StoneAgeState {
   const placements = {} as Record<PlaceId, Record<string, number>>;
   for (const place of ALL_PLACES) placements[place] = {};
 
+  const { display, deck } = dealCards(rng);
+
   return {
     id,
     players: playerStates,
@@ -66,6 +68,8 @@ export function createGame(options: CreateGameOptions): StoneAgeState {
     activePlayerIndex: 0,
     placements,
     buildings: dealBuildings(count, rng),
+    cardDisplay: display,
+    cardDeck: deck,
     pendingGather: null,
     status: 'active',
     winnerIds: [],

@@ -8,6 +8,7 @@ const gatherForest = { type: 'GATHER', place: 'forest', dice: [1, 1] } as const;
 const useField = { type: 'USE', place: 'field' } as const;
 const feedAction = { type: 'FEED' } as const;
 const buildAction = { type: 'BUILD', stack: 0, resources: {} } as const;
+const acquireAction = { type: 'ACQUIRE_CARD', slot: 0, resources: {} } as const;
 
 describe('applyAction', () => {
   it('dispatches PLACE during the placement phase', () => {
@@ -26,6 +27,9 @@ describe('applyAction', () => {
     // BUILD: decline (empty payment) returns the person from the building slot.
     const withBuilding = withPlacements({ building1: { p1: 1 } }, { phase: 'actions', activePlayerIndex: 0 });
     expect(applyAction(withBuilding, 'p1', buildAction).placements.building1).toEqual({});
+    // ACQUIRE_CARD: decline returns the person from the card slot.
+    const withCard = withPlacements({ card1: { p1: 1 } }, { phase: 'actions', activePlayerIndex: 0 });
+    expect(applyAction(withCard, 'p1', acquireAction).placements.card1).toEqual({});
   });
 
   it('locks the turn to TAKE_GATHER while a roll is pending', () => {
@@ -50,17 +54,21 @@ describe('applyAction', () => {
     expectError(() => applyAction(makeState(), 'p1', useField), 'WRONG_PHASE'); // use in placement phase
     expectError(() => applyAction(makeState(), 'p1', feedAction), 'WRONG_PHASE'); // feed in placement phase
     expectError(() => applyAction(makeState(), 'p1', buildAction), 'WRONG_PHASE'); // build in placement phase
+    expectError(() => applyAction(makeState(), 'p1', acquireAction), 'WRONG_PHASE'); // acquire in placement phase
   });
 });
 
 describe('legalActions', () => {
   it('lists placements in placement, USE actions in the action phase, and FEED in feeding', () => {
-    expect(legalActions(makeState())).toHaveLength(30); // fresh 2-player board (28 + 2 building stacks)
+    expect(legalActions(makeState())).toHaveLength(34); // fresh board: 28 + 2 building stacks + 4 card slots
     const acting = withPlacements({ toolMaker: { p1: 1 } }, { phase: 'actions', activePlayerIndex: 0 });
     expect(legalActions(acting)).toEqual([{ type: 'USE', place: 'toolMaker' }]);
     // A person on a building slot surfaces a BUILD marker (its payment is the caller's choice).
     const onBuilding = withPlacements({ building2: { p1: 1 } }, { phase: 'actions', activePlayerIndex: 0 });
     expect(legalActions(onBuilding)).toEqual([{ type: 'BUILD', stack: 1, resources: {} }]);
+    // A person on a card slot surfaces an ACQUIRE_CARD marker.
+    const onCard = withPlacements({ card3: { p1: 1 } }, { phase: 'actions', activePlayerIndex: 0 });
+    expect(legalActions(onCard)).toEqual([{ type: 'ACQUIRE_CARD', slot: 2, resources: {} }]);
     expect(legalActions(makeState({ phase: 'feeding' }))).toEqual([{ type: 'FEED' }]);
   });
 

@@ -3,10 +3,10 @@ import type { Action, PlaceId, Resource } from '@game-hub/engine/stoneage';
 import type { ParseResult } from '../module';
 
 /**
- * Validate opaque JSON into a typed Stone Age `Action`: `PLACE` (SA1), `USE` (the non-dice places,
- * SA4–6), `FEED` (SA7) and `BUILD` (SA9). `GATHER` is server-only (the roll route builds its dice).
+ * Validate opaque JSON into a typed Stone Age `Action`: `PLACE` (SA1), `USE` (SA4–6), `FEED` (SA7),
+ * `BUILD` (SA9), `ACQUIRE_CARD` (SA10) and `TAKE_GATHER` (SA4b). `GATHER` (the roll) is server-only.
  * Structural checks only — the engine judges legality (whose turn, which place is full/wrong-kind, a
- * payment that fits the tile) and answers with a `GameError`.
+ * payment that fits the tile/card) and answers with a `GameError`.
  */
 export function parseStoneAgeAction(raw: unknown): ParseResult<Action> {
   if (typeof raw !== 'object' || raw === null) return bad('An action must be an object');
@@ -49,6 +49,21 @@ export function parseStoneAgeAction(raw: unknown): ParseResult<Action> {
         resources[r] = n;
       }
       return { ok: true, action: { type: 'BUILD', stack, resources } };
+    }
+    case 'ACQUIRE_CARD': {
+      const slot = record['slot'];
+      if (typeof slot !== 'number' || !Number.isInteger(slot) || slot < 0) return bad('ACQUIRE_CARD requires a slot index');
+      const rawResources = record['resources'];
+      if (typeof rawResources !== 'object' || rawResources === null) return bad('ACQUIRE_CARD requires a resources payment');
+      const src = rawResources as Record<string, unknown>;
+      const resources: Partial<Record<Resource, number>> = {};
+      for (const r of RESOURCES) {
+        const n = src[r];
+        if (n === undefined) continue;
+        if (typeof n !== 'number' || !Number.isInteger(n) || n < 0) return bad(`ACQUIRE_CARD ${r} must be a non-negative whole number`);
+        resources[r] = n;
+      }
+      return { ok: true, action: { type: 'ACQUIRE_CARD', slot, resources } };
     }
     case 'TAKE_GATHER': {
       const raw = record['toolIndices'];

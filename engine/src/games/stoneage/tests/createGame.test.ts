@@ -29,6 +29,13 @@ describe('createGame', () => {
     expect(Object.values(state.placements).every((p) => Object.keys(p).length === 0)).toBe(true);
   });
 
+  it('deals a 4-card civilization display and keeps the rest as the deck (setup step 8)', () => {
+    const state = createGame({ id: 'g1', players: [{ name: 'A' }, { name: 'B' }] });
+    expect(state.cardDisplay).toHaveLength(4);
+    expect(state.cardDisplay.every((c) => c !== null)).toBe(true);
+    expect(state.cardDeck).toHaveLength(32); // 36 − 4 shown
+  });
+
   it('deals one building stack of 7 per player (setup step 9)', () => {
     const two = createGame({ id: 'g1', players: [{ name: 'A' }, { name: 'B' }] });
     expect(two.buildings).toHaveLength(2);

@@ -16,8 +16,11 @@ export type FixedPlaceId = 'toolMaker' | 'hut' | 'field' | 'hunt' | 'forest' | '
  */
 export type BuildingPlaceId = 'building1' | 'building2' | 'building3' | 'building4';
 
-/** Anywhere a person can be placed — the fixed board places plus the building slots (SA9). */
-export type PlaceId = FixedPlaceId | BuildingPlaceId;
+/** A civilization-card slot (pg. 4): one per display space, holding exactly 1 person (SA10). */
+export type CardPlaceId = 'card1' | 'card2' | 'card3' | 'card4';
+
+/** Anywhere a person can be placed — the fixed board places, building slots (SA9), and card slots (SA10). */
+export type PlaceId = FixedPlaceId | BuildingPlaceId | CardPlaceId;
 
 /** The four places you gather a resource from (all resolved by a dice roll). */
 export type ResourcePlaceId = 'forest' | 'clayPit' | 'quarry' | 'river';
@@ -44,6 +47,36 @@ export type BuildingCost =
 export interface Building {
   readonly id: string;
   readonly cost: BuildingCost;
+}
+
+/**
+ * A civilization card's **immediate effect**, applied the moment it's acquired (pg. 6 + info sheet).
+ * SA10a models the instant benefits; the roll-and-share / choose-later cards are deferred.
+ */
+export type CardEffect =
+  | { readonly kind: 'resource'; readonly resource: Resource; readonly amount: number }
+  | { readonly kind: 'food'; readonly amount: number }
+  | { readonly kind: 'foodTrack'; readonly amount: number }
+  | { readonly kind: 'tool' }
+  | { readonly kind: 'points'; readonly amount: number }
+  | { readonly kind: 'none' };
+
+/**
+ * How a civilization card scores at game end (pg. 8) — used in SA11. `green` culture cards score by the
+ * count of *distinct* symbols squared; the four sand-coloured cards each multiply a player quantity.
+ */
+export type CardScoring =
+  | { readonly kind: 'green'; readonly symbol: string }
+  | { readonly kind: 'farmer' } // × food-track position
+  | { readonly kind: 'toolMaker' } // × total tool value
+  | { readonly kind: 'builder' } // × buildings
+  | { readonly kind: 'shaman' }; // × people
+
+/** One civilization card: its id, immediate effect, and final-scoring rule. */
+export interface CivCard {
+  readonly id: string;
+  readonly effect: CardEffect;
+  readonly scoring: CardScoring;
 }
 
 /**
@@ -113,6 +146,13 @@ export interface StoneAgeState {
    * stack is a game-end trigger (wired in SA11).
    */
   readonly buildings: readonly (readonly Building[])[];
+  /**
+   * The civilization-card display (pg. 4, 6): 4 slots, cheapest (slot 0) to dearest. `null` is an empty
+   * slot. Filled from `cardDeck`; a slot's cost is its position (`CARD_COST`). Refilled each round (SA10).
+   */
+  readonly cardDisplay: readonly (CivCard | null)[];
+  /** The face-down civilization-card draw pile (shuffled at `createGame`); refills the display. */
+  readonly cardDeck: readonly CivCard[];
   /**
    * A dice roll the active player has made and not yet taken (pg. 5–6) — set by the server-only roll,
    * cleared when they take it (optionally adding tools). `null` the rest of the time; while set, the

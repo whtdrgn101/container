@@ -2,6 +2,7 @@ import { GameError } from '../core';
 import type { StoneAgeState } from '../core';
 import { seatOf } from '../internal';
 import type { Action } from './action';
+import { acquireCard } from './acquireCard';
 import { build } from './build';
 import { feed } from './feed';
 import { gather } from './gather';
@@ -51,6 +52,11 @@ export function applyAction(state: StoneAgeState, playerId: string, action: Acti
         throw new GameError('WRONG_PHASE', 'Buildings are only bought during the action phase');
       }
       return build(state, playerId, action.stack, action.resources);
+    case 'ACQUIRE_CARD':
+      if (state.phase !== 'actions') {
+        throw new GameError('WRONG_PHASE', 'Cards are only acquired during the action phase');
+      }
+      return acquireCard(state, playerId, action.slot, action.resources);
     case 'FEED':
       if (state.phase !== 'feeding') {
         throw new GameError('WRONG_PHASE', 'People are only fed during the feeding phase');
