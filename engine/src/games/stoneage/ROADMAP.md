@@ -190,13 +190,29 @@ effect fires, kept for scoring), empty the slot — or **passes** (empty payment
 which folds into SA11; and the fancy card types — roll-and-share, choose-later. Deck-can't-refill as a
 **game-end trigger** is wired in SA11.)*
 
-### SA11 — Game end + final scoring  · **M** · pg. 8
+### ✅ SA11 — Game end + final scoring: the core game is complete (shipped)
 
-End when the card deck can't fill the display (immediate) or a building stack is empty (finish the
-round). Score: green cards **squared** (distinct-symbol count²), sand multipliers (farmers×food-track,
-tool-makers×tool-value, hut-builders×buildings, shamen×people), +1 per leftover resource. Winner by
-total, then food+tools+people tiebreak (pg. 8). `status: 'ended'` + `winnerIds` + a results screen in
-the shared `GameOver`.
+Stone Age is now **winnable end-to-end** (pg. 8). Both game-end triggers resolve at the round transition
+(`startNewRound`, after the round's feeding): a **building stack is empty** (played to the end) or the
+**card deck can't refill** the display. Either ends the game with final scoring and no new round.
+
+- **Engine** (100% covered): `internal/scoring.ts` — `scorePlayer` adds to the points banked during the
+  game (buildings, card `points` effects, feeding penalties): green culture cards score **distinct
+  symbols²**, the four sand multipliers score farmers×food-track / tool-makers×tool-value /
+  hut-builders×buildings / shamen×people, and each leftover **resource** is +1 (food doesn't score).
+  `finalScoring` ranks players and picks the winner by total, then the **food-track + tools + people**
+  tiebreak, sharing if still level. State gained `results` (a per-player `ScoreBreakdown`) alongside
+  `winnerIds`; `status` flips to `'ended'`.
+- **UI**: when `status === 'ended'` the board renders the shared **`GameOver`** frame with a scoreboard
+  breaking out each scoring line (cards² / farm / tools / build / shaman / res / total), sorted, winner
+  crowned — the same ending every game gets, plus rematch.
+- **Not integration-tested over REST**: reaching an end trigger takes ~15 rounds of moves, so the engine
+  tests are authoritative for scoring + triggers; the backend just passes `status`/`results` through
+  `viewFor`, and the results screen reuses the `GameOver` pattern container/cantstop already e2e-cover.
+
+🎉 **The core Stone Age game is complete** — place → gather (with tools) / actions / buildings / cards →
+feed → round loop → game end + scoring, at 100% engine coverage. Remaining is additive: the AI bot
+(SA12) and polish (SA13).
 
 ### SA12 — AI bot  · **L** · after the game is winnable
 

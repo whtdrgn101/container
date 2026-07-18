@@ -1,6 +1,7 @@
 import { ALL_PLACES } from '../core';
 import type { PlaceId, StoneAgeState } from '../core';
 import { refillDisplay } from './cards';
+import { finalScoring } from './scoring';
 
 /**
  * The feeding phase (rulebook pg. 7, phase 3) and the roll into the next round (pg. 7, "New round").
@@ -26,16 +27,24 @@ export function advanceFeeder(state: StoneAgeState): Partial<StoneAgeState> {
 }
 
 /**
- * Begin a new round (pg. 7, "New round"): resupply the civilization-card display (SA10), pass the
- * start-player marker one seat to the left, clear the board, flip every used tool back to unused (pg. 5,
- * SA4b), bump the round counter, and return to the placement phase with the new start player up.
- *
- * *(Buildings don't resupply — an empty stack simply stays empty and ends the game in SA11.)*
+ * Begin a new round (pg. 7, "New round"), unless the game ends first (pg. 8, SA11). Two triggers, both
+ * resolved here (the round with the trigger has just finished feeding): a **building stack is empty**, or
+ * the **card deck can't refill** the display. Either ends the game now with final scoring and no new
+ * round. Otherwise: resupply the card display (SA10), pass the start-player marker one seat left, clear
+ * the board, flip every used tool back to unused (SA4b), bump the round, and return to placement.
  */
 export function startNewRound(state: StoneAgeState): Partial<StoneAgeState> {
   const n = state.players.length;
   const startPlayerIndex = (state.startPlayerIndex + 1) % n;
   const { display, deck } = refillDisplay(state.cardDisplay, state.cardDeck);
+
+  const stackEmpty = state.buildings.some((stack) => stack.length === 0);
+  const cardsShort = display.some((card) => card === null);
+  if (stackEmpty || cardsShort) {
+    const { results, winnerIds } = finalScoring(state);
+    return { status: 'ended', results, winnerIds };
+  }
+
   return {
     round: state.round + 1,
     phase: 'placement',

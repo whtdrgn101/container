@@ -20,6 +20,7 @@ import {
 import type { Building, BuildingCost, CardPlaceId, FixedPlaceId, PlaceId, Resource, StoneAgeView } from '@game-hub/engine/stoneage';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { GameOver } from '@/components/GameOver';
 import type { BoardProps } from '../types';
 import * as stoneageApi from './api';
 import { CardRow } from './CardRow';
@@ -71,7 +72,7 @@ const occupancy = (place: Readonly<Record<string, number>>): number =>
  * (gather / tool maker / hut / field), feed everyone, then the round rolls over. Buildings, civilization
  * cards, game end and the AI bot arrive in later stages.
  */
-export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewer, busy, guard, onPayload }: BoardProps<StoneAgeView>) {
+export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewer, busy, guard, onPayload, onLeave }: BoardProps<StoneAgeView>) {
   // Draft count per place for the variable places (hunt / resource); fixed places ignore it.
   const [counts, setCounts] = useState<Partial<Record<PlaceId, number>>>({});
   // In-progress building payment, per stack index (the resources you'll pay when you press Build).
@@ -218,6 +219,40 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
 
   return (
     <div data-testid="board" className="space-y-4">
+      {game.status === 'ended' && game.results && (
+        <GameOver winnerNames={game.winnerIds.map((id) => playerName(id))} onNewGame={onLeave}>
+          <table className="w-full text-sm" data-testid="sa-results">
+            <thead>
+              <tr className="text-left text-xs text-muted-foreground">
+                <th className="py-1 pr-2 font-medium">Player</th>
+                <th className="px-1 font-medium">Cards²</th>
+                <th className="px-1 font-medium">Farm</th>
+                <th className="px-1 font-medium">Tools</th>
+                <th className="px-1 font-medium">Build</th>
+                <th className="px-1 font-medium">Shaman</th>
+                <th className="px-1 font-medium">Res</th>
+                <th className="pl-1 text-right font-semibold">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...game.results]
+                .sort((a, b) => b.total - a.total)
+                .map((r) => (
+                  <tr key={r.playerId} data-testid={`sa-result-${r.playerId}`} className="border-t">
+                    <td className={cn('py-1 pr-2 font-medium', seatColorOf(r.playerId).text)}>{playerName(r.playerId)}</td>
+                    <td className="px-1 tabular-nums text-muted-foreground">{r.breakdown.green}</td>
+                    <td className="px-1 tabular-nums text-muted-foreground">{r.breakdown.farmers}</td>
+                    <td className="px-1 tabular-nums text-muted-foreground">{r.breakdown.toolMakers}</td>
+                    <td className="px-1 tabular-nums text-muted-foreground">{r.breakdown.builders}</td>
+                    <td className="px-1 tabular-nums text-muted-foreground">{r.breakdown.shamen}</td>
+                    <td className="px-1 tabular-nums text-muted-foreground">{r.breakdown.resources}</td>
+                    <td className="pl-1 text-right font-semibold tabular-nums">{r.total}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </GameOver>
+      )}
       <div
         data-testid="sa-banner"
         className="flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-sm"

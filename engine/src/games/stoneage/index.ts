@@ -19,7 +19,9 @@ export type {
   PlaceId,
   ResourcePlaceId,
   Resource,
+  ScoreBreakdown,
   StoneAgePlayer,
+  StoneAgeResult,
   StoneAgeState,
 } from './core';
 

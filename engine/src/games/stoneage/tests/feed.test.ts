@@ -46,11 +46,31 @@ describe('feed', () => {
     const next = feed(base, 'p2');
     expect(next.players[0]!.toolsUsed).toEqual([false, false]); // tools flip back to unused (SA4b)
     expect(next.cardDisplay).toHaveLength(4); // the card display is resupplied for the new round (SA10)
+    expect(next.status).toBe('active'); // no game-end trigger → the round rolls over
     expect(next.round).toBe(2);
     expect(next.phase).toBe('placement');
     expect(next.startPlayerIndex).toBe(1); // marker passed one seat left
     expect(next.activePlayerIndex).toBe(1);
     expect(next.placements.forest).toEqual({}); // board cleared for the new round
     expect(next.placements.building1).toEqual({}); // building slots survive the reset (not just fixed places)
+  });
+
+  it('ends the game at the round transition when a building stack is empty (SA11)', () => {
+    // Last feeder; one building stack has been emptied → final scoring instead of a new round.
+    const base = feeding({}, { activePlayerIndex: 1, startPlayerIndex: 0 });
+    const next = feed({ ...base, buildings: [[], base.buildings[1]!] }, 'p2');
+    expect(next.status).toBe('ended');
+    expect(next.results).not.toBeNull();
+    expect(next.winnerIds.length).toBeGreaterThanOrEqual(1);
+    expect(next.round).toBe(1); // no new round started
+  });
+
+  it('ends the game when the card deck cannot refill the display (SA11)', () => {
+    // Two slots taken, empty deck → the display can't be refilled → game ends.
+    const base = feeding({}, { activePlayerIndex: 1, startPlayerIndex: 0 });
+    const short = { ...base, cardDeck: [], cardDisplay: [base.cardDisplay[0]!, null, null, base.cardDisplay[3]!] };
+    const next = feed(short, 'p2');
+    expect(next.status).toBe('ended');
+    expect(next.results).not.toBeNull();
   });
 });

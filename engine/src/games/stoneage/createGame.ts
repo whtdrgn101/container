@@ -73,6 +73,7 @@ export function createGame(options: CreateGameOptions): StoneAgeState {
     pendingGather: null,
     status: 'active',
     winnerIds: [],
+    results: null,
     version: 0,
     log: [],
   };

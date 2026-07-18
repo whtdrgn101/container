@@ -79,6 +79,32 @@ export interface CivCard {
   readonly scoring: CardScoring;
 }
 
+/** A player's final-score breakdown (pg. 8, SA11), each line summed into `total`. */
+export interface ScoreBreakdown {
+  /** Points banked *during* the game (buildings, card `points` effects, feeding penalties). */
+  readonly base: number;
+  /** Green culture cards: the count of *distinct* symbols, squared. */
+  readonly green: number;
+  /** Farmer cards × food-track position. */
+  readonly farmers: number;
+  /** Tool-maker cards × total tool value. */
+  readonly toolMakers: number;
+  /** Hut-builder cards × buildings acquired. */
+  readonly builders: number;
+  /** Shaman cards × people. */
+  readonly shamen: number;
+  /** +1 per leftover resource on the player board (food doesn't score). */
+  readonly resources: number;
+  readonly total: number;
+}
+
+/** One player's final result (SA11). */
+export interface StoneAgeResult {
+  readonly playerId: string;
+  readonly total: number;
+  readonly breakdown: ScoreBreakdown;
+}
+
 /**
  * A dice roll awaiting resolution (pg. 5–6): the active player has rolled at a gather place and may now
  * add tools before taking the yield. Held on the state so the dice stay server-authoritative between the
@@ -162,6 +188,8 @@ export interface StoneAgeState {
   readonly status: 'active' | 'ended';
   /** Winner(s) once scored — empty until the game ends. */
   readonly winnerIds: readonly string[];
+  /** Per-player final-score breakdown once the game ends (SA11); `null` while active. */
+  readonly results: readonly StoneAgeResult[] | null;
   readonly version: number;
   readonly log: readonly MoveRecord[];
 }

@@ -19,6 +19,11 @@ export function cardPlaceId(index: number): CardPlaceId {
   return CARD_PLACES[index]!;
 }
 
+/** Look up a card by id (from the fixed deck) — used at final scoring to read acquired cards' scoring. */
+export function civCardById(id: string): CivCard {
+  return CIV_CARD_DECK.find((card) => card.id === id)!;
+}
+
 /**
  * Shuffle the civilization deck (Fisher–Yates on the injected rng) and deal the 4-slot display off the
  * top (pg. 3, setup step 8). Without an rng the deck order is kept — deterministic, for tests. Returns

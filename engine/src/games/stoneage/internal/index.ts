@@ -5,5 +5,6 @@ export * from './actionsPhase';
 export * from './buildings';
 export * from './cards';
 export * from './feeding';
+export * from './scoring';
 export * from './tools';
 export * from './record';
