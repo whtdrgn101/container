@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import {
   availableToPlace,
   buildingIndex,
@@ -6,14 +6,9 @@ import {
   cardIndex,
   HUNT_THRESHOLD,
   isBuildingPlace,
-  isGatherPlace,
-  isUsePlace,
   paymentValue,
   placedBy,
-  legalActions,
-  PLACE_CAPACITY,
   PLACE_RESOURCE,
-  PLACES,
   RESOURCE_THRESHOLD,
   RESOURCES,
 } from '@game-hub/engine/stoneage';
@@ -21,22 +16,12 @@ import type { Building, BuildingCost, CardPlaceId, FixedPlaceId, PlaceId, Resour
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { GameOver } from '@/components/GameOver';
+import { PanZoom } from '@/components/PanZoom';
 import type { BoardProps } from '../types';
 import * as stoneageApi from './api';
 import { CardRow } from './CardRow';
-import { FieldIcon, Hut, HuntIcon, Meeple, ResourceIcon, ToolIcon } from './art';
-
-/** The prehistoric emblem for each board place. */
-const PLACE_ICON: Record<FixedPlaceId, (props: { className?: string }) => ReactNode> = {
-  toolMaker: ToolIcon,
-  hut: Hut,
-  field: FieldIcon,
-  hunt: HuntIcon,
-  forest: (p) => <ResourceIcon resource="wood" {...p} />,
-  clayPit: (p) => <ResourceIcon resource="brick" {...p} />,
-  quarry: (p) => <ResourceIcon resource="stone" {...p} />,
-  river: (p) => <ResourceIcon resource="gold" {...p} />,
-};
+import { BoardMap } from './BoardMap';
+import { FieldIcon, Hut, Meeple, ResourceIcon, ToolIcon } from './art';
 
 const PLACE_LABEL: Record<FixedPlaceId, string> = {
   toolMaker: 'Tool maker',
@@ -61,7 +46,6 @@ const costLabel = (cost: BuildingCost): string => {
   return `any ${cost.min}–${cost.max} resources`;
 };
 /** Button labels for the non-dice `USE` places. */
-const USE_LABEL: Record<string, string> = { toolMaker: 'Take tool', hut: 'Grow +1', field: 'Field +1' };
 const RESOURCE_LABEL: Record<Resource, string> = { wood: 'Wood', brick: 'Brick', stone: 'Stone', gold: 'Gold' };
 /** Per-seat player colours (the game's palette: red, blue, green, yellow). */
 const SEAT_COLOR = [
@@ -71,17 +55,12 @@ const SEAT_COLOR = [
   { dot: 'bg-yellow-400', text: 'text-yellow-600', ring: 'ring-yellow-500' },
 ] as const;
 
-const occupancy = (place: Readonly<Record<string, number>>): number =>
-  Object.values(place).reduce((sum, n) => sum + n, 0);
-
 /**
- * Stone Age's board. A **full round** is playable (roadmap SA1–SA8): place people, use their actions
- * (gather / tool maker / hut / field), feed everyone, then the round rolls over. Buildings, civilization
- * cards, game end and the AI bot arrive in later stages.
+ * Stone Age's board — the illustrated landscape (`BoardMap`) plus the buildings/cards markets, the
+ * player boards, the floating gather panel, and the end-of-game results. The full game is playable
+ * (SA1–SA11); the AI bot arrives in SA12.
  */
 export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewer, busy, guard, onPayload, onLeave }: BoardProps<StoneAgeView>) {
-  // Draft count per place for the variable places (hunt / resource); fixed places ignore it.
-  const [counts, setCounts] = useState<Partial<Record<PlaceId, number>>>({});
   // In-progress building payment, per stack index (the resources you'll pay when you press Build).
   const [pay, setPay] = useState<Record<number, Partial<Record<Resource, number>>>>({});
   // Tools selected to add to the pending dice roll (by index into the player's tools).
@@ -156,25 +135,6 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
         return { produced, shortfall, canPay: resourcesOnHand >= shortfall };
       })()
     : { produced: 0, shortfall: 0, canPay: true };
-
-  // The active player's legal placements, collapsed to a {min,max} per place.
-  const placeOptions = new Map<PlaceId, { min: number; max: number }>();
-  if (canDrive && placing) {
-    for (const a of legalActions(game)) {
-      if (a.type !== 'PLACE') continue;
-      const cur = placeOptions.get(a.place);
-      placeOptions.set(a.place, {
-        min: Math.min(cur?.min ?? a.count, a.count),
-        max: Math.max(cur?.max ?? a.count, a.count),
-      });
-    }
-  }
-  // Default to placing the *most* you can (min of open spots and workers in hand). Placing on a place
-  // uses it up for the round — and the hunt is once-per-round — so defaulting to 1 quietly wasted a
-  // whole turn's worth of workers. You dial it down with −.
-  const clampedCount = (place: PlaceId, min: number, max: number) => Math.max(min, Math.min(max, counts[place] ?? max));
-  const bump = (place: PlaceId, by: number, min: number, max: number) =>
-    setCounts((c) => ({ ...c, [place]: Math.max(min, Math.min(max, (c[place] ?? max) + by)) }));
 
   const remaining = active ? availableToPlace(game, active.id) : 0;
   const waitingFor = active?.name ?? 'the next player';
@@ -304,84 +264,21 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
         </div>
       )}
 
-      {/* The board (pg. 4) — a prehistoric camp of clickable places. Placement clicks a place; the gather
-          panel floats over it during the action phase (SA13). */}
+      {/* The board (pg. 4) as an illustrated landscape you place workers on. Zoomable/pannable for small
+          screens; the gather panel floats over it during the action phase (SA13). */}
       <div className="relative">
-        <div className="grid grid-cols-2 gap-2 rounded-xl border border-amber-900/20 bg-gradient-to-br from-[#efe3cf] to-[#e2d2b4] p-2 sm:grid-cols-4 dark:from-[#3a2f22] dark:to-[#2c241a]">
-          {PLACES.map((place) => {
-            const used = occupancy(game.placements[place]);
-            const resource = place in PLACE_RESOURCE ? PLACE_RESOURCE[place as keyof typeof PLACE_RESOURCE] : null;
-            const cap = PLACE_CAPACITY[place];
-            const option = placeOptions.get(place);
-            const mine = !!active && game.placements[place][active.id] !== undefined;
-            // A pending roll locks the turn, so hide the other action affordances until it's taken.
-            const canGather = acting && canDrive && mine && isGatherPlace(place) && !pending;
-            const canUse = acting && canDrive && mine && isUsePlace(place) && !pending;
-            const count = option ? clampedCount(place, option.min, option.max) : 0;
-            const Icon = PLACE_ICON[place];
-            return (
-              <div
-                key={place}
-                data-testid={`place-${place}`}
-                className={cn(
-                  'relative flex flex-col overflow-hidden rounded-lg border bg-card/85 px-2.5 py-2 shadow-sm backdrop-blur-sm transition-colors',
-                  option && 'cursor-pointer ring-2 ring-primary/40 hover:ring-primary',
-                )}
-                role={option ? 'button' : undefined}
-                tabIndex={option ? 0 : undefined}
-                onClick={option ? () => doPlace(place, count) : undefined}
-                aria-label={option ? `Place ${count} on ${PLACE_LABEL[place]}` : undefined}
-              >
-                {/* Faded emblem in the corner. */}
-                <Icon className="pointer-events-none absolute -bottom-3 -right-2 h-16 w-16 opacity-10" />
-                <div className="relative flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1.5 text-sm font-medium">
-                    <Icon className="h-4 w-4" />
-                    {PLACE_LABEL[place]}
-                  </span>
-                  <span className="text-xs tabular-nums text-muted-foreground">
-                    {used}/{cap === null ? '∞' : cap}
-                  </span>
-                </div>
-                {resource && (
-                  <div className="relative mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                    <ResourceIcon resource={resource} className="h-3.5 w-3.5" />
-                    per full {RESOURCE_THRESHOLD[resource]}
-                  </div>
-                )}
-                {/* Worker figures placed here. */}
-                {used > 0 && <div className="relative mt-1 flex flex-wrap items-center gap-0.5">{meeplesFor(game.placements[place])}</div>}
-
-                {/* Placement: the whole tile is clickable; a count stepper rides in the corner for the
-                    variable places. Buttons stop propagation so they don't also fire the tile's place. */}
-                {option && (
-                  <div className="relative mt-2 flex items-center gap-1">
-                    {option.min !== option.max && (
-                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button size="sm" variant="outline" aria-label="Fewer" data-testid={`place-${place}-dec`} disabled={busy} onClick={() => bump(place, -1, option.min, option.max)}>−</Button>
-                        <span className="w-5 text-center text-xs tabular-nums" data-testid={`place-${place}-count`}>{count}</span>
-                        <Button size="sm" variant="outline" aria-label="More" data-testid={`place-${place}-inc`} disabled={busy} onClick={() => bump(place, 1, option.min, option.max)}>+</Button>
-                      </div>
-                    )}
-                    <Button size="sm" className="ml-auto" data-testid={`place-${place}-go`} disabled={busy} onClick={(e) => { e.stopPropagation(); doPlace(place, count); }}>
-                      Place {count}
-                    </Button>
-                  </div>
-                )}
-                {canGather && (
-                  <Button size="sm" className="relative mt-2 self-end" data-testid={`gather-${place}`} disabled={busy} onClick={() => doGather(place)}>
-                    Gather
-                  </Button>
-                )}
-                {canUse && (
-                  <Button size="sm" className="relative mt-2 self-end" data-testid={`use-${place}`} disabled={busy} onClick={() => doUse(place)}>
-                    {USE_LABEL[place]}
-                  </Button>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <PanZoom className="h-[26rem] w-full rounded-xl border border-amber-900/20 shadow-sm sm:h-[30rem]" maxScale={3}>
+          <BoardMap
+            game={game}
+            canDrive={canDrive}
+            busy={busy}
+            onPlace={(place, count) => doPlace(place, count)}
+            onGather={(place) => doGather(place)}
+            onUse={(place) => doUse(place)}
+            seatColorOf={seatColorOf}
+            playerName={playerName}
+          />
+        </PanZoom>
 
         {/* The gather panel floats over the board during the action phase (SA13). */}
         {pending && gatherPreview && canDrive && active && (

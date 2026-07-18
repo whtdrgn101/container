@@ -3,7 +3,8 @@
  * palette of wood/clay/slate/gold and tribal silhouettes. **Deliberately original**, not a reproduction
  * of any published game's artwork; just the same *mood* (rock, bone, hide, campfire).
  */
-import type { Resource } from '@game-hub/engine/stoneage';
+import type { FixedPlaceId, Resource } from '@game-hub/engine/stoneage';
+import type { ReactNode } from 'react';
 
 /** Earthy fills shared across the art. */
 export const RESOURCE_FILL: Record<Resource, string> = {
@@ -100,3 +101,15 @@ export function HuntIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+/** The prehistoric emblem for each of the eight board places. */
+export const PLACE_ICON: Record<FixedPlaceId, (props: { className?: string }) => ReactNode> = {
+  toolMaker: ToolIcon,
+  hut: Hut,
+  field: FieldIcon,
+  hunt: HuntIcon,
+  forest: (p) => <ResourceIcon resource="wood" {...p} />,
+  clayPit: (p) => <ResourceIcon resource="brick" {...p} />,
+  quarry: (p) => <ResourceIcon resource="stone" {...p} />,
+  river: (p) => <ResourceIcon resource="gold" {...p} />,
+};

@@ -230,14 +230,21 @@ The functional board got a prehistoric skin. **All artwork is original** (simple
   / gold nugget), a **hut**, and place emblems (spear/tool, grain field, leaping deer for the hunt).
   Applied across the board tiles, player boards, buildings, cards and the gather panel — colored squares
   and emoji are gone.
-- **Clickable board:** the places sit on a warm earthy panel; each placeable tile is a click target
-  (ring-highlighted) that places the current count — the count stepper still rides in the corner for the
-  variable places. Workers show as **meeples** tinted to their owner (with SR labels for a11y).
+- **Illustrated board map** (`BoardMap.tsx`, like Container's `BoardMap`): the eight places are laid out
+  on a hand-drawn **landscape** — resource sites (forest / clay pit / quarry against mountains / river
+  flowing down the right) across the top, the hunting ground on the grassland, the camp (tool maker /
+  hut / field) below. Each place is a positioned node you place workers on / act from; workers show as
+  **meeples** tinted to their owner (with SR labels for a11y). Placement clicks a node (count stepper on
+  the variable places); gather/use buttons appear on your occupied nodes.
+- **Zoom + pan** (`components/PanZoom.tsx`, generic + dependency-free): mouse-wheel / pinch / ± buttons
+  to zoom, drag to pan, reset to recentre — the escape hatch for the detailed board on a phone.
+  Translation is clamped so the board can't be lost off-frame.
 - **Floating gather panel:** during the action phase the roll floats *over* the board (blurred behind),
-  dice rendered as bone tiles, tools as chips, live yield → Take.
-- Verified desktop **and** mobile e2e; the `CardRow` stayed its own component.
+  dice as bone tiles, tools as chips, live yield → Take.
+- The buildings/cards markets stay as rows below the landscape (the board's market edge). Verified on
+  desktop **and** mobile e2e (no 320px overflow, clicks land at any zoom).
 
-*(Deferred: a single big illustrated board map like Container's Slice 8; per-place motion.)*
+*(Deferred: per-place motion; richer terrain art.)*
 
 ### Later (optional)
 
