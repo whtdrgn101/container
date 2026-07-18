@@ -1,4 +1,4 @@
-import { PLACES } from '../core';
+import { ALL_PLACES } from '../core';
 import type { PlaceId, StoneAgeState } from '../core';
 
 /**
@@ -6,10 +6,10 @@ import type { PlaceId, StoneAgeState } from '../core';
  * Feeding is sequential in start-player order; the feed mechanic itself lives in `actions/feed.ts`.
  */
 
-/** An empty placement board — every place holds nobody (between rounds). */
+/** An empty placement board — every place (fixed + building slots) holds nobody (between rounds). */
 export function emptyPlacements(): StoneAgeState['placements'] {
   const placements = {} as Record<PlaceId, Record<string, number>>;
-  for (const place of PLACES) placements[place] = {};
+  for (const place of ALL_PLACES) placements[place] = {};
   return placements;
 }
 
@@ -26,10 +26,10 @@ export function advanceFeeder(state: StoneAgeState): Partial<StoneAgeState> {
 
 /**
  * Begin a new round (pg. 7, "New round"): pass the start-player marker one seat to the left, clear the
- * board, bump the round counter, and return to the placement phase with the new start player up.
+ * board, flip every used tool back to unused (pg. 5, SA4b), bump the round counter, and return to the
+ * placement phase with the new start player up.
  *
- * *(Used tools flip back to unused here once tool-spending lands — SA4b; the card/building resupply
- * arrives with SA9/SA10. Neither is modeled yet, so there is nothing to reset today.)*
+ * *(The card/building resupply arrives with SA9/SA10.)*
  */
 export function startNewRound(state: StoneAgeState): Partial<StoneAgeState> {
   const n = state.players.length;
@@ -40,5 +40,6 @@ export function startNewRound(state: StoneAgeState): Partial<StoneAgeState> {
     startPlayerIndex,
     activePlayerIndex: startPlayerIndex,
     placements: emptyPlacements(),
+    players: state.players.map((player) => ({ ...player, toolsUsed: player.toolsUsed.map(() => false) })),
   };
 }

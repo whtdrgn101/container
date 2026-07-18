@@ -1,4 +1,4 @@
-import type { PlaceId } from '../core';
+import type { PlaceId, Resource } from '../core';
 
 /**
  * Everything a player can do in Stone Age.
@@ -10,13 +10,18 @@ import type { PlaceId } from '../core';
  */
 export type Action =
   | { readonly type: 'PLACE'; readonly place: PlaceId; readonly count: number }
-  // Gather resources/food from a placed group by rolling dice (SA2–3). **Server-only**: the dice are
-  // rolled with the injected rng by the roll route and never chosen by a client — like Can't Stop's `ROLL`.
+  // Step 1 of a gather (SA2–3): roll the dice on a placed group → a `pendingGather`. **Server-only**:
+  // the dice come from the injected rng by the roll route, never chosen by a client (like Can't Stop's `ROLL`).
   | { readonly type: 'GATHER'; readonly place: PlaceId; readonly dice: readonly number[] }
+  // Step 2 of a gather (SA4b): take the pending roll, optionally adding tools (by index) to the total.
+  | { readonly type: 'TAKE_GATHER'; readonly toolIndices: readonly number[] }
   // Use a non-dice place — tool maker → tool, hut → person, field → food production (SA4–6).
   | { readonly type: 'USE'; readonly place: PlaceId }
   // Feed your people in the feeding phase (SA7). `payWithResources` (default true) covers any food
   // shortfall with resources; false (or being unable) takes the −10 penalty instead.
-  | { readonly type: 'FEED'; readonly payWithResources?: boolean };
+  | { readonly type: 'FEED'; readonly payWithResources?: boolean }
+  // Buy (or decline) the building your person stands on (SA9). `stack` is its 0-based index; `resources`
+  // is the payment — an empty payment declines and takes the person back.
+  | { readonly type: 'BUILD'; readonly stack: number; readonly resources: Readonly<Partial<Record<Resource, number>>> };
 
 export type ActionType = Action['type'];

@@ -187,6 +187,19 @@ export default function App() {
   }
 
   /**
+   * Resume a game as **pass-and-play** — drive every seat on this one device (`controlledIds = null`),
+   * which is what a hotseat game is. Re-entering a hotseat game you left should land you back here, not
+   * bound to a single seat.
+   */
+  async function resumeHotseat(gameId: string) {
+    await guard(async () => {
+      const full = await api.getGame(gameId);
+      setControlledIds(null);
+      applyPayload(full);
+    });
+  }
+
+  /**
    * Abandon a game from the home screen: close out something nobody means to finish.
    *
    * Drops the row immediately rather than waiting for the 3s poll to notice — otherwise the game you
@@ -428,6 +441,7 @@ export default function App() {
             onJoinWaiting={(id) => void joinFromBrowse(id)}
             onRejoinWaiting={(id, seat) => void rejoinLobbyAs(id, seat)}
             onResume={(id, playerId) => void resumeAs(id, playerId)}
+            onResumeHotseat={(id) => void resumeHotseat(id)}
             confirmingAbandon={confirmingAbandon}
             onConfirmAbandon={setConfirmingAbandon}
             onAbandon={(id) => void abandon(id)}

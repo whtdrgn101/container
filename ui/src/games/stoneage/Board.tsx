@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import {
   availableToPlace,
+  buildingIndex,
+  buildingPaymentError,
+  HUNT_THRESHOLD,
   isGatherPlace,
   isUsePlace,
+  paymentValue,
   placedBy,
   legalActions,
   PLACE_CAPACITY,
@@ -11,13 +15,13 @@ import {
   RESOURCE_THRESHOLD,
   RESOURCES,
 } from '@game-hub/engine/stoneage';
-import type { PlaceId, Resource, StoneAgeView } from '@game-hub/engine/stoneage';
+import type { Building, BuildingCost, FixedPlaceId, PlaceId, Resource, StoneAgeView } from '@game-hub/engine/stoneage';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { BoardProps } from '../types';
 import * as stoneageApi from './api';
 
-const PLACE_LABEL: Record<PlaceId, string> = {
+const PLACE_LABEL: Record<FixedPlaceId, string> = {
   toolMaker: 'Tool maker',
   hut: 'Hut',
   field: 'Field',
@@ -26,6 +30,15 @@ const PLACE_LABEL: Record<PlaceId, string> = {
   clayPit: 'Clay pit',
   quarry: 'Quarry',
   river: 'River',
+};
+/** A readable label for any place, including the building slots (`building1` → "Building 1"). */
+const placeLabel = (place: PlaceId): string =>
+  place in PLACE_LABEL ? PLACE_LABEL[place as FixedPlaceId] : `Building ${buildingIndex(place as 'building1') + 1}`;
+/** A short cost/scoring summary for a building tile. */
+const costLabel = (cost: BuildingCost): string => {
+  if (cost.kind === 'fixed') return RESOURCES.filter((r) => cost.resources[r]).map((r) => `${cost.resources[r]}× ${RESOURCE_LABEL[r]}`).join(' + ');
+  if (cost.kind === 'choice') return `any ${cost.count} from ${cost.kinds} kinds`;
+  return `any ${cost.min}–${cost.max} resources`;
 };
 /** Button labels for the non-dice `USE` places. */
 const USE_LABEL: Record<string, string> = { toolMaker: 'Take tool', hut: 'Grow +1', field: 'Field +1' };
@@ -55,6 +68,10 @@ const occupancy = (place: Readonly<Record<string, number>>): number =>
 export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewer, busy, guard, onPayload }: BoardProps<StoneAgeView>) {
   // Draft count per place for the variable places (hunt / resource); fixed places ignore it.
   const [counts, setCounts] = useState<Partial<Record<PlaceId, number>>>({});
+  // In-progress building payment, per stack index (the resources you'll pay when you press Build).
+  const [pay, setPay] = useState<Record<number, Partial<Record<Resource, number>>>>({});
+  // Tools selected to add to the pending dice roll (by index into the player's tools).
+  const [selectedTools, setSelectedTools] = useState<number[]>([]);
 
   const active = game.players[game.activePlayerIndex];
   const activeIsBot = !!active && bots.includes(active.id);
@@ -70,7 +87,15 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
   };
   const doGather = (place: PlaceId) => {
     if (!canDrive || !active) return;
+    setSelectedTools([]);
     void run(() => stoneageApi.gather(gameId, active.id, place, viewer));
+  };
+  const toggleTool = (i: number) =>
+    setSelectedTools((prev) => (prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i]));
+  const doTake = (toolIndices: number[]) => {
+    if (!canDrive || !active) return;
+    setSelectedTools([]);
+    void run(() => stoneageApi.act(gameId, active.id, { type: 'TAKE_GATHER', toolIndices }, viewer));
   };
   const doUse = (place: PlaceId) => {
     if (!canDrive || !active) return;
@@ -80,6 +105,29 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
     if (!canDrive || !active) return;
     void run(() => stoneageApi.act(gameId, active.id, { type: 'FEED', payWithResources }, viewer));
   };
+  const doBuild = (stack: number, resources: Partial<Record<Resource, number>>) => {
+    if (!canDrive || !active) return;
+    void run(() => stoneageApi.act(gameId, active.id, { type: 'BUILD', stack, resources }, viewer));
+  };
+  const bumpPay = (stack: number, resource: Resource, by: number, owned: number) =>
+    setPay((prev) => {
+      const draft = prev[stack] ?? {};
+      const next = Math.max(0, Math.min(owned, (draft[resource] ?? 0) + by));
+      return { ...prev, [stack]: { ...draft, [resource]: next } };
+    });
+
+  // A rolled gather awaiting the take (SA4b): show the dice, let the player add tools, preview the yield.
+  const pending = game.pendingGather;
+  const gatherPreview = pending && active
+    ? (() => {
+        const diceTotal = pending.dice.reduce((sum, d) => sum + d, 0);
+        const boost = selectedTools.reduce((sum, i) => sum + (active.tools[i] ?? 0), 0);
+        const total = diceTotal + boost;
+        const threshold = pending.place === 'hunt' ? HUNT_THRESHOLD : RESOURCE_THRESHOLD[PLACE_RESOURCE[pending.place]];
+        const kind = pending.place === 'hunt' ? 'food' : RESOURCE_LABEL[PLACE_RESOURCE[pending.place]];
+        return { diceTotal, boost, total, amount: Math.floor(total / threshold), kind };
+      })()
+    : null;
 
   // Feeding maths for the active player (pg. 7): food-track production first, then 1 food per person.
   const feed = active
@@ -103,9 +151,12 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
       });
     }
   }
-  const clampedCount = (place: PlaceId, min: number, max: number) => Math.max(min, Math.min(max, counts[place] ?? min));
+  // Default to placing the *most* you can (min of open spots and workers in hand). Placing on a place
+  // uses it up for the round — and the hunt is once-per-round — so defaulting to 1 quietly wasted a
+  // whole turn's worth of workers. You dial it down with −.
+  const clampedCount = (place: PlaceId, min: number, max: number) => Math.max(min, Math.min(max, counts[place] ?? max));
   const bump = (place: PlaceId, by: number, min: number, max: number) =>
-    setCounts((c) => ({ ...c, [place]: Math.max(min, Math.min(max, (c[place] ?? min) + by)) }));
+    setCounts((c) => ({ ...c, [place]: Math.max(min, Math.min(max, (c[place] ?? max) + by)) }));
 
   const remaining = active ? availableToPlace(game, active.id) : 0;
   const waitingFor = active?.name ?? 'the next player';
@@ -117,8 +168,8 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
         : `Waiting for ${waitingFor} to place…`
       : acting
         ? canDrive
-          ? 'Your turn — gather resources from your places (rolls the dice)'
-          : `Waiting for ${waitingFor} to gather…`
+          ? 'Your turn — use your placed people (gather, take actions, buy buildings)'
+          : `Waiting for ${waitingFor} to take their actions…`
         : canDrive
           ? 'Feeding phase — feed your people (1 food each)'
           : `Waiting for ${waitingFor} to feed…`;
@@ -128,8 +179,12 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
   const describeMove = (entry: StoneAgeView['log'][number]): string => {
     const who = playerName(entry.playerId);
     const p = (entry.payload ?? {}) as Record<string, unknown>;
-    if (entry.type === 'PLACE') return `${who} placed ${p['count']} on ${PLACE_LABEL[p['place'] as PlaceId]}`;
-    if (entry.type === 'GATHER') return `${who} rolled ${(p['dice'] as number[])?.join('+')} → ${p['amount']} ${p['kind']}`;
+    if (entry.type === 'PLACE') return `${who} placed ${p['count']} on ${placeLabel(p['place'] as PlaceId)}`;
+    if (entry.type === 'GATHER') return `${who} rolled ${(p['dice'] as number[])?.join('+')} at ${placeLabel(p['place'] as PlaceId)}`;
+    if (entry.type === 'TAKE') {
+      const boost = p['boost'] as number;
+      return `${who} took ${p['amount']} ${p['kind']}${boost > 0 ? ` (+${boost} from tools)` : ''}`;
+    }
     if (entry.type === 'USE') {
       const place = p['place'] as PlaceId;
       const effect = place === 'toolMaker' ? 'took a tool' : place === 'hut' ? 'grew (+1 person)' : 'raised food production';
@@ -139,6 +194,10 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
       if (p['starved'] !== undefined) return `${who} went hungry — −${p['penalty']} points`;
       if (p['paidResources'] !== undefined) return `${who} fed ${p['need']} people (${p['paidResources']} from resources)`;
       return `${who} fed ${p['need']} people`;
+    }
+    if (entry.type === 'BUILD') {
+      if (p['declined']) return `${who} passed on a building`;
+      return `${who} built (+${p['points']} points)`;
     }
     return `${who}: ${entry.type.toLowerCase()}`;
   };
@@ -191,8 +250,9 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
             const cap = PLACE_CAPACITY[place];
             const option = placeOptions.get(place);
             const mine = !!active && game.placements[place][active.id] !== undefined;
-            const canGather = acting && canDrive && mine && isGatherPlace(place);
-            const canUse = acting && canDrive && mine && isUsePlace(place);
+            // A pending roll locks the turn, so hide the other action affordances until it's taken.
+            const canGather = acting && canDrive && mine && isGatherPlace(place) && !pending;
+            const canUse = acting && canDrive && mine && isUsePlace(place) && !pending;
             return (
               <div key={place} data-testid={`place-${place}`} className="flex flex-col rounded-md border bg-card px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
@@ -267,6 +327,127 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
           })}
         </div>
       </div>
+
+      {/* The gather panel (SA4b): after you roll, the dice sit here so you can add tools before taking. */}
+      {pending && gatherPreview && canDrive && active && (
+        <div data-testid="gather-panel" className="space-y-2 rounded-lg border bg-card p-3 reveal-in">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Gathering — {placeLabel(pending.place)}</span>
+            <span className="text-xs text-muted-foreground">
+              rolled {pending.dice.length} {pending.dice.length === 1 ? 'die' : 'dice'}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-1">
+            {pending.dice.map((d, i) => (
+              // eslint-disable-next-line react/no-array-index-key -- dice are positional
+              <span key={i} data-testid={`die-${i}`} className="grid h-7 w-7 place-items-center rounded border bg-background text-sm font-semibold tabular-nums">
+                {d}
+              </span>
+            ))}
+            <span className="ml-1 text-sm text-muted-foreground">
+              = {gatherPreview.diceTotal}
+              {gatherPreview.boost > 0 && ` + ${gatherPreview.boost} tools = ${gatherPreview.total}`}
+            </span>
+          </div>
+          {active.tools.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="mr-1 text-xs text-muted-foreground">Add tools:</span>
+              {active.tools.map((value, i) => {
+                const used = active.toolsUsed[i];
+                const selected = selectedTools.includes(i);
+                return (
+                  <Button
+                    key={i}
+                    size="sm"
+                    variant={selected ? 'default' : 'outline'}
+                    data-testid={`tool-${i}`}
+                    aria-pressed={selected}
+                    disabled={busy || used}
+                    title={used ? 'Already used this round' : `Tool +${value}`}
+                    onClick={() => toggleTool(i)}
+                  >
+                    +{value}
+                    {used ? ' ·used' : ''}
+                  </Button>
+                );
+              })}
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <span className="text-sm">
+              → <span className="font-medium" data-testid="gather-yield">{gatherPreview.amount} {gatherPreview.kind}</span>
+            </span>
+            <Button size="sm" data-testid="take-gather" disabled={busy} onClick={() => doTake(selectedTools)}>
+              Take
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* The building stacks (pg. 5, 7): place a worker on a stack's top tile, then buy it in the action
+          phase. `?? []` keeps pre-SA9 games (created before buildings existed, no `buildings` field) from
+          crashing the board — they simply show no Buildings row. */}
+      {(game.buildings ?? []).length > 0 && (
+        <div>
+          <h2 className="mb-2 text-sm font-semibold">Buildings</h2>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {(game.buildings ?? []).map((stack, i) => {
+              const placeId = `building${i + 1}` as PlaceId;
+              const top: Building | undefined = stack[0];
+              const occupants = Object.entries(game.placements[placeId] ?? {});
+              const mineHere = !!active && (game.placements[placeId]?.[active.id] ?? undefined) !== undefined;
+              const canPlaceHere = canDrive && placing && !!top && occupants.length === 0 && !!active && availableToPlace(game, active.id) >= 1;
+              const draft = pay[i] ?? {};
+              const draftCount = RESOURCES.reduce((sum, r) => sum + (draft[r] ?? 0), 0);
+              const canBuild = acting && canDrive && mineHere && !!top && !!active && draftCount > 0 && buildingPaymentError(top, draft, active) === null;
+              return (
+                <div key={placeId} data-testid={`place-${placeId}`} className="flex flex-col rounded-md border bg-card px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium">Building {i + 1}</span>
+                    <span className="text-xs tabular-nums text-muted-foreground">{stack.length} left</span>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">{top ? `Cost: ${costLabel(top.cost)}` : 'empty'}</div>
+                  {occupants.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-x-2 text-xs">
+                      {occupants.map(([id, n]) => (
+                        <span key={id} className={cn('flex items-center gap-1 font-medium', seatColorOf(id).text)}>
+                          <span className={cn('inline-block h-2 w-2 rounded-full', seatColorOf(id).dot)} aria-hidden />
+                          {playerName(id)}×{n}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {canPlaceHere && (
+                    <Button size="sm" className="mt-2 self-end" data-testid={`place-${placeId}-go`} disabled={busy} onClick={() => doPlace(placeId, 1)}>
+                      Place worker
+                    </Button>
+                  )}
+                  {acting && canDrive && mineHere && top && active && !pending && (
+                    <div className="mt-2 space-y-1.5 border-t pt-2">
+                      {RESOURCES.filter((r) => active.resources[r] > 0).map((r) => (
+                        <div key={r} className="flex items-center gap-1 text-xs">
+                          <span className={cn('inline-block h-2.5 w-2.5 rounded-sm', RESOURCE_DOT[r])} aria-hidden />
+                          <span className="w-9">{RESOURCE_LABEL[r]}</span>
+                          <Button size="sm" variant="outline" aria-label={`Less ${r}`} data-testid={`pay-${i}-${r}-dec`} disabled={busy} onClick={() => bumpPay(i, r, -1, active.resources[r])}>−</Button>
+                          <span className="w-4 text-center tabular-nums" data-testid={`pay-${i}-${r}`}>{draft[r] ?? 0}</span>
+                          <Button size="sm" variant="outline" aria-label={`More ${r}`} data-testid={`pay-${i}-${r}-inc`} disabled={busy} onClick={() => bumpPay(i, r, 1, active.resources[r])}>+</Button>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between gap-1 pt-1">
+                        <span className="text-xs text-muted-foreground" data-testid={`build-value-${i}`}>+{paymentValue(draft)} pts</span>
+                        <span className="flex gap-1">
+                          <Button size="sm" variant="outline" data-testid={`decline-${i}`} disabled={busy} onClick={() => doBuild(i, {})}>Pass</Button>
+                          <Button size="sm" data-testid={`build-${i}`} disabled={busy || !canBuild} onClick={() => doBuild(i, draft)}>Build</Button>
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Each player's board (pg. 2). */}
       <div>

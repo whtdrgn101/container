@@ -20,9 +20,13 @@ export function use(state: StoneAgeState, playerId: string, place: PlaceId): Sto
   const player = state.players[seat]!;
   let updated: StoneAgePlayer;
   switch (place) {
-    case 'toolMaker':
-      updated = { ...player, tools: addTool(player.tools) };
+    case 'toolMaker': {
+      const tools = addTool(player.tools);
+      // A brand-new tool (the array grew) starts unused; an upgraded tool keeps its used state.
+      const toolsUsed = tools.length > player.tools.length ? [...player.toolsUsed, false] : player.toolsUsed;
+      updated = { ...player, tools, toolsUsed };
       break;
+    }
     case 'hut':
       updated = { ...player, people: player.people + 1 };
       break;

@@ -38,3 +38,24 @@ test('resume an in-progress game from the home screen by picking a seat', async 
   await firstCtx.close();
   await secondCtx.close();
 });
+
+/**
+ * A hotseat (pass-and-play) game you leave should be resumable as hotseat — driving *every* seat —
+ * not silently rebound to a single seat. The "Play all seats" affordance does that; the tell is the
+ * tab title has no "- [name]" suffix (that only appears when you're bound to specific seats).
+ */
+test('resume a hotseat game as pass-and-play keeps every seat', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('start-game').click(); // hotseat Container
+  await expect(page.getByTestId('board')).toBeVisible();
+  await expect(page).toHaveTitle('Container'); // hotseat: no seat binding
+  const code = await page.getByTestId('game-code').getAttribute('data-game-id');
+
+  // Leave to the home screen, find the game, and resume driving all seats.
+  await page.getByTestId('home-link').click();
+  await expect(page.getByTestId(`active-game-${code}`)).toBeVisible();
+  await page.getByTestId(`resume-hotseat-${code}`).click();
+
+  await expect(page.getByTestId('board')).toBeVisible();
+  await expect(page).toHaveTitle('Container'); // still hotseat — not "Container - [Ann]"
+});

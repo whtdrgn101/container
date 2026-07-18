@@ -8,11 +8,21 @@ const acting = (placed: Parameters<typeof withPlacements>[0]) =>
   withPlacements(placed, { phase: 'actions', activePlayerIndex: 0 });
 
 describe('use', () => {
-  it('tool maker → take a tool', () => {
+  it('tool maker → take a tool (a new tool is unused)', () => {
     const next = use(acting({ toolMaker: { p1: 1 } }), 'p1', 'toolMaker');
     expect(next.players[0]!.tools).toEqual([1]);
+    expect(next.players[0]!.toolsUsed).toEqual([false]); // brand-new tool, available
     expect(next.placements.toolMaker).toEqual({}); // person returned
     expect(next.log.at(-1)).toEqual({ seq: 1, type: 'USE', playerId: 'p1', payload: { place: 'toolMaker' } });
+  });
+
+  it('tool maker → upgrades the lowest tool once you hold three, keeping used state', () => {
+    // With 3 tools the ladder upgrades the lowest value rather than adding a tile; used flags stay put.
+    const base = acting({ toolMaker: { p1: 1 } });
+    const withTools = { ...base, players: base.players.map((p, i) => (i === 0 ? { ...p, tools: [1, 1, 2], toolsUsed: [true, false, false] } : p)) };
+    const next = use(withTools, 'p1', 'toolMaker');
+    expect(next.players[0]!.tools).toEqual([2, 1, 2]); // lowest 1 upgraded
+    expect(next.players[0]!.toolsUsed).toEqual([true, false, false]); // unchanged (no new tile)
   });
 
   it('hut → gain a person; field → raise food production', () => {

@@ -1,5 +1,6 @@
-import { GameError, MAX_PLAYERS, MIN_PLAYERS, PLACES, RESOURCES, STARTING_FOOD, STARTING_PEOPLE } from './core';
+import { ALL_PLACES, GameError, MAX_PLAYERS, MIN_PLAYERS, RESOURCES, STARTING_FOOD, STARTING_PEOPLE } from './core';
 import type { PlaceId, Resource, StoneAgePlayer, StoneAgeState } from './core';
+import { dealBuildings } from './internal';
 
 /** Input for a single seat when creating a game. */
 export interface NewPlayer {
@@ -9,6 +10,11 @@ export interface NewPlayer {
 export interface CreateGameOptions {
   readonly id: string;
   readonly players: readonly NewPlayer[];
+  /**
+   * Randomness for the building shuffle (pg. 3, setup step 9), injected so the engine stays pure. Omit
+   * for a deterministic deck order (tests) — the backend passes `ctx.rng`.
+   */
+  readonly rng?: () => number;
 }
 
 const emptyResources = (): Record<Resource, number> => {
@@ -18,14 +24,14 @@ const emptyResources = (): Record<Resource, number> => {
 };
 
 /**
- * Build the initial Stone Age setup (rulebook pg. 2–3) — the **bootstrap scaffold** (roadmap SA0).
+ * Build the initial Stone Age setup (rulebook pg. 2–3).
  *
- * Deterministic: each player starts with 5 people, 12 food, an empty board and empty holdings. The
- * card/building decks and dice arrive with the stages that use them, so no randomness is needed here
- * yet (unlike Container's scoring shuffle) — hence no `rng`.
+ * Each player starts with 5 people, 12 food, an empty board and empty holdings; the building deck is
+ * shuffled and dealt into `playerCount` stacks of 7 (setup step 9). Randomness is injected via `rng` so
+ * the engine stays pure and the 100% gate is reachable (omit it for a deterministic deck order).
  */
 export function createGame(options: CreateGameOptions): StoneAgeState {
-  const { id, players } = options;
+  const { id, players, rng } = options;
   const count = players.length;
   if (count < MIN_PLAYERS || count > MAX_PLAYERS) {
     throw new GameError(
@@ -41,6 +47,7 @@ export function createGame(options: CreateGameOptions): StoneAgeState {
     food: STARTING_FOOD,
     foodTrack: 0,
     tools: [],
+    toolsUsed: [],
     resources: emptyResources(),
     civCards: [],
     buildings: 0,
@@ -48,7 +55,7 @@ export function createGame(options: CreateGameOptions): StoneAgeState {
   }));
 
   const placements = {} as Record<PlaceId, Record<string, number>>;
-  for (const place of PLACES) placements[place] = {};
+  for (const place of ALL_PLACES) placements[place] = {};
 
   return {
     id,
@@ -58,6 +65,8 @@ export function createGame(options: CreateGameOptions): StoneAgeState {
     startPlayerIndex: 0,
     activePlayerIndex: 0,
     placements,
+    buildings: dealBuildings(count, rng),
+    pendingGather: null,
     status: 'active',
     winnerIds: [],
     version: 0,

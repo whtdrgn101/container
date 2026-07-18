@@ -1,6 +1,7 @@
-import { PLACES, RESOURCE_PLACES } from '../core';
+import { ALL_PLACES, BUILDING_PLACES, RESOURCE_PLACES } from '../core';
 import type { PlaceId, StoneAgeState } from '../core';
 import type { Action } from '../actions/action';
+import { buildingIndex } from './buildings';
 
 /**
  * The action phase (rulebook pg. 6, phase 2): the start player uses **all** their placed people, then
@@ -43,21 +44,33 @@ export function legalUses(state: StoneAgeState, playerId: string): Action[] {
 }
 
 /**
- * Whether a player still has people to resolve. Every board place now has an implemented action (dice
- * or `USE`), so a player's turn simply ends when their board is clear. (Building/card placements land in
- * SA9/SA10 and slot in automatically, since they'll live in `placements` too.)
+ * The `BUILD` options a seat has right now — a marker per building slot they occupy (the resources to
+ * pay are the client's choice, so `resources` is left empty, like Container's bare bot markers). At
+ * minimum "decline" (empty payment) is always legal; the UI/bot fills in a real payment.
  */
-export function hasActionablePlacements(state: StoneAgeState, playerId: string): boolean {
-  return PLACES.some((place) => state.placements[place][playerId] !== undefined);
+export function legalBuilds(state: StoneAgeState, playerId: string): Action[] {
+  return BUILDING_PLACES.filter((place) => state.placements[place][playerId] !== undefined).map((place) => ({
+    type: 'BUILD',
+    stack: buildingIndex(place),
+    resources: {},
+  }));
 }
 
-/** Return all of a player's people — remove them from every place. */
+/**
+ * Whether a player still has people to resolve. Every board place now has an implemented action (dice,
+ * `USE`, or `BUILD` for a building slot), so a player's turn simply ends when their board is clear.
+ */
+export function hasActionablePlacements(state: StoneAgeState, playerId: string): boolean {
+  return ALL_PLACES.some((place) => state.placements[place][playerId] !== undefined);
+}
+
+/** Return all of a player's people — remove them from every place (fixed board + building slots). */
 function clearPlayer(
   placements: StoneAgeState['placements'],
   playerId: string,
 ): StoneAgeState['placements'] {
   const next = {} as Record<PlaceId, Record<string, number>>;
-  for (const place of PLACES) {
+  for (const place of ALL_PLACES) {
     const { [playerId]: _removed, ...rest } = placements[place];
     next[place] = rest;
   }

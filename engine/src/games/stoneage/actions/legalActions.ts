@@ -1,5 +1,5 @@
 import type { StoneAgeState } from '../core';
-import { activePlayer, legalPlacements, legalUses } from '../internal';
+import { activePlayer, legalBuilds, legalPlacements, legalUses } from '../internal';
 import type { Action } from './action';
 
 /**
@@ -16,8 +16,12 @@ export function legalActions(state: StoneAgeState, playerId?: string): Action[] 
     return legalPlacements(state, active.id);
   }
   if (state.phase === 'actions') {
-    // The `USE` actions (tool maker/hut/field); the dice gathers are server-only, offered by the route.
-    return legalUses(state, active.id);
+    // A rolled gather locks the turn to taking it (tools are the client's choice, so `toolIndices` is
+    // left empty — a marker, like the bare BUILD markers).
+    if (state.pendingGather) return [{ type: 'TAKE_GATHER', toolIndices: [] }];
+    // `USE` (tool maker/hut/field) + `BUILD` markers (building slots); the dice gathers are server-only,
+    // offered by the route.
+    return [...legalUses(state, active.id), ...legalBuilds(state, active.id)];
   }
   // Feeding: the active feeder simply feeds (whether to spend resources is the action's own parameter).
   return [{ type: 'FEED' }];

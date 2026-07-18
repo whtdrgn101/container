@@ -35,6 +35,8 @@ export interface LandingProps {
   readonly onRejoinWaiting: (lobbyId: string, seat: number) => void;
 
   readonly onResume: (gameId: string, playerId: string) => void;
+  /** Resume driving *every* seat on this device (pass-and-play / hotseat). */
+  readonly onResumeHotseat: (gameId: string) => void;
   readonly confirmingAbandon: string | null;
   readonly onConfirmAbandon: (gameId: string | null) => void;
   readonly onAbandon: (gameId: string) => void;
@@ -70,6 +72,7 @@ export function Landing({
   onJoinWaiting,
   onRejoinWaiting,
   onResume,
+  onResumeHotseat,
   confirmingAbandon,
   onConfirmAbandon,
   onAbandon,
@@ -252,6 +255,23 @@ export function Landing({
                       </span>
                     )}
                   </div>
+                  {/*
+                    Pass-and-play: drive every seat on this device. This is how you get back into a
+                    hotseat game you left — resuming a single seat would strand the others (no bot to
+                    play them). Shown when at least two humans share the game.
+                  */}
+                  {active.players.filter((player) => !(active.bots ?? []).includes(player.id)).length > 1 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      data-testid={`resume-hotseat-${active.id}`}
+                      disabled={busy}
+                      onClick={() => onResumeHotseat(active.id)}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      ↩ Play all seats (pass &amp; play)
+                    </Button>
+                  )}
                   {/*
                     Abandoning closes out a game nobody means to finish. Two steps rather than
                     one: it's the only control here that acts on *everyone's* game, and the

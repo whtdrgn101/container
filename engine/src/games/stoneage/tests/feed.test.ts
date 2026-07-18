@@ -40,13 +40,16 @@ describe('feed', () => {
     expect(next.players[0]!.score).toBe(0); // max(0, 4 − 10)
   });
 
-  it('rolls the round over once the last player has fed', () => {
+  it('rolls the round over once the last player has fed, resetting used tools', () => {
     // Bob (seat 1) is the last feeder; feeding him wraps back to the start player → new round.
-    const next = feed(feeding({}, { activePlayerIndex: 1, startPlayerIndex: 0 }), 'p2');
+    const base = feeding({ tools: [1, 2], toolsUsed: [true, true] }, { activePlayerIndex: 1, startPlayerIndex: 0 });
+    const next = feed(base, 'p2');
+    expect(next.players[0]!.toolsUsed).toEqual([false, false]); // tools flip back to unused (SA4b)
     expect(next.round).toBe(2);
     expect(next.phase).toBe('placement');
     expect(next.startPlayerIndex).toBe(1); // marker passed one seat left
     expect(next.activePlayerIndex).toBe(1);
     expect(next.placements.forest).toEqual({}); // board cleared for the new round
+    expect(next.placements.building1).toEqual({}); // building slots survive the reset (not just fixed places)
   });
 });

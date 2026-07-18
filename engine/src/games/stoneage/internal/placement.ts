@@ -1,6 +1,7 @@
-import { PLACE_CAPACITY, PLACES } from '../core';
+import { ALL_PLACES, PLACE_CAPACITY } from '../core';
 import type { PlaceId, StoneAgeState } from '../core';
 import type { Action } from '../actions/action';
+import { buildingIndex, isBuildingPlace } from './buildings';
 
 /**
  * The worker-placement rules of phase 1 (rulebook pg. 4). Capacities live in `PLACE_CAPACITY`; the
@@ -11,10 +12,10 @@ import type { Action } from '../actions/action';
  * are deliberately deferred; SA1 implements the 4-player capacities for all counts.)*
  */
 
-/** Total people this player has placed on the board this round (across every place). */
+/** Total people this player has placed on the board this round (across every place, buildings included). */
 export function placedBy(state: StoneAgeState, playerId: string): number {
   let total = 0;
-  for (const place of PLACES) total += state.placements[place][playerId] ?? 0;
+  for (const place of ALL_PLACES) total += state.placements[place][playerId] ?? 0;
   return total;
 }
 
@@ -40,6 +41,13 @@ export function countRange(state: StoneAgeState, place: PlaceId, playerId: strin
   const available = availableToPlace(state, playerId);
   if (available < 1) return null;
 
+  // Building slots (pg. 5): exactly 1 person, but only while the stack still has a tile to buy.
+  if (isBuildingPlace(place)) {
+    const stack = state.buildings[buildingIndex(place)];
+    if (!stack || stack.length === 0) return null;
+    return occupancy(state, place) === 0 ? { min: 1, max: 1 } : null;
+  }
+
   switch (place) {
     case 'toolMaker':
     case 'field':
@@ -57,7 +65,7 @@ export function countRange(state: StoneAgeState, place: PlaceId, playerId: strin
 
 /** Whether a player has any legal placement left. */
 export function canPlace(state: StoneAgeState, playerId: string): boolean {
-  return PLACES.some((place) => countRange(state, place, playerId) !== null);
+  return ALL_PLACES.some((place) => countRange(state, place, playerId) !== null);
 }
 
 /**
@@ -77,7 +85,7 @@ export function nextPlacer(state: StoneAgeState, fromIndex: number): number | nu
 /** Every legal `PLACE` for a seat, one per (place, count) — drives the UI and (later) the bot. */
 export function legalPlacements(state: StoneAgeState, playerId: string): Action[] {
   const actions: Action[] = [];
-  for (const place of PLACES) {
+  for (const place of ALL_PLACES) {
     const range = countRange(state, place, playerId);
     if (!range) continue;
     for (let count = range.min; count <= range.max; count += 1) {

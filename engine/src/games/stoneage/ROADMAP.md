@@ -120,16 +120,51 @@ shortfall), **Pay N resources** / **Take −10** (short but able), or just **Tak
 gated on `canDrive`; the move log narrates each feed. Backend + e2e play a full round and assert it rolls
 into round 2. **Stone Age is now a playable multi-round loop** (minus buildings/cards).
 
-*(Deferred to their stages: flipping used tools back to unused — SA8's tool reset waits on SA4b's
-tool-spending; the hunt's once-per-round limit — placements already clear each round; the hand-picked
-resource spend at feeding — auto lowest-value-first for now.)*
+*(Deferred to their stages: the hunt's once-per-round limit — placements already clear each round; the
+hand-picked resource spend at feeding — auto lowest-value-first for now.)*
 
-### SA9 — Buildings  · **M–L** · pg. 7 + setup pg. 3
+### ✅ SA4b — Spending tools on a gather roll (shipped)
 
-The building tiles: `playerCount` face-down stacks of 7 (shuffled at `createGame`), top revealed. Pay
-the shown resources → take the building → **immediate points** onto the scoring track → reveal the next.
-Model the two flexible-cost building kinds (exactly-4-from-2-kinds, and 1–7-any, scored by resource
-value). An emptied stack is a **game-end trigger** (feeds into SA11).
+Tools finally do something (pg. 5–6): a gather is now **two steps** — roll, then take, adding tools in
+between. The engine holds the rolled dice as a `pendingGather` on the state so they stay
+server-authoritative across the two calls (the same "roll is data" discipline, just split): the
+server-only `GATHER` route sets it; the client's `TAKE_GATHER { toolIndices }` adds the chosen tools to
+the total, takes the yield, and clears it. While a roll is pending the turn is **locked** to taking it
+(`GATHER_PENDING`), mirrored in the UI. Each tool is **once per round** — `StoneAgePlayer.toolsUsed`
+(parallel to `tools`) tracks spent tiles, and **SA8's round transition now flips them all back** (the
+reset that was waiting on this). New tools from the tool maker start unused; an upgraded tile keeps its
+state. UI: a **gather panel below the board** shows the dice, the running total, your tools as toggle
+chips (used ones greyed), and a live yield preview → **Take**. 100% engine coverage; backend + e2e prove
+a tool turns an 8 into a 9 (2 wood → 3).
+
+### ✅ SA9 — Buildings (shipped)
+
+Buildings are **placement targets** (pg. 5): each stack's revealed top tile is a slot that holds exactly
+1 person, filled during the placement phase; in the action phase that person **buys** the tile (pay its
+resources → score their combined value immediately → reveal the next tile) or **declines** (empty
+payment → take the person back, leave the tile). The deck is `playerCount` face-down stacks of 7,
+**shuffled at `createGame`** (setup step 9) — which is why `createGame` now takes the injected `rng`.
+
+- **Engine** (100% covered): the placement model gained **dynamic building slots** — `PlaceId` now
+  includes `building1..4`, `PLACES` stays the 8 fixed places, and the internal bookkeeping
+  (`placedBy`/`clearPlayer`/`hasActionable`/`canPlace`) iterates `ALL_PLACES`. `countRange` gates a
+  building slot on its stack being non-empty. The three cost kinds live in `internal/buildings.ts`
+  (`buildingPaymentError` + `paymentValue`): **fixed** (exact resources), **choice** (exactly N from
+  exactly K kinds — 8 tiles), **any** (a `min..max` total — 3 tiles). The `BUILD { stack, resources }`
+  action pays or (empty) declines. The tile deck (`BUILDING_DECK`, 17 fixed + 8 choice + 3 any) is a
+  faithful **adaptation** — the rulebook doesn't print every fixed cost, same discipline as Container's
+  scoring-card deck.
+- **Backend**: `parseAction` accepts `BUILD` (and `PLACE` on a `building*` slot — validated against
+  `ALL_PLACES`); `createGame` passes `ctx.rng` to the shuffle. A REST test buys a building for its exact
+  points and rejects the no-person / malformed cases.
+- **UI**: a **Buildings** row shows each stack's top tile + cost; a **Place worker** button in placement,
+  and in the action phase a per-resource payment picker with a live `+N pts` readout gated on
+  `buildingPaymentError`, plus **Build** / **Pass**. The move log narrates buys and passes.
+- **Bug caught by the e2e**: the round-transition `emptyPlacements()` rebuilt only the 8 fixed places,
+  dropping the building slots and breaking round 2 — fixed to use `ALL_PLACES`, with a regression test.
+
+*(Deferred: an emptied stack as a **game-end trigger** — wired in SA11; the 2–3-player building rules are
+unchanged.)*
 
 ### SA10 — Civilization cards  · **L** (biggest) · pg. 6 + info sheet
 
@@ -169,8 +204,5 @@ your actions well). 90% coverage gate + self-play, like the other bots.
   stays pure — dice arrive as data on a roll action.
 - **Low hidden information:** only the undrawn decks are secret. `viewFor` is near-identity today; redact
   the deck order in SA9/SA10 if it ever matters.
-- **The state grows per stage** — add fields (building stacks, card display, per-place tool spend, dice
-  awaiting a roll) when their stage needs them, exactly as Container's state did across its slices.
-- **Deferred (SA4b) — spending tools on a gather roll (pg. 6).** Tools boost a gather total, but that
-  needs a two-step roll (roll → optionally spend tools → finalize), so `GATHER` currently ignores tools.
-  Fold it in when the gather flow gains that pending step; it also depends on SA8's per-round tool reset.
+- **The state grows per stage** — add fields (`buildings`, `pendingGather`, `toolsUsed`, later the card
+  display) when their stage needs them, exactly as Container's state did across its slices.

@@ -7,6 +7,7 @@ const placeToolMaker = { type: 'PLACE', place: 'toolMaker', count: 1 } as const;
 const gatherForest = { type: 'GATHER', place: 'forest', dice: [1, 1] } as const;
 const useField = { type: 'USE', place: 'field' } as const;
 const feedAction = { type: 'FEED' } as const;
+const buildAction = { type: 'BUILD', stack: 0, resources: {} } as const;
 
 describe('applyAction', () => {
   it('dispatches PLACE during the placement phase', () => {
@@ -14,11 +15,22 @@ describe('applyAction', () => {
     expect(next.placements.toolMaker).toEqual({ p1: 1 });
   });
 
-  it('dispatches GATHER and USE during the action phase', () => {
+  it('dispatches GATHER (roll → pending), TAKE_GATHER, and USE during the action phase', () => {
     const withForest = withPlacements({ forest: { p1: 2 } }, { phase: 'actions', activePlayerIndex: 0 });
-    expect(applyAction(withForest, 'p1', gatherForest).players[0]!.resources.wood).toBeGreaterThanOrEqual(0);
+    const rolled = applyAction(withForest, 'p1', gatherForest);
+    expect(rolled.pendingGather).toEqual({ place: 'forest', dice: [1, 1] });
+    const taken = applyAction(rolled, 'p1', { type: 'TAKE_GATHER', toolIndices: [] });
+    expect(taken.pendingGather).toBeNull();
     const withField = withPlacements({ field: { p1: 1 } }, { phase: 'actions', activePlayerIndex: 0 });
     expect(applyAction(withField, 'p1', useField).players[0]!.foodTrack).toBe(1);
+    // BUILD: decline (empty payment) returns the person from the building slot.
+    const withBuilding = withPlacements({ building1: { p1: 1 } }, { phase: 'actions', activePlayerIndex: 0 });
+    expect(applyAction(withBuilding, 'p1', buildAction).placements.building1).toEqual({});
+  });
+
+  it('locks the turn to TAKE_GATHER while a roll is pending', () => {
+    const rolled = applyAction(withPlacements({ forest: { p1: 2 } }, { phase: 'actions', activePlayerIndex: 0 }), 'p1', gatherForest);
+    expectError(() => applyAction(rolled, 'p1', useField), 'GATHER_PENDING');
   });
 
   it('dispatches FEED during the feeding phase', () => {
@@ -37,15 +49,24 @@ describe('applyAction', () => {
     expectError(() => applyAction(makeState(), 'p1', gatherForest), 'WRONG_PHASE'); // gather in placement phase
     expectError(() => applyAction(makeState(), 'p1', useField), 'WRONG_PHASE'); // use in placement phase
     expectError(() => applyAction(makeState(), 'p1', feedAction), 'WRONG_PHASE'); // feed in placement phase
+    expectError(() => applyAction(makeState(), 'p1', buildAction), 'WRONG_PHASE'); // build in placement phase
   });
 });
 
 describe('legalActions', () => {
   it('lists placements in placement, USE actions in the action phase, and FEED in feeding', () => {
-    expect(legalActions(makeState())).toHaveLength(28); // fresh 2-player board
+    expect(legalActions(makeState())).toHaveLength(30); // fresh 2-player board (28 + 2 building stacks)
     const acting = withPlacements({ toolMaker: { p1: 1 } }, { phase: 'actions', activePlayerIndex: 0 });
     expect(legalActions(acting)).toEqual([{ type: 'USE', place: 'toolMaker' }]);
+    // A person on a building slot surfaces a BUILD marker (its payment is the caller's choice).
+    const onBuilding = withPlacements({ building2: { p1: 1 } }, { phase: 'actions', activePlayerIndex: 0 });
+    expect(legalActions(onBuilding)).toEqual([{ type: 'BUILD', stack: 1, resources: {} }]);
     expect(legalActions(makeState({ phase: 'feeding' }))).toEqual([{ type: 'FEED' }]);
+  });
+
+  it('offers only TAKE_GATHER while a roll is pending', () => {
+    const rolled = withPlacements({ forest: { p1: 2 } }, { phase: 'actions', activePlayerIndex: 0, pendingGather: { place: 'forest', dice: [1, 1] } });
+    expect(legalActions(rolled)).toEqual([{ type: 'TAKE_GATHER', toolIndices: [] }]);
   });
 
   it('is empty for an off-turn seat or an ended game', () => {

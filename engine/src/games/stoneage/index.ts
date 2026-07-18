@@ -3,7 +3,21 @@
 
 // Domain types
 export type { Action, ActionType } from './actions';
-export type { MoveRecord, Phase, PlaceId, Resource, StoneAgePlayer, StoneAgeState } from './core';
+export type {
+  Building,
+  BuildingCost,
+  BuildingPlaceId,
+  FixedPlaceId,
+  GatherPlaceId,
+  MoveRecord,
+  PendingGather,
+  Phase,
+  PlaceId,
+  ResourcePlaceId,
+  Resource,
+  StoneAgePlayer,
+  StoneAgeState,
+} from './core';
 
 // Errors
 export { GameError } from './core';
@@ -11,10 +25,14 @@ export type { StoneAgeErrorCode } from './core';
 
 // Constants (rulebook-sourced values used by the UI + backend seat bounds)
 export {
+  ALL_PLACES,
+  BUILDING_DECK,
+  BUILDING_PLACES,
   BUILDING_STACK_SIZE,
   CIV_CARD_SLOTS,
   DIE_FACES,
   HUNT_THRESHOLD,
+  MAX_BUILDING_STACKS,
   MAX_PLAYERS,
   MIN_PLAYERS,
   PLACE_CAPACITY,
@@ -37,8 +55,20 @@ export type { CreateGameOptions, NewPlayer } from './createGame';
 export { viewFor } from './view';
 export type { StoneAgeView, Viewer } from './view';
 
-// Helpers the UI reads (people still to place; which places roll dice / are used directly).
-export { availableToPlace, isGatherPlace, isResourcePlace, isUsePlace, placedBy } from './internal';
+// Helpers the UI reads (people still to place; which places roll dice / are used / are building slots).
+export {
+  availableToPlace,
+  buildingIndex,
+  buildingPaymentError,
+  buildingPlaceId,
+  isBuildingPlace,
+  isGatherPlace,
+  isResourcePlace,
+  isUsePlace,
+  paymentValue,
+  placedBy,
+} from './internal';
+export type { Payment } from './internal';
 
-// Mechanics + turn-aware entry point. `gather` is server-only (the roll route builds its dice).
-export { place, gather, use, feed, applyAction, legalActions } from './actions';
+// Mechanics + turn-aware entry point. `gather` (the roll) is server-only; `takeGather` finalizes it.
+export { place, gather, takeGather, use, build, feed, applyAction, legalActions } from './actions';

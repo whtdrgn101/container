@@ -51,6 +51,15 @@ describe('countRange', () => {
     expect(countRange(withPlacements({ forest: { p1: 2 } }), 'forest', 'p1')).toBeNull();
     expect(countRange(withPlacements({ hunt: { p1: 5 } }), 'toolMaker', 'p1')).toBeNull(); // 0 left
   });
+
+  it('a building slot takes exactly 1, but only while its stack has a tile and is unoccupied', () => {
+    expect(countRange(makeState(), 'building1', 'p1')).toEqual({ min: 1, max: 1 });
+    // Occupied by another player → full.
+    expect(countRange(withPlacements({ building1: { p2: 1 } }), 'building1', 'p1')).toBeNull();
+    // An emptied stack offers no slot.
+    const base = makeState();
+    expect(countRange({ ...base, buildings: [[], base.buildings[1]!] }, 'building1', 'p1')).toBeNull();
+  });
 });
 
 describe('canPlace / nextPlacer', () => {
@@ -72,17 +81,18 @@ describe('canPlace / nextPlacer', () => {
 describe('legalPlacements', () => {
   it('enumerates one action per legal (place, count) for a fresh board', () => {
     const options = legalPlacements(makeState(), 'p1');
-    // toolMaker(1) + field(1) + hut(1) + hunt(1..5)=5 + 4 resource places ×(1..5)=20 → 28.
-    expect(options).toHaveLength(28);
+    // toolMaker(1) + field(1) + hut(1) + hunt(1..5)=5 + 4 resource places ×(1..5)=20 → 28,
+    // plus 1 per building stack (2 in a 2-player game) → 30.
+    expect(options).toHaveLength(30);
     expect(options).toContainEqual({ type: 'PLACE', place: 'hut', count: 2 });
     expect(options).toContainEqual({ type: 'PLACE', place: 'hunt', count: 5 });
     expect(options).toContainEqual({ type: 'PLACE', place: 'toolMaker', count: 1 });
   });
 
   it('skips places that are no longer available', () => {
-    // The tool maker is taken, so it drops out (28 − its one option = 27).
+    // The tool maker is taken, so it drops out (30 − its one option = 29).
     const options = legalPlacements(withPlacements({ toolMaker: { p2: 1 } }), 'p1');
-    expect(options).toHaveLength(27);
+    expect(options).toHaveLength(29);
     expect(options.some((a) => a.type === 'PLACE' && a.place === 'toolMaker')).toBe(false);
   });
 });
