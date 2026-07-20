@@ -8,7 +8,8 @@
   "exports": {
     "./kernel": "./src/kernel/index.ts",
     "./container": "./src/games/container/index.ts",
-    "./cantstop": "./src/games/cantstop/index.ts"
+    "./cantstop": "./src/games/cantstop/index.ts",
+    "./stoneage": "./src/games/stoneage/index.ts"
   },
   "scripts": {
     "test": "vitest run --coverage",

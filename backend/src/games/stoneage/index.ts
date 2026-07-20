@@ -1,16 +1,17 @@
 import { applyAction, legalActions, MAX_PLAYERS, MIN_PLAYERS, viewFor } from '@game-hub/engine/stoneage';
 import type { Action, StoneAgeState, Viewer } from '@game-hub/engine/stoneage';
-import type { GameModule, GameSummary } from '../module';
+import type { BotDriver, GameModule, GameSummary, ModuleContext } from '../module';
+import { BotRunner } from './botRunner';
 import { newStoneAgeGame } from './createGame';
 import { mapStoneAgeError } from './errors';
 import { parseStoneAgeAction } from './parseAction';
 import { registerStoneAgeRoutes } from './routes';
 
 /**
- * Stone Age, as a `GameModule` — the **bootstrap** (roadmap SA0). A registered, creatable, viewable
- * game with no playable actions yet; the mechanics land one stage at a time. No dice route, no bot, no
- * side-channel, so `routes`/`createBotDriver`/`onStateChanged`/`pendingStep` are omitted (the
- * resource/hunt dice will add a roll route later, exactly as Can't Stop did).
+ * Stone Age, as a `GameModule` — a fully playable worker-placement Euro (roadmap SA0–SA12). Its per-turn
+ * dice go through a server-side roll route (`routes`, like Can't Stop) and its AI seats through
+ * `createBotDriver` (like Container). No side-channel state, so `onStateChanged`/`pendingStep` stay off —
+ * the gather's pending step lives inside the engine state, not beside it.
  */
 export const stoneAgeModule: GameModule<StoneAgeState, Action> = {
   id: 'stoneage',
@@ -45,4 +46,14 @@ export const stoneAgeModule: GameModule<StoneAgeState, Action> = {
 
   // The resource/hunt dice roll (SA2). Server-only, drawn from the injected `ctx.rng`.
   routes: (app, ctx) => registerStoneAgeRoutes(app, ctx),
+
+  // AI seats (SA12). Same policies as self-play, same `applyAction` a human takes; the gather dice come
+  // from `ctx.rng`, so a bot rolls exactly as a human does.
+  createBotDriver: (ctx: ModuleContext): BotDriver =>
+    new BotRunner(
+      { get: (id) => ctx.games.get(id) as StoneAgeState | undefined, update: (state) => ctx.games.update(state) },
+      ctx.botSeats,
+      ctx.rng,
+      (state) => ctx.pushGame(state.id, state),
+    ),
 };

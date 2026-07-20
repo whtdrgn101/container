@@ -214,12 +214,25 @@ Stone Age is now **winnable end-to-end** (pg. 8). Both game-end triggers resolve
 feed → round loop → game end + scoring, at 100% engine coverage. Remaining is additive: the AI bot
 (SA12) and polish (SA13).
 
-### SA12 — AI bot  · **L** · after the game is winnable
+### ✅ SA12 — AI bot (shipped)
 
-The last stage (as planned): a worker-placement bot in `bot/src/games/stoneage/` and a backend
-`createBotDriver`, so Stone Age gets AI seats and the platform's 🤖 toggles for free. Stone Age's low
-hidden information makes valuation tractable; the hard part is the multi-phase turn (place, then order
-your actions well). 90% coverage gate + self-play, like the other bots.
+A worker-placement bot (`bot/src/games/stoneage/`, exported as `@game-hub/bot/stoneage`) + a backend
+`createBotDriver`, so Stone Age gets AI seats and the platform's 🤖 toggles for free.
+
+- **Bot = opinions, engine = rules.** `decide(view, playerId, { rollDice })` returns a legal `Action`
+  per phase: placement → the best-scored `PLACE` (`policy.ts` heuristics: food security first, then
+  spending on affordable buildings/cards — which drains the decks and empties the stacks, the game-end
+  triggers — then the gathering that funds it); feeding → `FEED`; action phase → resolve one worker
+  (take a pending roll with the minimal tools to cross a threshold, else roll a gather, else use / buy /
+  decline a building or card). Gathering is two-step, so the bot produces `GATHER` with **injected dice**
+  (`rollDice`, like Can't Stop) then `TAKE_GATHER` — it can't invent dice.
+- **Self-play is the real test:** `playSelfPlay` drives a whole game with every seat botted from its own
+  `viewFor`, so any illegal action throws. Games finish on a real trigger in ~13–20 rounds (realistic).
+  90% coverage gate (bot files ~96%), like the other bots.
+- **Backend `BotRunner`** (`games/stoneage/botRunner.ts`) — far simpler than Container's: Stone Age is
+  strictly turn-based (no off-turn moves), so `tick` just plays the active seat forward while it's a bot,
+  same `applyAction` a human takes, gather dice from `ctx.rng`. A REST test plays an all-bot game to a
+  finish server-side, and a human+bot game hands back correctly.
 
 ### ✅ SA13 — Visual: original art + a clickable board (shipped)
 

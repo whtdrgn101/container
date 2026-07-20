@@ -385,3 +385,72 @@ describe('Stone Age buildings (SA9)', () => {
     expect(got.json().game.cardDisplay[0]).toBeNull(); // slot emptied
   });
 });
+
+/** A real PRNG (mulberry32) so an all-bot game advances through varied dice/shuffles. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * SA12 — AI seats end-to-end. The bot runs server-side: creating an all-bot game ticks it forward, and
+ * with no human ever on the clock the runner plays the whole game out synchronously (like Container /
+ * Can't Stop). Proves the bot's actions are legal over REST and that a game moves with no browser open.
+ */
+describe('Stone Age bots (SA12)', () => {
+  let db: DB;
+  let app: FastifyInstance;
+
+  beforeEach(async () => {
+    db = createDatabase();
+    app = buildApp({ db, rng: mulberry32(0x5a5a) });
+    await app.ready();
+  });
+
+  afterEach(async () => {
+    await app.close();
+    db.close();
+  });
+
+  it('plays an all-bot game to a finish on its own (server-side, no client)', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/games',
+      payload: { gameType: 'stoneage', players: [{ name: 'Ann', bot: true }, { name: 'Bob', bot: true }] },
+    });
+    expect(response.statusCode).toBe(201);
+    const game = response.json().game;
+    expect(game.status).toBe('ended'); // the runner played it out
+    expect(game.results).not.toBeNull();
+    expect(game.winnerIds.length).toBeGreaterThanOrEqual(1);
+    expect(response.json().bots).toEqual(['p1', 'p2']); // both seats recorded as AI
+  });
+
+  it('lets a bot take its turn after a human acts', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/games',
+      payload: { gameType: 'stoneage', players: [{ name: 'Human' }, { name: 'Bot', bot: true }] },
+    });
+    expect(created.json().bots).toEqual(['p2']);
+    const id = created.json().game.id as string;
+
+    // Human (p1) places; the bot (p2) then plays its placement turn server-side and hands back to p1.
+    const placed = await app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId: 'p1', action: { type: 'PLACE', place: 'hunt', count: 1 } },
+    });
+    expect(placed.statusCode).toBe(200);
+    // The bot placed too (p2 has people on the board), and it's p1's move again (or the phase moved on).
+    const game = placed.json().game;
+    const p2Placed = Object.values(game.placements).some((byPlayer) => (byPlayer as Record<string, number>)['p2'] !== undefined);
+    expect(p2Placed).toBe(true);
+  });
+});
