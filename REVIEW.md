@@ -37,8 +37,8 @@ That's a high floor. Two things qualify it:
 - [~] **Tier 2 — CI + inverted risk allocation** — partial:
   - [x] 2.3 backend coverage gate
   - [x] 2.4 SPA-fallback test
-  - [ ] 2.1 CI pipeline — **deferred** (owner is planning the CI/CD + docker.io push separately)
-  - [ ] 2.2 Linux visual baselines — **deferred with 2.1** (coupled to the CI-container choice)
+  - [~] 2.1 CI pipeline — build + push to Docker Hub shipped (`.github/workflows/ci.yml`); e2e not yet gated
+  - [ ] 2.2 Linux visual baselines — still deferred (needed before e2e can join the CI gate)
 - [ ] **Tier 3 — kernel/board/bot extraction** (do before game 4)
 - [ ] **Tier 4 — ops hardening**
 - [ ] **Tier 5 — worth knowing**
@@ -118,7 +118,14 @@ normal 200. A self-inflicted DoS with no log line.
 
 ## Tier 2 — No CI, and inverted risk allocation ◐ (test-infra done; CI deferred)
 
-### 2.1 There is no CI. `.github` does not exist ⏸️ Deferred (owner planning CI/CD + docker.io separately)
+### 2.1 There is no CI ◐ (build+push shipped; e2e still out)
+
+> **Partly done.** `.github/workflows/ci.yml` now runs on every push to `main`: a `test` job
+> (`pnpm typecheck` + `pnpm test` — engine 100% / bot 90% / backend coverage-gated) gates a `docker`
+> job that builds the image and pushes `whtdrgn101/game-hub:latest` + `:v<run-number>` to Docker Hub
+> (secrets `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`), with a GHA layer cache.
+> **Still missing:** the Playwright e2e suite is not in CI — it's blocked on 2.2 (Linux visual
+> baselines). Add an `e2e` job to the gate once those exist.
 
 This is the top *process* finding, because every gate in this repo is voluntary — the 100% engine
 gate only fires if someone remembers to run it locally, on a clean tree.
