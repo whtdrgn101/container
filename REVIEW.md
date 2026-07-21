@@ -35,10 +35,10 @@ That's a high floor. Two things qualify it:
   bot and the fired "extract on the third game" rule are recorded; the stale Decisions-log entries are
   corrected.
 - [~] **Tier 2 — CI + inverted risk allocation** — partial:
+  - [x] 2.1 CI pipeline — test → e2e → build + push to Docker Hub (`.github/workflows/ci.yml`)
+  - [x] 2.2 Linux visual baselines — generated in the pinned Playwright container; e2e now gates the push
   - [x] 2.3 backend coverage gate
   - [x] 2.4 SPA-fallback test
-  - [~] 2.1 CI pipeline — build + push to Docker Hub shipped (`.github/workflows/ci.yml`); e2e not yet gated
-  - [ ] 2.2 Linux visual baselines — still deferred (needed before e2e can join the CI gate)
 - [ ] **Tier 3 — kernel/board/bot extraction** (do before game 4)
 - [ ] **Tier 4 — ops hardening**
 - [ ] **Tier 5 — worth knowing**
@@ -116,16 +116,15 @@ normal 200. A self-inflicted DoS with no log line.
 
 ---
 
-## Tier 2 — No CI, and inverted risk allocation ◐ (test-infra done; CI deferred)
+## Tier 2 — No CI, and inverted risk allocation ✅
 
-### 2.1 There is no CI ◐ (build+push shipped; e2e still out)
+### 2.1 There is no CI ✅
 
-> **Partly done.** `.github/workflows/ci.yml` now runs on every push to `main`: a `test` job
-> (`pnpm typecheck` + `pnpm test` — engine 100% / bot 90% / backend coverage-gated) gates a `docker`
-> job that builds the image and pushes `whtdrgn101/game-hub:latest` + `:v<run-number>` to Docker Hub
-> (secrets `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`), with a GHA layer cache.
-> **Still missing:** the Playwright e2e suite is not in CI — it's blocked on 2.2 (Linux visual
-> baselines). Add an `e2e` job to the gate once those exist.
+> **Done.** `.github/workflows/ci.yml` runs on every push to `main`: a `test` job (`pnpm typecheck` +
+> `pnpm test` — engine 100% / bot 90% / backend coverage-gated) and an `e2e` job (full Playwright suite
+> in the pinned container) both gate a `docker` job that builds the image and pushes
+> `whtdrgn101/game-hub:latest` + `:v<run-number>` to Docker Hub (secrets `DOCKERHUB_USERNAME` /
+> `DOCKERHUB_TOKEN`), with a GHA layer cache.
 
 This is the top *process* finding, because every gate in this repo is voluntary — the 100% engine
 gate only fires if someone remembers to run it locally, on a clean tree.
@@ -137,12 +136,14 @@ Recommended pipeline (push + PR, Node 22 to match `.nvmrc`/`Dockerfile`): `typec
 `test:e2e` (with `playwright install --with-deps chromium`) → `docker build`. Keep thresholds where
 they are, in each package's vitest config; CI should *run* the gates, not redefine them.
 
-### 2.2 The visual spec is guaranteed-red on Linux ⏸️ Deferred with 2.1
+### 2.2 The visual spec is guaranteed-red on Linux ✅
 
-> **Why deferred, not fixed now:** the proper fix is to generate baselines in the CI Playwright
-> container (`mcr.microsoft.com/playwright:…-jammy`) and commit them next to the `-darwin` set — a
-> decision that belongs with the CI-container choice. Generating them on this bare-Linux dev box risks
-> baselines that then fail in a differently-rendered CI container. Do it as the first step of the CI work.
+> **Done.** Generated `-linux` baselines for both projects **inside** the pinned Playwright container
+> (`mcr.microsoft.com/playwright:v1.61.1-jammy`) and committed them next to the `-darwin` set, and the
+> CI `e2e` job runs in that same image so rendering matches bit-for-bit — verified by a fresh
+> comparison run (2 passed, no `--update`). `ui/e2e/README.md` documents how to regenerate them. Note:
+> the image ships Node 24, so the job installs a C toolchain to compile better-sqlite3 (no Node-24
+> prebuild); the app still ships on Node 22, which the unit `test` job certifies.
 
 Verified: full e2e is **110 passed, 2 failed, 52.7s**, no flakes at `workers: 4`. Both failures are
 `visual.spec.ts` — only `-darwin` baselines are committed, and Playwright keys snapshots on

@@ -1,15 +1,15 @@
 name: CI
 
-# Build → test → publish the single Game Hub image to Docker Hub.
+# Test → e2e → publish the single Game Hub image to Docker Hub.
 #
-# Every push to `main` runs the unit/integration suites and, only if they pass, builds the image and
-# pushes two tags: `latest` and `v<run-number>` (an integer that GitHub increments on every run — so
-# each build gets its own immutable, incrementing version while `latest` always points at the newest).
+# Every push to `main` runs the unit/integration suites and the Playwright e2e suite; only if both pass
+# does it build the image and push two tags: `latest` and `v<run-number>` (an integer GitHub increments
+# on every run — each build gets its own immutable, incrementing version while `latest` tracks newest).
 #
-# Deliberately NOT run here yet: the Playwright e2e suite. Its visual-regression spec only has macOS
-# baselines and is guaranteed-red on Linux (REVIEW.md §2.2); wiring e2e in needs Linux baselines
-# generated in the Playwright container first. Until then the image is gated on engine (100%), bot
-# (90%) and backend (coverage-gated) tests plus a full typecheck — not on the browser flows.
+# The e2e job (including the visual-regression spec) runs inside the pinned Playwright container
+# `mcr.microsoft.com/playwright:v1.61.1-jammy` — the exact image the committed `-linux` snapshot
+# baselines were generated in, so rendering matches bit-for-bit (REVIEW.md §2.2). Regenerate baselines
+# in that same image if the board art changes (see ui/e2e/README or the REVIEW note).
 
 on:
   push:
@@ -26,7 +26,7 @@ env:
 
 jobs:
   test:
-    name: Typecheck & test
+    name: Typecheck & unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +37,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          node-version-file: .nvmrc # Node 22 — the version the app ships on
           cache: pnpm
 
       # `allowBuilds` in pnpm-workspace.yaml lets install compile better-sqlite3 + esbuild, which the
@@ -48,9 +48,39 @@ jobs:
 
       - run: pnpm test # engine + bot + backend; `ui` has no unit `test` script so it's skipped
 
+  e2e:
+    name: Playwright e2e
+    runs-on: ubuntu-latest
+    # Run inside the pinned Playwright image: browsers are preinstalled and, crucially, its rendering
+    # matches the committed `-linux` visual baselines exactly. Ships Node 24 (fine for driving the app
+    # in e2e; the unit `test` job above is the one that certifies Node 22 behaviour).
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-jammy
+    steps:
+      - uses: actions/checkout@v4
+
+      # The image has no C toolchain; better-sqlite3 has no Node-24 prebuild, so it must compile.
+      - run: apt-get update && apt-get install -y --no-install-recommends python3 make g++
+
+      - run: corepack enable && corepack prepare pnpm@11.13.0 --activate
+
+      - run: pnpm install --frozen-lockfile
+
+      # Playwright boots the API + UI dev servers itself (see ui/playwright.config.ts). `CI` is already
+      # set inside GitHub Actions, so the config uses its CI branch (fresh servers, 1 retry).
+      - run: pnpm test:e2e
+
+      # Traces (captured on first retry) — the useful artifact when a spec fails in CI.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: ui/test-results/
+          retention-days: 7
+
   docker:
     name: Build & push image
-    needs: test # never publish an image whose tests didn't pass
+    needs: [test, e2e] # never publish an image whose tests or e2e didn't pass
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
