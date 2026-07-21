@@ -257,6 +257,10 @@ bot `rank`/`decide` scaffold (see §3.4).
 
 ### 3.3 The UI shell duck-types game state, and three boards re-implement platform rules
 
+> **Interim note (2026-07-21):** Stone Age's board now computes `myNames` and shows a "You are X — "
+> banner (`role="status"`, `aria-live="polite"`) — the same one-liner Can't Stop carries, duplicated a
+> third time on purpose. The full extraction below absorbs it.
+
 `App.tsx` casts `players` straight off the opaque state to get seat names for the tab title and
 rematch. The `version` guard in `useGameTransport` is documented and defensible; this isn't. A game 4
 that calls them `seats` breaks the header with no type error. `GameSummary` already models this
@@ -356,7 +360,19 @@ devDependency**, so the image *must* keep devDependencies — a future `--prod` 
 breaks the container at startup. Slimming it properly means compiling the backend with `tsc`; note
 `backend` currently has **no `build` script at all**, so `pnpm build` skips it.
 
-### 4.6 Security footguns (the no-auth choice is fine; these are orthogonal)
+### 4.6 Stone Age's `viewFor` sends the face-down card deck to every client
+
+`engine/src/games/stoneage/view.ts` is a pass-through (`{ ...state, viewerId }`), and its own comment
+calls the undrawn decks "the only secret … redact them here then if it matters." It now matters, mildly:
+`cardDeck` (the full shuffled draw order) and each stack's unrevealed buildings ride every REST response
+and WS push, so a client with dev tools open can read the future. Not cheating-relevant for bots (the
+bot reads only `cardDeck.length` — see `remainingRounds`), and *held* civ cards are fine to show (they
+are drafted from a public display; face-down stacking in the physical game is a memory aid, not hidden
+info). **Decision 2026-07-21: deferred** — redacting means splitting server state from the client view
+shape for a game whose view is otherwise the whole state, a larger refactor than the leak warrants for
+trusted-LAN play. If it's ever done, redact in `viewFor` (deck → count), never in the UI.
+
+### 4.7 Security footguns (the no-auth choice is fine; these are orthogonal)
 
 Validation is genuinely consistent — every body-taking route has a Fastify schema and all SQL is
 parameterized. Real gaps:

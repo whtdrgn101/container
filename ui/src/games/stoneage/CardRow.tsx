@@ -10,43 +10,66 @@ import {
 import type { CardEffect, CardScoring, CivCard, PlaceId, Resource, StoneAgePlayer, StoneAgeView } from '@game-hub/engine/stoneage';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { ResourceIcon } from './art';
+import { FieldIcon, FoodIcon, Hut, Meeple, ResourceIcon, SYMBOL_ICON, ToolIcon } from './art';
+import { AnyPips } from './pieces';
 
 const RESOURCE_LABEL: Record<Resource, string> = { wood: 'Wood', brick: 'Brick', stone: 'Stone', gold: 'Gold' };
 
-/** A one-line summary of a card's immediate benefit (pg. 6). */
-const effectLabel = (effect: CardEffect): string => {
-  switch (effect.kind) {
-    case 'resource':
-      return `+${effect.amount} ${RESOURCE_LABEL[effect.resource]}`;
-    case 'food':
-      return `+${effect.amount} food`;
-    case 'foodTrack':
-      return `+${effect.amount} food track`;
-    case 'tool':
-      return 'Take a tool';
-    case 'points':
-      return `+${effect.amount} pts`;
-    default:
-      return 'No instant effect';
-  }
+/** A card's title: its green symbol, or its sand multiplier kind. */
+const cardTitle = (scoring: CardScoring): string => {
+  if (scoring.kind === 'green') return scoring.symbol.charAt(0).toUpperCase() + scoring.symbol.slice(1);
+  return { farmer: 'Farmer', toolMaker: 'Tool maker', builder: 'Hut builder', shaman: 'Shaman' }[scoring.kind];
 };
 
-/** How a card scores at game end (pg. 8) — a green culture symbol or a sand-coloured multiplier. */
-const scoringLabel = (scoring: CardScoring): string => {
-  switch (scoring.kind) {
-    case 'green':
-      return `🟢 ${scoring.symbol}`;
-    case 'farmer':
-      return '🌾 farmer';
-    case 'toolMaker':
-      return '🔨 tool maker';
-    case 'builder':
-      return '🏠 hut builder';
-    default:
-      return '🧙 shaman';
-  }
+/** The icon a sand multiplier multiplies by (its stat), shared with the player panel's chips. */
+const MULT_ICON: Record<Exclude<CardScoring['kind'], 'green'>, (p: { className?: string }) => React.ReactNode> = {
+  farmer: FieldIcon,
+  toolMaker: ToolIcon,
+  builder: Hut,
+  shaman: (p) => <Meeple {...p} />,
 };
+
+/** A card's immediate benefit (pg. 6) as icon + value. */
+function EffectLine({ effect }: { effect: CardEffect }) {
+  switch (effect.kind) {
+    case 'resource':
+      return (
+        <span className="flex items-center gap-1">
+          {Array.from({ length: effect.amount }, (_, i) => <ResourceIcon key={i} resource={effect.resource} className="h-4 w-4" />)}
+          +{effect.amount} {RESOURCE_LABEL[effect.resource].toLowerCase()}
+        </span>
+      );
+    case 'food':
+      return <span className="flex items-center gap-1"><FoodIcon className="h-4 w-4" /> +{effect.amount} food</span>;
+    case 'foodTrack':
+      return <span className="flex items-center gap-1"><FieldIcon className="h-4 w-4" /> +{effect.amount} food track</span>;
+    case 'tool':
+      return <span className="flex items-center gap-1"><ToolIcon className="h-4 w-4" /> Take a tool</span>;
+    case 'points':
+      return <span className="font-medium">+{effect.amount} pts</span>;
+    default:
+      return <span className="text-muted-foreground">No instant effect</span>;
+  }
+}
+
+/** How a card scores at game end (pg. 8), as an iconized formula with a readable label. */
+function ScoringLine({ scoring }: { scoring: CardScoring }) {
+  if (scoring.kind === 'green') {
+    const Icon = SYMBOL_ICON[scoring.symbol]!;
+    return (
+      <span className="flex items-center gap-1">
+        <Icon className="h-4 w-4" /> distinct symbols<sup className="font-bold">2</sup>
+      </span>
+    );
+  }
+  const Icon = MULT_ICON[scoring.kind];
+  const stat = { farmer: 'food track', toolMaker: 'tool value', builder: 'buildings', shaman: 'people' }[scoring.kind];
+  return (
+    <span className="flex items-center gap-1">
+      <Icon className="h-4 w-4" /> <span className="font-bold">×</span> {stat}
+    </span>
+  );
+}
 
 export interface CardRowProps {
   readonly game: StoneAgeView;
@@ -91,19 +114,31 @@ export function CardRow({ game, active, canDrive, placing, acting, pending, busy
           const draft = pay[slot] ?? {};
           const canAcquire = acting && canDrive && mineHere && !!card && !!active && cardPaymentError(slot, draft, active) === null;
           return (
-            <div key={placeId} data-testid={`place-${placeId}`} className="flex flex-col rounded-md border bg-card px-3 py-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium">Card {slot + 1}</span>
-                <span className="text-xs tabular-nums text-muted-foreground">{CARD_COST[slot]} res</span>
+            <div key={placeId} data-testid={`place-${placeId}`} className="flex flex-col overflow-hidden rounded-md border">
+              {/* The header band is the card's type at a glance: green = culture set, sand = multiplier. */}
+              <div
+                className={cn(
+                  'flex items-center justify-between gap-2 px-3 py-1.5',
+                  !card && 'bg-muted text-muted-foreground',
+                  card && (card.scoring.kind === 'green' ? 'bg-[#5d7c42] text-[#f3f0e2]' : 'bg-[#cfa95d] text-[#46392a]'),
+                )}
+              >
+                <span className="text-sm font-semibold">{card ? cardTitle(card.scoring) : `Card ${slot + 1}`}</span>
+                {card && card.scoring.kind === 'green' && (() => { const Icon = SYMBOL_ICON[card.scoring.symbol]!; return <Icon className="h-4 w-4" />; })()}
               </div>
+              <div className="flex flex-1 flex-col bg-card px-3 py-2">
               {card ? (
-                <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
-                  <div>{effectLabel(card.effect)}</div>
-                  <div>{scoringLabel(card.scoring)}</div>
+                <div className="space-y-1 text-xs">
+                  <div><span className="mr-1 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Now</span><EffectLine effect={card.effect} /></div>
+                  <div><span className="mr-1 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">End</span><ScoringLine scoring={card.scoring} /></div>
                 </div>
               ) : (
-                <div className="mt-1 text-xs text-muted-foreground">empty</div>
+                <div className="text-xs text-muted-foreground">empty</div>
               )}
+              <div className="mt-1 flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground">
+                <AnyPips count={CARD_COST[slot]!} />
+                {CARD_COST[slot]} res
+              </div>
               {occupants.length > 0 && (
                 <div className="mt-1 flex flex-wrap gap-x-2 text-xs">
                   {occupants.map(([id, n]) => (
@@ -136,6 +171,7 @@ export function CardRow({ game, active, canDrive, placing, acting, pending, busy
                   </div>
                 </div>
               )}
+              </div>
             </div>
           );
         })}

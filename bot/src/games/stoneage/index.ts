@@ -8,8 +8,19 @@
  */
 export { decide } from './decide';
 export { playSelfPlay } from './selfPlay';
-export { buildingPaymentFor, cardPaymentFor, chooseTools, foodDeficit, pickPlacement, placementScore } from './policy';
+export {
+  buildingPaymentFor,
+  cardPaymentFor,
+  chooseTools,
+  foodDeficit,
+  heldScoring,
+  pickPlacement,
+  placementValue,
+  remainingRounds,
+  residualAfterCommitments,
+  WEIGHTS,
+} from './policy';
 export { BotError } from '../../kernel';
 
-export type { DecideOptions } from './types';
+export type { DecideFn, DecideOptions } from './types';
 export type { SelfPlayOptions, SelfPlayResult } from './selfPlay';

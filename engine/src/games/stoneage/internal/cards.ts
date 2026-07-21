@@ -1,4 +1,4 @@
-import { CARD_COST, CARD_PLACES, CIV_CARD_DECK, CIV_CARD_SLOTS, RESOURCES } from '../core';
+import { CARD_COST, CARD_PLACES, CIV_CARD_DECK, CIV_CARD_SLOTS, MAX_FOOD_TRACK, RESOURCES } from '../core';
 import type { CardPlaceId, CivCard, PlaceId, Resource, StoneAgePlayer } from '../core';
 import { totalPaid } from './buildings';
 import type { Payment } from './buildings';
@@ -87,7 +87,8 @@ export function applyCardEffect(player: StoneAgePlayer, card: CivCard): StoneAge
     case 'food':
       return { ...player, food: player.food + effect.amount };
     case 'foodTrack':
-      return { ...player, foodTrack: player.foodTrack + effect.amount };
+      // Clamped like the field (pg. 2 — the printed track ends at MAX_FOOD_TRACK).
+      return { ...player, foodTrack: Math.min(player.foodTrack + effect.amount, MAX_FOOD_TRACK) };
     case 'points':
       return { ...player, score: player.score + effect.amount };
     case 'tool': {

@@ -11,6 +11,7 @@ import type { FixedPlaceId, StoneAgeView } from '@game-hub/engine/stoneage';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Meeple, PLACE_ICON } from './art';
+import { Scene } from './art/Scene';
 
 const PLACE_LABEL: Record<FixedPlaceId, string> = {
   toolMaker: 'Tool maker',
@@ -24,16 +25,21 @@ const PLACE_LABEL: Record<FixedPlaceId, string> = {
 };
 const USE_LABEL: Record<string, string> = { toolMaker: 'Take tool', hut: 'Grow +1', field: 'Field +1' };
 
-/** Where each place sits on the landscape (percent of the board). Resource sites up top, camp below. */
+/**
+ * Where each place plaque sits (percent of the board), following the classic board's geography:
+ * hunting meadow top-left, forest top-center, clay pit beside it, quarry in the mountains (right),
+ * river below the falls, and the village — field / hut / tool maker — center-left. Each plaque is
+ * offset to sit *beside* its painted vignette in `Scene`, never over it.
+ */
 const PLACE_POS: Record<FixedPlaceId, { left: number; top: number }> = {
-  forest: { left: 15, top: 24 },
-  clayPit: { left: 38, top: 17 },
-  quarry: { left: 62, top: 18 },
-  river: { left: 86, top: 33 },
-  hunt: { left: 47, top: 48 },
-  toolMaker: { left: 16, top: 76 },
-  hut: { left: 44, top: 80 },
-  field: { left: 74, top: 76 },
+  hunt: { left: 13, top: 38 },
+  forest: { left: 42, top: 36 },
+  clayPit: { left: 64, top: 31 },
+  quarry: { left: 85, top: 25 },
+  river: { left: 86, top: 64 },
+  field: { left: 26, top: 63 },
+  hut: { left: 58, top: 74 },
+  toolMaker: { left: 13, top: 84 },
 };
 
 export interface BoardMapProps {
@@ -90,31 +96,8 @@ export function BoardMap({ game, canDrive, busy, onPlace, onGather, onUse, seatC
       aria-label="Stone Age board: resource sites, the hunting ground, and the camp"
       className="relative h-full w-full select-none overflow-hidden"
     >
-      {/* The landscape — sky, mountains, forest, a river, grassland, and the camp ground. */}
-      <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
-        <defs>
-          <linearGradient id="sa-sky" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#bcd3e0" />
-            <stop offset="1" stopColor="#cfe0d2" />
-          </linearGradient>
-        </defs>
-        <rect width="100" height="100" fill="url(#sa-sky)" />
-        {/* distant mountains */}
-        <path d="M40 34 L58 8 L76 34 Z" fill="#9aa1a8" />
-        <path d="M56 34 L72 14 L88 34 Z" fill="#b3b8bd" />
-        <path d="M58 14 L64 22 L52 22 Z" fill="#eef2f5" />
-        {/* grass + camp ground */}
-        <path d="M0 40 Q50 33 100 42 L100 100 L0 100 Z" fill="#a9c07e" />
-        <path d="M0 66 Q50 60 100 68 L100 100 L0 100 Z" fill="#c8b184" />
-        {/* forest patch */}
-        <g fill="#5b7c3a">
-          <circle cx="12" cy="28" r="7" />
-          <circle cx="20" cy="26" r="6" />
-          <circle cx="8" cy="34" r="5" />
-        </g>
-        {/* river down the right */}
-        <path d="M92 20 Q84 45 90 70 Q96 88 88 100 L100 100 L100 20 Z" fill="#7fb4d6" opacity="0.85" />
-      </svg>
+      {/* The Morning Valley landscape (original art; classic-board arrangement — see art/Scene). */}
+      <Scene />
 
       {/* Place nodes. */}
       {PLACES.map((place) => {
@@ -133,8 +116,9 @@ export function BoardMap({ game, canDrive, busy, onPlace, onGather, onUse, seatC
             key={place}
             data-testid={`place-${place}`}
             className={cn(
-              'absolute w-24 -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-card/90 p-1.5 text-center shadow-md backdrop-blur-sm transition-transform sm:w-28',
-              opt && 'cursor-pointer ring-2 ring-primary/50 hover:ring-primary motion-safe:hover:scale-105',
+              // Parchment plaques — diegetic like the scene, so hardcoded rather than theme tokens.
+              'absolute w-24 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[#7a603a]/35 bg-[#f9f2e3]/[0.92] p-1.5 text-center text-[#4a3c28] shadow-md backdrop-blur-sm transition-transform sm:w-28',
+              opt && 'cursor-pointer ring-2 ring-[#a05a24]/60 hover:ring-[#a05a24] motion-safe:hover:scale-105',
             )}
             style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
             role={opt ? 'button' : undefined}
@@ -146,7 +130,7 @@ export function BoardMap({ game, canDrive, busy, onPlace, onGather, onUse, seatC
               <Icon className="h-4 w-4" />
               <span className="text-xs font-semibold">{PLACE_LABEL[place]}</span>
             </div>
-            <div className="text-[10px] tabular-nums text-muted-foreground">{used}/{cap === null ? '∞' : cap}</div>
+            <div className="text-[10px] tabular-nums text-[#7a6a4d]">{used}/{cap === null ? '∞' : cap}</div>
             {used > 0 && <div className="mt-0.5 flex flex-wrap items-center justify-center gap-0.5">{meeplesFor(here)}</div>}
 
             {opt && (
@@ -158,16 +142,16 @@ export function BoardMap({ game, canDrive, busy, onPlace, onGather, onUse, seatC
                     <Button size="icon" variant="outline" className="h-5 w-5" aria-label="More" data-testid={`place-${place}-inc`} disabled={busy} onClick={() => bump(place, 1, opt.min, opt.max)}>+</Button>
                   </>
                 )}
-                <Button size="sm" className="h-6 px-2 text-[11px]" data-testid={`place-${place}-go`} disabled={busy} onClick={(e) => { e.stopPropagation(); onPlace(place, count); }}>
+                <Button size="sm" className="h-6 bg-[#a05a24] px-2 text-[11px] text-[#f9f2e3] hover:bg-[#8a4c1e]" data-testid={`place-${place}-go`} disabled={busy} onClick={(e) => { e.stopPropagation(); onPlace(place, count); }}>
                   Place {count}
                 </Button>
               </div>
             )}
             {canGather && (
-              <Button size="sm" className="mt-1 h-6 px-2 text-[11px]" data-testid={`gather-${place}`} disabled={busy} onClick={() => onGather(place)}>Gather</Button>
+              <Button size="sm" className="mt-1 h-6 bg-[#a05a24] px-2 text-[11px] text-[#f9f2e3] hover:bg-[#8a4c1e]" data-testid={`gather-${place}`} disabled={busy} onClick={() => onGather(place)}>Gather</Button>
             )}
             {canUse && (
-              <Button size="sm" className="mt-1 h-6 px-2 text-[11px]" data-testid={`use-${place}`} disabled={busy} onClick={() => onUse(place)}>{USE_LABEL[place]}</Button>
+              <Button size="sm" className="mt-1 h-6 bg-[#a05a24] px-2 text-[11px] text-[#f9f2e3] hover:bg-[#8a4c1e]" data-testid={`use-${place}`} disabled={busy} onClick={() => onUse(place)}>{USE_LABEL[place]}</Button>
             )}
           </div>
         );

@@ -48,6 +48,21 @@ entirely inside `bot/`.
 - 🎉 **The core game is complete and finishable in hotseat.**
 - ✅ **Slice 8 — UI/UX polish & board:** original SVG container/ship art, a `BoardMap` minimap with
   click-to-sail, motion + a11y (reduced-motion-aware), per-viewport visual-regression baselines.
+- ✅ **Slice 8a — visual overhaul (2026-07, comps-approved).** The board became a **mariner's chart**
+  (`art/Chart.tsx`, aged-parchment style, original art): depth contours, graticule, dotted rhumb routes
+  radiating from the charted ocean waypoint (every sail is one hop through open water), Container
+  Island with docks, the Off-Shore Bank as a commercial building ($ plate), seat-tinted quays, and a
+  fixed-aspect `CompassRose` (the stretch layer would distort it). The **ship** (`art/Ship.tsx`) is a
+  squared-bow freighter whose `cargo` prop renders the actual load — deck plan 3 across + 2 stacked
+  (SHIP_CAPACITY 5) — used with real cargo on the map, and empty on the mat where the live
+  `cargo-<id>` `ContainerChip`s overlay the deck (preserving the e2e span-count contract). **Player
+  cards became spatial mats** (`panels/mat/`): seat-color ribbon + money strip (loans live there),
+  factory district (store lots + Produce in-zone), harbor district (warehouses + lots + Build
+  warehouse), dock (ship, cargo aboard, location caption, Sail/Load-from-bank), island/card/holding
+  footer, and `controls` as the End-turn console strip. `ActionControls.tsx` dissolved into the zones;
+  `seatColors.ts` is the one seat-color source for map + mats. Every pre-mat testid and text contract
+  was preserved (112 non-visual e2e specs passed unchanged); the 4 `board-map` baselines were
+  regenerated (darwin + linux, scoped so the Stone Age baselines didn't churn).
 - ✅ **UX — activity feed:** a running "Activity" log at the bottom of the board narrates every move in
   plain English (newest first, 🤖 for AI seats). Safe straight from `GameState.log` — the engine only
   records public information (losing delivery bids are never written down, pinned by exact-payload tests).

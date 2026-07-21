@@ -84,6 +84,8 @@ export function StoredChip({
   disabled?: boolean;
   selected?: boolean;
 }) {
+  // A priced dockside lot pad (visual overhaul, 2026-07): container on a small bordered pad with its
+  // price tag. Same DOM contract as ever — button/span split, testid, reprice title, "$N" text.
   const swatch = (
     <span
       className={cn(
@@ -94,7 +96,8 @@ export function StoredChip({
       <ContainerSvg color={COLOR_HEX[container.color]} />
     </span>
   );
-  const label = <span className="text-[10px] leading-none tabular-nums text-muted-foreground">${container.price}</span>;
+  const label = <span className="text-[10px] font-semibold leading-none tabular-nums text-muted-foreground">${container.price}</span>;
+  const pad = 'flex flex-col items-center gap-0.5 rounded-md border border-border/70 bg-background/60 px-1 py-0.5';
   if (onClick) {
     return (
       <button
@@ -103,7 +106,7 @@ export function StoredChip({
         title={`Reprice ${container.color} (1 action)`}
         disabled={disabled}
         onClick={onClick}
-        className="flex flex-col items-center gap-0.5 rounded transition-transform hover:scale-110 disabled:opacity-50"
+        className={cn(pad, 'transition-transform hover:scale-110 hover:border-ring disabled:opacity-50')}
       >
         {swatch}
         {label}
@@ -111,7 +114,7 @@ export function StoredChip({
     );
   }
   return (
-    <span data-testid={testid} className="flex flex-col items-center gap-0.5">
+    <span data-testid={testid} className={pad}>
       {swatch}
       {label}
     </span>

@@ -1,11 +1,14 @@
-import { Factory as FactoryIcon, Ship as ShipIcon, Warehouse as WarehouseIcon } from 'lucide-react';
 import type { Action, GameView, PlayerView } from '@game-hub/engine/container';
 import { COLORS, SHIP_CAPACITY, WAREHOUSE_BUILD_COSTS } from '@game-hub/engine/container';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { cardRank, ContainerChip, nextFactoryLot, shipLabel, StoredChip } from '../chips';
-import { ActionControls } from './ActionControls';
+import { cardRank, ContainerChip } from '../chips';
+import { seatColorOf } from '../seatColors';
+import { MatHeader } from './mat/MatHeader';
+import { FactoryZone } from './mat/FactoryZone';
+import { HarborZone } from './mat/HarborZone';
+import { DockZone } from './mat/DockZone';
 
 /** The active player's current buy selection: one district, one seller at a time. */
 export interface BuyPick {
@@ -33,6 +36,25 @@ export interface PlayerCardProps {
   readonly commitBuy: () => void;
 }
 
+/** A tiny face-down-card glyph for the hidden scoring card (replaces the 🂠 emoji). */
+function FaceDownCard() {
+  return (
+    <svg viewBox="0 0 16 20" className="h-4 w-3.5" aria-hidden focusable="false">
+      <rect x="1" y="1" width="14" height="18" rx="2" fill="currentColor" opacity="0.15" />
+      <rect x="1" y="1" width="14" height="18" rx="2" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.5" />
+      <path d="M4.5 5.5 L11.5 14.5 M11.5 5.5 L4.5 14.5" stroke="currentColor" strokeWidth="1" opacity="0.4" />
+    </svg>
+  );
+}
+
+/**
+ * A player's board as a spatial **mat** (visual overhaul, 2026-07): money strip up top, then the
+ * factory district and harbor district side by side, the dock (ship + cargo aboard) full-width, and
+ * the island/scoring-card/holding rows in the footer. The active seat's action controls live inside
+ * the zone they act on (Produce → factory, Build → harbor, Sail/Load → dock, loans → money strip),
+ * with `data-testid="controls"` as the end-turn console strip. Every testid and text contract from
+ * the pre-mat card is preserved.
+ */
 export function PlayerCard({
   game,
   player,
@@ -52,11 +74,13 @@ export function PlayerCard({
   commitBuy,
 }: PlayerCardProps) {
   const isActive = index === game.activePlayerIndex;
+  const seatColor = seatColorOf(game.players, player.id);
   // The server only sends a player's secret scoring card to that player (all cards at game end).
   const card = player.scoringCard;
   const nextWarehouseCost = WAREHOUSE_BUILD_COSTS[player.warehouses - 1];
   const capacity = Math.min(player.factories.length, player.factoryLimit - player.factoryStore.length);
   const canReprice = isActive && can('REPRICE') && !busy && canDrive;
+  const showControls = isActive && canDrive && !mustDeliverNow;
 
   // Buying is done by the active player from THIS card's player (an opponent).
   const active = game.players[game.activePlayerIndex]!;
@@ -89,150 +113,66 @@ export function PlayerCard({
     harborPick.length > 0 &&
     active.money >= harborPickCost &&
     active.ship.cargo.length + harborPick.length <= SHIP_CAPACITY;
+
   return (
     <Card
       data-testid={`player-card-${player.id}`}
       data-active={isActive}
-      className={cn(isActive && 'ring-2 ring-ring')}
+      className={cn('overflow-hidden border-l-4', isActive && cn('ring-2', seatColor.ring))}
+      style={{ borderLeftColor: seatColor.hull }}
     >
-      <CardHeader className="flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-1.5">
-          {/* Say who's a machine: an unlabelled AI opponent is just a confusing human. */}
-          {botIds.includes(player.id) && (
-            <span data-testid={`bot-badge-${player.id}`} title="Played by the AI" aria-label="Played by the AI">
-              🤖
-            </span>
-          )}
-          {player.name}
-        </CardTitle>
-        <div className="flex items-center gap-2">
-          {player.loans > 0 && (
-            <span
-              data-testid={`loans-${player.id}`}
-              className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive"
-            >
-              🏦 {player.loans} loan{player.loans === 1 ? '' : 's'}
-            </span>
-          )}
-          <span
-            data-testid={`money-${player.id}`}
-            className="rounded-full bg-secondary px-2 py-0.5 text-sm font-medium tabular-nums"
-          >
-            ${player.money}
-          </span>
+      <MatHeader player={player} isBot={botIds.includes(player.id)} showControls={showControls} can={can} busy={busy} act={act} />
+      <CardContent className="space-y-2">
+        <div className="grid gap-2 min-[420px]:grid-cols-2">
+          <FactoryZone
+            player={player}
+            canReprice={canReprice}
+            canFactoryBuy={canFactoryBuy}
+            factoryPick={factoryPick}
+            factoryPickCost={factoryPickCost}
+            factoryPickOk={factoryPickOk}
+            showControls={showControls}
+            can={can}
+            capacity={capacity}
+            produceLot={produceLot}
+            setProduceLot={setProduceLot}
+            busy={busy}
+            act={act}
+            toggleBuy={toggleBuy}
+            commitBuy={commitBuy}
+          />
+          <HarborZone
+            player={player}
+            canHarborBuy={canHarborBuy}
+            harborPick={harborPick}
+            harborPickCost={harborPickCost}
+            harborPickOk={harborPickOk}
+            showControls={showControls}
+            can={can}
+            nextWarehouseCost={nextWarehouseCost}
+            busy={busy}
+            act={act}
+            toggleBuy={toggleBuy}
+            commitBuy={commitBuy}
+          />
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <FactoryIcon className="h-4 w-4" aria-hidden />
-          <span>Factories</span>
-          {player.factories.map((factory) => (
-            <ContainerChip key={factory.id} color={factory.color} />
-          ))}
-          <span className="ml-auto inline-flex items-center gap-1" data-testid={`warehouses-${player.id}`}>
-            <WarehouseIcon className="h-4 w-4" aria-hidden />
-            {player.warehouses}
-          </span>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground" data-testid={`ship-${player.id}`}>
-          <ShipIcon className="h-4 w-4" aria-hidden />
-          <span>{shipLabel(player.ship.location, game.players)}</span>
-          <span className="flex flex-wrap gap-1" data-testid={`cargo-${player.id}`}>
-            {player.ship.cargo.map((color, cargoIndex) => (
-              <ContainerChip key={cargoIndex} color={color} />
-            ))}
-          </span>
-        </div>
-
-        <div>
-          <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-            <span>
-              Factory store
-              {canReprice ? ' (click to reprice)' : canFactoryBuy ? ' (click to buy)' : ''}
-            </span>
-            <span data-testid={`store-count-${player.id}`}>
-              {player.factoryStore.length} / {player.factoryLimit}
-            </span>
-          </div>
-          <div className="flex min-h-8 flex-wrap items-end gap-2" data-testid={`store-${player.id}`}>
-            {player.factoryStore.map((container, chipIndex) => (
-              <StoredChip
-                key={chipIndex}
-                container={container}
-                testid={`store-chip-${player.id}-${chipIndex}`}
-                disabled={busy}
-                selected={factoryPick.includes(chipIndex)}
-                onClick={
-                  canReprice
-                    ? () =>
-                        act(player.id, {
-                          type: 'REPRICE',
-                          district: 'factory',
-                          arrangement: player.factoryStore.map((current, i) =>
-                            i === chipIndex ? { color: current.color, price: nextFactoryLot(current.price) } : current,
-                          ),
-                        })
-                    : canFactoryBuy
-                      ? () => toggleBuy('factory', player.id, chipIndex)
-                      : undefined
-                }
-              />
-            ))}
-          </div>
-          {canFactoryBuy && factoryPick.length > 0 && (
-            <Button
-              size="sm"
-              className="mt-2 w-full"
-              data-testid={`buy-factory-${player.id}`}
-              disabled={busy || !factoryPickOk}
-              onClick={commitBuy}
-            >
-              Buy {factoryPick.length} for ${factoryPickCost}
-            </Button>
-          )}
-        </div>
-
-        <div>
-          <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-            <span>Harbor{canHarborBuy ? ' (click to load ship)' : ''}</span>
-            <span data-testid={`harbor-count-${player.id}`}>
-              {player.harborStore.length} / {player.harborLimit}
-            </span>
-          </div>
-          <div className="flex min-h-8 flex-wrap items-end gap-2" data-testid={`harbor-${player.id}`}>
-            {player.harborStore.map((container, chipIndex) => (
-              <StoredChip
-                key={chipIndex}
-                container={container}
-                testid={`harbor-chip-${player.id}-${chipIndex}`}
-                disabled={busy}
-                selected={harborPick.includes(chipIndex)}
-                onClick={canHarborBuy ? () => toggleBuy('harbor', player.id, chipIndex) : undefined}
-              />
-            ))}
-          </div>
-          {canHarborBuy && harborPick.length > 0 && (
-            <Button
-              size="sm"
-              className="mt-2 w-full"
-              data-testid={`buy-harbor-${player.id}`}
-              disabled={busy || !harborPickOk}
-              onClick={commitBuy}
-            >
-              Load {harborPick.length} for ${harborPickCost}
-            </Button>
-          )}
-        </div>
+        <DockZone
+          player={player}
+          players={game.players}
+          hull={seatColor.hull}
+          showControls={showControls}
+          sailActions={sailActions}
+          can={can}
+          busy={busy}
+          act={act}
+        />
 
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground" data-testid={`scoring-${player.id}`}>
           <span>Island:</span>
           {player.scoringArea.length === 0 ? (
             <span>—</span>
           ) : (
-            player.scoringArea.map((color, scoreIndex) => (
-              <ContainerChip key={scoreIndex} color={color} />
-            ))
+            player.scoringArea.map((color, scoreIndex) => <ContainerChip key={scoreIndex} color={color} />)
           )}
         </div>
 
@@ -253,7 +193,9 @@ export function PlayerCard({
                 })}
             </div>
           ) : (
-            <span className="text-muted-foreground">🂠 Secret scoring card</span>
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <FaceDownCard /> Secret scoring card
+            </span>
           )}
         </div>
 
@@ -266,19 +208,13 @@ export function PlayerCard({
           </div>
         )}
 
-        {isActive && canDrive && !mustDeliverNow && (
-          <ActionControls
-            player={player}
-            players={game.players}
-            capacity={capacity}
-            nextWarehouseCost={nextWarehouseCost}
-            sailActions={sailActions}
-            can={can}
-            busy={busy}
-            produceLot={produceLot}
-            setProduceLot={setProduceLot}
-            act={act}
-          />
+        {/* The turn console: end the turn from anywhere. (The other actions live in their zones.) */}
+        {showControls && (
+          <div className="flex items-center justify-end gap-2 border-t pt-2" data-testid="controls">
+            <Button size="sm" variant="secondary" data-testid="end-turn" disabled={busy} onClick={() => act(player.id, { type: 'END_TURN' })}>
+              End turn
+            </Button>
+          </div>
         )}
       </CardContent>
     </Card>

@@ -18,3 +18,20 @@ test('board minimap matches its visual baseline', async ({ page }) => {
 
   await expect(board).toHaveScreenshot('board-map.png', { maxDiffPixelRatio: 0.02 });
 });
+
+/**
+ * Stone Age's landscape (the Morning Valley art) — also deterministic at game start: the map shows
+ * only the eight fixed places with zero placements; the randomized building stacks and card display
+ * render *outside* `board-map`, so the shuffle can't move pixels here. Note both games share the
+ * `board-map` testid — each test navigates its own game, and the snapshot filenames differ.
+ */
+test('stone age board matches its visual baseline', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('pick-game-stoneage').click();
+  await page.getByTestId('start-game').click();
+  const board = page.getByTestId('board-map');
+  await expect(board).toBeVisible();
+  await expect(board.getByTestId('place-hut')).toBeVisible();
+
+  await expect(board).toHaveScreenshot('stoneage-board-map.png', { maxDiffPixelRatio: 0.02 });
+});

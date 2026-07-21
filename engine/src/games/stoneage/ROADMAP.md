@@ -234,6 +234,33 @@ A worker-placement bot (`bot/src/games/stoneage/`, exported as `@game-hub/bot/st
   same `applyAction` a human takes, gather dice from `ctx.rng`. A REST test plays an all-bot game to a
   finish server-side, and a human+bot game hands back correctly.
 
+**SA12a — value-based policy rework (shipped).** The original static weight table was trivially
+beatable: it hard-gated the hut to rounds 1–2 (and even then never won the argmax, so the bot **never
+grew population**), stopped valuing tools at 2, abandoned the field once fed, had no notion of denying
+single-occupancy slots, and checked purchase affordability against *unspent* stock (so one affordable
+building made every slot look buyable and workers were stranded on slots it then declined).
+`policy.ts` now prices every legal `(place, count)` in **marginal end-game points** over a
+`remainingRounds` horizon derived from the real end triggers (shallowest building stack; card deck ÷
+buy rate): hut = worker-rounds net of feeding (the gate is gone — value decays naturally late), field/
+toolMaker = per-round production + held multiplier cards, cards = effect + scoring marginal (a new green
+symbol is worth `2s+1`; multipliers are priced at projected final stats), buildings = payment value net
+of resource worth, plus a **denial bonus** on single-occupancy slots while opponents still hold workers,
+all against a `residualAfterCommitments` player (the affordability fix). "Any 1–7" buildings are now
+paid to the **max**, richest-first (they convert resources at face value; the old min-payment scored
+3–6 where 20+ was available). Tunables live in one `WEIGHTS` block. **The strength benchmark**
+(`tests/benchmark.test.ts`) pits the live policy against a verbatim frozen copy of the old one
+(`tests/legacyPolicy.ts`) over 32 seeded head-to-head games via `playSelfPlay`'s per-seat `policies`
+map — deterministic per seed, so it cannot flake (pre-caps it measured 32/32, mean margin +112).
+Self-play average end-state moved from 5 people / 2 tool value / 6 food track
+to the pg. 2 caps (10 people / food track 10 — `MAX_PEOPLE`/`MAX_FOOD_TRACK`, enforced as no-op-at-cap
+in `use()`/`applyCardEffect`, exactly like the 13th tool; placing there stays legal as a block). Capping
+exposed a deadlock the benchmark then caught: every resource's expected per-worker value is identical
+(yield × value cancels), so gathering never chased the *specific* resource a revealed building needed
+and a two-bot game could stall forever both-capped and unable to end the game. Fixed with demand
+pricing (`purchaseShortfall` — a bonus on the binding resource of a *nearly-buyable* fixed-cost
+building) plus a tiny scarcity tie-breaker. Post-caps calibration: 30/32 wins, mean margin +72;
+committed bar 26/32, margin > 20. If retuning `WEIGHTS`, re-measure before moving the bar.
+
 ### ✅ SA13 — Visual: original art + a clickable board (shipped)
 
 The functional board got a prehistoric skin. **All artwork is original** (simple earthy SVG shapes —
@@ -257,7 +284,32 @@ The functional board got a prehistoric skin. **All artwork is original** (simple
 - The buildings/cards markets stay as rows below the landscape (the board's market edge). Verified on
   desktop **and** mobile e2e (no 320px overflow, clicks land at any zoom).
 
-*(Deferred: per-place motion; richer terrain art.)*
+*(Deferred: per-place motion; ~~richer terrain art~~ — done, see SA13a.)*
+
+**SA13a — visual upgrade (shipped 2026-07).** The board became the **Morning Valley** — a painterly
+layered scene (`art/Scene.tsx`, original art; the *arrangement* follows the classic board's geography:
+hunting meadow top-left, forest top-center, clay pit, quarry mountains feeding the river down the right
+edge, the village center-left), with parchment place plaques offset to sit *beside* their painted
+vignettes. Scene colors are deliberately hardcoded (diegetic board art, no dark-mode re-theme — same
+rule as Container's board); the chrome around it keeps semantic tokens. Style comps were approved on an
+artifact before the port. Also in this pass:
+- **Card faces** (`CardRow.tsx`): green vs sand **header bands**, icon+value "Now" effect, an iconized
+  "End" scoring formula (symbol glyph · distinct², or multiplier icon × stat), dashed-pip slot cost.
+  The 8 culture symbols each got an original glyph (`SYMBOL_ICON` in `art/`); 🍖/🃏 emoji became real
+  icons (`FoodIcon`/`CardIcon`).
+- **Building tiles** (`Board.tsx` + `pieces.tsx` `CostPips`): costs as resource-icon pips (fixed shows
+  its point value; choice/any show their shapes), text kept in `title`/`sr-only`.
+- **Player panels** (`PlayerPanel.tsx`): the viewer's own seat(s) show the full engines-at-a-glance
+  panel — the 8-slot green collection (distinct², "all 8 = 64") and every sand multiplier priced
+  against its **live** stat — while opponents collapse to one-line summaries so 4-player games stay
+  scannable (hotseat follows the active seat). Held-card faces come from the public `CIV_CARD_DECK`
+  (drafting is open information; face-down stacking in the physical game is a memory aid).
+- **Seat identity banner** (REVIEW 3.3 interim): `sa-banner` gains "You are X — " when seat-bound,
+  `role="status"` + `aria-live="polite"`.
+- **Visual baseline:** `e2e/visual.spec.ts` now snapshots the Stone Age board too
+  (`stoneage-board-map.png`, both projects, darwin + linux) — deterministic at game start since the
+  randomized stacks/display render outside `board-map`. All 8 stoneage e2e specs passed unchanged
+  (every testid and text assertion preserved).
 
 ### Later (optional)
 

@@ -82,6 +82,8 @@ describe('applyCardEffect', () => {
     expect(applyCardEffect(player(), card('c', { kind: 'resource', resource: 'stone', amount: 2 })).resources.stone).toBe(2);
     expect(applyCardEffect(player(), card('c', { kind: 'food', amount: 3 })).food).toBe(15);
     expect(applyCardEffect(player(), card('c', { kind: 'foodTrack', amount: 1 })).foodTrack).toBe(1);
+    // The food track ends at 10 (pg. 2) — a food-track card at the top is clamped like the field.
+    expect(applyCardEffect({ ...player(), foodTrack: 10 }, card('c', { kind: 'foodTrack', amount: 1 })).foodTrack).toBe(10);
     expect(applyCardEffect(player(), card('c', { kind: 'points', amount: 4 })).score).toBe(4);
     const tooled = applyCardEffect(player(), card('c', { kind: 'tool' }));
     expect(tooled.tools).toEqual([1]);

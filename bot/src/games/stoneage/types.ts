@@ -1,3 +1,5 @@
+import type { Action, StoneAgeView } from '@game-hub/engine/stoneage';
+
 /**
  * Options for a Stone Age decision.
  *
@@ -10,3 +12,9 @@
 export interface DecideOptions {
   readonly rollDice?: (count: number) => number[];
 }
+
+/**
+ * The shape of a decision policy — `decide`'s signature. Self-play accepts one per seat so different
+ * policies can play each other (the strength benchmark pits the live policy against a frozen legacy copy).
+ */
+export type DecideFn = (view: StoneAgeView, playerId: string, options?: DecideOptions) => Action;

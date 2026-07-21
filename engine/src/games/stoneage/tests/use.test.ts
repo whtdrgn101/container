@@ -30,6 +30,17 @@ describe('use', () => {
     expect(use(acting({ field: { p1: 1 } }), 'p1', 'field').players[0]!.foodTrack).toBe(1);
   });
 
+  it('hut and field cap at 10 — the supply and the printed track run out (pg. 2)', () => {
+    // 10 people = 5 start + the 5 in the general supply; the food track tops out at 10. At the cap the
+    // use is a no-op (like the 13th tool) — placing stays legal, the gain is what stops.
+    const hutState = acting({ hut: { p1: 2 } });
+    const maxedPeople = { ...hutState, players: hutState.players.map((p, i) => (i === 0 ? { ...p, people: 10 } : p)) };
+    expect(use(maxedPeople, 'p1', 'hut').players[0]!.people).toBe(10);
+    const fieldState = acting({ field: { p1: 1 } });
+    const maxedTrack = { ...fieldState, players: fieldState.players.map((p, i) => (i === 0 ? { ...p, foodTrack: 10 } : p)) };
+    expect(use(maxedTrack, 'p1', 'field').players[0]!.foodTrack).toBe(10);
+  });
+
   it('advances the turn once the player is done', () => {
     // p1 uses their only placement → Bob (forest) is up.
     const next = use(acting({ field: { p1: 1 }, forest: { p2: 2 } }), 'p1', 'field');

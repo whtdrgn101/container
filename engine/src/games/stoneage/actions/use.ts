@@ -1,15 +1,17 @@
-import { GameError } from '../core';
+import { GameError, MAX_FOOD_TRACK, MAX_PEOPLE } from '../core';
 import type { PlaceId, StoneAgePlayer, StoneAgeState } from '../core';
 import { addTool, advanceActor, isUsePlace, record, seatOf, withPlayer } from '../internal';
 
 /**
  * Use a non-dice place (rulebook pg. 5–6):
  * - **tool maker** → take 1 tool (climbing the 1→2→3→4 ladder),
- * - **hut** → gain 1 more person for every future round,
- * - **field** → move up the food track (+1 food produced at the end of each round).
+ * - **hut** → gain 1 more person for every future round — while the general supply lasts
+ *   (`MAX_PEOPLE`, pg. 2),
+ * - **field** → move up the food track (+1 food produced at the end of each round), to the top of the
+ *   printed track (`MAX_FOOD_TRACK`, pg. 2).
  *
- * The people are returned and the turn advances. (Tools acquired here add to dice rolls once spending
- * lands in SA4b.)
+ * At a cap the use is a no-op, like the 13th tool — placing there stays legal (it still blocks the
+ * spot), you just gain nothing. The people are returned and the turn advances.
  */
 export function use(state: StoneAgeState, playerId: string, place: PlaceId): StoneAgeState {
   if (!isUsePlace(place) || state.placements[place][playerId] === undefined) {
@@ -29,10 +31,10 @@ export function use(state: StoneAgeState, playerId: string, place: PlaceId): Sto
       break;
     }
     case 'hut':
-      updated = { ...player, people: player.people + 1 };
+      updated = { ...player, people: Math.min(player.people + 1, MAX_PEOPLE) };
       break;
     default: // field
-      updated = { ...player, foodTrack: player.foodTrack + 1 };
+      updated = { ...player, foodTrack: Math.min(player.foodTrack + 1, MAX_FOOD_TRACK) };
       break;
   }
 

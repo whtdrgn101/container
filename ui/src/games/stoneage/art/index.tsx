@@ -102,6 +102,100 @@ export function HuntIcon({ className }: { className?: string }) {
   );
 }
 
+/** A meat joint + growing stalk — food in hand (replaces the 🍖 emoji). */
+export function FoodIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <ellipse cx="9" cy="10" rx="6" ry="4.6" transform="rotate(-30 9 10)" fill="#b3552b" />
+      <rect x="11" y="12.5" width="8" height="2.4" rx="1.2" transform="rotate(-30 15 13.7)" fill="#e9dcc0" />
+      <circle cx="19.2" cy="9.4" r="1.6" fill="#e9dcc0" />
+    </svg>
+  );
+}
+
+/** A face-down card stack — held civilization cards (replaces the 🃏 emoji). */
+export function CardIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <rect x="7" y="4" width="11" height="15" rx="1.6" transform="rotate(8 12.5 11.5)" fill="#8a9a5b" />
+      <rect x="5" y="5" width="11" height="15" rx="1.6" fill="#a9b878" />
+      <path d="M8 9h5M8 12h5M8 15h3" stroke="#5f6f3a" strokeWidth="1.1" />
+    </svg>
+  );
+}
+
+/**
+ * The eight green culture symbols (final scoring counts distinct symbols, squared — pg. 8). Original
+ * pictographs on the 24×24 grid, `currentColor` so they tint with their context (green card face,
+ * player-panel collection slots).
+ */
+export const SYMBOL_ICON: Record<string, (props: { className?: string }) => ReactNode> = {
+  writing: ({ className }) => (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <rect x="5" y="3" width="14" height="18" rx="2" fill="currentColor" opacity="0.3" />
+      <path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" strokeWidth="1.6" fill="none" />
+    </svg>
+  ),
+  pottery: ({ className }) => (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden fill="currentColor">
+      <path d="M8 4h8l-1.5 3c2.5 1.5 4 4 4 7 0 4-3.5 6-6.5 6S5.5 18 5.5 14c0-3 1.5-5.5 4-7Z" />
+      <path d="M7.5 12h9" stroke="#f6efe0" strokeWidth="1.2" opacity="0.7" />
+    </svg>
+  ),
+  art: ({ className }) => (
+    // A hand stencil — the cave-wall signature.
+    <svg viewBox="0 0 24 24" className={className} aria-hidden fill="currentColor">
+      <ellipse cx="12" cy="15" rx="4" ry="5" />
+      <rect x="8.6" y="5" width="1.9" height="6" rx="0.9" />
+      <rect x="11.1" y="3.6" width="1.9" height="7" rx="0.9" />
+      <rect x="13.6" y="4.2" width="1.9" height="6.4" rx="0.9" />
+      <rect x="16" y="6.5" width="1.7" height="5" rx="0.85" transform="rotate(-30 17 9)" />
+      <rect x="5.8" y="7.5" width="1.7" height="4.6" rx="0.85" transform="rotate(28 6.6 9.8)" />
+    </svg>
+  ),
+  music: ({ className }) => (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <rect x="4" y="10" width="16" height="3.6" rx="1.8" transform="rotate(-24 12 12)" fill="currentColor" />
+      <g fill="#f6efe0" opacity="0.8">
+        <circle cx="9" cy="13.2" r="0.8" />
+        <circle cx="12" cy="11.9" r="0.8" />
+        <circle cx="15" cy="10.6" r="0.8" />
+      </g>
+    </svg>
+  ),
+  medicine: ({ className }) => (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <path d="M12 21c-4-3-6-6.5-6-10 0-3.5 2.5-7 6-8 3.5 1 6 4.5 6 8 0 3.5-2 7-6 10Z" fill="currentColor" />
+      <path d="M12 5v14M8.5 10c2 1.6 5 1.6 7 0" stroke="#f6efe0" strokeWidth="1.1" opacity="0.75" fill="none" />
+    </svg>
+  ),
+  weaving: ({ className }) => (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <g stroke="currentColor" strokeWidth="1.7">
+        <path d="M5 5v14M9.7 5v14M14.4 5v14M19 5v14" />
+      </g>
+      <g stroke="currentColor" strokeWidth="1.4" opacity="0.6">
+        <path d="M4 8.5h16M4 13h16M4 17.5h16" />
+      </g>
+    </svg>
+  ),
+  transport: ({ className }) => (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden fill="currentColor">
+      <path d="M3 13c3 3 15 3 18 0l-2.5 5.5c-4 1.6-9 1.6-13 0Z" />
+      <path d="M15 5l-2 7" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      <ellipse cx="15.6" cy="4.6" rx="1.7" ry="1" transform="rotate(28 15.6 4.6)" />
+    </svg>
+  ),
+  timekeeping: ({ className }) => (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <circle cx="12" cy="12" r="5" fill="currentColor" />
+      <g stroke="currentColor" strokeWidth="1.5">
+        <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2 2M19 5l-2 2M5 19l2-2M19 19l-2-2" />
+      </g>
+    </svg>
+  ),
+};
+
 /** The prehistoric emblem for each of the eight board places. */
 export const PLACE_ICON: Record<FixedPlaceId, (props: { className?: string }) => ReactNode> = {
   toolMaker: ToolIcon,

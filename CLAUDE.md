@@ -524,7 +524,7 @@ sessions). The Container summary below is retained for context; the per-game roa
   /games` in e2e (resume spec targets its own game by id; the resume card is landing-only).
 - **Slice 8 ✅ (UI/UX polish & board).** Original SVG art (`ui/src/components/art/{Container,Ship}.tsx`)
   replaces all colored-square chips via the `ContainerChip` wrapper (kept as `span[title]` for e2e
-  counts). A `BoardMap` (`ui/src/components/BoardMap.tsx`) draws every ship on an
+  counts). A `BoardMap` (`ui/src/games/container/BoardMap.tsx`) draws every ship on an
   ocean/island/bank/harbor board with click-to-sail. Motion (ship glide, active pulse, `.reveal-in`
   panels) is `motion-safe`/`prefers-reduced-motion`-gated; board nodes are focusable buttons with
   aria-labels. Visual-regression baselines: `ui/e2e/visual.spec.ts` (board only — deterministic at
@@ -691,6 +691,11 @@ sessions). The Container summary below is retained for context; the per-game roa
   auctions, the Off-Shore Bank, and final scoring (the "factory district only" note from Slice 0 is long
   obsolete). All three games are feature-complete; remaining work is platform hardening (see `REVIEW.md`),
   not core mechanics.
+- **Stone Age caps population and the food track at 10** (`MAX_PEOPLE`/`MAX_FOOD_TRACK`, decided
+  2026-07-21): the rulebook's caps are physical (10 figures per color — 5 start + 5 supply; the track
+  is printed 0–10, pg. 2), so the engine clamps the *gain* (no-op at cap, like the 13th tool) while
+  placement stays legal as a blocking move. The Stone Age rulebook PDF now lives in
+  `reference_materials/` (gitignored — copyrighted PDFs stay local-only).
 
 ## Working agreement for Claude
 

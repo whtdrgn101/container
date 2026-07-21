@@ -21,7 +21,9 @@ import type { BoardProps } from '../types';
 import * as stoneageApi from './api';
 import { CardRow } from './CardRow';
 import { BoardMap } from './BoardMap';
-import { FieldIcon, Hut, Meeple, ResourceIcon, ToolIcon } from './art';
+import { PlayerPanel } from './PlayerPanel';
+import { CostPips } from './pieces';
+import { Hut, Meeple, ResourceIcon, ToolIcon } from './art';
 
 const PLACE_LABEL: Record<FixedPlaceId, string> = {
   toolMaker: 'Tool maker',
@@ -138,6 +140,9 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
 
   const remaining = active ? availableToPlace(game, active.id) : 0;
   const waitingFor = active?.name ?? 'the next player';
+  // Seat identity for the banner (REVIEW 3.3 interim — same one-liner as Can't Stop's board; the
+  // full shell extraction will absorb this).
+  const myNames = controlledIds ? game.players.filter((p) => controlledIds.includes(p.id)).map((p) => p.name) : null;
   const banner = game.status === 'ended'
     ? 'Game over.'
     : placing
@@ -230,9 +235,14 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
       )}
       <div
         data-testid="sa-banner"
+        role="status"
+        aria-live="polite"
         className="flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-sm"
       >
-        <span className="font-medium">{banner}</span>
+        <span className="font-medium">
+          {myNames && myNames.length > 0 && <span className="text-muted-foreground">You are {myNames.join(' & ')} — </span>}
+          {banner}
+        </span>
         {active && <span className="text-xs text-muted-foreground">{active.name}’s turn</span>}
       </div>
 
@@ -350,7 +360,18 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
                     <span className="text-sm font-medium">Building {i + 1}</span>
                     <span className="text-xs tabular-nums text-muted-foreground">{stack.length} left</span>
                   </div>
-                  <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Hut className="h-3.5 w-3.5" /> {top ? costLabel(top.cost) : 'empty'}</div>
+                  <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground" title={top ? costLabel(top.cost) : 'empty'}>
+                    <Hut className="h-3.5 w-3.5 flex-none" />
+                    {top ? (
+                      <>
+                        <CostPips cost={top.cost} />
+                        {top.cost.kind === 'fixed' && <span className="tabular-nums">= {paymentValue(top.cost.resources)} pts</span>}
+                        <span className="sr-only">{costLabel(top.cost)}</span>
+                      </>
+                    ) : (
+                      'empty'
+                    )}
+                  </div>
                   {occupants.length > 0 && <div className="mt-1 flex flex-wrap items-center gap-0.5">{meeplesFor(game.placements[placeId] ?? {})}</div>}
                   {canPlaceHere && (
                     <Button size="sm" className="mt-2 self-end" data-testid={`place-${placeId}-go`} disabled={busy} onClick={() => doPlace(placeId, 1)}>
@@ -399,46 +420,45 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
         seatColorOf={seatColorOf}
       />
 
-      {/* Each player's board (pg. 2). */}
+      {/* Each player's board (pg. 2). Your own seat(s) get the full engines-at-a-glance panel (green
+          collection + multipliers priced live); opponents collapse to a one-line summary so a 4-player
+          game stays scannable. Hotseat (no bound seats) follows the active player. */}
       <div>
         <h2 className="mb-2 text-sm font-semibold">Players</h2>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {game.players.map((player, seat) => (
-            <div
-              key={player.id}
-              data-testid={`player-${player.id}`}
-              className={cn(
-                'rounded-lg border bg-card p-3',
-                seat === game.activePlayerIndex && cn('ring-2', seatColorOf(player.id).ring),
-              )}
-            >
-              <div className="mb-2 flex items-center justify-between">
-                <span className={cn('flex items-center gap-1.5 font-medium', seatColorOf(player.id).text)}>
-                  <span className={cn('inline-block h-3 w-3 rounded-full', seatColorOf(player.id).dot)} aria-hidden />
-                  {player.name}
-                </span>
-                <span className="text-xs text-muted-foreground" data-testid={`score-${player.id}`}>{player.score} pts</span>
-              </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                <span className="flex items-center gap-1">
-                  <Meeple className={cn('h-3.5 w-3.5', seatColorOf(player.id).text)} />
-                  People: <span className="font-medium tabular-nums">{placedBy(game, player.id)}/{player.people}</span> placed
-                </span>
-                <span>🍖 Food: <span className="font-medium tabular-nums">{player.food}</span></span>
-                <span className="flex items-center gap-1"><FieldIcon className="h-3.5 w-3.5" /> Food track: <span className="font-medium tabular-nums">{player.foodTrack}</span></span>
-                <span className="flex items-center gap-1"><ToolIcon className="h-3.5 w-3.5" /> Tools: <span className="font-medium tabular-nums">{player.tools.join(', ') || '—'}</span></span>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                {RESOURCES.map((resource) => (
-                  <span key={resource} className="flex items-center gap-1">
-                    <ResourceIcon resource={resource} className="h-4 w-4" />
-                    <span className="tabular-nums">{player.resources[resource]}</span>
-                  </span>
+        <div className="space-y-2">
+          {(() => {
+            const detailedIds = controlledIds && controlledIds.length > 0 ? controlledIds : active ? [active.id] : [];
+            const detailed = game.players.filter((p) => detailedIds.includes(p.id));
+            const rest = game.players.filter((p) => !detailedIds.includes(p.id));
+            return (
+              <>
+                {detailed.length > 0 && (
+                  <div className={cn('grid gap-2', detailed.length > 1 && 'sm:grid-cols-2')}>
+                    {detailed.map((player) => (
+                      <PlayerPanel
+                        key={player.id}
+                        game={game}
+                        player={player}
+                        seat={game.players.indexOf(player)}
+                        detailed
+                        seatColor={seatColorOf(player.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+                {rest.map((player) => (
+                  <PlayerPanel
+                    key={player.id}
+                    game={game}
+                    player={player}
+                    seat={game.players.indexOf(player)}
+                    detailed={false}
+                    seatColor={seatColorOf(player.id)}
+                  />
                 ))}
-                <span className="flex items-center gap-1 text-muted-foreground">· 🃏 {player.civCards.length} · <Hut className="h-3.5 w-3.5" /> {player.buildings}</span>
-              </div>
-            </div>
-          ))}
+              </>
+            );
+          })()}
         </div>
       </div>
 

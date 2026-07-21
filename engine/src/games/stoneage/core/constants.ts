@@ -14,6 +14,18 @@ export const STARTING_PEOPLE = 5;
 export const STARTING_FOOD = 12;
 
 /**
+ * Population cap (pg. 2): 40 people figures ÷ 4 colors — 5 start on the player board (step 11) and 5
+ * sit in the general supply (step 12). The hut takes "from the general supply" (pg. 6), so once your
+ * color's supply is empty there is nothing left to gain. Placing on the hut stays legal at the cap
+ * (nothing in the rules forbids it — it's a legitimate blocking move); the *gain* is what stops,
+ * like the 13th tool.
+ */
+export const MAX_PEOPLE = 10;
+
+/** Food-track cap (pg. 2): the track printed on the board runs 0–10 (setup step 10). Same clamp rule. */
+export const MAX_FOOD_TRACK = 10;
+
+/**
  * The die pip you need "a full N of" to gather a resource, and each resource's scoring value —
  * wood is commonest (full 3s) and cheapest, gold rarest (full 6s) and dearest (pg. 6).
  */
