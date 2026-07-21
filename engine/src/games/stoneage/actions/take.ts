@@ -1,6 +1,6 @@
 import { GameError, HUNT_THRESHOLD, PLACE_RESOURCE, RESOURCE_THRESHOLD } from '../core';
 import type { StoneAgePlayer, StoneAgeState } from '../core';
-import { advanceActor, record, withPlayer } from '../internal';
+import { advanceActor, record, seatOf, withPlayer } from '../internal';
 
 /**
  * **Step 2 of a gather (pg. 5–6): take the yield.** Resolve the `pendingGather`, optionally adding the
@@ -14,7 +14,8 @@ export function takeGather(state: StoneAgeState, playerId: string, toolIndices: 
     throw new GameError('INVALID_TAKE', `Player "${playerId}" has no rolled gather to take`);
   }
 
-  const seat = state.activePlayerIndex;
+  // Seat from `playerId`, not `activePlayerIndex` — see `feed` for why (this is a public export).
+  const seat = seatOf(state, playerId);
   const player = state.players[seat]!;
 
   // Validate the tool selection: unique, in range, and not already spent this round.

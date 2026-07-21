@@ -6,6 +6,7 @@ import {
   buildingPlaceId,
   paymentValue,
   record,
+  seatOf,
   totalPaid,
   withPlayer,
 } from '../internal';
@@ -25,7 +26,8 @@ export function build(state: StoneAgeState, playerId: string, stack: number, pay
     throw new GameError('INVALID_BUILD', `Player "${playerId}" has no person on a buildable stack ${stack}`);
   }
 
-  const seat = state.activePlayerIndex;
+  // Seat from `playerId`, not `activePlayerIndex` — see `feed` for why (this is a public export).
+  const seat = seatOf(state, playerId);
   const player = state.players[seat]!;
 
   let players = state.players;

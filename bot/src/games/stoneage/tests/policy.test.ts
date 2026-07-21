@@ -55,6 +55,16 @@ describe('building/card payments', () => {
     expect(buildingPaymentFor(any, player())).toBeNull(); // nothing to pay
   });
 
+  it('pays an "any" building with its most valuable resources (the payment is the score)', () => {
+    // Building points = paymentValue(payment), so a free-choice cost should shed gold before wood.
+    const any: Building = { id: 'a', cost: { kind: 'any', min: 2, max: 7 } };
+    const rich = player({ resources: { wood: 5, brick: 0, stone: 0, gold: 5 } });
+    expect(buildingPaymentFor(any, rich)).toEqual({ gold: 2 }); // not { wood: 2 }
+    // Falls through to the cheaper kinds only once the richer ones run out.
+    const gilded = player({ resources: { wood: 5, brick: 0, stone: 0, gold: 1 } });
+    expect(buildingPaymentFor(any, gilded)).toEqual({ gold: 1, wood: 1 });
+  });
+
   it('pays a card its position cost from cheapest resources, or nothing if too poor', () => {
     expect(cardPaymentFor(0, player({ resources: { wood: 1, brick: 0, stone: 0, gold: 0 } }))).toEqual({ wood: 1 });
     expect(cardPaymentFor(3, player({ resources: { wood: 2, brick: 0, stone: 0, gold: 0 } }))).toBeNull(); // needs 4

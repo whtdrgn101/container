@@ -1,6 +1,6 @@
 import { RESOURCES, STARVATION_PENALTY } from '../core';
 import type { Resource, StoneAgePlayer, StoneAgeState } from '../core';
-import { advanceFeeder, record, withPlayer } from '../internal';
+import { advanceFeeder, record, seatOf, withPlayer } from '../internal';
 
 /**
  * Feed the active player's people (rulebook pg. 7, phase 3):
@@ -16,7 +16,11 @@ import { advanceFeeder, record, withPlayer } from '../internal';
  * later. Nothing here is a dice roll, so `FEED` is a normal client action, not a server-only one.)*
  */
 export function feed(state: StoneAgeState, playerId: string, payWithResources = true): StoneAgeState {
-  const seat = state.activePlayerIndex;
+  // Resolve the seat from `playerId`, not `activePlayerIndex`: `applyAction` guarantees they match, but
+  // this is a public export, and reading the seat off the argument means a stray `feed(state, 'p2')`
+  // throws PLAYER_NOT_FOUND / mutates the right seat rather than silently editing the active player and
+  // writing a falsified `playerId` into the log.
+  const seat = seatOf(state, playerId);
   const player = state.players[seat]!;
 
   const produced = player.food + player.foodTrack; // step 1: food-track production (pg. 7)

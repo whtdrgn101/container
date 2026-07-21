@@ -1,6 +1,6 @@
 import { GameError } from '../core';
 import type { PlaceId, StoneAgePlayer, StoneAgeState } from '../core';
-import { addTool, advanceActor, isUsePlace, record, withPlayer } from '../internal';
+import { addTool, advanceActor, isUsePlace, record, seatOf, withPlayer } from '../internal';
 
 /**
  * Use a non-dice place (rulebook pg. 5–6):
@@ -16,7 +16,8 @@ export function use(state: StoneAgeState, playerId: string, place: PlaceId): Sto
     throw new GameError('INVALID_USE', `Player "${playerId}" has no people to use at "${place}"`);
   }
 
-  const seat = state.activePlayerIndex;
+  // Seat from `playerId`, not `activePlayerIndex` — see `feed` for why (this is a public export).
+  const seat = seatOf(state, playerId);
   const player = state.players[seat]!;
   let updated: StoneAgePlayer;
   switch (place) {

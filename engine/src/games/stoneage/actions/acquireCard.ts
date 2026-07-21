@@ -6,6 +6,7 @@ import {
   cardPaymentError,
   cardPlaceId,
   record,
+  seatOf,
   totalPaid,
   withPlayer,
 } from '../internal';
@@ -25,7 +26,8 @@ export function acquireCard(state: StoneAgeState, playerId: string, slot: number
     throw new GameError('INVALID_CARD', `Player "${playerId}" has no person on a takeable card slot ${slot}`);
   }
 
-  const seat = state.activePlayerIndex;
+  // Seat from `playerId`, not `activePlayerIndex` — see `feed` for why (this is a public export).
+  const seat = seatOf(state, playerId);
   const player = state.players[seat]!;
 
   let players = state.players;

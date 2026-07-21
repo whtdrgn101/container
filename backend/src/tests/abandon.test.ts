@@ -58,6 +58,7 @@ describe('abandoning a game', () => {
   it('keeps the game readable, and its move log intact', async () => {
     const id = await createGame();
     const before = await app.inject({ method: 'GET', url: `/games/${id}` });
+    const movesBefore = new GameRepository(db).listMoves(id);
     await app.inject({ method: 'POST', url: `/games/${id}/abandon` });
 
     const after = await app.inject({ method: 'GET', url: `/games/${id}` });
@@ -65,7 +66,9 @@ describe('abandoning a game', () => {
     expect(after.json().game.id).toBe(id);
     expect(after.json().abandoned).toBe(true);
     expect(before.json().game.version).toBe(after.json().game.version);
-    expect(new GameRepository(db).listMoves(id).length).toBeGreaterThanOrEqual(0);
+    // The log is untouched by abandonment — same entries, same order, not merely "≥ 0" (which every
+    // array satisfies). Comparing the whole array is what actually asserts "intact".
+    expect(new GameRepository(db).listMoves(id)).toEqual(movesBefore);
     expect(db.prepare(`SELECT COUNT(*) AS n FROM games WHERE id = ?`).get(id)).toEqual({ n: 1 });
   });
 
@@ -196,9 +199,18 @@ describe('the abandoned_at migration', () => {
     const db = createDatabase(path);
     const columns = (db.prepare(`PRAGMA table_info(games)`).all() as { name: string }[]).map((c) => c.name);
     expect(columns).toContain('abandoned_at');
-    // The pre-existing game survives, un-abandoned, and is listable.
-    expect(db.prepare(`SELECT abandoned_at FROM games WHERE id = 'old'`).get()).toEqual({ abandoned_at: null });
+    // Both added columns must appear, not just `abandoned_at`: the legacy DDL above omits `game_type`
+    // too, and without it `moduleOf` (which reads `game_type` on the very first request) throws on
+    // every deployed database. Asserting only one column let a dropped `game_type` migration pass.
+    expect(columns).toContain('game_type');
+    // The pre-existing game survives, un-abandoned, and is listable — and is backfilled to the game it
+    // could only have been before the column existed, so its rules resolve.
+    expect(db.prepare(`SELECT abandoned_at, game_type FROM games WHERE id = 'old'`).get()).toEqual({
+      abandoned_at: null,
+      game_type: 'container',
+    });
     expect(new GameRepository(db).isAbandoned('old')).toBe(false);
+    expect(new GameRepository(db).typeOf('old')).toBe('container');
     db.close();
   });
 

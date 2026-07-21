@@ -60,5 +60,10 @@ export class BotRunner {
       this.repo.update(applyAction(state, active.id, action));
       this.onChange(this.repo.get(gameId)!);
     }
+    // Reaching here means the loop never hit a human, a finished game, or a botless seat in MAX_STEPS
+    // steps — a policy is cycling on a legal-but-non-progressing action. Self-play throws on exactly
+    // this; the server used to fall out silently and re-run the whole spin on *every* read. Throw so it
+    // surfaces (the app's `tick` contains and logs it) instead of becoming an invisible per-read DoS.
+    throw new Error(`Stone Age bot runner exceeded ${MAX_STEPS} steps for game "${gameId}" — a policy is likely cycling`);
   }
 }

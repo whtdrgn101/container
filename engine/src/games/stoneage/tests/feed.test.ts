@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { StoneAgePlayer, StoneAgeState } from '../core';
 import { feed } from '../actions';
-import { makeState } from './helpers';
+import { expectError, makeState } from './helpers';
 
 /** A feeding-phase game whose active player (seat 0) is overridden with the given board. */
 function feeding(p1: Partial<StoneAgePlayer>, overrides: Partial<StoneAgeState> = {}): StoneAgeState {
@@ -38,6 +38,25 @@ describe('feed', () => {
     const next = feed(feeding({ food: 2, foodTrack: 0, people: 5, score: 4, resources: { wood: 9, brick: 0, stone: 0, gold: 0 } }), 'p1', false);
     expect(next.players[0]!.resources.wood).toBe(9); // not spent
     expect(next.players[0]!.score).toBe(0); // max(0, 4 − 10)
+  });
+
+  it('acts on the seat named by playerId, not the active seat (public export, off-turn safe)', () => {
+    // `applyAction` guarantees playerId === active, but `feed` is a public export the bot/UI import
+    // directly. It must resolve the seat from its argument: a stray `feed(state, 'p1')` while seat 1 is
+    // active must feed p1, never silently edit the active player and log a falsified playerId.
+    const base = makeState({ phase: 'feeding', activePlayerIndex: 1, startPlayerIndex: 0 });
+    const state: StoneAgeState = {
+      ...base,
+      players: base.players.map((p, i) =>
+        i === 0 ? { ...p, food: 10, people: 3 } : { ...p, food: 100, people: 1 },
+      ),
+    };
+    const next = feed(state, 'p1');
+    expect(next.players[0]!.food).toBe(7); // p1 (seat 0) fed: 10 − 3
+    expect(next.players[1]!.food).toBe(100); // the active seat left untouched
+    expect(next.log.at(-1)).toMatchObject({ type: 'FEED', playerId: 'p1' });
+    // An id that isn't at the table is a PLAYER_NOT_FOUND, not a wrong-seat mutation.
+    expectError(() => feed(state, 'nobody'), 'PLAYER_NOT_FOUND');
   });
 
   it('rolls the round over once the last player has fed, resetting used tools', () => {

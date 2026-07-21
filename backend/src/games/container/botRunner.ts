@@ -79,6 +79,10 @@ export class BotRunner {
       // No `collectBids`: a bot at the island is handled by the auction above, never here.
       this.applyBotAction(state, active.id);
     }
+    // MAX_STEPS with no human on the clock (turn, bid, or delivery call) means a policy is cycling on a
+    // legal-but-non-progressing action. Throw (the app's `tick` contains and logs it) rather than fall
+    // out silently and re-run the whole spin on every read — the invisible per-read DoS this guards.
+    throw new Error(`Container bot runner exceeded ${MAX_STEPS} steps for game "${gameId}" — a policy is likely cycling`);
   }
 
   /** Take the one next bot step an open auction is waiting for. False ⇒ it's a human's move. */

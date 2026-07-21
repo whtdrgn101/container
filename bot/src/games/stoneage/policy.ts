@@ -96,6 +96,13 @@ function affordsCard(view: StoneAgeView, player: StoneAgePlayer, place: PlaceId)
  * A valid, affordable payment for a building, or `null` if the bot can't (or shouldn't) buy it. Fixed
  * buildings pay their exact cost; the flexible kinds are paid with the resources the bot has most of, so
  * it keeps a spread. Validated against the engine's own `buildingPaymentError` so it can never be illegal.
+ *
+ * ⚠️ A building's score **is** the value of what you pay (`build.ts` scores `paymentValue(payment)`),
+ * while an unspent resource is worth only 1 point at game end. So a free-choice ("any") building should
+ * be paid with the bot's *most* valuable resources, not its cheapest — spending gold (6) beats spending
+ * wood (3). This is the opposite of a card, whose cost is a pure toll that awards no points and so is
+ * rightly paid cheapest-first (`cardPaymentFor`). Same affordability either way (both spend the same
+ * total count), so richest-first never turns an affordable building unaffordable.
  */
 export function buildingPaymentFor(building: Building, player: StoneAgePlayer): Payment | null {
   const cost = building.cost;
@@ -104,7 +111,7 @@ export function buildingPaymentFor(building: Building, player: StoneAgePlayer): 
   if (cost.kind === 'fixed') return valid({ ...cost.resources });
 
   if (cost.kind === 'any') {
-    const pay = takeCheapest(player, cost.min);
+    const pay = takeRichest(player, cost.min);
     return pay ? valid(pay) : null;
   }
 
@@ -134,9 +141,19 @@ export function cardPaymentFor(slot: number, player: StoneAgePlayer): Payment | 
 
 /** Take exactly `need` resource units from a player, cheapest kinds first, or `null` if they haven't got them. */
 function takeCheapest(player: StoneAgePlayer, need: number): Payment | null {
+  return takeInOrder(player, need, RESOURCES);
+}
+
+/** As `takeCheapest`, but spends the *most* valuable kinds first — for building payments (see above). */
+function takeRichest(player: StoneAgePlayer, need: number): Payment | null {
+  return takeInOrder(player, need, [...RESOURCES].reverse());
+}
+
+/** Take exactly `need` units, drawing kinds in `order`, or `null` if the player hasn't got that many. */
+function takeInOrder(player: StoneAgePlayer, need: number, order: readonly Resource[]): Payment | null {
   const pay: Partial<Record<Resource, number>> = {};
   let rest = need;
-  for (const r of RESOURCES) {
+  for (const r of order) {
     if (rest <= 0) break;
     const take = Math.min(player.resources[r], rest);
     if (take > 0) {

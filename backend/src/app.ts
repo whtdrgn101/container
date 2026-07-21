@@ -125,7 +125,17 @@ export function buildApp(options: AppOptions): FastifyInstance {
     // The gate lives here rather than in any module: abandonment is a platform concern, and no game
     // should have to re-implement it.
     if (repo.isAbandoned(gameId)) return;
-    drivers.get(moduleFor(gameId).id)?.tick(gameId);
+    try {
+      drivers.get(moduleFor(gameId).id)?.tick(gameId);
+    } catch (error) {
+      // A bot that can't produce a legal move — or a runner that trips its runaway guard — must stall
+      // its own seat, never take the game down. `tick` runs on `GET /games/:id` and WS subscribe as
+      // well as on writes, so an uncontained throw here would 500 *every future read* of the game, and
+      // no human could unstick it (it isn't their turn). Contain it: log, and leave the seat unadvanced
+      // so a human can still load the board. The bug this guards is invisible until a rules change makes
+      // a policy's assumption false, because the invariant keeping bots safe lives in a different package.
+      app.log.error({ err: error, gameId }, 'bot driver failed; stalling AI seat');
+    }
   };
 
   /**

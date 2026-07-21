@@ -53,5 +53,8 @@ export class CantStopBotRunner {
       this.repo.update(next);
       this.onChange(next);
     }
+    // MAX_STEPS with no human, finished game, or botless seat means a policy is cycling. Throw (the
+    // app's `tick` contains and logs it) rather than fall out silently and re-spin on every read.
+    throw new Error(`Can't Stop bot runner exceeded ${MAX_STEPS} steps for game "${gameId}" — a policy is likely cycling`);
   }
 }
