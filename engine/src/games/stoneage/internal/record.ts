@@ -1,21 +1,4 @@
-import type { StoneAgeState } from '../core';
-
-/**
- * Produce the next state after a mechanic: apply the top-level changes, bump the version, and append
- * one move to the log. The single place that touches `version`/`log`.
- */
-export function record(
-  state: StoneAgeState,
-  type: string,
-  playerId: string,
-  changes: Partial<StoneAgeState> = {},
-  payload?: Record<string, unknown>,
-): StoneAgeState {
-  const version = state.version + 1;
-  return {
-    ...state,
-    ...changes,
-    version,
-    log: [...state.log, payload ? { seq: version, type, playerId, payload } : { seq: version, type, playerId }],
-  };
-}
+// Stone Age's `record()` is the shared kernel one verbatim — bump `version`, append one log entry —
+// so it re-exports rather than re-implements (the shape turned out common across all three games;
+// see REVIEW.md §3.2). `record(state, type, playerId, changes?, payload?)`.
+export { record } from '../../../kernel';

@@ -39,7 +39,11 @@ That's a high floor. Two things qualify it:
   - [x] 2.2 Linux visual baselines — generated in the pinned Playwright container; e2e now gates the push
   - [x] 2.3 backend coverage gate
   - [x] 2.4 SPA-fallback test
-- [ ] **Tier 3 — kernel/board/bot extraction** (do before game 4)
+- [~] **Tier 3 — kernel/board/bot extraction** (do before game 4)
+  - [x] 3.2 kernel extraction — `record()` + seat helpers
+  - [ ] 3.1 end-state discriminated union
+  - [ ] 3.3 UI shell fields + shared board components
+  - [ ] 3.4 hoist the bot drive-loop
 - [ ] **Tier 4 — ops hardening**
 - [ ] **Tier 5 — worth knowing**
 
@@ -214,7 +218,15 @@ and both meaningless.
 
 Highest-value type change available in the package. Game 4 will otherwise invent a fourth convention.
 
-### 3.2 `record()` and the seat helpers are literally identical code
+### 3.2 `record()` and the seat helpers are literally identical code ✅
+
+> **Done.** `record()` now lives in `engine/src/kernel/record.ts` (generic over `VersionedState`), and
+> the seat helpers in `engine/src/kernel/seating.ts` as `makeSeating<P>(onMissing)` returning
+> `{ seatOf, withPlayer, activePlayer }`. Can't Stop and Stone Age re-export the kernel `record`
+> verbatim; Container keeps its `players`-first wrapper delegating to it (14 call sites). Each game binds
+> `makeSeating` to its **own** `GameError` subclass via the injected `onMissing` thrower — so
+> PLAYER_NOT_FOUND stays `instanceof` the subclass the backend's `mapError` checks, avoiding the
+> 404→500 trap with **zero backend change**. Engine 100% (kernel files included); bot + backend green.
 
 `cantstop/internal/record.ts` and `stoneage/internal/record.ts` are byte-identical after normalizing
 the state type name and comment; Container's differs only by a redundant hoisted `players` parameter
