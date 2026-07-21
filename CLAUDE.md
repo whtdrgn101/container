@@ -60,12 +60,12 @@ container/
 ├── engine/     @game-hub/engine  — pure, deterministic rules cores (NO I/O, NO randomness)
 │   └── src/                        — a per-game platform, mirroring the backend/UI:
 │       ├── kernel/                 — the tiny shared kernel: GameError, MoveRecord, Viewer
-│       └── games/                  — one folder per game (container/, cantstop/), each its own
-│                                     subpath export `@game-hub/engine/<game>`
-├── bot/        @game-hub/bot     — AI players; pure policies over a redacted GameView (Container)
+│       └── games/                  — one folder per game (container/, cantstop/, stoneage/), each its
+│                                     own subpath export `@game-hub/engine/<game>`
+├── bot/        @game-hub/bot     — AI players; pure policies over a redacted GameView (all three games)
 ├── backend/    @game-hub/backend — Fastify REST API; persists to SQLite; runs the AI (BotRunner)
 │   └── src/games/                 — the GameModule seam: module.ts (contract), registry.ts,
-│                                    container/ + cantstop/ (each a registered game)
+│                                    container/ + cantstop/ + stoneage/ (each a registered game)
 ├── ui/         @game-hub/ui      — React + Tailwind + shadcn; talks to the API
 │   └── src/
 │       ├── App.tsx                — the Game Hub shell: routing + seat binding (knows no game)
@@ -73,8 +73,8 @@ container/
 │       ├── hooks/                 — useGameTransport (one socket), useHomeLists
 │       ├── lib/api.ts             — the platform API client (generic)
 │       └── games/                 — the GameClient seam: types.ts, registry.ts,
-│                                    container/ + cantstop/ (board + its own api.ts)
-└── reference_materials/           — the rulebook PDFs (Container, Can't Stop)
+│                                    container/ + cantstop/ + stoneage/ (board + its own api.ts)
+└── reference_materials/           — the rulebook PDFs (Container, Can't Stop, Stone Age)
 ```
 
 **Data flow:** UI → REST → backend → **engine** (authoritative) → SQLite snapshot + move log.
@@ -93,7 +93,8 @@ gets them free.
 
 The backend hosts **games**, plural, through one contract: `backend/src/games/module.ts`. Container is
 one registered module (`games/container/`), not the only thing the server can do — and since C1 that is
-literal: two games can run side by side on one server, proven by `tests/module-seam.test.ts`.
+literal: **three games** (Container, Can't Stop, Stone Age) run side by side on one server, proven by
+`tests/module-seam.test.ts`.
 
 - **`games.game_type` says whose rules a row plays by.** A game's state is an opaque blob, so this
   column is the only thing tying it to an engine. **Every route resolves its module from the row**
@@ -125,9 +126,9 @@ literal: two games can run side by side on one server, proven by `tests/module-s
   **all** action validation is `module.parseAction`. Don't re-add a `type` enum to the route — that's the
   thing that couldn't survive a second game.
 - **Randomness is injected**, never reached for inside a module — at setup (`createGame({ rng })`) and,
-  since C3, **per action** via `ModuleContext.rng` (Can't Stop's dice roll route draws from it and
-  applies a pure engine action carrying the result). That's what keeps every engine pure, deterministic
-  and replayable. A module reaching for `Math.random` is the bug this prevents.
+  since C3, **per action** via `ModuleContext.rng` (Can't Stop's dice roll route and Stone Age's gather
+  roll both draw from it and apply a pure engine action carrying the result). That's what keeps every
+  engine pure, deterministic and replayable. A module reaching for `Math.random` is the bug this prevents.
 ### The `GameClient` seam — the UI side (Track C / C2)
 
 The UI mirrors the backend split. `App.tsx` is the **Game Hub shell**: landing, lobby, navigation,
@@ -175,24 +176,32 @@ opponents** later (both just drive the same engine).
 
 `@game-hub/engine` exports **TypeScript source** (not a build), and is a **per-game platform**:
 there is deliberately **no `.` entry**. Consumers import a specific game's surface by subpath —
-`@game-hub/engine/container`, `@game-hub/engine/cantstop` — over a tiny shared
-`@game-hub/engine/kernel`. No game is a privileged default, mirroring the backend rule "resolve the
-module from the row, never a default". Both consumers transpile the TS source directly:
+`@game-hub/engine/container`, `@game-hub/engine/cantstop`, `@game-hub/engine/stoneage` — over a tiny
+shared `@game-hub/engine/kernel`. No game is a privileged default, mirroring the backend rule "resolve
+the module from the row, never a default". Both consumers transpile the TS source directly:
 
 - **backend** — `tsx` (dev/prod-start) and Vitest (`server.deps.inline: [/@game-hub\/engine/]`)
   transform the TS source across the workspace boundary; the subpath `exports` map resolves each game.
-- **ui** — `vite.config.ts` has **one alias per subpath** (`/container`, `/cantstop`, `/kernel`) →
-  the matching `engine/src/…` file, so Vite bundles it as project source. This also gives the
-  **frontend shared types** (`CantStopState`, `Color`, …) for free.
+- **ui** — `vite.config.ts` has **one alias per subpath** (`/container`, `/cantstop`, `/stoneage`,
+  `/kernel`) → the matching `engine/src/…` file, so Vite bundles it as project source. This also gives
+  the **frontend shared types** (`CantStopState`, `StoneAgeState`, `Color`, …) for free.
 
 `engine` also has a real `build` (`tsc -p tsconfig.build.json` → `dist/`) used for typecheck/
 distribution; consumers may switch to `dist` later if we ever publish.
 
 **The kernel is tiny on purpose** (`engine/src/kernel/`): only `GameError` (generic in its code
 union), `MoveRecord`, and `Viewer` — the primitives every game *and* the backend `GameModule` contract
-share. Each game keeps its **own** `record()`, state types, constants and `viewFor`. We did **not**
-extract a shared `record`/state off two examples — same discipline as not building a sealed-bid
-framework off one. If a third game makes a shape genuinely common, extract it *then*.
+share. Each game currently keeps its **own** `record()`, state types, constants and `viewFor` — we did
+**not** extract a shared `record`/state off two examples, the same discipline as not building a
+sealed-bid framework off one.
+
+⚠️ **That restraint rule has now fired: the third game arrived.** `record()` and the seat helpers
+(`seatOf`/`withPlayer`/`activePlayer`) turned out **byte-identical across all three games**, and the
+end-state shape drifted three different ways — so extraction into the kernel (with the error-class trap
+noted there) is warranted and is tracked in **[`REVIEW.md`](./REVIEW.md) Tier 3**, not yet done. What
+should stay per-game even so: `viewFor` (redaction must be an explicit per-game decision, not a shared
+no-op) and the `legalActions` preamble (Container deliberately admits off-turn `REQUEST_LOAN`). Extract
+the genuinely-common shapes; resist the coincidental ones.
 
 ### The bot package (`@game-hub/bot`, per-game like the engine)
 
@@ -200,31 +209,36 @@ framework off one. If a third game makes a shape genuinely common, extract it *t
 No bot code goes in `engine/`, and the engine must never learn what a bot is. A bot is not
 authoritative — it just produces an `Action` that the engine validates like any human's move.
 
-- **Per-game, like the engine and backend.** `bot/src/games/<game>/` (Container, Can't Stop) over a tiny
-  `bot/src/kernel/` (just `BotError`), exported by **subpath** — `@game-hub/bot/container`,
-  `@game-hub/bot/cantstop`, no `.` default. Each game's backend module wires its own bot through
-  `createBotDriver`. The bullets below split into a general rule and each game's specifics.
+- **Per-game, like the engine and backend.** `bot/src/games/<game>/` (Container, Can't Stop, Stone Age)
+  over a tiny `bot/src/kernel/` (just `BotError`), exported by **subpath** — `@game-hub/bot/container`,
+  `@game-hub/bot/cantstop`, `@game-hub/bot/stoneage`, no `.` default. Each game's backend module wires
+  its own bot through `createBotDriver`. The bullets below split into a general rule and each game's specifics.
 - **Bots decide from a `GameView`, never a `GameState`:** `decide(viewFor(state, botId), botId)`. Taking
   the redacted view makes cheating *structurally impossible* rather than a matter of discipline. For
-  Container, `selfOf()` enforces the other half (the bot's own card must be visible). **Can't Stop hides
-  nothing**, so its view *is* the whole state and the redaction is a no-op — the shared kernel must not
-  assume redaction. **Never hand a bot more than a player's view.**
+  Container, `selfOf()` enforces the other half (the bot's own card must be visible). **Can't Stop and
+  Stone Age hide (almost) nothing**, so a view is essentially the whole state and the redaction is a
+  no-op — the shared kernel must not assume redaction. **Never hand a bot more than a player's view.**
 - **Coverage gate is 90%, not 100%** (deliberate — see `bot/vitest.config.ts`, per game). Heuristic
   weights get retuned constantly, and a 100% bar on judgement calls buys churn, not correctness. What
   must stay covered: every decision is legal, every policy reachable.
 - **Layout** mirrors the engine's conventions: Container splits opinions one-per-concern in
-  `games/container/policies/`; Can't Stop's whole risk model is `games/cantstop/policy.ts`. Barrels
-  re-export only; tests live in `games/<game>/tests/`.
+  `games/container/policies/`; Can't Stop's whole risk model and Stone Age's whole placement model each
+  live in a single `games/<game>/policy.ts`. Barrels re-export only; tests live in `games/<game>/tests/`.
 - **⚠️ Randomness the bot can't invent is injected by the caller** — Container's `collectBids` (sealed
-  opponent bids), Can't Stop's `rollDice` (server-side dice, since the bot can't roll). `decide` throws a
-  `BotError` if the caller didn't supply it. Self-play seeds it; the backend runner fills it from `ctx.rng`.
+  opponent bids), Can't Stop's and Stone Age's `rollDice` (server-side dice, since the bot can't roll).
+  `decide` throws a `BotError` if the caller didn't supply it. Self-play seeds it; the backend runner
+  fills it from `ctx.rng`.
 - **Container specifics:** `legalActions` returns 5 of 12 actions as bare *markers* `applyAction` throws
   on — completing them is `rank()`'s job and *is* the strategy; and value containers with `gainFrom`,
   never `card.values[color]` (the discard rule makes marginal value differ from face value, even negative).
+- **Stone Age specifics:** a building's score **is** the value of what you pay (`build.ts` scores
+  `paymentValue`), so building payments spend the bot's *richest* resources (`takeRichest`) while card
+  costs — a pure toll — spend its *cheapest* (`takeCheapest`). Don't collapse the two.
 - **Self-play (`playSelfPlay`) is each bot's real test** — it drives thousands of live engine actions, so
-  any illegal action throws. Keep it passing (Container 3–5 players; Can't Stop 2–4, seeded rng).
+  any illegal action throws. Keep it passing (Container 3–5 players; Can't Stop and Stone Age 2–4, seeded rng).
 - **Greedy bots cannot see multi-action payoffs.** The delivery run is 4+ actions; score long chains
   against the *goal*, not the hop, or ships never leave port (this actually happened — see ROADMAP A0).
+  Stone Age hit the same class of bug (a myopic food heuristic hunted forever); watch for it in any new bot.
 
 ### Engine module layout
 
@@ -235,7 +249,7 @@ barrel files; its public API is defined solely by its own `index.ts`, exported a
 
 ```
 engine/src/
-  kernel/             # the tiny shared kernel (both games + the backend contract use these)
+  kernel/             # the tiny shared kernel (every game + the backend contract use these)
     errors.ts         # GameError<Code> — generic base class; each game subclasses it
     moveRecord.ts     # MoveRecord (type-only)
     viewer.ts         # Viewer (type-only)
@@ -279,9 +293,9 @@ engine/src/
 
 ### Building a new game (the platform recipe)
 
-Container and Can't Stop are two registered games on one platform; a third is **additive**, touching
-no shared core. The seams are the same at every layer — engine, backend, UI — and each has an "only
-the game knows this" rule. To add a game `foo`:
+Container, Can't Stop and Stone Age are three registered games on one platform; a fourth is
+**additive**, touching no shared core. The seams are the same at every layer — engine, backend, UI —
+and each has an "only the game knows this" rule. To add a game `foo`:
 
 1. **Engine** — `engine/src/games/foo/` with the layout above; export its surface from
    `index.ts`, add `"./foo": "./src/games/foo/index.ts"` to `engine/package.json`'s `exports`, and a
@@ -328,13 +342,15 @@ the game knows this" rule. To add a game `foo`:
 - **Engine purity:** no I/O, no `Date`/`Math.random`, no mutation. Return new state; never
   mutate inputs (there's a test asserting this). All rejections throw `GameError` with a
   stable `GameErrorCode`.
-- **Action model:** all moves flow through `applyAction(state, playerId, action)` — the turn-aware
-  entry point that enforces turn order and the per-turn action budget (2), then dispatches to pure
-  mechanic functions (`produce`, `buildFactory`, `buildWarehouse`, `endTurn`). `legalActions(state)`
-  enumerates what the active player may do (drives UI enable/disable and, later, AI search). The
-  backend exposes this as `POST /games/:id/actions` with body `{ playerId, action }`; the UI imports
-  `legalActions` from the engine and computes availability client-side. Add new moves as `Action`
-  variants + a mechanic + a `legalActions` branch.
+- **Action model:** every game's moves flow through `applyAction(state, playerId, action)` — the
+  turn-aware entry point that enforces turn order and the game's own turn structure, then dispatches to
+  pure mechanic functions. *(Container's is a 2-action budget dispatching to `produce`/`buildFactory`/
+  `buildWarehouse`/`endTurn`; Can't Stop and Stone Age are instead **phase machines** — roll/select/stop,
+  and placement/actions/feeding. The entry point is common; the turn shape is per-game.)* `legalActions`
+  enumerates what a seat may do (drives UI enable/disable and the bots). The backend exposes this as
+  `POST /games/:id/actions` with body `{ playerId, action }`; the UI imports `legalActions` from the
+  engine and computes availability client-side. Add new moves as `Action` variants + a mechanic + a
+  `legalActions` branch.
 - **Error mapping:** the API maps `GameErrorCode` → HTTP (`PLAYER_NOT_FOUND` → 404,
   `INVALID_PLAYER_COUNT` → 400, other illegal-move codes like `NOT_YOUR_TURN` / `NO_ACTIONS_REMAINING`
   → 409). Add new codes in the engine, not ad-hoc strings.
@@ -408,10 +424,14 @@ game's folder. Read the relevant one before starting a phase.
 
 - **[`ROADMAP.md`](./ROADMAP.md)** — the platform: the `GameModule`/`GameClient` seams (Track C), online
   multiplayer (Track B), the per-game **bot reorg**, deploy, and the games index.
+- **[`REVIEW.md`](./REVIEW.md)** — the three-games-in architecture/practices review and its tiered
+  follow-ups (kernel extraction, CI, ops). Read it before starting hardening work.
 - **[`engine/src/games/container/ROADMAP.md`](./engine/src/games/container/ROADMAP.md)** — Container's
   vertical slices + its AI (Track A).
-- **[`engine/src/games/cantstop/ROADMAP.md`](./engine/src/games/cantstop/ROADMAP.md)** — Can't Stop: what
-  C3 shipped + the plan to finish it (a bot).
+- **[`engine/src/games/cantstop/ROADMAP.md`](./engine/src/games/cantstop/ROADMAP.md)** — Can't Stop:
+  complete (playable + its bot, CS1); only optional variants remain.
+- **[`engine/src/games/stoneage/ROADMAP.md`](./engine/src/games/stoneage/ROADMAP.md)** — Stone Age:
+  complete (SA0–SA13) — full worker-placement game, illustrated board, and a bot.
 
 We build each game as **vertical slices** (engine → API → UI → tests), not big-bang layers. Each slice
 ends green and demoable, so it's a safe stopping point (and a clean place to check plan usage between
@@ -639,16 +659,18 @@ sessions). The Container summary below is retained for context; the per-game roa
   - **UI**: a lazy Can't Stop board plugs into the same `GameClient` seam; the landing **picker**
     activates automatically now that two games are registered. All existing e2e stayed green
     (`e2e/cantstop.spec.ts` added); the two-games-side-by-side backend test is the real proof.
-  - **Deferred (fine for "simple"):** no Can't Stop AI, and the board is functional-not-fancy (no
-    original art like Slice 8). Both are additive later. **Next: C4** could be a Can't Stop bot, or a
-    third game to test the "extract when a shape is common" rule.
+  - **Since shipped (both the deferrals are done):** Can't Stop got its bot (CS1) and art/a11y polish
+    (CS2), and a **third game — Stone Age (SA0–SA13)** — was added end to end (engine, backend, UI,
+    illustrated board, bot), exercising the "extract when a shape is common" rule for real. See each
+    game's ROADMAP and **[`REVIEW.md`](./REVIEW.md)** for the resulting kernel-extraction follow-up.
 - **Track B — online multiplayer:** independent track. The authoritative, serializable engine makes all
   of these additive (see `ROADMAP.md`).
 
 ## Decisions & assumptions log
 
-- **v1 is local hotseat / pass-and-play** (one screen). Online multiplayer and AI are future
-  roadmap items. Revisit before Phase 4 if priorities change.
+- **v1 was local hotseat / pass-and-play** (one screen). Both original "future" items have since
+  **shipped**: online multiplayer (Track B — lobbies, live sync, seat identity, resume) and AI (Track A
+  for Container; CS1/SA12 for the other two). Hotseat still works and its testids are kept intact.
 - **Container colors:** `white, red, green, blue, yellow` (from rulebook scoring cards).
 - **"Player on your right"** (Produce union wage) is modeled as the **next seat index**
   `(seat + 1) % n`. Confirm against physical table convention if it ever matters for scoring.
@@ -665,8 +687,10 @@ sessions). The Container summary below is retained for context; the per-game roa
 - **Package manager is pnpm** (corepack couldn't symlink into `/usr/local/bin`; pnpm was
   installed via Homebrew). Native `better-sqlite3` and `esbuild` builds are allow-listed in
   `pnpm-workspace.yaml`.
-- **Slice scope:** the engine currently models only the factory district (what Produce needs).
-  `types.ts` calls out what's deferred to Phase 2.
+- **Container is fully modelled** — factory + harbor districts, ships, the trade chain, delivery
+  auctions, the Off-Shore Bank, and final scoring (the "factory district only" note from Slice 0 is long
+  obsolete). All three games are feature-complete; remaining work is platform hardening (see `REVIEW.md`),
+  not core mechanics.
 
 ## Working agreement for Claude
 

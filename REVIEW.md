@@ -28,9 +28,26 @@ That's a high floor. Two things qualify it:
 
 ---
 
-## Tier 1 — Live bugs
+## Progress
 
-### 1.1 A throwing bot permanently 500s a game, on the read path
+- [x] **Tier 1 — live bugs** (1.1–1.5) — done, commit `1c11157`
+- [x] **Documentation drift** — done: Stone Age is first-class throughout CLAUDE.md; the Can't Stop
+  bot and the fired "extract on the third game" rule are recorded; the stale Decisions-log entries are
+  corrected.
+- [~] **Tier 2 — CI + inverted risk allocation** — partial:
+  - [x] 2.3 backend coverage gate
+  - [x] 2.4 SPA-fallback test
+  - [ ] 2.1 CI pipeline — **deferred** (owner is planning the CI/CD + docker.io push separately)
+  - [ ] 2.2 Linux visual baselines — **deferred with 2.1** (coupled to the CI-container choice)
+- [ ] **Tier 3 — kernel/board/bot extraction** (do before game 4)
+- [ ] **Tier 4 — ops hardening**
+- [ ] **Tier 5 — worth knowing**
+
+---
+
+## Tier 1 — Live bugs ✅ (done — commit `1c11157`)
+
+### 1.1 A throwing bot permanently 500s a game, on the read path ✅
 
 `tick()` (`backend/src/app.ts`) has no `try`/`catch`, and it runs on `GET /games/:id` and on WS
 subscribe, not just on mutations. A `BotError` is not a module domain error, so `mapError` returns
@@ -48,7 +65,7 @@ the coupling that breaks silently on a rules change.
 **Fix:** contain the error in `tick()`. A bot that can't decide should stall its own seat, not take
 down reads of the game.
 
-### 1.2 Stone Age mechanics take `playerId` but act on `activePlayerIndex`
+### 1.2 Stone Age mechanics take `playerId` but act on `activePlayerIndex` ✅
 
 Five of Stone Age's seven mechanics (`feed`, `use`, `take`, `build`, `acquireCard`) resolve the seat
 from `state.activePlayerIndex` rather than from the `playerId` argument. Container does the opposite
@@ -62,7 +79,7 @@ precisely the class of bug the append-only log exists to catch.
 **Fix:** use `seatOf(state, playerId)` in all five, matching Container. Turns latent silent
 corruption into a `PLAYER_NOT_FOUND` / `NOT_YOUR_TURN` throw.
 
-### 1.3 The Stone Age bot pays for buildings with its lowest-value resources
+### 1.3 The Stone Age bot pays for buildings with its lowest-value resources ✅
 
 Building points **are** `paymentValue` (wood 3, brick 4, stone 5, gold 6), while an unspent resource
 is worth 1 point at game end. So spending gold on a building converts 1 pt → 6 pts; wood, 1 pt → 3.
@@ -77,7 +94,7 @@ helper, two call sites, opposite correct answers.
 
 **Fix:** split into `takeCheapest` (cards, tolls) and `takeRichest` (building payments).
 
-### 1.4 `MAX_STEPS` exhaustion is silent in production, loud only in self-play
+### 1.4 `MAX_STEPS` exhaustion is silent in production, loud only in self-play ✅
 
 All three bot runners cap iterations and then fall out of the loop with no signal. Self-play **throws**
 on the same condition ("a policy is cycling"). The production path is the one that swallows it.
@@ -88,7 +105,7 @@ normal 200. A self-inflicted DoS with no log line.
 
 **Fix:** log loudly on exhaustion. (Hoisting the loop, §3.4, then puts this in one place.)
 
-### 1.5 Two test gaps that hide deploy-breaking regressions
+### 1.5 Two test gaps that hide deploy-breaking regressions ✅
 
 - **The `game_type` migration is unasserted.** `abandon.test.ts` does genuinely good work — it builds
   a real pre-column database on disk and reopens it — but the legacy DDL omits *both* added columns
@@ -99,9 +116,9 @@ normal 200. A self-inflicted DoS with no log line.
 
 ---
 
-## Tier 2 — No CI, and inverted risk allocation
+## Tier 2 — No CI, and inverted risk allocation ◐ (test-infra done; CI deferred)
 
-### 2.1 There is no CI. `.github` does not exist
+### 2.1 There is no CI. `.github` does not exist ⏸️ Deferred (owner planning CI/CD + docker.io separately)
 
 This is the top *process* finding, because every gate in this repo is voluntary — the 100% engine
 gate only fires if someone remembers to run it locally, on a clean tree.
@@ -113,7 +130,12 @@ Recommended pipeline (push + PR, Node 22 to match `.nvmrc`/`Dockerfile`): `typec
 `test:e2e` (with `playwright install --with-deps chromium`) → `docker build`. Keep thresholds where
 they are, in each package's vitest config; CI should *run* the gates, not redefine them.
 
-### 2.2 The visual spec is guaranteed-red on Linux
+### 2.2 The visual spec is guaranteed-red on Linux ⏸️ Deferred with 2.1
+
+> **Why deferred, not fixed now:** the proper fix is to generate baselines in the CI Playwright
+> container (`mcr.microsoft.com/playwright:…-jammy`) and commit them next to the `-darwin` set — a
+> decision that belongs with the CI-container choice. Generating them on this bare-Linux dev box risks
+> baselines that then fail in a differently-rendered CI container. Do it as the first step of the CI work.
 
 Verified: full e2e is **110 passed, 2 failed, 52.7s**, no flakes at `workers: 4`. Both failures are
 `visual.spec.ts` — only `-darwin` baselines are committed, and Playwright keys snapshots on
@@ -123,7 +145,12 @@ but the original Mac and will be born red in CI.
 Fix properly by generating Linux baselines in the Playwright container image and committing both.
 Cheap interim: skip when `process.platform !== 'darwin'` so it isn't a false red.
 
-### 2.3 The backend has no coverage gate — and coverage can't be measured
+### 2.3 The backend has no coverage gate — and coverage can't be measured ✅
+
+> **Done.** Added `@vitest/coverage-v8` to the backend, switched its `test` script to
+> `vitest run --coverage`, and set an honest floor in `backend/vitest.config.ts` (statements 94 /
+> branches 83 / functions 92 / lines 94 — just under the measured 96.5 / 85.8 / 94.8 / 96.5), excluding
+> the type-only `games/module.ts` contract and the `server.ts` bootstrap. Ratchet up, never down.
 
 `backend/vitest.config.ts` has no `coverage` key, the script is a bare `vitest run`, and
 `@vitest/coverage-v8` is a devDependency of **engine and bot only**.
@@ -133,7 +160,13 @@ which owns all I/O, migrations, the WS transport, error mapping, and the viewer/
 is held to nothing and has never been measured. The strong engine number creates a false impression
 of coverage over the layer where the real hazards live.
 
-### 2.4 The production-only serving path is executed by nothing
+### 2.4 The production-only serving path is executed by nothing ✅
+
+> **Done.** `backend/src/tests/staticServing.test.ts` boots `buildApp({ db, staticDir })` against a
+> fixture UI dir and pins the contract: unknown non-API GETs return `index.html`; every allowlisted API
+> prefix (`/games`, `/lobbies`, `/health`) stays JSON — an unknown game is a JSON 404, not the SPA shell;
+> a non-GET unknown route is a JSON 404. A dropped allowlist entry now fails a test instead of silently
+> returning HTML with a 200.
 
 `staticDir`/`UI_DIST` appear nowhere in the backend tests. That path runs only in the Docker image;
 Playwright runs against the **Vite dev server with an `/api` proxy**, the opposite configuration.
@@ -372,7 +405,16 @@ parameterized. Real gaps:
 
 ---
 
-## Documentation drift
+## Documentation drift ✅
+
+> **Done.** CLAUDE.md now treats Stone Age as a first-class third game throughout (architecture tree,
+> the `GameModule`/`GameClient` seams, engine subpaths + Vite aliases, the bot package, and the
+> "building a new game" recipe). Corrected stale claims: Can't Stop has a bot (CS1); the "extract when a
+> third game makes it common" note records that the rule has fired (record()/seat helpers) and points
+> here; the action-model convention no longer implies Container's 2-action budget is universal; and the
+> Decisions log reflects that online multiplayer and AI both shipped. Stone Age mentions went 1 → 22.
+> The embedded ⚠️ working-rules in the roadmap history were **kept in CLAUDE.md** (load-bearing); a
+> fuller relocation of pure history into ROADMAP.md remains available as an optional follow-up.
 
 CLAUDE.md is 678 lines and mentions Can't Stop 32 times and **Stone Age once**. It still states that
 Can't Stop has no AI (CS1 shipped one), and the "GameClient seam", "bot package" and "Building a new
