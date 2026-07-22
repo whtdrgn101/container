@@ -1,4 +1,5 @@
-import { PHASES, effectiveCost, handCost, handLimit } from '@game-hub/engine/stpetersburg';
+import { useState } from 'react';
+import { PHASES, displacementCost, effectiveCost, handCost, handLimit, legalDisplaceTargets } from '@game-hub/engine/stpetersburg';
 import type { Card, CardKind, Phase, PlayerView, StPetersburgView } from '@game-hub/engine/stpetersburg';
 import { Button } from '@/components/ui/button';
 import { ActivityFeed } from '@/components/ActivityFeed';
@@ -153,22 +154,36 @@ function PlayerPanel({
   );
 }
 
+/** A candidate displacement: an owned card to discard and what the trading card then costs (pg. 7). */
+type TradeOption = { readonly target: Card; readonly cost: number };
+
+/** The displacement targets `tradingCard` can afford from `player`'s play area (pg. 7), each with its cost. */
+function tradeOptions(player: PlayerView, tradingCard: Card, fromRow?: 'upper' | 'lower'): TradeOption[] {
+  if (player.rubles === null) return [];
+  return legalDisplaceTargets(player, tradingCard)
+    .map((target) => ({ target, cost: displacementCost(player, tradingCard, target, fromRow) }))
+    .filter((o) => o.cost <= player.rubles!);
+}
+
 /**
  * The viewer's own hidden hand (pg. 3), rendered as playable cards. Only the active driving seat can play
- * (`playable`); an own but off-turn seat still sees its cards, greyed. A **trading** card can be *held*
- * but not *played* until displacement exists (SP4), so it shows a disabled "needs SP4" state. Effective
- * play cost is shown (printed struck through when reductions apply) — the same `handCost` the engine charges.
+ * (`playable`); an own but off-turn seat still sees its cards, greyed. A **trading** card is played by
+ * *displacing* a card you own (SP4, pg. 7): clicking it opens the displacement picker (or acts at once when
+ * there is a single legal target). Effective cost is shown (printed struck through when reduced), and a
+ * trading card with nothing legal to displace stays disabled.
  */
 function HandSection({
   player,
   playable,
   busy,
   onPlay,
+  onTrade,
 }: {
   player: PlayerView;
   playable: boolean;
   busy: boolean;
   onPlay: (index: number) => void;
+  onTrade: (card: Card, index: number, options: TradeOption[]) => void;
 }) {
   const hand = player.hand ?? [];
   return (
@@ -182,11 +197,15 @@ function HandSection({
         ) : (
           hand.map((card, index) => {
             const trading = card.kind === 'trading';
-            const cost = handCost(player, card);
+            const options = trading ? tradeOptions(player, card) : [];
+            // A trading card's shown price is the cheapest affordable displacement; a plain card its hand cost.
+            const cost = trading ? (options.length ? Math.min(...options.map((o) => o.cost)) : card.cost) : handCost(player, card);
             const reduced = cost !== card.cost;
-            const canPlay = playable && !trading && player.rubles !== null && player.rubles >= cost;
+            const canPlay = playable && (trading ? options.length > 0 : player.rubles !== null && player.rubles >= cost);
             const title = trading
-              ? `${card.name} — trading cards can't be played yet (needs SP4)`
+              ? options.length
+                ? `${card.name} — upgrade by displacing a card you own (from ${cost}₽)`
+                : `${card.name} — no card of yours to displace, or you can't afford it (pg. 7)`
               : `${card.name} — play for ${cost}${reduced ? ` (was ${card.cost})` : ''}`;
             return (
               <button
@@ -202,14 +221,14 @@ function HandSection({
                 )}
                 title={title}
                 disabled={!canPlay || busy}
-                onClick={() => onPlay(index)}
+                onClick={() => (trading ? onTrade(card, index, options) : onPlay(index))}
               >
                 <span className="self-start rounded bg-background/70 px-1 font-semibold tabular-nums">
                   {reduced ? <s className="mr-0.5 opacity-50">{card.cost}</s> : null}
                   {cost}
                 </span>
                 <span className="text-center font-medium leading-tight">{card.name}</span>
-                <span className="self-end text-[9px] text-muted-foreground">{trading ? 'needs SP4' : 'play'}</span>
+                <span className="self-end text-[9px] text-muted-foreground">{trading ? 'upgrade' : 'play'}</span>
               </button>
             );
           })
@@ -222,10 +241,12 @@ function HandSection({
 /**
  * Saint Petersburg's board — the whole game as one plugin the shell renders (roadmap SP1).
  *
- * Interactive for the phase spine: the active driving seat clicks an affordable card in either row to buy
- * it (effective cost shown, printed cost struck through when reduced), or presses Pass. Everything Saint
- * Petersburg knows lives at or below this file; the shell hands it an opaque state it never reads, pinned
- * back to `StPetersburgView` here. `ADD_TO_HAND` / `PLAY_FROM_HAND` and the trading cards land in SP3–SP4.
+ * Interactive across the whole game: the active driving seat clicks an affordable card in either row to
+ * buy it (effective cost shown, printed cost struck through when reduced), takes a card into hand (free),
+ * plays from its hand, or presses Pass. A **trading** card is bought/played by *displacing* a card you own
+ * (SP4, pg. 7) — click it to pick which card to discard (a single legal target acts at once). Everything
+ * Saint Petersburg knows lives at or below this file; the shell hands it an opaque state it never reads,
+ * pinned back to `StPetersburgView` here.
  */
 export default function StPetersburgBoard({
   gameId,
@@ -245,26 +266,44 @@ export default function StPetersburgBoard({
     controlledIds,
   });
 
+  // An open displacement picker (pg. 7): the trading card being bought/played, and how each candidate
+  // target resolves to a `BUY`/`PLAY_FROM_HAND`. Shown when a trading card has more than one legal target.
+  const [picker, setPicker] = useState<{ title: string; options: TradeOption[]; act: (targetId: string) => void } | null>(null);
+
   // Which phases each seat opens next (its starting-player markers, pg. 5) — indexed by seat.
   const markersFor = (seatIndex: number): Phase[] => PHASES.filter((phase) => game.startingPlayers[phase] === seatIndex);
 
   const run = (work: () => Promise<spApi.StPetersburgPayload>) => guard(async () => onPayload(await work()));
-  const doBuy = (row: 'upper' | 'lower', index: number) => {
+  const doBuy = (row: 'upper' | 'lower', index: number, displace?: string) => {
     if (!canDrive || !active) return;
-    void run(() => spApi.act(gameId, active.id, { type: 'BUY', row, index }, viewer));
+    setPicker(null);
+    void run(() => spApi.act(gameId, active.id, { type: 'BUY', row, index, ...(displace ? { displace } : {}) }, viewer));
   };
   const doAdd = (row: 'upper' | 'lower', index: number) => {
     if (!canDrive || !active) return;
     void run(() => spApi.act(gameId, active.id, { type: 'ADD_TO_HAND', row, index }, viewer));
   };
-  const doPlay = (index: number) => {
+  const doPlay = (index: number, displace?: string) => {
     if (!canDrive || !active) return;
-    void run(() => spApi.act(gameId, active.id, { type: 'PLAY_FROM_HAND', index }, viewer));
+    setPicker(null);
+    void run(() => spApi.act(gameId, active.id, { type: 'PLAY_FROM_HAND', index, ...(displace ? { displace } : {}) }, viewer));
   };
   const doPass = () => {
     if (!canDrive || !active) return;
     void run(() => spApi.act(gameId, active.id, { type: 'PASS' }, viewer));
   };
+
+  // Buy/play a trading card by displacement (pg. 7): with a single legal target act at once, otherwise open
+  // the picker so the driver chooses which card of theirs to discard.
+  const startTrade = (title: string, options: TradeOption[], act: (targetId: string) => void) => {
+    if (options.length === 0) return;
+    if (options.length === 1) act(options[0]!.target.id);
+    else setPicker({ title, options, act });
+  };
+  const startRowTrade = (card: Card, row: 'upper' | 'lower', index: number, options: TradeOption[]) =>
+    startTrade(`Upgrade to ${card.name} — choose a card to displace`, options, (targetId) => doBuy(row, index, targetId));
+  const startHandTrade = (card: Card, index: number, options: TradeOption[]) =>
+    startTrade(`Play ${card.name} — choose a card to displace`, options, (targetId) => doPlay(index, targetId));
 
   // The active driving seat may add ANY row card to its hand (free, pg. 3) while under the hand limit.
   const canAddToHand = canDrive && !!active && active.handCount < handLimit(active);
@@ -280,13 +319,23 @@ export default function StPetersburgBoard({
 
   const renderRow = (row: 'upper' | 'lower') =>
     game.board[row].map((card, index) => {
-      const affordableCost = buyableCost(card, row);
+      const trading = card.kind === 'trading';
+      // A trading card is bought by displacement (pg. 7): its options + cheapest affordable price.
+      const rowTradeOpts = trading && canDrive && active ? tradeOptions(active, card, row) : [];
+      const tradingCost = rowTradeOpts.length ? Math.min(...rowTradeOpts.map((o) => o.cost)) : undefined;
+      const affordableCost = trading ? tradingCost : buyableCost(card, row);
+      const onBuy =
+        affordableCost === undefined
+          ? undefined
+          : trading
+            ? () => startRowTrade(card, row, index, rowTradeOpts)
+            : () => doBuy(row, index);
       return (
         <div key={card.id} className="flex shrink-0 flex-col gap-1">
           <CardTile
             card={card}
-            effective={costOf(card, row)}
-            onBuy={affordableCost !== undefined ? () => doBuy(row, index) : undefined}
+            effective={trading ? (affordableCost ?? card.cost) : costOf(card, row)}
+            onBuy={onBuy}
             disabled={busy}
           />
           {canAddToHand ? (
@@ -324,6 +373,36 @@ export default function StPetersburgBoard({
           {game.phase} phase · {active?.name ?? '—'}
         </span>
       </TurnBanner>
+
+      {/* Displacement picker (pg. 7): a trading card with more than one legal target to displace. */}
+      {picker ? (
+        <div data-testid="sp-displace-picker" className="rounded-lg border border-primary bg-primary/5 p-3">
+          <div className="mb-2 text-sm font-medium">{picker.title}</div>
+          <div className="flex flex-wrap gap-2">
+            {picker.options.map(({ target, cost }) => (
+              <button
+                key={target.id}
+                type="button"
+                data-testid={`sp-displace-${target.id}`}
+                className="rounded border bg-card px-2 py-1 text-xs transition hover:ring-2 hover:ring-primary focus-visible:ring-2 focus-visible:ring-primary"
+                title={`Displace ${target.name} — pay ${cost}₽`}
+                disabled={busy}
+                onClick={() => picker.act(target.id)}
+              >
+                <span className="font-medium">{target.name}</span> · <span className="tabular-nums">{cost}₽</span>
+              </button>
+            ))}
+            <button
+              type="button"
+              data-testid="sp-displace-cancel"
+              className="rounded border px-2 py-1 text-xs text-muted-foreground transition hover:text-foreground"
+              onClick={() => setPicker(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Phase track — which of the four phases is in progress (pg. 2). */}
       <div className="flex flex-wrap gap-2 text-xs" role="group" aria-label="Phase order">
@@ -396,7 +475,14 @@ export default function StPetersburgBoard({
       {/* The viewer's own hidden hand (pg. 3) — playable cards. Opponents' hands show only as a face-down
           count on their panel below. */}
       {ownHands.map((player) => (
-        <HandSection key={player.id} player={player} playable={canDrive && player.id === active?.id} busy={busy} onPlay={doPlay} />
+        <HandSection
+          key={player.id}
+          player={player}
+          playable={canDrive && player.id === active?.id}
+          busy={busy}
+          onPlay={doPlay}
+          onTrade={startHandTrade}
+        />
       ))}
 
       {/* Players — rubles are the game's secret, so opponents show a lock, not a number. */}
@@ -418,7 +504,8 @@ export default function StPetersburgBoard({
         botIds={bots}
         describe={(entry) => {
           if (entry.type === 'BUY') {
-            const p = entry.payload as { cardName?: string; cost?: number } | undefined;
+            const p = entry.payload as { cardName?: string; cost?: number; displacedName?: string } | undefined;
+            if (p?.displacedName) return `upgraded the ${p.displacedName} to the ${p.cardName} (${p.cost}₽)`;
             return p ? `bought the ${p.cardName} for ${p.cost}₽` : 'bought a card';
           }
           if (entry.type === 'ADD_TO_HAND') {
@@ -428,7 +515,8 @@ export default function StPetersburgBoard({
             return p?.cardName ? `took the ${p.cardName} into hand` : 'took a card into hand';
           }
           if (entry.type === 'PLAY_FROM_HAND') {
-            const p = entry.payload as { cardName?: string; cost?: number } | undefined;
+            const p = entry.payload as { cardName?: string; cost?: number; displacedName?: string } | undefined;
+            if (p?.displacedName) return `upgraded the ${p.displacedName} to the ${p.cardName} from hand (${p.cost}₽)`;
             return p ? `played the ${p.cardName} from hand for ${p.cost}₽` : 'played a card from hand';
           }
           if (entry.type === 'PASS') {

@@ -123,6 +123,37 @@ export interface StPetersburgResult {
 }
 
 /**
+ * The **Observatory** draw interlude (pg. 8, SP5). A player who owns an unflipped Observatory may, once
+ * per round during the building phase, draw the top card of a chosen stack **instead of a normal action**;
+ * it lands here as a forced follow-up decision (buy / hand / discard), locking the drawing seat's turn
+ * exactly like Stone Age's `pendingGather`. The `card` is drawn from a stack (otherwise a *secret*, pg. 2),
+ * but the observatory draw happens openly at the table — like a hand *take* (SP3), the card is **public
+ * the moment it's drawn** — so `viewFor` reveals it (documented in `view.ts` / `actions/observatory.ts`).
+ */
+export interface PendingDraw {
+  /** Seat index of the Observatory's owner (the only seat that may resolve this). */
+  readonly seat: number;
+  /** Which stack the top card came from (pg. 8: "the stack of his choice"). */
+  readonly stack: CardKind;
+  /** The drawn card — public (revealed by `viewFor`, never redacted; see above). */
+  readonly card: Card;
+  /** The instance id of the Observatory that drew — flipped (scored 0) once this resolves. */
+  readonly observatoryId: string;
+}
+
+/**
+ * The **Pub** decision window (pg. 8, SP5). *Immediately after* the building phase scores, every seat
+ * owning at least one Pub may buy up to 5 victory points at 2 rubles each. It is modelled as an interlude:
+ * the building phase's actions have ended and scoring has run, but the phase does **not** advance (no
+ * refill, no next phase) until each queued Pub owner has taken a `PUB_BUY` (0 points = decline). The head
+ * of the queue is the seat on the clock (`activePlayerIndex`); the phase advances when the queue empties.
+ */
+export interface PendingPubBuy {
+  /** Seat indices owning a Pub, not yet resolved, in ascending seat order. The head is up. */
+  readonly queue: readonly number[];
+}
+
+/**
  * The complete, serializable state of a Saint Petersburg game — the **bootstrap scaffold** (roadmap SP0).
  *
  * Everything a setup needs to *render* is here; the game is intentionally inert until each action lands
@@ -163,6 +194,24 @@ export type StPetersburgState = {
    * interaction.
    */
   readonly tookCardThisPhase: boolean;
+  /**
+   * Instance ids of **Observatory** cards flipped (used) this round (pg. 8, SP5). A flipped Observatory
+   * scores 0 points at building scoring and may not be upgraded (displaced) while flipped. Reset to `[]`
+   * at the round transition ("to begin the next round, he turns it face-up"). Empty when no Observatory
+   * has been used.
+   */
+  readonly observatoryUsed: readonly string[];
+  /**
+   * A rolled-but-unresolved Observatory draw (pg. 8, SP5), or absent. While present the drawing seat's
+   * turn is **locked**: the only legal move is `OBSERVATORY_RESOLVE` (buy / hand / discard), the same way
+   * `pendingGather` locks a Stone Age turn.
+   */
+  readonly pendingDraw?: PendingDraw;
+  /**
+   * The **Pub** buy-points interlude after building scoring (pg. 8, SP5), or absent. While present the
+   * building phase is paused: the queued Pub owner on the clock must take a `PUB_BUY` before anything else.
+   */
+  readonly pendingPubBuy?: PendingPubBuy;
   readonly version: number;
   readonly log: readonly MoveRecord[];
 } & GameEndState<StPetersburgResult>;

@@ -29,18 +29,38 @@ export const BOARD_SIZE = 8;
 /** A card must always cost at least 1 ruble, even after reductions (pg. 6). */
 export const MIN_CARD_COST = 1;
 
-/** A player may hold at most **3 cards** in hand (pg. 3). The Warehouse raises its owner's limit to 4 (SP5). */
+/** A player may hold at most **3 cards** in hand (pg. 3). The Warehouse raises its owner's limit to 4. */
 export const HAND_LIMIT = 3;
+
+/** The **Warehouse** (pg. 8: "The player can have up to 4 cards in his hand") raises its owner's limit. */
+export const WAREHOUSE_HAND_LIMIT = 4;
 
 /**
  * The most cards `player` may hold in hand right now (pg. 3: "at most 3 cards"). A **function, not a bare
- * constant**, so SP5's **Warehouse** — which raises *its owner's* limit to 4 (pg. 8) — has a seam to hook
- * without touching the callers (`addToHand`, `legalActions`). At SP3 nothing changes the limit, so it
- * always returns `HAND_LIMIT`; the `PlayArea` parameter is the seam the warehouse check will read.
+ * constant**, so the **Warehouse** — which raises *its owner's* limit to 4 (pg. 8, SP5) — is a seam the
+ * callers (`addToHand`, `legalActions`) read without change.
+ *
+ * **Warehouse ruling (pg. 8, documented):** the limit is read from the *current* play area, so it drops
+ * back to 3 the instant a Warehouse leaves play (displaced by a blue trading card). This is **not** a
+ * forced discard — `addToHand` only refuses an *add* while at/over the limit, so a player holding 4 when
+ * their Warehouse is displaced simply cannot ADD again until they play a card back under 3. Nothing forces
+ * them to shed the extra card (there is no rule that does), matching the sheet, which grants an *upper
+ * bound* on adds, not a hand-size that must be maintained.
  */
-export function handLimit(_player: { readonly playArea: PlayArea }): number {
-  return HAND_LIMIT;
+export function handLimit(player: { readonly playArea: PlayArea }): number {
+  return player.playArea.building.some((c) => c.special === 'warehouse') ? WAREHOUSE_HAND_LIMIT : HAND_LIMIT;
 }
+
+/** **Pub** (pg. 8): a player may buy up to 5 points, each costing 2 rubles, after building scoring. */
+export const PUB_MAX_POINTS = 5;
+export const PUB_POINT_COST = 2;
+
+/**
+ * **Potjomkin's Village** displacement value (pg. 8, SP5). Its printed *buy* cost is 2 (an ordinary blue
+ * building, reducible/min-1 like any card), but "if he displaces the card with a trading card, it is worth
+ * **6 rubles**" — so a trading card upgrading a Potjomkin computes its difference against 6, not 2.
+ */
+export const POTEMKIN_DISPLACE_VALUE = 6;
 
 /** Aristocrat final-scoring table, indexed by count of *distinct* aristocrats (pg. 5–6). */
 export const ARISTOCRAT_SCORE: readonly number[] = [0, 1, 3, 6, 10, 15, 21, 28, 36, 45, 55];

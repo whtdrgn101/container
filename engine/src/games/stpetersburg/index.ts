@@ -48,7 +48,9 @@ export type { CreateGameOptions, NewPlayer } from './createGame';
 export { viewFor } from './view';
 export type { BoardView, PlayerView, StPetersburgView, Viewer } from './view';
 
-// Mechanics + turn-aware entry point. `effectiveCost`/`handCost`/`costReductions` are exported so the UI
-// can show a card's real price (printed cost struck through when reductions apply) with the exact rule the
-// buy / hand-play charges.
-export { addToHand, applyAction, buy, costReductions, effectiveCost, handCost, legalActions, pass, playFromHand } from './actions';
+// Mechanics + turn-aware entry point. `effectiveCost`/`handCost`/`costReductions`/`displacementCost` are
+// exported so the UI can show a card's real price (printed cost struck through when reductions apply, and
+// the trading-card difference math) with the exact rule the buy / hand-play charges. `legalDisplaceTargets`
+// lets the UI build a trading card's displacement picker (pg. 7).
+export { addToHand, applyAction, buy, costReductions, displacementCost, effectiveCost, handCost, legalActions, pass, playFromHand } from './actions';
+export { legalDisplaceTargets } from './internal';

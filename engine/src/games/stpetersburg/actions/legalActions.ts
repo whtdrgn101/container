@@ -1,16 +1,16 @@
 import type { StPetersburgState } from '../core';
 import { handLimit } from '../core';
-import { seatOf } from '../internal';
+import { legalDisplaceTargets, seatOf } from '../internal';
 import type { Action } from './action';
-import { effectiveCost, handCost } from './buy';
+import { displacementCost, effectiveCost, handCost } from './buy';
 
 /**
- * The actions a seat may legally take right now (roadmap SP1–SP3): `PASS` (always, on your turn); a `BUY`
- * for every non-trading row card the seat can afford; an `ADD_TO_HAND` for **every** row card while the
- * hand isn't full (free, so no affordability check — and trading cards *are* addable, see `addToHand`);
- * and a `PLAY_FROM_HAND` for every affordable non-trading card in the seat's **own hand**. Trading cards
- * are omitted from buys/plays — those need displacement (pg. 7), which lands in SP4. Drives the UI's
- * affordances and — later — the bot.
+ * The actions a seat may legally take right now (roadmap SP1–SP4): `PASS` (always, on your turn); a `BUY`
+ * for every affordable row card — a plain buy for a non-trading card, or **one buy per legal displacement
+ * target** for a trading card (pg. 7); an `ADD_TO_HAND` for **every** row card while the hand isn't full
+ * (free, so no affordability check — and trading cards *are* addable, see `addToHand`); and a
+ * `PLAY_FROM_HAND` for every affordable card in the seat's **own hand** (again, one per target for a
+ * trading card). Drives the UI's affordances and — later — the bot.
  *
  * **It reads only own-seat knowledge**, so it never leaks hidden info: affordability uses the seat's own
  * rubles (its own secret), its play area (public), and its **own hand** (the only hand it may read).
@@ -29,15 +29,28 @@ export function legalActions(state: StPetersburgState, playerId?: string): Actio
   const canAdd = player.hand.length < handLimit(player);
   for (const row of ['upper', 'lower'] as const) {
     state.board[row].forEach((card, index) => {
-      if (card.kind !== 'trading' && player.rubles >= effectiveCost(player, card, row)) {
-        actions.push({ type: 'BUY', row, index }); // not buyable if trading (SP4)
+      if (card.kind === 'trading') {
+        // A trading card is buyable once per legal displacement target the seat can afford (pg. 7).
+        for (const target of legalDisplaceTargets(player, card)) {
+          if (player.rubles >= displacementCost(player, card, target, row)) {
+            actions.push({ type: 'BUY', row, index, displace: target.id });
+          }
+        }
+      } else if (player.rubles >= effectiveCost(player, card, row)) {
+        actions.push({ type: 'BUY', row, index });
       }
       if (canAdd) actions.push({ type: 'ADD_TO_HAND', row, index }); // free; any card, trading included
     });
   }
-  // PLAY_FROM_HAND — own hand only. Trading cards can't be played until displacement exists (SP4).
+  // PLAY_FROM_HAND — own hand only. A trading card is playable once per affordable displacement target.
   player.hand.forEach((card, index) => {
-    if (card.kind !== 'trading' && player.rubles >= handCost(player, card)) {
+    if (card.kind === 'trading') {
+      for (const target of legalDisplaceTargets(player, card)) {
+        if (player.rubles >= displacementCost(player, card, target, undefined)) {
+          actions.push({ type: 'PLAY_FROM_HAND', index, displace: target.id });
+        }
+      }
+    } else if (player.rubles >= handCost(player, card)) {
       actions.push({ type: 'PLAY_FROM_HAND', index });
     }
   });

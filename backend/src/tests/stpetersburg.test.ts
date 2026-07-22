@@ -1,12 +1,43 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { GameError } from '@game-hub/engine/stpetersburg';
+import { GameError, legalActions } from '@game-hub/engine/stpetersburg';
+import type { Action, Card, StPetersburgState } from '@game-hub/engine/stpetersburg';
 import { buildApp } from '../app';
 import { createDatabase } from '../db';
 import type { DB } from '../db';
 import { mapStPetersburgError } from '../games/stpetersburg/errors';
 
 type WsClient = Awaited<ReturnType<FastifyInstance['injectWS']>>;
+
+/** A small deterministic PRNG (mulberry32) so a seeded game's whole deck order is reproducible. */
+function makeRng(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** The active-seat's own view shape the SP4 displacement driver reads (its own rubles + play areas). */
+interface DriveView {
+  readonly players: readonly {
+    readonly id: string;
+    readonly rubles: number | null;
+    readonly playArea: { readonly worker: readonly Card[]; readonly building: readonly Card[]; readonly aristocrat: readonly Card[] };
+  }[];
+  readonly board: { readonly discard: number };
+  readonly activePlayerIndex: number;
+  readonly log: readonly unknown[];
+}
+
+/** Every face-up card in a seat's play area (all three groups), for the displacement assertions. */
+function playAreaCards(g: DriveView, seat: string): readonly Card[] {
+  const p = g.players.find((pl) => pl.id === seat)!;
+  return [...p.playArea.worker, ...p.playArea.building, ...p.playArea.aristocrat];
+}
 
 /** Pull-based reader over an injected WebSocket: `next()` resolves with the next JSON message. */
 function reader(socket: WsClient): () => Promise<{ type: string; game: PlayerViewShape }> {
@@ -49,12 +80,13 @@ interface PlayerViewShapeFull {
 }
 
 /**
- * Saint Petersburg bootstrap (roadmap SP0) over REST + WS — the platform proof that a **fourth** game
- * registers and renders, coexisting with Container, Can't Stop and Stone Age. It has no playable actions
- * yet (each lands in its own slice), so `/actions` is refused; the interest is that redaction (opponents'
- * rubles + hands, and the draw-stack contents) holds on every response path from day one.
+ * Saint Petersburg over REST + WS — the platform proof that a **fourth** game registers and plays,
+ * coexisting with Container, Can't Stop and Stone Age. The phase spine (BUY/PASS), the hidden hand
+ * (ADD_TO_HAND/PLAY_FROM_HAND) and the trading-card displacement (SP4) all flow through `/actions`; the
+ * standing interest is that redaction (opponents' rubles + hands, and the draw-stack contents) holds on
+ * every response path from day one.
  */
-describe('Saint Petersburg bootstrap', () => {
+describe('Saint Petersburg', () => {
   let db: DB;
   let app: FastifyInstance;
 
@@ -323,6 +355,88 @@ describe('Saint Petersburg bootstrap', () => {
     expect(overflow.json().error.code).toBe('HAND_FULL');
   });
 
+  it('rejects a displacement target on a non-trading card with 409 DISPLACE_NOT_ALLOWED (SP4)', async () => {
+    const id = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game.id as string;
+    // The opening upper row is all workers (non-trading); a displacement target on one is refused.
+    const start = (await app.inject({ method: 'GET', url: `/games/${id}?viewer=p1` })).json().game as HandView;
+    const seat = start.players[start.activePlayerIndex]!.id;
+    const res = await app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions?viewer=${seat}`,
+      payload: { playerId: seat, action: { type: 'BUY', row: 'upper', index: 0, displace: 'anything' } },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error.code).toBe('DISPLACE_NOT_ALLOWED');
+  });
+
+  it('validates the displace field shape (parseAction — must be a string when present)', async () => {
+    const id = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game.id as string;
+    const res = await app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions?viewer=p1`,
+      payload: { playerId: 'p1', action: { type: 'BUY', row: 'upper', index: 0, displace: 42 } },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.message).toMatch(/displace/);
+  });
+
+  it('buys a trading card by displacement over REST — the play area swaps, the discard grows, the difference is charged (SP4)', async () => {
+    // A seeded rng makes the whole deck deterministic, so this greedy driver reproducibly reaches a
+    // trading-card displacement. It reads each active seat's own view and computes `legalActions` on it
+    // (the same cast the UI uses — move enumeration never touches another seat's secrets).
+    const seededDb = createDatabase();
+    const app2 = buildApp({ db: seededDb, rng: makeRng(20260722) });
+    await app2.ready();
+    try {
+      const id = (
+        await app2.inject({ method: 'POST', url: '/games', payload: { gameType: 'stpetersburg', players: [{ name: 'Ann' }, { name: 'Bob' }] } })
+      ).json().game.id as string;
+
+      const readAs = async (viewer: string) =>
+        (await app2.inject({ method: 'GET', url: `/games/${id}?viewer=${viewer}` })).json().game as DriveView;
+      const post = async (seat: string, action: Action) =>
+        (await app2.inject({ method: 'POST', url: `/games/${id}/actions?viewer=${seat}`, payload: { playerId: seat, action } })).json().game as DriveView;
+      const activeId = (g: DriveView) => g.players[g.activePlayerIndex]!.id;
+      const isTradeBuy = (a: Action): a is Extract<Action, { type: 'BUY' }> => a.type === 'BUY' && a.displace !== undefined;
+
+      let cursor = await readAs('p1');
+      let done: { seat: string; before: DriveView; action: Extract<Action, { type: 'BUY' }> } | undefined;
+      for (let step = 0; step < 400 && !done; step += 1) {
+        const seat = activeId(cursor);
+        const view = await readAs(seat); // active seat sees its own rubles + hand
+        const actions = legalActions(view as unknown as StPetersburgState, seat);
+        const trade = actions.find(isTradeBuy);
+        if (trade) {
+          done = { seat, before: view, action: trade };
+          break;
+        }
+        // Otherwise accumulate a stock of cards (so blue/orange trading cards have something to displace),
+        // buying the first affordable card; if none, pass to move the phase along.
+        const buy = actions.find((a) => a.type === 'BUY');
+        cursor = await post(seat, buy ?? { type: 'PASS' });
+      }
+
+      expect(done).toBeDefined();
+      const { seat, before, action } = done!;
+      const target = [...playAreaCards(before, seat)].find((c) => c.id === action.displace)!;
+      expect(target).toBeDefined(); // the card we're about to displace, in the buyer's play area
+
+      const after = await post(seat, action);
+      const log = after.log.at(-1) as { type: string; payload: { cost: number; cardKey: string; displacedName?: string } };
+      expect(log.type).toBe('BUY');
+      expect(log.payload.displacedName).toBeTruthy(); // the feed names the displaced card
+      // The displaced card is gone from the play area; the discard grew by exactly one.
+      expect([...playAreaCards(after, seat)].some((c) => c.id === action.displace)).toBe(false);
+      expect(after.board.discard).toBe(before.board.discard + 1);
+      // The difference was charged: rubles fell by exactly the logged cost.
+      const rublesBefore = before.players.find((p) => p.id === seat)!.rubles!;
+      expect(after.players.find((p) => p.id === seat)!.rubles).toBe(rublesBefore - log.payload.cost);
+    } finally {
+      await app2.close();
+      seededDb.close();
+    }
+  });
+
   it('creates via a lobby and enforces the 2–4 seat range', async () => {
     const tooMany = await app.inject({ method: 'POST', url: '/lobbies', payload: { seats: 5, gameType: 'stpetersburg' } });
     expect(tooMany.statusCode).toBe(400);
@@ -370,7 +484,9 @@ describe('mapStPetersburgError', () => {
     expect(mapStPetersburgError(new GameError('NOT_YOUR_TURN', 'x'))?.status).toBe(409);
     expect(mapStPetersburgError(new GameError('INSUFFICIENT_RUBLES', 'x'))?.status).toBe(409);
     expect(mapStPetersburgError(new GameError('INVALID_CARD_SLOT', 'x'))?.status).toBe(409);
-    expect(mapStPetersburgError(new GameError('TRADING_NOT_BUYABLE', 'x'))?.status).toBe(409);
+    expect(mapStPetersburgError(new GameError('DISPLACE_REQUIRED', 'x'))?.status).toBe(409);
+    expect(mapStPetersburgError(new GameError('DISPLACE_NOT_ALLOWED', 'x'))?.status).toBe(409);
+    expect(mapStPetersburgError(new GameError('INVALID_DISPLACE_TARGET', 'x'))?.status).toBe(409);
     expect(mapStPetersburgError(new GameError('HAND_FULL', 'x'))?.status).toBe(409);
     expect(mapStPetersburgError(new Error('not ours'))).toBeNull();
   });

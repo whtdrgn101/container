@@ -211,11 +211,48 @@ count.
 - **Verified green:** engine **427 @ 100%**, bot 157 (untouched), backend **219**, e2e **132**, typecheck
   clean, visual baselines untouched.
 
-### SP4 — Trading cards
+### SP4 — Trading cards ✅
 `BUY`/`PLAY_FROM_HAND` of a trading card requires a displacement target (pg. 7): same color; green
 needs matching ware symbols (five fixed pairs); blue displaces any building, orange any aristocrat;
 trading cards never displace trading cards; Czar Peter displaceable by any green. Cost = difference,
 **min 1**; displaced card discarded. The full 30-card trading deck data (pg. 9–10 card sheet).
+
+**What shipped (SP4):** trading cards are buyable/playable end to end via displacement.
+
+- **Action shape (chosen): a `displace?: string` on `BUY` and `PLAY_FROM_HAND` — the *instance id* of the
+  card to discard, not a play-area index.** An id is stable (immune to compaction) and self-validating.
+  Three typed errors enforce the shape (`core/errors.ts`, all → HTTP 409): a trading card with no target is
+  `DISPLACE_REQUIRED`; a non-trading card carrying one is `DISPLACE_NOT_ALLOWED`; a stale/wrong/illegal id
+  (wrong colour, another trading card, or a green ware mismatch) is `INVALID_DISPLACE_TARGET`. The SP1–SP3
+  `TRADING_NOT_BUYABLE` refusal is **removed** (engine + backend + tests); SP3's disabled-hand-play UI is now live.
+- **The displacement rules live in `internal/displace.ts`** (`groupOf`, `legalDisplaceTargets`,
+  `validateDisplacement`, `placeInPlayArea`) — reused by `buy`, `playFromHand` and `legalActions` so the
+  pairing/colour/Czar rules have one home. A placed trading card joins the play-area group it *upgrades*
+  (`groupOf` = `tradingGroup`), which is also the group it displaces from. `legalActions` now enumerates one
+  `BUY`/`PLAY_FROM_HAND` **per legal target** (a bare trading card with nothing to displace stays omitted).
+- **Cost (pg. 7, `displacementCost`):** printed cost − displaced card's printed cost when dearer, else 1
+  ruble; then all normal reductions apply (`baseReductions` + lower-row −1 for a buy), min-1 floor.
+- **Owned-card reductions are live (pg. 7–8 sheet):** a **carpenter workshop** −1 on every blue card
+  bought/played, a **gold smelter** −1 on every orange — keyed off the card's colour *group* (so they fire
+  for plain buildings/aristocrats *and* their trading upgrades), folded into `baseReductions` (the SP3 seam),
+  cumulative, min-1. Mariinskij/Tax-man scoring effects remain SP5 (they're scoring hooks, not reductions).
+- **Data verification (no fixes needed).** Every value the pg. 7–8 sheet prints matches the SP0 deck data,
+  verified in tests: the five green-pair costs (carpenter workshop 4−3=1, gold smelter 6−4=2, weaving mill
+  8−5=3, fur shop 10−6=4, wharf 12−7=5), the green upgrade incomes/points (weaving mill income 6; fur shop
+  income 3 + 2★; wharf income 6 + 1★), Mariinskij cost 10, Tax-man cost 17, and the two worked examples —
+  **St Isaac's 15 − Market 5 = 10, then −1 lower-row −1 carpenter-workshop = 8** (confirming an ADAPTED
+  building-trading cost against the rulebook), and the **senator = 1 ruble** (same-or-cheaper rule). The 17
+  ADAPTED building/aristocrat trading values are unchanged and stay isolated in `core/constants.ts` for a
+  future pure-constants patch once physical-card photos arrive.
+- **Item 5 (upgrades ride the card data):** a scoring test confirms an upgraded worker pays its printed
+  income at phase scoring (weaving mill 6₽; fur shop 3₽ + 2★) through the existing phase machinery.
+- **UI:** trading cards in rows/hand are buyable/playable with a displacement picker — one legal target acts
+  at once, several open a small chooser (`sp-displace-picker` with `sp-displace-<targetId>` buttons +
+  `sp-displace-cancel`); effective cost shown with the difference math. The feed narrates upgrades ("Ann
+  upgraded the Lumberjack to the Carpenter Workshop (2₽)", and "… from hand …" for a hand play). All prior
+  testids intact.
+- **Verified green:** engine **445 @ 100%**, bot 157 (untouched), backend **222**, e2e **134** (incl. a full
+  UI displacement flow; visual baselines untouched), typecheck clean.
 
 ### SP5 — Special cards
 The six specials (pg. 7–8), each behind its own mechanic: **Pub** (after each building scoring, buy up
@@ -236,16 +273,26 @@ Backend REST suite playing full seeded games; the honest four-games-coexist chec
 colors + resume all work (they're platform-free wins, but the e2e proves it); `describe(move)` for the
 shared activity feed; seat palette.
 
-### SP8 — Bot
-Last, once the game is winnable. The first bot deciding from a **redacted** view (no opponent rubles or
-hands): value cards by payback horizon (the pg. 8 tips are the seed heuristics — 2 workers early,
-expensive cards have better ratios, keep trading-phase money), hand-speculation risk (−5), displacement
-chains. Self-play 2–4p seeded; strength benchmark per the calibrate-then-commit convention (baseline: a
-frozen greedy first cut, the Stone Age pattern).
-
-### SP9 — Art & board polish
+### SP8 — Art & board polish *(moved ahead of the bot, owner call 2026-07-22: playability before bots)*
 The comps-on-artifact flow (like Morning Valley / the parchment chart): a proper board with the two
 rows, stack/phase indicator, grouped play areas, hand fans. Original art only.
+
+Owner-requested scope (2026-07-22), to be comped before porting:
+- **Card iconography**: kind identity as color banding (green/blue/orange, tri-color for trading),
+  **ware symbols as real icons on the green pairs** (they gate displacement legality, so visual =
+  rules clarity), coin-vs-shield income/point marks, and effective-cost badges. Original glyphs on
+  the repo's 24×24 convention — no reproduction of the published cards.
+- **Player tableaus**: the platform's detailed-vs-compact split (the Stone Age `PlayerPanel` /
+  Container mat pattern) — the viewer's own seat gets a full tableau (play area grouped by kind with
+  per-phase income/point summaries, hand as cards), opponents collapse to one-line rows (tableau
+  counts per kind, hand count, public score). Seat colors throughout.
+
+### SP9 — Bot
+Last, once the game is winnable **and playable-polished**. The first bot deciding from a **redacted**
+view (no opponent rubles or hands): value cards by payback horizon (the pg. 8 tips are the seed
+heuristics — 2 workers early, expensive cards have better ratios, keep trading-phase money),
+hand-speculation risk (−5), displacement chains. Self-play 2–4p seeded; strength benchmark per the
+calibrate-then-commit convention (baseline: a frozen greedy first cut, the Stone Age pattern).
 
 ## Scope notes
 

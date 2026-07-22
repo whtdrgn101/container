@@ -136,6 +136,147 @@ test('SP3: add a card to hand, then play it in a later phase — the slot emptie
   await expect(page.getByTestId('sp-play-0')).toHaveCount(0); // the card left the hand
 });
 
+/**
+ * SP4 — a full trading-card displacement through the real UI. The deck is server-shuffled (the e2e backend
+ * shares one in-memory DB across parallel specs, so per-game seeding is impossible), so this drives greedily,
+ * reading the live game over the API to pick moves. It grabs a blue/orange trading card into hand (free)
+ * while securing a building + aristocrat as displacement targets, then — once income makes it affordable —
+ * plays the held trading card by displacement in the UI and asserts the swap + the "upgraded …" feed line.
+ */
+test('SP4: play a trading card by displacement — the play area swaps and the feed narrates the upgrade', async ({ page, request }) => {
+  test.setTimeout(120_000);
+
+  type SpCard = { id: string; key: string; kind: string; name: string; cost: number; ware?: string; tradingGroup?: 'worker' | 'building' | 'aristocrat' };
+  type SpView = {
+    activePlayerIndex: number;
+    round: number;
+    players: { id: string; rubles: number | null; hand: SpCard[] | null; playArea: { worker: SpCard[]; building: SpCard[]; aristocrat: SpCard[] } }[];
+    board: { upper: SpCard[]; lower: SpCard[]; discard: number };
+  };
+  const placedCount = (pa: SpView['players'][number]['playArea']) => pa.worker.length + pa.building.length + pa.aristocrat.length;
+
+  /** The already-placed cards a trading card may displace (pg. 7) — colour group, ware match for green. */
+  const targetsFor = (owned: SpView['players'][number]['playArea'], tc: SpCard): SpCard[] => {
+    const group = tc.tradingGroup!;
+    return owned[group].filter((t) => {
+      if (t.kind === 'trading') return false;
+      if (tc.tradingGroup !== 'worker') return true;
+      return t.key === 'czarCarpenter' || t.ware === tc.ware;
+    });
+  };
+
+  await page.goto('/');
+  await page.getByTestId('pick-game-stpetersburg').click();
+  await page.getByTestId('remove-player-2').click(); // 2-seat game (Ann, Bob)
+  await page.getByTestId('start-game').click();
+  await expect(page.getByTestId('board')).toBeVisible();
+
+  const gameId = await page.locator('[data-game-id]').first().getAttribute('data-game-id');
+  expect(gameId).toBeTruthy();
+
+  const readAs = async (seat: string): Promise<SpView> => {
+    const res = await request.get(`/api/games/${gameId}?viewer=${seat}`);
+    return (await res.json()).game as SpView;
+  };
+  const settle = () => expect(page.getByTestId('sp-pass')).toBeEnabled();
+  const has = async (testId: string) => (await page.getByTestId(testId).count()) > 0;
+  const enabled = async (testId: string) => (await has(testId)) && (await page.getByTestId(testId).first().isEnabled());
+
+  let upgraded = false;
+  for (let step = 0; step < 400 && !upgraded; step += 1) {
+    // The board follows the active seat (hotseat); read that seat's own view (its rubles + hand visible).
+    const cursor = await readAs('p1');
+    const seat = cursor.players[cursor.activePlayerIndex]!.id;
+    const view = await readAs(seat);
+    const me = view.players.find((p) => p.id === seat)!;
+    const hand = me.hand ?? [];
+    const rowCards = [...view.board.upper, ...view.board.lower];
+
+    // P1 — a held trading card that is playable-by-displacement right now (the UI enables its sp-play button
+    // exactly when the seat can afford the difference). Prefer the cheapest so it fires as early as possible.
+    const playableIdx = hand
+      .map((c, i) => ({ c, i }))
+      .filter(({ c }) => c.kind === 'trading' && targetsFor(me.playArea, c).length > 0)
+      .sort((a, b) => a.c.cost - b.c.cost);
+    let playedCard: SpCard | undefined;
+    for (const { c, i } of playableIdx) {
+      if (await enabled(`sp-play-${i}`)) {
+        await page.getByTestId(`sp-play-${i}`).first().click();
+        // A single affordable target acts at once; several open the displacement picker (which lists only
+        // targets the seat can pay to displace). Wait for the picker to render — a short timeout distinguishes
+        // the immediate-play case — then click whichever target *button* it offers (not the container/cancel).
+        try {
+          const pickerBox = page.getByTestId('sp-displace-picker');
+          await pickerBox.waitFor({ state: 'visible', timeout: 2000 });
+          await pickerBox.locator('button[data-testid^="sp-displace-"]:not([data-testid="sp-displace-cancel"])').first().click();
+        } catch {
+          // No picker appeared → a single legal target, already played.
+        }
+        playedCard = c;
+        break;
+      }
+    }
+    if (playedCard) {
+      await settle();
+      // The upgrade landed (pg. 7): the feed narrates it, the trading card is now placed, the discard grew
+      // by exactly one, and the play-area count is unchanged (one card in, its displaced partner out).
+      await expect(page.getByTestId('sp-log')).toContainText('upgraded');
+      const after = await readAs(seat);
+      const mine = after.players.find((p) => p.id === seat)!;
+      const all = [...mine.playArea.worker, ...mine.playArea.building, ...mine.playArea.aristocrat];
+      expect(all.some((c) => c.id === playedCard!.id)).toBe(true); // the trading card is now placed
+      expect(placedCount(mine.playArea)).toBe(placedCount(me.playArea)); // net zero: one in, one displaced out
+      expect(after.board.discard).toBe(view.board.discard + 1); // the displaced card went to the discard
+      upgraded = true;
+      break;
+    }
+
+    let acted = false;
+
+    // Do we already hold a blue/orange trading card whose displacement target we own? If so — and we have an
+    // income source (worker/aristocrat) so money will keep growing — stop spending and just pass: income
+    // accrues each round until P1's play becomes affordable. This converges fast and avoids draining money.
+    const readyToWait =
+      hand.some((c) => c.kind === 'trading' && (c.tradingGroup === 'building' || c.tradingGroup === 'aristocrat') && targetsFor(me.playArea, c).length > 0) &&
+      (me.playArea.worker.length > 0 || me.playArea.aristocrat.length > 0);
+
+    // P2 — grab a blue/orange trading card into hand (free) while there's room, so a placed building/
+    // aristocrat can be upgraded once we can afford the difference. Prefer the cheapest to shorten the wait.
+    if (!readyToWait) {
+      const grabbable = rowCards
+        .filter((c) => c.kind === 'trading' && (c.tradingGroup === 'building' || c.tradingGroup === 'aristocrat'))
+        .sort((a, b) => a.cost - b.cost);
+      for (const c of grabbable) {
+        if (await has(`sp-hand-${c.id}`)) {
+          await page.getByTestId(`sp-hand-${c.id}`).first().click();
+          acted = true;
+          break;
+        }
+      }
+    }
+
+    // P3 — otherwise buy the cheapest affordable non-trading card. Until we hold a ready trading card, taking
+    // a card every turn keeps the pg. 8 mid-round refills firing (so fresh trading cards keep flowing) and
+    // stocks displacement targets + income; once ready, we stop buying (readyToWait) so money can build.
+    if (!acted && !readyToWait) {
+      for (const c of [...rowCards].filter((x) => x.kind !== 'trading').sort((a, b) => a.cost - b.cost)) {
+        if (await has(`sp-buy-${c.id}`)) {
+          await page.getByTestId(`sp-buy-${c.id}`).first().click();
+          acted = true;
+          break;
+        }
+      }
+    }
+
+    // P4 — nothing affordable/available (or waiting for income): pass to advance the phase and accrue income
+    // card becomes playable.
+    if (!acted) await page.getByTestId('sp-pass').click();
+    await settle();
+  }
+
+  expect(upgraded).toBe(true);
+});
+
 test('SP3: the hand limit (3) blocks a 4th add', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('pick-game-stpetersburg').click();

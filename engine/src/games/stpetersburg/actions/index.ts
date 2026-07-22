@@ -2,7 +2,7 @@
 export type { Action, ActionType } from './action';
 export { applyAction } from './applyAction';
 export { legalActions } from './legalActions';
-export { baseReductions, buy, costReductions, effectiveCost, handCost } from './buy';
+export { baseReductions, buy, costReductions, displacementCost, effectiveCost, handCost } from './buy';
 export { addToHand } from './addToHand';
 export { playFromHand } from './playFromHand';
 export { pass } from './pass';

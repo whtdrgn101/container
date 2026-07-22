@@ -29,11 +29,11 @@ export function applyAction(state: StPetersburgState, playerId: string, action: 
 
   switch (action.type) {
     case 'BUY':
-      return buy(state, playerId, action.row, action.index);
+      return buy(state, playerId, action.row, action.index, action.displace);
     case 'ADD_TO_HAND':
       return addToHand(state, playerId, action.row, action.index);
     case 'PLAY_FROM_HAND':
-      return playFromHand(state, playerId, action.index);
+      return playFromHand(state, playerId, action.index, action.displace);
     case 'PASS':
       return pass(state, playerId);
   }

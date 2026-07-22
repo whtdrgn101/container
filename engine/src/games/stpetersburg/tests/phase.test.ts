@@ -42,6 +42,17 @@ describe('scoreAndRefill', () => {
     expect(changes.players![1]!.points).toBe(0);
   });
 
+  it('scores an upgraded worker by its own card data — a weaving mill pays income 6, a fur shop 3₽ + 2★ (SP4, pg. 7)', () => {
+    // A green worker *trading* card lives in the worker group and scores at worker-close by its printed
+    // values (item 5: the upgrade rides the card data through the existing phase machinery). Weaving mill
+    // raises income to 6; the fur shop keeps income 3 and adds 2 victory points.
+    const weavingMill = card({ id: 'wm', key: 'weavingMill', kind: 'trading', name: 'Weaving Mill', cost: 8, income: 6, points: 0, ware: 'wool', tradingGroup: 'worker' });
+    const furShop = card({ id: 'fs', key: 'furShop', kind: 'trading', name: 'Fur Shop', cost: 10, income: 3, points: 2, ware: 'fur', tradingGroup: 'worker' });
+    const changes = scoreAndRefill(game({ playArea: area({ worker: [weavingMill, furShop] }) }, {}, { tookCardThisPhase: true }));
+    expect(changes.players![0]!.rubles).toBe(25 + 6 + 3); // both incomes
+    expect(changes.players![0]!.points).toBe(2); // the fur shop's 2 points
+  });
+
   it('refills the upper row from the next phase’s stack to 8 total, then advances (pg. 4)', () => {
     // Worker phase closing after a card was taken: 4 workers (upper), lower empty → 4 more from buildings.
     const changes = scoreAndRefill(game({}, {}, { tookCardThisPhase: true }));
