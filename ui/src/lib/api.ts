@@ -23,10 +23,12 @@ interface ApiError {
 
 export const JSON_HEADERS = { 'content-type': 'application/json' };
 
-/** A claimed lobby seat: who's in it, and whether that's a person or the AI. */
+/** A claimed lobby seat: who's in it, whether that's a person or the AI, and its chosen colour. */
 export interface LobbyMember {
   name: string;
   bot: boolean;
+  /** The player colour this seat picked (a palette id), or undefined until one is chosen. */
+  color?: string;
 }
 
 /** A pre-game lobby: a shareable room whose seats players claim by name before the game starts. */
@@ -40,16 +42,28 @@ export interface Lobby {
   gameId: string | null;
 }
 
+/** Secret-free seat identity carried beside every game state (roadmap C2 / REVIEW §3.3). */
+export interface GameIdentity {
+  /** Seats in order, name-and-id only — no hidden info. Filled from the module's `summarize`. */
+  players: { id: string; name: string }[];
+  /** Whose turn it is, or `null` (e.g. a finished game). */
+  activePlayerId: string | null;
+}
+
 /**
  * A game, plus what a generic caller needs to make sense of it.
  *
  * `gameType` says which board reads `game`; `bots` travels beside the state rather than inside it,
- * because which seats are bots is coordination state the engine never learns about.
+ * because which seats are bots is coordination state the engine never learns about. `players` /
+ * `activePlayerId` (REVIEW §3.3) let the shell name seats and apply seat-binding rules **without**
+ * duck-typing the opaque `game` blob — the one thing the shell must never read a game's shape for.
  */
-export interface GamePayload<S = unknown> {
+export interface GamePayload<S = unknown> extends GameIdentity {
   game: S;
   gameType: string;
   bots: string[];
+  /** Each seat's chosen player colour (playerId → palette id). Beside the game like `bots`. */
+  colors: Record<string, string>;
 }
 
 /** One of the games this server hosts, from `GET /games/catalog`. */
@@ -58,6 +72,8 @@ export interface GameInfo {
   name: string;
   minPlayers: number;
   maxPlayers: number;
+  /** The game's player-colour palette (ordered ids), so the lobby can offer the pick. */
+  colors: string[];
 }
 
 /** A secret-free summary of an in-progress game (for the home-screen "resume" list). */
@@ -88,8 +104,22 @@ export async function fail(response: Response): Promise<never> {
 // The server sends a per-viewer projection (opponents' secret cards are redacted to null).
 export async function unwrap<S = unknown>(response: Response): Promise<GamePayload<S>> {
   if (!response.ok) await fail(response);
-  const body = (await response.json()) as { game: S; gameType: string; bots?: string[] };
-  return { game: body.game, gameType: body.gameType, bots: body.bots ?? [] };
+  const body = (await response.json()) as {
+    game: S;
+    gameType: string;
+    bots?: string[];
+    colors?: Record<string, string>;
+    players?: { id: string; name: string }[];
+    activePlayerId?: string | null;
+  };
+  return {
+    game: body.game,
+    gameType: body.gameType,
+    bots: body.bots ?? [],
+    colors: body.colors ?? {},
+    players: body.players ?? [],
+    activePlayerId: body.activePlayerId ?? null,
+  };
 }
 
 async function unwrapLobby(response: Response): Promise<Lobby> {
@@ -219,16 +249,32 @@ export async function getLobby(id: string): Promise<Lobby> {
 
 /**
  * Claim the next open seat in a lobby with `name`; returns the updated lobby and your seat index.
- * Pass `bot` to hand the seat to the AI instead of a person.
+ * Pass `bot` to hand the seat to the AI instead of a person, and `color` to pick a player colour.
  */
-export async function joinLobby(id: string, name: string, bot = false): Promise<{ lobby: Lobby; seat: number }> {
+export async function joinLobby(
+  id: string,
+  name: string,
+  bot = false,
+  color?: string,
+): Promise<{ lobby: Lobby; seat: number }> {
   const response = await fetch(`${BASE_URL}/lobbies/${id}/join`, {
     method: 'POST',
     headers: JSON_HEADERS,
-    body: JSON.stringify({ name, bot }),
+    body: JSON.stringify({ name, bot, ...(color !== undefined ? { color } : {}) }),
   });
   if (!response.ok) await fail(response);
   return (await response.json()) as { lobby: Lobby; seat: number };
+}
+
+/** Change a claimed seat's player colour while waiting; returns the updated lobby. */
+export async function setLobbyColor(id: string, seat: number, color: string): Promise<Lobby> {
+  return unwrapLobby(
+    await fetch(`${BASE_URL}/lobbies/${id}/color`, {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ seat, color }),
+    }),
+  );
 }
 
 /** Start a full lobby's game and return the created game state. */
@@ -248,6 +294,11 @@ export interface StatePush {
   game: unknown;
   gameType: string;
   bots?: string[];
+  /** Each seat's chosen player colour (playerId → palette id). */
+  colors?: Record<string, string>;
+  /** Secret-free seat identity (REVIEW §3.3), same fields as `GamePayload`. */
+  players?: { id: string; name: string }[];
+  activePlayerId?: string | null;
 }
 
 /** Anything else the server pushes down the same socket — a game's own side-channel. */

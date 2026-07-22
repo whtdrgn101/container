@@ -30,6 +30,16 @@ export interface StateMessage {
    * state, not a rule, so it never enters a game's state (see `bots.ts`).
    */
   readonly bots: readonly string[];
+  /** Each seat's chosen colour (playerId → palette id). Beside the game like `bots`, never inside it. */
+  readonly colors: Readonly<Record<string, string>>;
+  /**
+   * Secret-free seat identity, sourced from the module's `summarize` (roadmap C2 / REVIEW §3.3). The
+   * shell reads these to name seats (tab title, rematch) and to apply platform seat-binding rules
+   * without duck-typing the opaque `game` blob — a game that called its seats `seats` would otherwise
+   * break the shell with no type error.
+   */
+  readonly players: readonly { readonly id: string; readonly name: string }[];
+  readonly activePlayerId: string | null;
 }
 
 interface Subscriber {

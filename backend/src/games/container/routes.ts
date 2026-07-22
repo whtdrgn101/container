@@ -161,6 +161,7 @@ export function registerAuctionRoutes(app: FastifyInstance, ctx: ModuleContext):
           game: viewFor(settled, viewerFrom(request.query.viewer, settled)),
           gameType: 'container',
           bots: ctx.botSeats.listForGame(request.params.id),
+          colors: ctx.colorsFor(request.params.id, settled),
         });
       } catch (error) {
         const mapped = mapContainerError(error);

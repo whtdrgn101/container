@@ -17,6 +17,17 @@ export interface GameTransport {
   readonly game: unknown;
   readonly gameType: string | null;
   readonly bots: string[];
+  /** Each seat's chosen player colour (playerId → palette id). Beside the game, never inside it. */
+  readonly colors: Record<string, string>;
+  /** This game's id, or `null` off the board — derived from the state so callers needn't cast it. */
+  readonly gameId: string | null;
+  /**
+   * Secret-free seat identity (REVIEW §3.3), carried on the payload so the shell names seats and gates
+   * turns **without** reading the opaque `game` blob. `players` is `[]` and `activePlayerId` `null`
+   * until a game is loaded.
+   */
+  readonly players: { id: string; name: string }[];
+  readonly activePlayerId: string | null;
   /** The most recent non-state push, for the board to read. */
   readonly lastMessage: GameMessage | null;
   readonly apply: (payload: GamePayload) => void;
@@ -39,6 +50,9 @@ export function useGameTransport(viewer: string | undefined): GameTransport {
   const [game, setGame] = useState<unknown>(null);
   const [gameType, setGameType] = useState<string | null>(null);
   const [bots, setBots] = useState<string[]>([]);
+  const [colors, setColors] = useState<Record<string, string>>({});
+  const [players, setPlayers] = useState<{ id: string; name: string }[]>([]);
+  const [activePlayerId, setActivePlayerId] = useState<string | null>(null);
   const [lastMessage, setLastMessage] = useState<GameMessage | null>(null);
 
   // Read inside the socket callback without making the subscription depend on it — re-subscribing on
@@ -50,12 +64,18 @@ export function useGameTransport(viewer: string | undefined): GameTransport {
     setGame(payload.game);
     setGameType(payload.gameType);
     setBots(payload.bots);
+    setColors(payload.colors);
+    setPlayers(payload.players);
+    setActivePlayerId(payload.activePlayerId);
   }, []);
 
   const clear = useCallback(() => {
     setGame(null);
     setGameType(null);
     setBots([]);
+    setColors({});
+    setPlayers([]);
+    setActivePlayerId(null);
     setLastMessage(null);
   }, []);
 
@@ -70,11 +90,14 @@ export function useGameTransport(viewer: string | undefined): GameTransport {
         setGame(push.game);
         setGameType(push.gameType);
         setBots(push.bots ?? []);
+        setColors(push.colors ?? {});
+        setPlayers(push.players ?? []);
+        setActivePlayerId(push.activePlayerId ?? null);
       },
       viewer,
       setLastMessage,
     );
   }, [gameId, viewer]);
 
-  return { game, gameType, bots, lastMessage, apply, clear };
+  return { game, gameType, bots, colors, gameId: gameId ?? null, players, activePlayerId, lastMessage, apply, clear };
 }

@@ -1,6 +1,7 @@
 import { decide } from '@game-hub/bot/cantstop';
 import { applyAction, viewFor } from '@game-hub/engine/cantstop';
 import type { CantStopState } from '@game-hub/engine/cantstop';
+import { runBotLoop } from '../../botLoop';
 import type { BotRepository } from '../../bots';
 import { rollFourDice } from './dice';
 
@@ -38,23 +39,18 @@ export class CantStopBotRunner {
 
   tick(gameId: string): void {
     const rollDice = () => rollFourDice(this.rng);
-    for (let step = 0; step < MAX_STEPS; step += 1) {
-      const state = this.repo.get(gameId);
-      if (!state || state.status !== 'active') return;
-
-      const botIds = new Set(this.bots.listForGame(gameId));
-      if (botIds.size === 0) return;
-
-      const active = state.players[state.activePlayerIndex]!;
-      if (!botIds.has(active.id)) return; // a human's move
-
-      const action = decide(viewFor(state, active.id), active.id, { rollDice });
-      const next = applyAction(state, active.id, action);
-      this.repo.update(next);
-      this.onChange(next);
-    }
-    // MAX_STEPS with no human, finished game, or botless seat means a policy is cycling. Throw (the
-    // app's `tick` contains and logs it) rather than fall out silently and re-spin on every read.
-    throw new Error(`Can't Stop bot runner exceeded ${MAX_STEPS} steps for game "${gameId}" — a policy is likely cycling`);
+    runBotLoop<CantStopState>({
+      gameId,
+      maxSteps: MAX_STEPS,
+      label: "Can't Stop",
+      get: (id) => this.repo.get(id),
+      botSeats: (id) => this.bots.listForGame(id),
+      step: (state, seatId) => {
+        const action = decide(viewFor(state, seatId), seatId, { rollDice });
+        const next = applyAction(state, seatId, action);
+        this.repo.update(next);
+        this.onChange(next);
+      },
+    });
   }
 }

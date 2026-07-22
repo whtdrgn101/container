@@ -4,6 +4,8 @@ import { PlayerCard } from './PlayerCard';
 
 export interface PlayerCardsProps {
   readonly game: GameView;
+  /** Each seat's picked colour (playerId → palette id), passed down to each card's tint. */
+  readonly colors?: Readonly<Record<string, string>>;
   readonly legal: readonly Action[];
   readonly can: (type: Action['type']) => boolean;
   readonly sailActions: readonly Extract<Action, { type: 'SAIL' }>[];
@@ -21,6 +23,7 @@ export interface PlayerCardsProps {
 
 export function PlayerCards({
   game,
+  colors,
   legal,
   can,
   sailActions,
@@ -45,6 +48,7 @@ export function PlayerCards({
         <PlayerCard
           key={player.id}
           game={game}
+          colors={colors}
           player={player}
           index={index}
           legal={legal}

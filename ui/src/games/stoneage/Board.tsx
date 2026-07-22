@@ -16,6 +16,9 @@ import type { Building, BuildingCost, CardPlaceId, FixedPlaceId, PlaceId, Resour
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { GameOver } from '@/components/GameOver';
+import { ActivityFeed } from '@/components/ActivityFeed';
+import { TurnBanner } from '@/components/TurnBanner';
+import { seatIdentity } from '@/components/seatIdentity';
 import { PanZoom } from '@/components/PanZoom';
 import type { BoardProps } from '../types';
 import * as stoneageApi from './api';
@@ -49,28 +52,37 @@ const costLabel = (cost: BuildingCost): string => {
 };
 /** Button labels for the non-dice `USE` places. */
 const RESOURCE_LABEL: Record<Resource, string> = { wood: 'Wood', brick: 'Brick', stone: 'Stone', gold: 'Gold' };
-/** Per-seat player colours (the game's palette: red, blue, green, yellow). */
+/** Per-seat player colours (the game's palette: red, blue, green, yellow — the module's order). */
 const SEAT_COLOR = [
-  { dot: 'bg-red-500', text: 'text-red-600', ring: 'ring-red-500' },
-  { dot: 'bg-blue-500', text: 'text-blue-600', ring: 'ring-blue-500' },
-  { dot: 'bg-green-600', text: 'text-green-700', ring: 'ring-green-600' },
-  { dot: 'bg-yellow-400', text: 'text-yellow-600', ring: 'ring-yellow-500' },
+  { id: 'red', dot: 'bg-red-500', text: 'text-red-600', ring: 'ring-red-500' },
+  { id: 'blue', dot: 'bg-blue-500', text: 'text-blue-600', ring: 'ring-blue-500' },
+  { id: 'green', dot: 'bg-green-600', text: 'text-green-700', ring: 'ring-green-600' },
+  { id: 'yellow', dot: 'bg-yellow-400', text: 'text-yellow-600', ring: 'ring-yellow-500' },
 ] as const;
+const SEAT_COLOR_BY_ID = new Map<string, (typeof SEAT_COLOR)[number]>(
+  SEAT_COLOR.map((color) => [color.id, color]),
+);
 
 /**
  * Stone Age's board — the illustrated landscape (`BoardMap`) plus the buildings/cards markets, the
  * player boards, the floating gather panel, and the end-of-game results. The full game is playable
  * (SA1–SA11); the AI bot arrives in SA12.
  */
-export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewer, busy, guard, onPayload, onLeave }: BoardProps<StoneAgeView>) {
+export default function StoneAgeBoard({ gameId, game, bots, colors, controlledIds, viewer, busy, guard, onPayload, onLeave }: BoardProps<StoneAgeView>) {
   // In-progress building payment, per stack index (the resources you'll pay when you press Build).
   const [pay, setPay] = useState<Record<number, Partial<Record<Resource, number>>>>({});
   // Tools selected to add to the pending dice roll (by index into the player's tools).
   const [selectedTools, setSelectedTools] = useState<number[]>([]);
 
   const active = game.players[game.activePlayerIndex];
-  const activeIsBot = !!active && bots.includes(active.id);
-  const canDrive = !activeIsBot && (!controlledIds || (!!active && controlledIds.includes(active.id)));
+  // Seat binding is a platform rule (shared `seatIdentity`, §3.3) — Stone Age no longer hand-rolls it,
+  // which is why it now has the "You are X" line the copy-paste version silently dropped.
+  const { canDrive, myNames } = seatIdentity({
+    players: game.players,
+    activePlayerId: active?.id ?? null,
+    bots,
+    controlledIds,
+  });
   const placing = game.phase === 'placement';
   const acting = game.phase === 'actions';
   const feedingPhase = game.phase === 'feeding';
@@ -140,9 +152,6 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
 
   const remaining = active ? availableToPlace(game, active.id) : 0;
   const waitingFor = active?.name ?? 'the next player';
-  // Seat identity for the banner (REVIEW 3.3 interim — same one-liner as Can't Stop's board; the
-  // full shell extraction will absorb this).
-  const myNames = controlledIds ? game.players.filter((p) => controlledIds.includes(p.id)).map((p) => p.name) : null;
   const banner = game.status === 'ended'
     ? 'Game over.'
     : placing
@@ -158,7 +167,12 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
           : `Waiting for ${waitingFor} to feed…`;
 
   const playerName = (id: string) => game.players.find((p) => p.id === id)?.name ?? id;
-  const seatColorOf = (id: string) => SEAT_COLOR[game.players.findIndex((p) => p.id === id) % SEAT_COLOR.length] ?? SEAT_COLOR[0];
+  // Picked colour first (colors[id] → its palette entry), falling back to the seat-index colour — which
+  // reproduces the old per-seat tints for a default game (palette order red/blue/green/yellow).
+  const seatColorOf = (id: string) =>
+    SEAT_COLOR_BY_ID.get(colors[id] ?? '') ??
+    SEAT_COLOR[game.players.findIndex((p) => p.id === id) % SEAT_COLOR.length] ??
+    SEAT_COLOR[0];
   /** A row of worker figures for the people on a place, each tinted to its owner (with an SR label). */
   const meeplesFor = (byPlayer: Readonly<Record<string, number>>) =>
     Object.entries(byPlayer).map(([id, n]) => (
@@ -167,34 +181,33 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
         <span className="sr-only">{playerName(id)} ×{n}</span>
       </span>
     ));
+  // The move's action text only — the shared `ActivityFeed` renders the actor's name and bot badge.
   const describeMove = (entry: StoneAgeView['log'][number]): string => {
-    const who = playerName(entry.playerId);
     const p = (entry.payload ?? {}) as Record<string, unknown>;
-    if (entry.type === 'PLACE') return `${who} placed ${p['count']} on ${placeLabel(p['place'] as PlaceId)}`;
-    if (entry.type === 'GATHER') return `${who} rolled ${(p['dice'] as number[])?.join('+')} at ${placeLabel(p['place'] as PlaceId)}`;
+    if (entry.type === 'PLACE') return `placed ${p['count']} on ${placeLabel(p['place'] as PlaceId)}`;
+    if (entry.type === 'GATHER') return `rolled ${(p['dice'] as number[])?.join('+')} at ${placeLabel(p['place'] as PlaceId)}`;
     if (entry.type === 'TAKE') {
       const boost = p['boost'] as number;
-      return `${who} took ${p['amount']} ${p['kind']}${boost > 0 ? ` (+${boost} from tools)` : ''}`;
+      return `took ${p['amount']} ${p['kind']}${boost > 0 ? ` (+${boost} from tools)` : ''}`;
     }
     if (entry.type === 'USE') {
       const place = p['place'] as PlaceId;
-      const effect = place === 'toolMaker' ? 'took a tool' : place === 'hut' ? 'grew (+1 person)' : 'raised food production';
-      return `${who} ${effect}`;
+      return place === 'toolMaker' ? 'took a tool' : place === 'hut' ? 'grew (+1 person)' : 'raised food production';
     }
     if (entry.type === 'FEED') {
-      if (p['starved'] !== undefined) return `${who} went hungry — −${p['penalty']} points`;
-      if (p['paidResources'] !== undefined) return `${who} fed ${p['need']} people (${p['paidResources']} from resources)`;
-      return `${who} fed ${p['need']} people`;
+      if (p['starved'] !== undefined) return `went hungry — −${p['penalty']} points`;
+      if (p['paidResources'] !== undefined) return `fed ${p['need']} people (${p['paidResources']} from resources)`;
+      return `fed ${p['need']} people`;
     }
     if (entry.type === 'BUILD') {
-      if (p['declined']) return `${who} passed on a building`;
-      return `${who} built (+${p['points']} points)`;
+      if (p['declined']) return 'passed on a building';
+      return `built (+${p['points']} points)`;
     }
     if (entry.type === 'ACQUIRE_CARD') {
-      if (p['declined']) return `${who} passed on a card`;
-      return `${who} took a civilization card`;
+      if (p['declined']) return 'passed on a card';
+      return 'took a civilization card';
     }
-    return `${who}: ${entry.type.toLowerCase()}`;
+    return entry.type.toLowerCase();
   };
 
   return (
@@ -233,18 +246,13 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
           </table>
         </GameOver>
       )}
-      <div
-        data-testid="sa-banner"
-        role="status"
-        aria-live="polite"
-        className="flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-sm"
-      >
+      <TurnBanner testId="sa-banner" canDrive={canDrive} className="mb-0">
         <span className="font-medium">
           {myNames && myNames.length > 0 && <span className="text-muted-foreground">You are {myNames.join(' & ')} — </span>}
           {banner}
         </span>
         {active && <span className="text-xs text-muted-foreground">{active.name}’s turn</span>}
-      </div>
+      </TurnBanner>
 
       {/* Feeding phase (pg. 7): pay 1 food per person; cover any shortfall with resources or take −10. */}
       {feedingPhase && canDrive && active && (
@@ -462,17 +470,9 @@ export default function StoneAgeBoard({ gameId, game, bots, controlledIds, viewe
         </div>
       </div>
 
-      {/* A compact activity feed — everything Stone Age logs is public. */}
-      {game.log.length > 0 && (
-        <ul data-testid="sa-log" className="space-y-0.5 text-xs text-muted-foreground">
-          {[...game.log]
-            .slice(-6)
-            .reverse()
-            .map((entry) => (
-              <li key={entry.seq}>{describeMove(entry)}</li>
-            ))}
-        </ul>
-      )}
+      {/* The activity feed — everything Stone Age logs is public. Shared frame; `describeMove` is the
+          per-game move-to-text, and the actor's name + bot badge are rendered by the feed. */}
+      <ActivityFeed log={game.log} players={game.players} botIds={bots} describe={describeMove} testId="sa-log" />
     </div>
   );
 }

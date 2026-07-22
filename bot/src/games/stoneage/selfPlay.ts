@@ -1,6 +1,6 @@
 import { applyAction, DIE_FACES, viewFor } from '@game-hub/engine/stoneage';
 import type { StoneAgeState } from '@game-hub/engine/stoneage';
-import { BotError } from '../../kernel';
+import { makeProgressGuard } from '../../kernel';
 import { decide } from './decide';
 import type { DecideFn } from './types';
 
@@ -29,8 +29,12 @@ export interface SelfPlayResult {
 }
 
 const DEFAULT_MAX_ROUNDS = 200;
-/** Far more actions than a real game needs; a runaway guard so a cycling policy throws instead of hanging. */
-const MAX_ACTIONS = 100_000;
+/**
+ * Per-round runaway cap. A real Stone Age round is well under a hundred actions (placements + resolves +
+ * feeds across the table), so this is generous headroom while still catching a cycling policy in ~one
+ * round — unlike the old flat 100,000-action cap, which let a cycle burn 100k actions before failing.
+ */
+const MAX_ACTIONS_PER_ROUND = 500;
 
 /**
  * Play a Stone Age game out with every seat driven by the bot. Deterministic given `(initial, rng)`: the
@@ -44,14 +48,13 @@ export function playSelfPlay(initial: StoneAgeState, options: SelfPlayOptions): 
 
   let state = initial;
   let actions = 0;
+  const guard = makeProgressGuard({ maxPerMarker: MAX_ACTIONS_PER_ROUND, marker: 'round', initial: state.round });
   while (state.status === 'active' && state.round <= maxRounds) {
     const active = state.players[state.activePlayerIndex]!;
     const decideFn = policies?.get(active.id) ?? decide;
     state = applyAction(state, active.id, decideFn(viewFor(state, active.id), active.id, { rollDice }));
     actions += 1;
-    if (actions > MAX_ACTIONS) {
-      throw new BotError(`Self-play exceeded ${MAX_ACTIONS} actions without ending — a policy is cycling`);
-    }
+    guard.record(state.round, active.id);
   }
 
   return { state, rounds: state.round, actions, completed: state.status === 'ended' };

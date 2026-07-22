@@ -1,5 +1,5 @@
 import type { GameView, PlayerView } from '@game-hub/engine/container';
-import { cn } from '@/lib/utils';
+import { TurnBanner } from '@/components/TurnBanner';
 
 export interface IdentityBannerProps {
   readonly game: GameView;
@@ -10,17 +10,12 @@ export interface IdentityBannerProps {
   readonly activePlayer: PlayerView | undefined;
 }
 
+/** Container's seat-identity + turn line, rendered through the shared `TurnBanner` frame (§3.3). */
 export function IdentityBanner({ game, controlledIds, canDrive, myNames, activePlayer }: IdentityBannerProps) {
   if (!controlledIds || game.status !== 'active') return null;
 
   return (
-    <div
-      data-testid="identity-banner"
-      className={cn(
-        'mb-4 flex flex-wrap items-center gap-x-2 rounded-lg border px-4 py-2 text-sm',
-        canDrive ? 'border-primary bg-primary/10 font-medium' : 'text-muted-foreground',
-      )}
-    >
+    <TurnBanner testId="identity-banner" canDrive={canDrive} className="justify-start">
       {myNames && myNames.length > 0 ? (
         <span>
           You are <span className="font-semibold text-foreground">{myNames.join(' & ')}</span>.
@@ -31,6 +26,6 @@ export function IdentityBanner({ game, controlledIds, canDrive, myNames, activeP
       <span data-testid="turn-status">
         {canDrive ? '✋ Your turn — take your actions.' : `Waiting for ${activePlayer?.name}…`}
       </span>
-    </div>
+    </TurnBanner>
   );
 }

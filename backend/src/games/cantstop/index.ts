@@ -18,6 +18,8 @@ export const cantStopModule: GameModule<CantStopState, Action> = {
   name: "Can't Stop",
   minPlayers: MIN_PLAYERS,
   maxPlayers: MAX_PLAYERS,
+  // The four seat tints the board already colours squares/runners with, in seat order (see the UI board).
+  colors: ['rose', 'sky', 'amber', 'emerald'],
 
   createGame: (opts) => newCantStopGame(opts),
 

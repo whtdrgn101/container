@@ -55,7 +55,7 @@ export default function App() {
   // Hotseat (null) follows the active player; a seat-bound client streams as its own seats only.
   const viewer = controlledIds === null ? undefined : controlledIds.join(',');
   const transport = useGameTransport(viewer);
-  const { game, bots, lastMessage } = transport;
+  const { game, gameId, bots, colors, players, lastMessage } = transport;
 
   const onLanding = !game && !lobby;
   const { catalog, openLobbies, activeGames, forget } = useHomeLists(onLanding);
@@ -214,6 +214,12 @@ export default function App() {
     });
   }
 
+  /** Pick a colour for a seat you hold in the current lobby (the waiting room polls, so it shows live). */
+  async function pickColor(seat: number, color: string) {
+    if (!lobby) return;
+    await guard(async () => setLobby(await api.setLobbyColor(lobby.id, seat, color)));
+  }
+
   /** Claim the next open seat in the current lobby with the entered name. */
   async function takeSeat() {
     if (!lobby) return;
@@ -271,8 +277,8 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- enterGameAs is stable enough for this poll
   }, [lobbyId, lobbyOpen, mySeats]);
 
-  const gameId = game ? (game as { id: string }).id : null;
-  const players = game ? (game as { players: { id: string; name: string }[] }).players : [];
+  // Seat identity comes from the payload (`players`), never by reading the opaque `game` blob — a
+  // game 4 that named its seats differently would otherwise break the header with no type error (§3.3).
   const myNames = controlledIds ? players.filter((p) => controlledIds.includes(p.id)).map((p) => p.name) : null;
 
   // --- Rematch (platform: play again with the same players). The shell owns it entirely. ---
@@ -394,6 +400,7 @@ export default function App() {
                   gameId={gameId}
                   game={game}
                   bots={bots}
+                  colors={colors}
                   controlledIds={controlledIds}
                   viewer={viewer}
                   busy={busy}
@@ -415,6 +422,8 @@ export default function App() {
           <WaitingRoom
             lobby={lobby}
             mySeats={mySeats}
+            palette={catalog.find((entry) => entry.id === lobby.gameType)?.colors ?? []}
+            onPickColor={(seat, color) => void pickColor(seat, color)}
             seatName={seatName}
             onSeatNameChange={setSeatName}
             busy={busy}

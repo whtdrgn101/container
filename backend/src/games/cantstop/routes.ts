@@ -55,6 +55,7 @@ export function registerCantStopRoutes(app: FastifyInstance, ctx: ModuleContext)
           game: viewFor(settled, viewerFrom(request.query.viewer, settled)),
           gameType: 'cantstop',
           bots: ctx.botSeats.listForGame(request.params.id),
+          colors: ctx.colorsFor(request.params.id, settled),
         });
       } catch (error) {
         const mapped = mapCantStopError(error);

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Action, Color, GameState, GameView, StoredContainer } from '@game-hub/engine/container';
 import { COLORS, FACTORY_BUILD_COSTS, legalActions } from '@game-hub/engine/container';
+import { seatIdentity } from '@/components/seatIdentity';
 import type { BoardProps } from '../types';
 import * as containerApi from './api';
 import type { DeliveryAuctionView } from './api';
@@ -30,6 +31,7 @@ export default function ContainerBoard({
   gameId,
   game,
   bots,
+  colors,
   controlledIds,
   viewer,
   busy,
@@ -82,14 +84,14 @@ export default function ContainerBoard({
     .map((action) => action.color);
   const sailActions = legal.filter((action): action is Extract<Action, { type: 'SAIL' }> => action.type === 'SAIL');
   const activePlayer = game.players[game.activePlayerIndex];
-  // This client may drive the game only when it controls the active seat (or controls all seats, in
-  // hotseat). This is what binds the window to the seat you joined as and locks other players' turns.
-  // Never offer to act for an AI seat: the server plays those, and a click here would be a second
-  // player at the same seat. In practice a bot has already moved by the time we render, but a
-  // dropped push shouldn't hand its turn to a human.
-  const activeIsBot = !!activePlayer && bots.includes(activePlayer.id);
-  const canDrive = !activeIsBot && (!controlledIds || (!!activePlayer && controlledIds.includes(activePlayer.id)));
-  const myNames = controlledIds ? game.players.filter((p) => controlledIds.includes(p.id)).map((p) => p.name) : null;
+  // Seat binding is a platform rule (shared `seatIdentity`, §3.3): this client may drive only when it
+  // controls the active seat (or all seats, in hotseat) and that seat isn't an AI the server plays.
+  const { canDrive, myNames } = seatIdentity({
+    players: game.players,
+    activePlayerId: activePlayer?.id ?? null,
+    bots,
+    controlledIds,
+  });
 
   const nextFactoryCost = activePlayer ? FACTORY_BUILD_COSTS[activePlayer.factories.length - 1] : undefined;
   const containersGone = COLORS.filter((color) => game.supply.containers[color] === 0).length;
@@ -238,6 +240,7 @@ export default function ContainerBoard({
       {activePlayer && (
         <BoardMap
           game={game}
+          colors={colors}
           sailActions={canDrive ? sailActions : []}
           onSail={(action) => act(activePlayer.id, action)}
           busy={busy}
@@ -246,6 +249,7 @@ export default function ContainerBoard({
 
       <PlayerCards
         game={game}
+        colors={colors}
         legal={legal}
         can={can}
         sailActions={sailActions}

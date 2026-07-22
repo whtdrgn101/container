@@ -19,6 +19,8 @@ export interface BuyPick {
 
 export interface PlayerCardProps {
   readonly game: GameView;
+  /** Each seat's picked colour (playerId → palette id) for the mat's ribbon/ring tint. */
+  readonly colors?: Readonly<Record<string, string>>;
   readonly player: PlayerView;
   readonly index: number;
   readonly legal: readonly Action[];
@@ -57,6 +59,7 @@ function FaceDownCard() {
  */
 export function PlayerCard({
   game,
+  colors,
   player,
   index,
   legal,
@@ -74,7 +77,7 @@ export function PlayerCard({
   commitBuy,
 }: PlayerCardProps) {
   const isActive = index === game.activePlayerIndex;
-  const seatColor = seatColorOf(game.players, player.id);
+  const seatColor = seatColorOf(game.players, player.id, colors);
   // The server only sends a player's secret scoring card to that player (all cards at game end).
   const card = player.scoringCard;
   const nextWarehouseCost = WAREHOUSE_BUILD_COSTS[player.warehouses - 1];

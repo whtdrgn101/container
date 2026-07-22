@@ -25,6 +25,9 @@ export const containerModule: GameModule<GameState, Action> = {
   name: 'Container',
   minPlayers: MIN_PLAYERS,
   maxPlayers: MAX_PLAYERS,
+  // The five hull tints the board already paints ships/mats with, in seat order (see the UI's
+  // `seatColors.ts`). PLAYER colours — not the white/red/green/blue/yellow container cargo colours.
+  colors: ['indigo', 'teal', 'rose', 'amber', 'violet'],
 
   createGame: (opts) => newContainerGame(opts),
 

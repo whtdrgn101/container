@@ -1,20 +1,19 @@
 import type { Color, MoveRecord, PlayerView, ShipLocation } from '@game-hub/engine/container';
+import { ActivityFeed } from '@/components/ActivityFeed';
 
 /**
- * The running activity feed (bottom of the board).
+ * Container's activity feed — the game-specific `describe`, rendered through the shared `ActivityFeed`
+ * (roadmap C2 / REVIEW §3.3). The frame (scroll, 60-entry cap, newest-first, 🤖 badges, actor name) is
+ * shared; only `describe` — one line of plain English per Container move — lives here.
  *
  * Reads `GameState.log`, which the engine appends to on every applied action. **Everything in that
  * log is public by construction** — the one genuinely secret thing in Container, a losing delivery
- * bid, is deliberately never recorded (see `deliver.ts` and its log tests). So this component can
- * render the log as-is; there is nothing here to redact. If you ever add a mechanic that records
- * something a player shouldn't see, redact it in the engine's `record()` / `viewFor`, **not here** —
- * the log reaches the client either way, so hiding it in the UI would hide nothing.
+ * bid, is deliberately never recorded (see `deliver.ts` and its log tests). If you ever add a mechanic
+ * that records something a player shouldn't see, redact it in the engine's `record()` / `viewFor`,
+ * **not here** — the log reaches the client either way, so hiding it in the UI would hide nothing.
  */
 
 const LOT_LABELS = ['I', 'II', 'III'];
-
-/** Show at most this many entries. A full game runs to a few hundred; nobody scrolls that far back. */
-const MAX_ENTRIES = 60;
 
 const nameOf = (players: readonly PlayerView[], id: string) => players.find((p) => p.id === id)?.name ?? id;
 
@@ -90,34 +89,14 @@ export function GameLog({
   players: readonly PlayerView[];
   botIds: readonly string[];
 }) {
-  const entries = log
-    .map((move) => ({ move, text: describe(move, players) }))
-    .filter((entry): entry is { move: MoveRecord; text: string } => entry.text !== null)
-    .slice(-MAX_ENTRIES)
-    .reverse(); // newest first — that's what you're checking when you look
-
   return (
-    <section className="mt-6" data-testid="game-log" aria-label="Activity log">
-      <h2 className="mb-2 text-sm font-medium text-muted-foreground">Activity</h2>
-      {entries.length === 0 ? (
-        <p className="text-xs text-muted-foreground" data-testid="game-log-empty">
-          Nothing has happened yet.
-        </p>
-      ) : (
-        <ol className="max-h-56 space-y-1 overflow-y-auto rounded-lg border p-3 text-xs">
-          {entries.map(({ move, text }) => (
-            // No move number: `seq` counts every applied action, but the feed hides End-turn, so the
-            // numbers would run 21, 20, 18, 17… and read as missing entries rather than as filtering.
-            <li key={move.seq} data-testid={`log-entry-${move.seq}`} className="leading-relaxed">
-              <span className="font-medium">
-                {botIds.includes(move.playerId) ? '🤖 ' : ''}
-                {nameOf(players, move.playerId)}
-              </span>{' '}
-              <span className="text-muted-foreground">{text}</span>
-            </li>
-          ))}
-        </ol>
-      )}
-    </section>
+    <ActivityFeed
+      log={log}
+      players={players}
+      botIds={botIds}
+      // `describe` closes over `players` — Container names sellers/winners inside the action text.
+      describe={(move) => describe(move, players)}
+      testId="game-log"
+    />
   );
 }

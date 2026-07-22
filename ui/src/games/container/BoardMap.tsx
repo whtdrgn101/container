@@ -1,7 +1,7 @@
 import type { Action, GameView, PlayerView, ShipLocation } from '@game-hub/engine/container';
 import { ShipSvg } from './art/Ship';
 import { Chart, CompassRose } from './art/Chart';
-import { seatColorOf, SEAT_COLORS } from './seatColors';
+import { seatColorOf } from './seatColors';
 import { cn } from '@/lib/utils';
 
 type SailAction = Extract<Action, { type: 'SAIL' }>;
@@ -48,20 +48,23 @@ function boardNodes(players: readonly PlayerView[]): Node[] {
  */
 export function BoardMap({
   game,
+  colors,
   sailActions,
   onSail,
   busy,
 }: {
   game: GameView;
+  colors?: Readonly<Record<string, string>>;
   sailActions: readonly SailAction[];
   onSail: (action: SailAction) => void;
   busy: boolean;
 }) {
   const nodes = boardNodes(game.players);
   const activeId = game.players[game.activePlayerIndex]?.id;
+  // Quay tint follows the harbour owner's picked colour (the node key carries the player id).
   const harbors = nodes
     .filter((n) => n.key.startsWith('harbor:'))
-    .map((n, i) => ({ left: n.left, tint: SEAT_COLORS[i % SEAT_COLORS.length]!.hull }));
+    .map((n) => ({ left: n.left, tint: seatColorOf(game.players, n.key.slice('harbor:'.length), colors).hull }));
 
   // Group ships by the node they occupy so several ships at one place fan out instead of overlapping.
   const shipsByNode = new Map<string, PlayerView[]>();
@@ -145,7 +148,7 @@ export function BoardMap({
               }}
             >
               <span className={cn('block h-7 w-12 drop-shadow sm:h-8 sm:w-14', isActive && 'motion-safe:animate-pulse')}>
-                <ShipSvg tint={seatColorOf(game.players, p.id).hull} cargo={p.ship.cargo} />
+                <ShipSvg tint={seatColorOf(game.players, p.id, colors).hull} cargo={p.ship.cargo} />
               </span>
               <span
                 className={cn(

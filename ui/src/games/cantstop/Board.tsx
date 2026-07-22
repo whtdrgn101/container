@@ -2,14 +2,25 @@ import { COLUMN_HEIGHTS, COLUMNS, MAX_RUNNERS, legalActions } from '@game-hub/en
 import type { Action, CantStopView } from '@game-hub/engine/cantstop';
 import { Button } from '@/components/ui/button';
 import { GameOver } from '@/components/GameOver';
+import { ActivityFeed } from '@/components/ActivityFeed';
+import { TurnBanner } from '@/components/TurnBanner';
+import { seatIdentity } from '@/components/seatIdentity';
 import { cn } from '@/lib/utils';
 import type { BoardProps } from '../types';
 import * as cantstopApi from './api';
 import { Die } from './art/Die';
 
-/** A colour per seat, by index. Can't Stop's squares are player-coloured (rulebook "Set Up"). */
-const SEAT_COLORS = ['bg-rose-500', 'bg-sky-500', 'bg-amber-500', 'bg-emerald-500'] as const;
-const seatColor = (index: number) => SEAT_COLORS[index % SEAT_COLORS.length]!;
+/**
+ * Can't Stop's squares are player-coloured (rulebook "Set Up"). The palette ids are the module's, in
+ * seat order; each maps to a Tailwind fill (literal strings so the build sees them).
+ */
+const PALETTE = ['rose', 'sky', 'amber', 'emerald'] as const;
+const SEAT_CLASS: Record<string, string> = {
+  rose: 'bg-rose-500',
+  sky: 'bg-sky-500',
+  amber: 'bg-amber-500',
+  emerald: 'bg-emerald-500',
+};
 
 /**
  * Can't Stop's board — the whole game as one plugin the shell renders (roadmap C3).
@@ -23,6 +34,7 @@ export default function CantStopBoard({
   gameId,
   game,
   bots,
+  colors,
   controlledIds,
   viewer,
   busy,
@@ -31,12 +43,24 @@ export default function CantStopBoard({
   onLeave,
 }: BoardProps<CantStopView>) {
   const active = game.players[game.activePlayerIndex];
-  // Same seat-binding rule as Container: drive only when this client controls the active seat (or
-  // holds all of them, in hotseat), and never act for a bot seat. Can't Stop has no bots yet, but the
-  // gate is the platform's, not the game's.
-  const activeIsBot = !!active && bots.includes(active.id);
-  const canDrive = !activeIsBot && (!controlledIds || (!!active && controlledIds.includes(active.id)));
-  const myNames = controlledIds ? game.players.filter((p) => controlledIds.includes(p.id)).map((p) => p.name) : null;
+  // The colour a seat picked, or its seat-index default (which reproduces the old per-seat tints for a
+  // default game — palette order rose/sky/amber/emerald). `colorIdOf` is the raw id (for `data-color`);
+  // `seatColor` is its Tailwind fill class.
+  const colorIdOf = (playerId: string): string => {
+    const picked = colors[playerId];
+    if (picked !== undefined && SEAT_CLASS[picked]) return picked;
+    const seat = game.players.findIndex((p) => p.id === playerId);
+    return PALETTE[(seat < 0 ? 0 : seat) % PALETTE.length]!;
+  };
+  const seatColor = (playerId: string): string => SEAT_CLASS[colorIdOf(playerId)]!;
+  // Same seat-binding rule as every game — the shared platform helper (§3.3): drive only when this
+  // client controls the active seat (or holds all of them, in hotseat), and never act for a bot seat.
+  const { canDrive, myNames } = seatIdentity({
+    players: game.players,
+    activePlayerId: active?.id ?? null,
+    bots,
+    controlledIds,
+  });
 
   const run = (work: () => Promise<cantstopApi.CantStopPayload>) => guard(async () => onPayload(await work()));
   const doRoll = () => {
@@ -101,10 +125,7 @@ export default function CantStopBoard({
         </GameOver>
       )}
 
-      <div
-        data-testid="identity-banner"
-        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-sm"
-      >
+      <TurnBanner testId="identity-banner" canDrive={canDrive} className="mb-0">
         <span>
           {myNames ? (
             <>
@@ -115,14 +136,19 @@ export default function CantStopBoard({
           )}
         </span>
         <span className={cn('font-medium', winner && 'text-primary')}>{turnLine}</span>
-      </div>
+      </TurnBanner>
 
       {/* Legend: each seat's colour + how many columns they've claimed (first to three wins). */}
       <div className="flex flex-wrap gap-3 text-xs">
-        {game.players.map((player, seat) => (
-          <span key={player.id} data-testid={`seat-legend-${player.id}`} className="flex items-center gap-1.5">
-            <span className={cn('inline-block h-3 w-3 rounded-full', seatColor(seat))} aria-hidden />
-            <span className={cn(seat === game.activePlayerIndex && 'font-semibold')}>{player.name}</span>
+        {game.players.map((player) => (
+          <span
+            key={player.id}
+            data-testid={`seat-legend-${player.id}`}
+            data-color={colorIdOf(player.id)}
+            className="flex items-center gap-1.5"
+          >
+            <span className={cn('inline-block h-3 w-3 rounded-full', seatColor(player.id))} aria-hidden />
+            <span className={cn(player.id === active?.id && 'font-semibold')}>{player.name}</span>
             <span className="text-muted-foreground">· {claimsOf(player.id)}/3</span>
           </span>
         ))}
@@ -178,7 +204,7 @@ export default function CantStopBoard({
                 <div
                   className={cn(
                     'flex h-5 w-6 items-center justify-center rounded text-[11px] font-semibold tabular-nums',
-                    claimedSeat >= 0 ? cn(seatColor(claimedSeat), 'text-white') : 'bg-muted text-muted-foreground',
+                    claimedBy ? cn(seatColor(claimedBy), 'text-white') : 'bg-muted text-muted-foreground',
                   )}
                   title={claimedBy ? `Won by ${game.players[claimedSeat]?.name}` : `Column ${col}`}
                   data-testid={claimedBy ? `claimed-${col}` : undefined}
@@ -189,7 +215,7 @@ export default function CantStopBoard({
                   {levels.map((level) => {
                     const runnerHere = game.runners[col] === level;
                     const squares = game.players
-                      .map((player, seat) => ({ seat, here: player.progress[col] === level }))
+                      .map((player) => ({ id: player.id, here: player.progress[col] === level }))
                       .filter((s) => s.here);
                     return (
                       <div
@@ -209,8 +235,8 @@ export default function CantStopBoard({
                         )}
                         {/* Banked progress is the rulebook's player-coloured *squares* — distinct from
                             the round temporary runners above. */}
-                        {squares.map(({ seat }) => (
-                          <span key={seat} className={cn('h-2 w-2 rounded-[2px]', seatColor(seat))} aria-hidden />
+                        {squares.map(({ id }) => (
+                          <span key={id} className={cn('h-2 w-2 rounded-[2px]', seatColor(id))} aria-hidden />
                         ))}
                       </div>
                     );
@@ -273,19 +299,15 @@ export default function CantStopBoard({
       </div>
       )}
 
-      {/* A compact activity feed — the whole log is public in Can't Stop. */}
-      {game.log.length > 0 && (
-        <ul data-testid="cantstop-log" className="space-y-0.5 text-xs text-muted-foreground">
-          {[...game.log]
-            .slice(-6)
-            .reverse()
-            .map((entry) => (
-              <li key={entry.seq}>
-                {game.players.find((p) => p.id === entry.playerId)?.name ?? entry.playerId}: {entry.type.toLowerCase()}
-              </li>
-            ))}
-        </ul>
-      )}
+      {/* The activity feed — the whole log is public in Can't Stop. Shared frame; the per-game part is
+          just the move-to-text `describe` (Can't Stop's moves need no more than their lowercased type). */}
+      <ActivityFeed
+        log={game.log}
+        players={game.players}
+        botIds={bots}
+        describe={(entry) => entry.type.toLowerCase()}
+        testId="cantstop-log"
+      />
     </div>
   );
 }

@@ -54,6 +54,11 @@ export interface BoardProps<S> {
   /** Seats an AI holds. Coordination state — beside the game, never inside it. */
   readonly bots: readonly string[];
   /**
+   * Each seat's chosen player colour (playerId → palette id). Coordination state beside the game like
+   * `bots`; a board maps the id to its own tint system, falling back to seat index when one is missing.
+   */
+  readonly colors: Readonly<Record<string, string>>;
+  /**
    * The seats this client may drive, or `null` for hotseat (drives them all). The shell owns seat
    * binding because it's a platform concern; the board consumes it to gate its own affordances.
    */

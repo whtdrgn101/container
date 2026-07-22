@@ -8,6 +8,7 @@ const stub = (id: string, overrides: Partial<GameModule<unknown, unknown>> = {})
   name: id,
   minPlayers: 2,
   maxPlayers: 4,
+  colors: [],
   createGame: () => ({}),
   applyAction: (state) => state,
   legalActions: () => [],
@@ -51,8 +52,8 @@ describe('GameRegistry', () => {
   it('lists games for the picker, in registration order', () => {
     const registry = new GameRegistry().register(stub('chess')).register(stub('go'));
     expect(registry.list()).toEqual([
-      { id: 'chess', name: 'chess', minPlayers: 2, maxPlayers: 4 },
-      { id: 'go', name: 'go', minPlayers: 2, maxPlayers: 4 },
+      { id: 'chess', name: 'chess', minPlayers: 2, maxPlayers: 4, colors: [] },
+      { id: 'go', name: 'go', minPlayers: 2, maxPlayers: 4, colors: [] },
     ]);
   });
 

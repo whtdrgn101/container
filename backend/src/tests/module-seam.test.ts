@@ -35,6 +35,8 @@ const counterModule: GameModule<CounterState, CounterAction> = {
   name: 'Counter',
   minPlayers: 2,
   maxPlayers: 3,
+  // A palette proves the contract's newest field — even a game nothing like Container declares one.
+  colors: ['red', 'green', 'blue'],
 
   createGame: (opts) => ({
     id: opts.id,
@@ -108,7 +110,9 @@ describe('a non-Container game hosted through the GameModule seam', () => {
 
   it('lists the hosted game in the catalog', async () => {
     const response = await app.inject({ method: 'GET', url: '/games/catalog' });
-    expect(response.json().games).toEqual([{ id: 'counter', name: 'Counter', minPlayers: 2, maxPlayers: 3 }]);
+    expect(response.json().games).toEqual([
+      { id: 'counter', name: 'Counter', minPlayers: 2, maxPlayers: 3, colors: ['red', 'green', 'blue'] },
+    ]);
   });
 
   it('creates a game through the module and projects it through its own viewFor', async () => {
@@ -175,6 +179,15 @@ describe('a non-Container game hosted through the GameModule seam', () => {
     const response = await app.inject({ method: 'GET', url: `/games/${game.id}` });
     expect(response.statusCode).toBe(200);
     expect(response.json().bots).toEqual([]);
+    // The payload's seat identity (§3.3) comes from the module's `summarize`, not a field off the
+    // game state — the counter's state has no `players` array at all, so a duck-typed core would send
+    // nothing here. This is the same honest test that caught the repository reading `state.version`.
+    const body = response.json() as { players: { id: string; name: string }[]; activePlayerId: string | null };
+    expect(body.players).toEqual([
+      { id: 'p1', name: 'Ann' },
+      { id: 'p2', name: 'Bo' },
+    ]);
+    expect(body.activePlayerId).toBe('p1');
     // Container's auction endpoints belong to Container's module, so they don't exist here at all.
     const auction = await app.inject({ method: 'GET', url: `/games/${game.id}/container/auction` });
     expect(auction.statusCode).toBe(404);

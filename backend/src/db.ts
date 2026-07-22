@@ -38,11 +38,15 @@ CREATE TABLE IF NOT EXISTS moves (
 
 -- Pre-game lobbies: a shareable room with N seats that players claim by name before the game starts.
 -- Stored as a JSON snapshot (like games); short-lived coordination state, not part of the engine.
+-- status is a real column, not only a JSON field, so the every-3s "waiting for players" poll and the
+-- expiry sweep can filter in SQL (indexed) instead of parsing every row ever created. It mirrors the
+-- authoritative status inside the data blob; LobbyRepository writes both in lockstep.
 CREATE TABLE IF NOT EXISTS lobbies (
   id         TEXT PRIMARY KEY,
   data       TEXT NOT NULL,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  status     TEXT NOT NULL DEFAULT 'open'
 );
 
 -- Pending delivery auctions: sealed bids collected from each player before the engine's single
@@ -70,6 +74,19 @@ CREATE TABLE IF NOT EXISTS game_bots (
   FOREIGN KEY (game_id) REFERENCES games(id)
 );
 
+-- Which colour each seat picked. Coordination state, exactly like game_bots: a colour is
+-- presentation (a player-color tint), never a rule, so the engine never learns it. The available
+-- palette is the module's (GameModule.colors); this table just records who ended up with which id.
+-- A separate table so CREATE TABLE IF NOT EXISTS picks it up on an existing database with no
+-- migration, and old games with no rows synthesize defaults from palette order at read time.
+CREATE TABLE IF NOT EXISTS game_colors (
+  game_id   TEXT NOT NULL,
+  player_id TEXT NOT NULL,
+  color     TEXT NOT NULL,
+  PRIMARY KEY (game_id, player_id),
+  FOREIGN KEY (game_id) REFERENCES games(id)
+);
+
 -- A proposed rematch of a finished game. Coordination state, game-agnostic (like lobbies/bots): when
 -- enough of the same players agree, a fresh game of the same type starts with the same seats + bot
 -- assignments. Keyed by the finished game; holds who has agreed and the new game's id once it starts.
@@ -82,6 +99,23 @@ CREATE TABLE IF NOT EXISTS rematches (
   updated_at  TEXT NOT NULL,
   FOREIGN KEY (game_id) REFERENCES games(id)
 );
+`;
+
+/**
+ * Indexes for the home-screen polls (`GET /games` + `GET /lobbies`, hit every 3s per visitor) and the
+ * lobby sweep. `CREATE INDEX IF NOT EXISTS` — unlike `ADD COLUMN` — *does* apply to an existing table,
+ * so these live in their own block run **after** `addMissingColumns` (below): a couple reference
+ * migrated columns (`abandoned_at`, `lobbies.status`) that a legacy database only grows during the
+ * migration, so building the index before that would throw "no such column".
+ *
+ * - games: `listActive` is `WHERE abandoned_at IS NULL ORDER BY updated_at DESC LIMIT` — a partial
+ *   index over exactly the un-abandoned rows, keyed on `updated_at`, matches it end to end.
+ * - lobbies: `listOpen` and the sweep are both `status = 'open' [AND created_at < ?] ORDER BY
+ *   created_at` — a `(status, created_at)` composite serves the filter and the ordering together.
+ */
+const INDEXES = `
+CREATE INDEX IF NOT EXISTS idx_games_active_updated ON games(updated_at) WHERE abandoned_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_lobbies_status_created ON lobbies(status, created_at);
 `;
 
 /**
@@ -103,6 +137,18 @@ const ADDED_COLUMNS: readonly { readonly table: string; readonly column: string;
     column: 'game_type',
     ddl: `ALTER TABLE games ADD COLUMN game_type TEXT NOT NULL DEFAULT 'container'`,
   },
+  // Promote `status` out of the JSON blob into a real, indexable column (REVIEW §4.3). The DEFAULT
+  // stamps every existing row 'open' as the column is added; the second statement then backfills the
+  // *true* status from each row's JSON so a already-started lobby isn't mislabeled open. `db.exec`
+  // runs both statements. (json_extract is core SQLite/JSON1, compiled into better-sqlite3.)
+  {
+    table: 'lobbies',
+    column: 'status',
+    ddl:
+      `ALTER TABLE lobbies ADD COLUMN status TEXT NOT NULL DEFAULT 'open';` +
+      `UPDATE lobbies SET status = json_extract(data, '$.status') ` +
+      `WHERE json_extract(data, '$.status') IN ('open', 'started')`,
+  },
 ];
 
 /** Bring an existing database up to the current schema. Additive only — never drops or rewrites. */
@@ -120,5 +166,6 @@ export function createDatabase(path = ':memory:'): DB {
   db.pragma('foreign_keys = ON');
   db.exec(SCHEMA);
   addMissingColumns(db);
+  db.exec(INDEXES); // after migrations: some indexes reference columns added there
   return db;
 }

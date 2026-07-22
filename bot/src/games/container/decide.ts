@@ -1,5 +1,6 @@
 import { deliveryOutcome, legalActions } from '@game-hub/engine/container';
 import type { Action, GameState, GameView } from '@game-hub/engine/container';
+import { assertBotTurn } from '../../kernel';
 import { chooseTiedWinner, wantsBuyout } from './bid';
 import { contextFor } from './context';
 import { BotError } from './errors';
@@ -63,15 +64,10 @@ function buildDelivery(ctx: Ctx, options: DecideOptions): Action {
  * The returned action is always fully parameterized and legal for `applyAction`.
  */
 export function decide(view: GameView, playerId: string, options: DecideOptions = {}): Action {
-  const me = selfOf(view, playerId);
-  if (view.status === 'ended') {
-    throw new BotError(`Game "${view.id}" has ended — there is nothing to decide`);
-  }
-
-  const active = view.players[view.activePlayerIndex];
-  if (!active || active.id !== playerId) {
-    throw new BotError(`It is not bot seat "${playerId}"'s turn (active seat is "${active?.id ?? 'none'}")`);
-  }
+  // `selfOf` runs first: it enforces that the bot's *own* card is visible (the caller passed the
+  // right view), independent of the shared turn checks.
+  selfOf(view, playerId);
+  assertBotTurn(view, playerId);
 
   const ctx = contextFor(view, playerId);
 

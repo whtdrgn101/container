@@ -83,11 +83,24 @@ WebSocket (`GameHub`), each projected per-viewer via `viewFor`. The socket is pu
 
 **Coordination state lives outside the engine.** Anything that is *not* a rule — pre-game lobbies
 (`lobbies.ts`), pending delivery auctions (`games/container/auctions.ts`), which seats are bots
-(`bots.ts`), and rematch proposals (`rematch.ts`) — is backend state with its own table and its own
-per-viewer projection. The engine stays a pure `state + action → state` library that knows nothing about
-rooms, sealed bids, bots, or rematches. Reach for this pattern before reaching into the engine.
-Game-agnostic ones (bots, abandon, rematch) live in the core with no `GameModule` hook, so every game
-gets them free.
+(`bots.ts`), which colour each seat picked (`colors.ts`), and rematch proposals (`rematch.ts`) — is
+backend state with its own table and its own per-viewer projection. The engine stays a pure
+`state + action → state` library that knows nothing about rooms, sealed bids, bots, colours, or
+rematches. Reach for this pattern before reaching into the engine. Game-agnostic ones (bots, colours,
+abandon, rematch) live in the core with no `GameModule` hook, so every game gets them free.
+
+**Player colours** are the worked example of this pattern (like bots): each game's `GameModule`
+declares an ordered palette (`colors: readonly string[]`, lowercase ids — Container's are its five hull
+tints, Stone Age's four seat tints, Can't Stop's four). The platform offers the pick (lobby join takes
+an optional `color`; `POST /lobbies/:id/color` changes it while waiting — validated against the
+palette, `400 INVALID_COLOR` / `409 COLOR_TAKEN` on a bad or taken pick), assigns colours on
+create/start (picks honoured, the rest defaulted in **palette order** — which reproduces each board's
+old per-seat-index tints, so visual baselines don't move), and persists them beside the game in
+`game_colors` (`colors.ts`, exactly the `bots.ts` shape). Colours ride **every** state payload as
+`colors: Record<playerId, colorId>` (GET, the action reply, create/start 201s, a module route's own
+state reply via `ctx.colorsFor`, and the WS push); old games with no rows synthesise defaults from
+palette order at read time. A board maps the id to its own tint system, falling back to seat index when
+one is missing. **The engine never learns a colour** — it is presentation, same rule as bots.
 
 ### The `GameModule` seam (Track C / C0 + C1)
 
@@ -105,8 +118,9 @@ literal: **three games** (Container, Can't Stop, Stone Age) run side by side on 
   correctness, not tidiness: unprefixed, two games both wanting `/auction` is a boot crash, and
   whichever registered first would be handed **every** game's requests. A scope guard also refuses any
   row that isn't that module's type (`WRONG_GAME_TYPE`), because a prefix is just a URL anyone can type.
-- **Seat ranges, action types, errors and bots are all the module's** — `POST /lobbies {gameType}`
-  validates against *that game's* min/max, not a constant.
+- **Seat ranges, action types, errors, bots and the colour palette are all the module's** —
+  `POST /lobbies {gameType}` validates seats against *that game's* min/max, not a constant, and a colour
+  pick against *that game's* `colors` palette (exposed on `GET /games/catalog` beside the seat bounds).
 - **`GameHub` is game-agnostic**: it fans out per-viewer messages and projects nothing itself, so
   redaction stays an explicit decision made by code that knows the game.
 - **An unregistered `game_type`** (a module pulled while its rows remain) is `409 GAME_TYPE_UNAVAILABLE`,
@@ -154,12 +168,24 @@ game's state.
   against Container — don't put a game's concept back into the transport.
 - **The header's status line is a plugin slot** (`GameClient.Status`), because "2 actions left" is a
   Container rule. Keep `Status` cheap and non-lazy: it renders before the board chunk lands.
+- **Platform rules that were three copies now live in `ui/src/components/` (C2 / REVIEW §3.3):**
+  `seatIdentity` (the `canDrive` + `myNames` seat-binding rule — gate every action affordance on
+  `canDrive`), `TurnBanner` (the `role="status"` / `aria-live="polite"` turn banner every board feeds its
+  own message into), and `ActivityFeed` (the scrollable, 60-entry, 🤖-badged log; the per-game part is a
+  `describe(entry) => string | null` closure). **These are typed off the payload's plain seat shape, never
+  off `@game-hub/engine`** — `e2e/architecture.spec.ts` fails the build if the shell imports a game. A
+  board keeps its own banner wording and `describe`; the frame is shared.
 - **The board is lazy** (`lazy(() => import('./Board'))`) and must stay that way — it's a real 41 kB
   chunk carrying the engine, the panels and the art, and the hub's landing screen ships none of it.
   Importing the board (or anything heavy) from `games/container/index.ts` would silently undo that.
-- **Every game payload carries `gameType`** (`{ game, gameType, bots }`, plus the WS state push), which
-  is how the shell picks a board for a state it just fetched. A new route returning game state must
-  include it.
+- **Every game payload carries `gameType`** (`{ game, gameType, bots, colors, players, activePlayerId }`,
+  plus the WS state push), which is how the shell picks a board for a state it just fetched. `players`
+  (`{ id, name }[]`) + `activePlayerId` are the **secret-free seat identity** the shell uses to name seats
+  (tab title, rematch) and apply seat binding **without duck-typing the opaque `game`** (REVIEW §3.3);
+  they come from the module's `summarize`, so the core still reads no game field. `colors`
+  (`Record<playerId, colorId>`) rides along the same way `bots` does — coordination state beside the
+  game, threaded through `lib/api.ts` → `useGameTransport` → `BoardProps.colors` to the board (the shell
+  never reads it). A new route returning game state must include all of them.
 
 - **The honest test is `tests/module-seam.test.ts`**, which drives a stub *counter* game through the core.
   Container's own tests pass fine even if the core is secretly hardcoded to Container — only a second
@@ -210,7 +236,10 @@ No bot code goes in `engine/`, and the engine must never learn what a bot is. A 
 authoritative — it just produces an `Action` that the engine validates like any human's move.
 
 - **Per-game, like the engine and backend.** `bot/src/games/<game>/` (Container, Can't Stop, Stone Age)
-  over a tiny `bot/src/kernel/` (just `BotError`), exported by **subpath** — `@game-hub/bot/container`,
+  over a tiny `bot/src/kernel/` — `BotError`, plus two helpers extracted once the third game made them
+  common (REVIEW §3.4): `assertBotTurn(view, playerId)` (the byte-identical `decide` preamble —
+  ended-check + not-your-turn check, returning the active seat) and `makeProgressGuard` (the self-play
+  runaway guard, per-turn/per-round progress detection). Exported by **subpath** — `@game-hub/bot/container`,
   `@game-hub/bot/cantstop`, `@game-hub/bot/stoneage`, no `.` default. Each game's backend module wires
   its own bot through `createBotDriver`. The bullets below split into a general rule and each game's specifics.
 - **Bots decide from a `GameView`, never a `GameState`:** `decide(viewFor(state, botId), botId)`. Taking
@@ -305,10 +334,15 @@ and each has an "only the game knows this" rule. To add a game `foo`:
    `createGame` input, so the state function is deterministic and the 100% gate is reachable.
 2. **Backend** — `backend/src/games/foo/` implementing `GameModule<State, Action>` (`createGame`,
    `applyAction`, `legalActions`, `viewFor`, `parseAction`, `summarize`, `versionOf`, `movesOf`,
-   `mapError`), and `.register(fooModule)` in `games/index.ts`. **`parseAction` accepts only the
-   actions a *client* may send.** A game's own endpoints (and any server-only action) go behind
-   `routes` under `/games/:id/foo/…` — never into the core, and never re-add a `type` enum to
-   `POST /actions`.
+   `mapError`, plus a `colors` palette), and `.register(fooModule)` in `games/index.ts`. **`parseAction`
+   accepts only the actions a *client* may send.** A game's own endpoints (and any server-only action)
+   go behind `routes` under `/games/:id/foo/…` — never into the core, and never re-add a `type` enum to
+   `POST /actions`. If such a route replies with game state, include `colors: ctx.colorsFor(id, state)`
+   so its shape matches the core payload.
+   - **Declare `colors`** — an ordered palette of lowercase colour ids that is *foo's current seat
+     tints in seat order* (so the palette-order default reproduces the board's existing look). The
+     platform handles the picking, uniqueness, persistence (`game_colors`) and wiring; foo just names
+     the ids. It should cover `maxPlayers`. These are **player** colours, not any game-piece colour.
    - **Per-turn randomness is injected via `ModuleContext.rng`** (added for Can't Stop's dice). A
      module route rolls from `ctx.rng` and applies a pure engine action carrying the result — the
      client only asks; it can't choose the dice. **Never reach for `Math.random` in a module.**
@@ -320,7 +354,9 @@ and each has an "only the game knows this" rule. To add a game `foo`:
    `cantstopClient`-style registration in `games/registry.ts` (the one cast). Render `foo`'s end screen
    with the shared `components/GameOver` frame so every game ends the same way. **No shell file may
    import `@game-hub/engine/*`** — `e2e/architecture.spec.ts` enforces it. The landing picker activates
-   automatically once two games are registered.
+   automatically once two games are registered. Map `BoardProps.colors` (playerId → colour id) to foo's
+   own tint system, falling back to seat index when a colour is missing — the shell threads it in; the
+   waiting-room swatch picker is generic and needs nothing per-game.
 4. **Tests** — 100% engine coverage for `foo`; a backend suite that plays it over REST (seed
    `AppOptions.rng` for deterministic rolls) and asserts it coexists with the other games; an
    `e2e/foo.spec.ts` that picks it and plays a turn. Keep every existing suite green.

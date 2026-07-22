@@ -1,6 +1,6 @@
 import { DICE_COUNT, DIE_FACES, applyAction, viewFor } from '@game-hub/engine/cantstop';
 import type { CantStopState } from '@game-hub/engine/cantstop';
-import { BotError } from '../../kernel';
+import { makeProgressGuard } from '../../kernel';
 import { decide } from './decide';
 
 export interface SelfPlayOptions {
@@ -43,26 +43,14 @@ export function playSelfPlay(initial: CantStopState, options: SelfPlayOptions): 
 
   let state = initial;
   let actions = 0;
-  let actionsThisTurn = 0;
-  let turn = state.turn;
+  const guard = makeProgressGuard({ maxPerMarker: MAX_ACTIONS_PER_TURN, marker: 'turn', initial: state.turn });
 
   while (state.status === 'active' && state.turn < maxTurns) {
     const active = state.players[state.activePlayerIndex]!;
     const action = decide(viewFor(state, active.id), active.id, { rollDice });
     state = applyAction(state, active.id, action);
     actions += 1;
-
-    if (state.turn === turn) {
-      actionsThisTurn += 1;
-      if (actionsThisTurn > MAX_ACTIONS_PER_TURN) {
-        throw new BotError(
-          `Bot seat "${active.id}" took ${actionsThisTurn} actions in turn ${turn} without ending it — a policy is cycling`,
-        );
-      }
-    } else {
-      turn = state.turn;
-      actionsThisTurn = 0;
-    }
+    guard.record(state.turn, active.id);
   }
 
   return { state, turns: state.turn, actions, completed: state.status === 'ended' };

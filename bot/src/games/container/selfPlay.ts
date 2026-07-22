@@ -1,8 +1,8 @@
 import { applyAction, viewFor } from '@game-hub/engine/container';
 import type { Color, GameState } from '@game-hub/engine/container';
+import { makeProgressGuard } from '../../kernel';
 import { bidFor, runoffBidFor } from './bid';
 import { decide } from './decide';
-import { BotError } from './errors';
 
 export interface SelfPlayOptions {
   /** Abandon the game after this many turns. Guards against a policy that never ends the game. */
@@ -39,8 +39,7 @@ export function playSelfPlay(initial: GameState, options: SelfPlayOptions = {}):
   const maxTurns = options.maxTurns ?? DEFAULT_MAX_TURNS;
   let state = initial;
   let actions = 0;
-  let actionsThisTurn = 0;
-  let turn = state.turn;
+  const guard = makeProgressGuard({ maxPerMarker: MAX_ACTIONS_PER_TURN, marker: 'turn', initial: state.turn });
 
   while (state.status === 'active' && state.turn < maxTurns) {
     const active = state.players[state.activePlayerIndex]!;
@@ -71,18 +70,7 @@ export function playSelfPlay(initial: GameState, options: SelfPlayOptions = {}):
     const action = decide(viewFor(state, active.id), active.id, { collectBids, collectRunoffBids });
     state = applyAction(state, active.id, action);
     actions += 1;
-
-    if (state.turn === turn) {
-      actionsThisTurn += 1;
-      if (actionsThisTurn > MAX_ACTIONS_PER_TURN) {
-        throw new BotError(
-          `Bot seat "${active.id}" took ${actionsThisTurn} actions in turn ${turn} without ending it — a policy is cycling`,
-        );
-      }
-    } else {
-      turn = state.turn;
-      actionsThisTurn = 0;
-    }
+    guard.record(state.turn, active.id);
   }
 
   return {

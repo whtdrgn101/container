@@ -37,6 +37,19 @@ export interface GameModule<S, A> {
   readonly maxPlayers: number;
 
   /**
+   * The player-colour palette this game offers, an ordered list of lowercase colour ids (e.g. Stone
+   * Age's `['red','blue','green','yellow']`). The platform offers the pick and enforces uniqueness;
+   * the game just declares which ids exist and in what order.
+   *
+   * **Order is load-bearing.** With no picks, seat `i` gets `palette[i]` (see `assignColors`), which
+   * must reproduce each board's existing per-seat-index tints — so a game's palette is *its current
+   * seat colours, in its current order*. Should cover `maxPlayers` so every seat can get a distinct
+   * colour. These are **player** colours (a seat tint), not any game-piece colour a game may also have
+   * (Container's container cargo is white/red/green/blue/yellow — unrelated to this).
+   */
+  readonly colors: readonly string[];
+
+  /**
    * Build a fresh game. **`rng` is injected, never reached for.** Every engine here is pure and
    * deterministic; the module must not call `Math.random` itself, or replay and reproducible tests
    * both die. (Container shuffles its scoring deck with this.)
@@ -188,4 +201,11 @@ export interface ModuleContext {
   readonly pushGame: (gameId: string, state: unknown) => void;
   /** This game's AI driver, for routes that must let the bots answer before replying. */
   readonly bots: BotDriver;
+  /**
+   * Each seat's chosen colour for a game (playerId → palette id), synthesising palette-order defaults
+   * for any seat without a stored pick. Exposed so a module's *own* state-returning route (Can't Stop's
+   * roll, Container's auction resolve) replies with the same `{ game, gameType, bots, colors }` shape
+   * the core's `gamePayload` does — a colour is coordination state the module itself never stores.
+   */
+  readonly colorsFor: (gameId: string, state: unknown) => Record<string, string>;
 }

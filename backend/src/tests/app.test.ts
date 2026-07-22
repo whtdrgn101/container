@@ -156,6 +156,42 @@ describe('GET /games/:id', () => {
   });
 });
 
+describe('Game payload seat identity (REVIEW §3.3)', () => {
+  // Shape asserted structurally so a game that named its seats differently can't quietly satisfy it.
+  interface IdentityPayload {
+    players: { id: string; name: string }[];
+    activePlayerId: string | null;
+  }
+
+  it('carries players + activePlayerId on the create response', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/games',
+      payload: { players: [{ name: 'Ann' }, { name: 'Bob' }, { name: 'Cid' }] },
+    });
+    const body = response.json() as IdentityPayload;
+    expect(body.players).toEqual([
+      { id: 'p1', name: 'Ann' },
+      { id: 'p2', name: 'Bob' },
+      { id: 'p3', name: 'Cid' },
+    ]);
+    expect(body.activePlayerId).toBe('p1');
+  });
+
+  it('carries the same identity on GET', async () => {
+    const game = await createThreePlayerGame();
+    const body = (await app.inject({ method: 'GET', url: `/games/${game.id}` })).json() as IdentityPayload;
+    expect(body.players.map((p) => p.name)).toEqual(['Ann', 'Bob', 'Cid']);
+    expect(body.activePlayerId).toBe('p1');
+  });
+
+  it('advances activePlayerId on the POST /actions reply as the turn moves', async () => {
+    const game = await createThreePlayerGame();
+    const body = (await act(game.id, 'p1', { type: 'END_TURN' })).json() as IdentityPayload;
+    expect(body.activePlayerId).toBe('p2');
+  });
+});
+
 describe('POST /games/:id/actions', () => {
   it('produces containers and persists the new state', async () => {
     const game = await createThreePlayerGame();
@@ -434,11 +470,15 @@ describe('GET /games/:id/stream (WebSocket, B2)', () => {
     expect(initial.game.version).toBe(0);
     expect(initial.game.players[0]!.scoringCard).not.toBeNull();
     expect(initial.game.players[1]!.scoringCard).toBeNull();
+    // Secret-free seat identity rides the push too (§3.3), so the shell needn't read `game`.
+    expect(initial.players.map((p) => p.name)).toEqual(['Ann', 'Bob', 'Cid']);
+    expect(initial.activePlayerId).toBe('p1');
 
     // p1 ends their turn over REST; the socket receives a fresh push...
     await act(game.id, 'p1', { type: 'END_TURN' });
     const pushed = await next();
     expect(pushed.game.activePlayerIndex).toBe(1);
+    expect(pushed.activePlayerId).toBe('p2'); // identity follows the turn
     // ...now projected for the new active player (seat 1), so the reveal follows the turn.
     expect(pushed.game.players[1]!.scoringCard).not.toBeNull();
     expect(pushed.game.players[0]!.scoringCard).toBeNull();

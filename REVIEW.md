@@ -41,10 +41,11 @@ That's a high floor. Two things qualify it:
   - [x] 2.4 SPA-fallback test
 - [~] **Tier 3 — kernel/board/bot extraction** (do before game 4)
   - [x] 3.2 kernel extraction — `record()` + seat helpers
-  - [ ] 3.1 end-state discriminated union
-  - [ ] 3.3 UI shell fields + shared board components
-  - [ ] 3.4 hoist the bot drive-loop
-- [ ] **Tier 4 — ops hardening**
+  - [x] 3.4 hoist the bot drive-loop (+ the two safe bot-package extractions)
+  - [x] 3.3 UI shell fields + shared board components
+  - [ ] 3.1 end-state discriminated union (the one Tier 3 item still open)
+- [~] **Tier 4 — ops hardening** — 4.3 (lobby poll bounds + retention) and 4.4 (graceful shutdown,
+  DB-checking health, WAL-safe backups) done; 4.1/4.2/4.5/4.6/4.7 open
 - [ ] **Tier 5 — worth knowing**
 
 ---
@@ -255,11 +256,23 @@ has no secrets" and "I forgot to redact" the same line of code); `legalActions`'
 deliberately breaks it — an off-turn seat may still `REQUEST_LOAN`, rulebook pg. 16); and a shared
 bot `rank`/`decide` scaffold (see §3.4).
 
-### 3.3 The UI shell duck-types game state, and three boards re-implement platform rules
+### 3.3 The UI shell duck-types game state, and three boards re-implement platform rules ✅
 
-> **Interim note (2026-07-21):** Stone Age's board now computes `myNames` and shows a "You are X — "
-> banner (`role="status"`, `aria-live="polite"`) — the same one-liner Can't Stop carries, duplicated a
-> third time on purpose. The full extraction below absorbs it.
+> **Done.** The game payload (`{ game, gameType, bots }`) now also carries secret-free seat identity —
+> `players: { id, name }[]` + `activePlayerId` — sourced from each module's existing `summarize`, so the
+> **core still reads no field off a game state**. It rides all three state paths (GET, the `POST /actions`
+> reply, the WS push) plus the create/start responses; `hub.ts`'s `StateMessage` and the UI's
+> `GamePayload`/`StatePush` gained the fields, and `useGameTransport` exposes `players` / `activePlayerId`
+> / `gameId`. **`App.tsx`'s two `game as { … }` casts are gone** — the `players` duck-type (tab title +
+> rematch) and the `gameId` duck-type both now read the payload. Three shared components landed in
+> `ui/src/components/` (typed off the payload shape, never off `@game-hub/engine` — the architecture spec
+> still passes): `seatIdentity` (the `canDrive` + `myNames` platform rule, replacing three byte-identical
+> copies), `TurnBanner` (`role="status"` + `aria-live="polite"` — **now all three games announce turns to
+> screen readers**, not just Stone Age's interim fix), and `ActivityFeed` (Container's scrollable 60-entry
+> 🤖-badged feed, adopted by Can't Stop and Stone Age in place of their inline 6-entry copies; the per-game
+> part is one `describe(entry) => string | null`). Boards keep their game-specific copy (banner wording,
+> `describe`). Backend +3 tests (identity on create/GET/actions, and the counter-game seam test proving it
+> comes from `summarize`, not `game.players`); all 114 e2e green, visual baselines undisturbed.
 
 `App.tsx` casts `players` straight off the opaque state to get seat names for the tab title and
 rematch. The `version` guard in `useGameTransport` is documented and defensible; this isn't. A game 4
@@ -281,7 +294,22 @@ That fix unblocks the rest, because the only reason the shell can't compute thes
 
 The shared `components/GameOver.tsx` — used correctly by all three — is the precedent and the model.
 
-### 3.4 Hoist the bot drive-loop; do not hoist `decide`
+### 3.4 Hoist the bot drive-loop; do not hoist `decide` ✅
+
+> **Done.** The drive-loop now lives once in `backend/src/botLoop.ts` — a game-agnostic
+> `runBotLoop({ gameId, maxSteps, label, get, botSeats, preStep?, step })` that imports **nothing** from
+> `@game-hub/engine` (C0 seam), reading only a structural `BotLoopState`. The three runners keep their
+> genuinely per-game `step` (Container also supplies a `preStep` for its delivery auction, returning
+> `'stepped' | 'waiting' | 'idle'`); observable behaviour is byte-identical (183 backend tests green,
+> cantstop/stoneage `botRunner.ts` now 100% covered). §1.1 (containment stays in `app.ts`'s `tick`) and
+> §1.4 (the loud runaway throw) now live in one place. **`decide`/`rank` were NOT hoisted** (as ruled).
+> The two safe bot-package extractions also shipped: `bot/src/kernel/turn.ts`'s `assertBotTurn` (the
+> byte-identical `decide` preamble, wired into all three games; Container keeps its `selfOf` check
+> ahead of it) and `bot/src/kernel/progress.ts`'s `makeProgressGuard` (the self-play cycling guard) —
+> **Stone Age switched from its flat 100k-action cap to per-round detection** (`MAX_ACTIONS_PER_ROUND`
+> = 500), so a cycle now fails in ~one round. Its self-play error message unified to the shared
+> `Bot seat … took N actions in round R …` shape (no test asserted the old wording). Bot 157 tests /
+> 98.53% coverage; engine 349 tests / 100% untouched.
 
 The three runners are the same ~15 lines modulo the `decide` import and the roll shape; Container's
 adds one auction pre-step. A core `runBotLoop({ get, botSeats, isActiveBot, step, maxSteps })` would
@@ -322,7 +350,21 @@ Related, and worth a code comment: the handler is currently race-free only **acc
 is no `await` between load and update, and better-sqlite3 is synchronous, so it runs atomically.
 Adding a single `await` to that block silently introduces a lost-update race.
 
-### 4.3 `listOpen()` has no LIMIT, and lobbies are never deleted
+### 4.3 `listOpen()` has no LIMIT, and lobbies are never deleted ✅
+
+> **Done.** `lobbies.status` is now a real, indexed column (JSON blob stays authoritative; the
+> repository writes both in lockstep), backfilled onto live databases via `ADDED_COLUMNS` — the
+> `ALTER` DEFAULTs every row 'open', then a `json_extract` UPDATE corrects the already-started ones so
+> a started lobby can't resurface. `listOpen` is now `WHERE status = 'open' ORDER BY created_at DESC
+> LIMIT 50`, with only the free-seat check (which SQL can't cheaply do over the `members` array) left
+> in JS — mirroring `listActive`. Indexes added (created **after** the migration, since two reference
+> migrated columns): a **partial** `idx_games_active_updated ON games(updated_at) WHERE abandoned_at IS
+> NULL` for the resume poll, and a composite `idx_lobbies_status_created ON lobbies(status, created_at)`
+> for the lobby poll *and* the sweep. **Retention:** `deleteExpiredOpen` drops never-started open
+> lobbies past a **24h** TTL (started ones are kept — join-by-code resolves them to their game); it runs
+> once at boot and hourly thereafter on an `unref`'d, close-cleared timer. Tests: `ops.test.ts` (cap
+> bound, started/full exclusion, status-in-sync-on-update, TTL sweep, boot sweep, the status migration
+> + index presence).
 
 Every lobby row ever created is selected, `JSON.parse`'d and filtered **in JS** — while the home
 screen polls `GET /lobbies` **every 3 seconds per visitor**, and nothing ever deletes a lobby, on a
@@ -334,7 +376,19 @@ The game repository got this right (SQL filter, `LIMIT 50`, with a comment expla
 
 Most likely cause of a gradually-slowing home server.
 
-### 4.4 No graceful shutdown; the health check checks nothing
+### 4.4 No graceful shutdown; the health check checks nothing ✅
+
+> **Done.** `server.ts` now handles `SIGTERM`/`SIGINT` (double-fire-guarded): it `await app.close()`s
+> to drain in-flight requests, then `db.close()`. `/health` runs a real `SELECT 1` through the
+> better-sqlite3 handle and returns **503** when it throws (unmounted/locked/closed volume), so the
+> compose `fetch(...).ok` check + `restart: unless-stopped` can actually fire — verified by an
+> `ops.test.ts` that closes the DB under a live app and asserts 503. DEPLOY.md's backup section was
+> rewritten from the WAL-torn `docker cp` of the live file to `VACUUM INTO` (atomic, WAL-correct,
+> live-safe) with a copy-pasteable timestamped `docker exec … node -e` command — **verified end to end**
+> against a live WAL database (single standalone file, no sidecars, rows intact). The `/actions`
+> load→apply→update stretch got the requested comment: it is race-free only because it is synchronous
+> (no `await`, better-sqlite3 is synchronous); adding an `await` opens a lost-update race — handler left
+> unrestructured.
 
 No `SIGTERM`/`SIGINT` handler anywhere — `docker stop` cuts in-flight requests and never calls
 `app.close()` or `db.close()`. WAL makes this crash-*safe*, but not clean.

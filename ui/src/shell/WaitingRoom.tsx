@@ -10,10 +10,34 @@ import type { Lobby } from '@/lib/api';
  * them, which is true of every game. The seat *count* was the lobby's business when it was created;
  * by the time you're here it's just a number.
  */
+/**
+ * Swatch fills for the colour picker. The palette ids come from the game's catalog entry, so the shell
+ * stays game-agnostic; this only says how to *draw* an arbitrary id. A known id gets an exact hex; any
+ * other falls back to using the id as a CSS colour (works for plain names like red/blue/teal/indigo).
+ */
+const SWATCH: Record<string, string> = {
+  indigo: '#4f46e5',
+  teal: '#0d9488',
+  rose: '#e11d48',
+  amber: '#d97706',
+  violet: '#7c3aed',
+  red: '#ef4444',
+  blue: '#3b82f6',
+  green: '#22c55e',
+  yellow: '#eab308',
+  sky: '#0ea5e9',
+  emerald: '#10b981',
+};
+const swatchColor = (id: string): string => SWATCH[id] ?? id;
+
 export interface WaitingRoomProps {
   readonly lobby: Lobby;
   /** Seat indices this client has claimed (a solo tester can hold several). */
   readonly mySeats: number[];
+  /** The game's colour palette (ordered ids), from its catalog entry. Empty ⇒ no picker. */
+  readonly palette: readonly string[];
+  /** Pick a colour for one of your claimed seats. */
+  readonly onPickColor: (seat: number, color: string) => void;
   readonly seatName: string;
   readonly onSeatNameChange: (name: string) => void;
   readonly busy: boolean;
@@ -26,6 +50,8 @@ export interface WaitingRoomProps {
 export function WaitingRoom({
   lobby,
   mySeats,
+  palette,
+  onPickColor,
   seatName,
   onSeatNameChange,
   busy,
@@ -35,6 +61,10 @@ export function WaitingRoom({
   onLeave,
 }: WaitingRoomProps) {
   const hasEmptySeat = lobby.members.some((member) => member === null);
+  // Which seats this client holds and can pick a colour for, in seat order.
+  const mineClaimed = mySeats
+    .filter((seat) => lobby.members[seat] != null)
+    .sort((a, b) => a - b);
 
   return (
     <Card className="mx-auto max-w-md" data-testid="lobby">
@@ -73,6 +103,51 @@ export function WaitingRoom({
             </li>
           ))}
         </ul>
+
+        {/* Colour picker: one row per seat this client holds. Taken colours are disabled; your own
+            current pick is ringed. The palette is the game's, from its catalog entry. */}
+        {palette.length > 0 && mineClaimed.length > 0 && (
+          <div className="space-y-2" data-testid="color-picker">
+            {mineClaimed.map((seat) => {
+              const mine = lobby.members[seat]?.color;
+              const takenByOthers = new Set(
+                lobby.members
+                  .map((member, i) => (i === seat ? undefined : member?.color))
+                  .filter((color): color is string => color !== undefined),
+              );
+              return (
+                <div key={seat} className="flex items-center gap-2" data-testid={`color-row-${seat}`}>
+                  <span className="w-14 shrink-0 text-xs text-muted-foreground">Seat {seat + 1}</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {palette.map((color) => {
+                      const taken = takenByOthers.has(color);
+                      const picked = mine === color;
+                      return (
+                        <button
+                          key={color}
+                          type="button"
+                          data-testid={`color-pick-${seat}-${color}`}
+                          data-color={color}
+                          aria-label={`${color}${picked ? ' (your colour)' : taken ? ' (taken)' : ''}`}
+                          aria-pressed={picked}
+                          title={color}
+                          disabled={busy || taken}
+                          onClick={() => onPickColor(seat, color)}
+                          className={cn(
+                            'h-6 w-6 rounded-full border transition-transform',
+                            picked && 'ring-2 ring-primary ring-offset-1',
+                            taken ? 'cursor-not-allowed opacity-30' : 'hover:scale-110',
+                          )}
+                          style={{ backgroundColor: swatchColor(color) }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {hasEmptySeat && (
           <div className="flex gap-2">

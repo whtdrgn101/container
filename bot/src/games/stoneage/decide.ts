@@ -8,7 +8,7 @@ import {
   isUsePlace,
 } from '@game-hub/engine/stoneage';
 import type { Action, FixedPlaceId, PlaceId, StoneAgeView } from '@game-hub/engine/stoneage';
-import { BotError } from '../../kernel';
+import { BotError, assertBotTurn } from '../../kernel';
 import { buildingPaymentFor, cardPaymentFor, chooseTools, foodDeficit, pickPlacement } from './policy';
 import type { DecideOptions } from './types';
 
@@ -24,13 +24,7 @@ import type { DecideOptions } from './types';
  *   first so the resources are in hand before buying.
  */
 export function decide(view: StoneAgeView, playerId: string, options: DecideOptions = {}): Action {
-  if (view.status === 'ended') {
-    throw new BotError(`Game "${view.id}" has ended — there is nothing to decide`);
-  }
-  const active = view.players[view.activePlayerIndex];
-  if (!active || active.id !== playerId) {
-    throw new BotError(`It is not bot seat "${playerId}"'s turn (active seat is "${active?.id ?? 'none'}")`);
-  }
+  const active = assertBotTurn(view, playerId);
 
   if (view.phase === 'placement') {
     return { type: 'PLACE', ...pickPlacement(view, playerId) };

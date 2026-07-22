@@ -1,5 +1,5 @@
 import type { Action, CantStopView } from '@game-hub/engine/cantstop';
-import { BotError } from '../../kernel';
+import { BotError, assertBotTurn } from '../../kernel';
 import { pickPairing, shouldRoll } from './policy';
 import type { DecideOptions } from './types';
 
@@ -14,13 +14,7 @@ import type { DecideOptions } from './types';
  *   the same contract Container's `decide` has for `collectBids`.
  */
 export function decide(view: CantStopView, playerId: string, options: DecideOptions = {}): Action {
-  if (view.status === 'ended') {
-    throw new BotError(`Game "${view.id}" has ended — there is nothing to decide`);
-  }
-  const active = view.players[view.activePlayerIndex];
-  if (!active || active.id !== playerId) {
-    throw new BotError(`It is not bot seat "${playerId}"'s turn (active seat is "${active?.id ?? 'none'}")`);
-  }
+  assertBotTurn(view, playerId);
 
   if (view.phase === 'selecting') {
     return { type: 'SELECT', columns: pickPairing(view) };

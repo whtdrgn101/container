@@ -18,6 +18,8 @@ export const stoneAgeModule: GameModule<StoneAgeState, Action> = {
   name: 'Stone Age',
   minPlayers: MIN_PLAYERS,
   maxPlayers: MAX_PLAYERS,
+  // The four seat tints the board already colours meeples/ribbons with, in seat order (see its Board.tsx).
+  colors: ['red', 'blue', 'green', 'yellow'],
 
   createGame: (opts) => newStoneAgeGame(opts),
 

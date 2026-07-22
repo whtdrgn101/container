@@ -1,6 +1,7 @@
 import { bidFor, chooseTiedWinner, contextFor, decide, runoffBidFor, wantsBuyout } from '@game-hub/bot/container';
 import { applyAction, viewFor } from '@game-hub/engine/container';
 import type { GameState } from '@game-hub/engine/container';
+import { runBotLoop } from '../../botLoop';
 import type { BotRepository } from '../../bots';
 import type { AuctionRepository, DeliveryAuction } from './auctions';
 import { applyBid, biddersFor, outcomeOf, syncAuction, tiedForLead } from './auctions';
@@ -59,34 +60,25 @@ export class BotRunner {
    * it's already a human's turn, or on a finished game — it simply does nothing.
    */
   tick(gameId: string): void {
-    for (let step = 0; step < MAX_STEPS; step += 1) {
-      const state = this.repo.get(gameId);
-      if (!state || state.status !== 'active') return;
-
-      const botIds = new Set(this.bots.listForGame(gameId));
-      if (botIds.size === 0) return;
-
+    runBotLoop<GameState>({
+      gameId,
+      maxSteps: MAX_STEPS,
+      label: 'Container',
+      get: (id) => this.repo.get(id),
+      botSeats: (id) => this.bots.listForGame(id),
       // A pending auction outranks the turn: everyone owes a bid before the deliverer can act.
-      const auction = syncAuction(this.auctions, state);
-      if (auction) {
-        if (!this.advanceAuction(state, auction, botIds)) return; // waiting on a human
-        continue;
-      }
-
-      const active = state.players[state.activePlayerIndex]!;
-      if (!botIds.has(active.id)) return; // a human's move
-
-      // No `collectBids`: a bot at the island is handled by the auction above, never here.
-      this.applyBotAction(state, active.id);
-    }
-    // MAX_STEPS with no human on the clock (turn, bid, or delivery call) means a policy is cycling on a
-    // legal-but-non-progressing action. Throw (the app's `tick` contains and logs it) rather than fall
-    // out silently and re-run the whole spin on every read — the invisible per-read DoS this guards.
-    throw new Error(`Container bot runner exceeded ${MAX_STEPS} steps for game "${gameId}" — a policy is likely cycling`);
+      preStep: (state, botIds) => {
+        const auction = syncAuction(this.auctions, state);
+        if (!auction) return 'idle';
+        return this.advanceAuction(state, auction, botIds) ? 'stepped' : 'waiting';
+      },
+      // No `collectBids`: a bot at the island is handled by the auction preStep, never here.
+      step: (state, seatId) => this.applyBotAction(state, seatId),
+    });
   }
 
   /** Take the one next bot step an open auction is waiting for. False ⇒ it's a human's move. */
-  private advanceAuction(state: GameState, auction: DeliveryAuction, botIds: Set<string>): boolean {
+  private advanceAuction(state: GameState, auction: DeliveryAuction, botIds: ReadonlySet<string>): boolean {
     if (auction.phase === 'bidding') {
       const next = biddersFor(state, auction.delivererId).find(
         (id) => botIds.has(id) && auction.bids[id] === undefined,

@@ -74,11 +74,32 @@ lives on the `/data` volume, **in-progress games and lobbies are preserved** acr
 
 ## Backups
 
-The whole game state is one SQLite file. Back up the volume (or copy the file out):
+The whole game state is one SQLite file — but the database runs in **WAL mode**, so the main
+`.sqlite` file alone is *not* a complete snapshot: recent writes live in the `-wal` sidecar until a
+checkpoint folds them in. Copying just the main file (`docker cp game-hub:/data/game-hub.sqlite …`)
+while the server is running gives a **silently stale or torn** backup — don't do it.
+
+Use `VACUUM INTO` instead. It writes a fresh, fully-checkpointed copy in a single atomic transaction,
+is WAL-correct, and is safe to run against the live database while games are in progress (it only
+reads a consistent snapshot of the source):
 
 ```bash
-docker cp game-hub:/data/game-hub.sqlite ./game-hub-backup.sqlite
+STAMP=$(date +%Y%m%d-%H%M%S)
+
+# Ask the running container to write a consistent copy onto the volume. VACUUM INTO fails if the
+# target already exists, so the timestamped name also stops it clobbering an earlier backup.
+docker exec game-hub node -e "const D=require('better-sqlite3'); new D(process.env.DATABASE_PATH || '/data/game-hub.sqlite').exec(\"VACUUM INTO '/data/backup-$STAMP.sqlite'\")"
+
+# Copy that single, self-contained file off the host (no -wal/-shm sidecars to worry about):
+docker cp "game-hub:/data/backup-$STAMP.sqlite" "./game-hub-backup-$STAMP.sqlite"
+
+# Optional: drop the on-volume copy once it's off the host.
+docker exec game-hub rm "/data/backup-$STAMP.sqlite"
 ```
+
+The resulting `game-hub-backup-*.sqlite` is a normal, standalone SQLite database. **Restore** by
+stopping the container, putting it in place of `game-hub.sqlite` on the `/data` volume (remove any
+stale `game-hub.sqlite-wal` / `-shm` alongside it), and starting again.
 
 ## Notes / expectations
 
@@ -87,3 +108,8 @@ docker cp game-hub:/data/game-hub.sqlite ./game-hub-backup.sqlite
 - **One image, one port.** The UI talks to the API same-origin, so there's no CORS or proxy to configure.
 - **WebSockets** work through the single port; if you put a reverse proxy in front, allow WS upgrades
   on `/games/:id/stream`.
+- **Health check.** `GET /health` runs a real `SELECT 1` against the database and returns `503` if it
+  can't reach it, so the compose healthcheck + `restart: unless-stopped` actually fire on a locked or
+  unmounted volume — not just when the process dies. It's what the compose `healthcheck` polls.
+- **Graceful shutdown.** The server handles `SIGTERM`/`SIGINT` (what `docker stop` and Ctrl-C send):
+  it drains in-flight requests and closes the database cleanly before exiting.

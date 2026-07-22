@@ -1,6 +1,7 @@
 import { decide } from '@game-hub/bot/stoneage';
 import { applyAction, viewFor } from '@game-hub/engine/stoneage';
 import type { StoneAgeState } from '@game-hub/engine/stoneage';
+import { runBotLoop } from '../../botLoop';
 import type { BotRepository } from '../../bots';
 import { rollDice } from './dice';
 
@@ -44,26 +45,19 @@ export class BotRunner {
    * reads as well as writes.
    */
   tick(gameId: string): void {
-    for (let step = 0; step < MAX_STEPS; step += 1) {
-      const state = this.repo.get(gameId);
-      if (!state || state.status !== 'active') return;
-
-      const botIds = new Set(this.bots.listForGame(gameId));
-      if (botIds.size === 0) return;
-
-      const active = state.players[state.activePlayerIndex]!;
-      if (!botIds.has(active.id)) return; // a human's move — stop
-
-      const action = decide(viewFor(state, active.id), active.id, {
-        rollDice: (count) => rollDice(this.rng, count),
-      });
-      this.repo.update(applyAction(state, active.id, action));
-      this.onChange(this.repo.get(gameId)!);
-    }
-    // Reaching here means the loop never hit a human, a finished game, or a botless seat in MAX_STEPS
-    // steps — a policy is cycling on a legal-but-non-progressing action. Self-play throws on exactly
-    // this; the server used to fall out silently and re-run the whole spin on *every* read. Throw so it
-    // surfaces (the app's `tick` contains and logs it) instead of becoming an invisible per-read DoS.
-    throw new Error(`Stone Age bot runner exceeded ${MAX_STEPS} steps for game "${gameId}" — a policy is likely cycling`);
+    runBotLoop<StoneAgeState>({
+      gameId,
+      maxSteps: MAX_STEPS,
+      label: 'Stone Age',
+      get: (id) => this.repo.get(id),
+      botSeats: (id) => this.bots.listForGame(id),
+      step: (state, seatId) => {
+        const action = decide(viewFor(state, seatId), seatId, {
+          rollDice: (count) => rollDice(this.rng, count),
+        });
+        this.repo.update(applyAction(state, seatId, action));
+        this.onChange(this.repo.get(gameId)!);
+      },
+    });
   }
 }

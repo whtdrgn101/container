@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import fastifyWebsocket from '@fastify/websocket';
 import { BotRepository } from './bots';
+import { ColorRepository, assignColors, colorsForSeats } from './colors';
 import type { DB } from './db';
 import { createDefaultRegistry, DEFAULT_GAME_ID } from './games';
 import type { AnyGameModule, BotDriver, ErrorResponse, ModuleContext, Viewer } from './games';
@@ -13,7 +14,7 @@ import type { StateMessage } from './hub';
 import type { Lobby, LobbyMember } from './lobbies';
 import { RematchRepository } from './rematch';
 import type { Rematch } from './rematch';
-import { LobbyRepository } from './lobbies';
+import { LobbyRepository, LOBBY_SWEEP_INTERVAL_MS, OPEN_LOBBY_TTL_MS } from './lobbies';
 import { GameRepository } from './repository';
 
 export interface AppOptions {
@@ -38,10 +39,14 @@ export interface AppOptions {
   rng?: () => number;
 }
 
-/** `NewSeat` is a name plus a per-seat AI flag. `bot` is stripped before the engine ever sees the seat. */
+/**
+ * `NewSeat` is a name plus a per-seat AI flag and optional colour pick. `bot` and `color` are both
+ * stripped before the engine ever sees the seat — the engine learns neither what a bot nor a colour is.
+ */
 interface NewSeat {
   name: string;
   bot?: boolean;
+  color?: string;
 }
 
 interface CreateGameBody {
@@ -70,6 +75,24 @@ export function buildApp(options: AppOptions): FastifyInstance {
   const repo = new GameRepository(options.db);
   const lobbies = new LobbyRepository(options.db);
   const botSeats = new BotRepository(options.db);
+  // Which colour each seat picked — coordination state beside the game, like bot seats (see colors.ts).
+  const colorSeats = new ColorRepository(options.db);
+
+  // Reclaim never-started open lobbies so the table doesn't grow without bound on the persistent
+  // volume (REVIEW §4.3). Nothing else ever deletes a lobby. Sweep once at boot, then on an interval
+  // that is `unref`'d (so it never keeps the process — or a test's app — alive) and cleared on close.
+  // Started lobbies are exempt: join-by-code still resolves them to their game.
+  const sweepLobbies = (): void => {
+    try {
+      lobbies.deleteExpiredOpen(new Date(Date.now() - OPEN_LOBBY_TTL_MS).toISOString());
+    } catch (error) {
+      app.log.error({ err: error }, 'lobby sweep failed');
+    }
+  };
+  sweepLobbies();
+  const sweepTimer = setInterval(sweepLobbies, LOBBY_SWEEP_INTERVAL_MS);
+  sweepTimer.unref();
+  app.addHook('onClose', async () => clearInterval(sweepTimer));
   const rematches = new RematchRepository(options.db);
   const hub = new GameHub();
 
@@ -150,14 +173,22 @@ export function buildApp(options: AppOptions): FastifyInstance {
   };
 
   /** The `{ type: 'state' }` push, projected for one subscriber. */
-  const stateMessage = (module: AnyGameModule, gameId: string, state: unknown, viewer: Viewer): StateMessage => ({
-    type: 'state',
-    // A null viewer follows whoever is active (a shared hotseat screen shows the current player); a
-    // seat list projects for exactly those seats; an empty list is a spectator (sees no cards).
-    game: module.viewFor(state, viewer ?? module.summarize(state).activePlayerId),
-    gameType: module.id,
-    bots: botSeats.listForGame(gameId),
-  });
+  const stateMessage = (module: AnyGameModule, gameId: string, state: unknown, viewer: Viewer): StateMessage => {
+    const summary = module.summarize(state);
+    return {
+      type: 'state',
+      // A null viewer follows whoever is active (a shared hotseat screen shows the current player); a
+      // seat list projects for exactly those seats; an empty list is a spectator (sees no cards).
+      game: module.viewFor(state, viewer ?? summary.activePlayerId),
+      gameType: module.id,
+      bots: botSeats.listForGame(gameId),
+      // Each seat's chosen colour (playerId → palette id). Beside the game like `bots`, never inside it.
+      colors: colorsFor(module, gameId, state),
+      // Secret-free seat identity, so the shell can name seats and gate turns without reading `game`.
+      players: summary.players,
+      activePlayerId: summary.activePlayerId,
+    };
+  };
 
   /** `?viewer=p1,p3` ⇒ those seats; omitted ⇒ follow the active player (hotseat); `?viewer=` ⇒ none. */
   const viewerFrom = (raw: string | undefined, module: AnyGameModule, state: unknown): Viewer =>
@@ -229,7 +260,20 @@ export function buildApp(options: AppOptions): FastifyInstance {
     return { state, module };
   };
 
-  /** Deal a new game of one type and record which of its seats an AI holds. */
+  /**
+   * The colour every seat holds, reading the stored picks and synthesising palette-order defaults for
+   * any seat without one — from the *module's* palette and `summarize`, so the core still reads no
+   * field off game state. Old games (no `game_colors` rows) come back fully coloured, so no payload
+   * path ever sees a colourless seat.
+   */
+  const colorsFor = (module: AnyGameModule, gameId: string, state: unknown): Record<string, string> =>
+    colorsForSeats(
+      module.colors,
+      module.summarize(state).players.map((player) => player.id),
+      colorSeats.listForGame(gameId),
+    );
+
+  /** Deal a new game of one type and record which of its seats an AI holds and each seat's colour. */
   const startGame = (module: AnyGameModule, seats: readonly NewSeat[]): unknown => {
     const state = module.createGame({
       id: randomUUID(),
@@ -248,6 +292,11 @@ export function buildApp(options: AppOptions): FastifyInstance {
     const botIds = players.filter((_, seat) => seats[seat]?.bot === true).map((player) => player.id);
     if (botIds.length > 0) botSeats.setForGame(gameId, botIds);
 
+    // Assign colours: honour each seat's pick, fill the rest with the first free palette colour in
+    // order (so a table with no picks reproduces today's seat-order tints — visual baselines hold).
+    const assigned = assignColors(module.colors, seats.map((seat) => seat.color));
+    colorSeats.setForGame(gameId, Object.fromEntries(players.map((player, seat) => [player.id, assigned[seat]!])));
+
     // A bot in an early seat should already have played by the time anyone sees the board.
     tick(gameId);
     return repo.get(gameId) ?? state;
@@ -259,12 +308,22 @@ export function buildApp(options: AppOptions): FastifyInstance {
    * `gameType` rides along because a game view is an opaque blob to anyone generic: a client that
    * hosts more than one game (roadmap C2's shell) has no other way to know which board to render for
    * a state it just fetched. Same reason the column exists server-side.
+   *
+   * `players` / `activePlayerId` ride along too (REVIEW §3.3), from the module's `summarize` — the
+   * secret-free seat identity the shell needs for the tab title, rematch, and seat binding without
+   * duck-typing the opaque `game`. The core still reads no field off game state; the module supplies it.
    */
-  const gamePayload = (module: AnyGameModule, gameId: string, state: unknown, viewer: Viewer) => ({
-    game: module.viewFor(state, viewer),
-    gameType: module.id,
-    bots: botSeats.listForGame(gameId),
-  });
+  const gamePayload = (module: AnyGameModule, gameId: string, state: unknown, viewer: Viewer) => {
+    const summary = module.summarize(state);
+    return {
+      game: module.viewFor(state, viewer),
+      gameType: module.id,
+      bots: botSeats.listForGame(gameId),
+      colors: colorsFor(module, gameId, state),
+      players: summary.players,
+      activePlayerId: summary.activePlayerId,
+    };
+  };
 
   app.register(fastifyWebsocket);
 
@@ -290,7 +349,22 @@ export function buildApp(options: AppOptions): FastifyInstance {
     if (gameId && repo.isAbandoned(gameId)) return abandoned(reply, gameId);
   });
 
-  app.get('/health', async () => ({ status: 'ok' }));
+  /**
+   * Liveness **and** readiness: actually touch the database with a cheap `SELECT 1`, so the compose
+   * healthcheck (and `restart: unless-stopped`) can fire when the `/data` volume is unmounted, the
+   * file is locked, or the handle is closed. The old constant `{ status: 'ok' }` proved only that the
+   * event loop was alive — a database that had vanished still read as healthy (REVIEW §4.4). Kept
+   * fast because it's polled every 30s. 503 on failure so `fetch(...).ok` in the compose check is false.
+   */
+  app.get('/health', async (_request, reply) => {
+    try {
+      options.db.prepare('SELECT 1').get();
+      return { status: 'ok' };
+    } catch (error) {
+      app.log.error({ err: error }, 'health check failed: database unreachable');
+      return reply.code(503).send({ status: 'unhealthy' });
+    }
+  });
 
   /** The games this site can host — what C2's picker lists. */
   app.get('/games/catalog', async () => ({ games: registry.list() }));
@@ -339,7 +413,8 @@ export function buildApp(options: AppOptions): FastifyInstance {
                 required: ['name'],
                 properties: {
                   name: { type: 'string', minLength: 1 },
-                  startingColor: { type: 'string' },
+                  // A player-colour pick (a palette id). Honoured if valid/unique, else defaulted.
+                  color: { type: 'string' },
                   bot: { type: 'boolean' },
                 },
               },
@@ -448,7 +523,13 @@ export function buildApp(options: AppOptions): FastifyInstance {
       const threshold = humanSeats.length === 0 ? 0 : Math.min(2, humanSeats.length);
       let newGameId: string | null = null;
       if (agreed.length >= threshold) {
-        const seats: NewSeat[] = summary.players.map((p) => ({ name: p.name, bot: botIds.has(p.id) }));
+        // Carry colours over too, the same way bot assignments carry: the rematch is the same table.
+        const oldColors = colorSeats.listForGame(request.params.id);
+        const seats: NewSeat[] = summary.players.map((p) => ({
+          name: p.name,
+          bot: botIds.has(p.id),
+          ...(oldColors[p.id] !== undefined ? { color: oldColors[p.id] } : {}),
+        }));
         newGameId = module.summarize(startGame(module, seats)).id;
       }
 
@@ -523,6 +604,12 @@ export function buildApp(options: AppOptions): FastifyInstance {
       if (pending) return sendError(reply, pending);
 
       try {
+        // ⚠️ Load → apply → update is race-free **only because this stretch is synchronous**:
+        // better-sqlite3 is synchronous and there is no `await` between `load` (above) and
+        // `repo.update` (below), so two concurrent POSTs cannot interleave a read and a write. Do NOT
+        // add an `await` into this block — a single one silently opens a lost-update / double-apply
+        // race (a double-click applying the same action twice). The real fix is optimistic
+        // concurrency on `version` (REVIEW §4.2); until that lands, keep this synchronous. (§4.4)
         const next = module.applyAction(state, request.body.playerId, parsed.action);
         repo.update(module, next);
         pushGame(request.params.id, next); // tell every connected client
@@ -561,6 +648,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       get bots(): BotDriver {
         return drivers.get(module.id) ?? noBots;
       },
+      colorsFor: (gameId, state) => colorsFor(module, gameId, state),
     };
     contexts.set(module.id, ctx);
     const driver = module.createBotDriver?.(ctx);
@@ -599,6 +687,33 @@ export function buildApp(options: AppOptions): FastifyInstance {
 
   const lobbyNotFound = (reply: FastifyReply, id: string) =>
     reply.code(404).send({ error: { code: 'LOBBY_NOT_FOUND', message: `No lobby with id "${id}"` } });
+
+  /**
+   * The colour palette a lobby offers, from its game's module (the module owns the palette, C1-style —
+   * the seat range comes from the same place). Empty if the game is no longer hosted.
+   */
+  const paletteOf = (lobby: Lobby): readonly string[] => registry.get(lobby.gameType)?.colors ?? [];
+
+  /**
+   * Reject a colour pick that isn't in the palette (`INVALID_COLOR`, 400) or is already held by
+   * another seat (`COLOR_TAKEN`, 409). `exceptSeat` is the seat doing the picking, so re-selecting your
+   * own colour is fine. Returns the sent reply to reject, or `null` to accept.
+   */
+  const rejectColor = (
+    reply: FastifyReply,
+    palette: readonly string[],
+    color: string,
+    members: readonly (LobbyMember | null)[],
+    exceptSeat: number,
+  ): FastifyReply | null => {
+    if (!palette.includes(color)) {
+      return reply.code(400).send({ error: { code: 'INVALID_COLOR', message: `"${color}" is not a colour in this game` } });
+    }
+    if (members.some((member, seat) => seat !== exceptSeat && member?.color === color)) {
+      return reply.code(409).send({ error: { code: 'COLOR_TAKEN', message: `Colour "${color}" is already taken` } });
+    }
+    return null;
+  };
 
   app.post<{ Body: { seats?: number; gameType?: string } }>(
     '/lobbies',
@@ -648,14 +763,19 @@ export function buildApp(options: AppOptions): FastifyInstance {
     return reply.send({ lobby });
   });
 
-  app.post<{ Params: { id: string }; Body: { name: string; bot?: boolean } }>(
+  app.post<{ Params: { id: string }; Body: { name: string; bot?: boolean; color?: string } }>(
     '/lobbies/:id/join',
     {
       schema: {
         body: {
           type: 'object',
           required: ['name'],
-          properties: { name: { type: 'string', minLength: 1 }, bot: { type: 'boolean' } },
+          properties: {
+            name: { type: 'string', minLength: 1 },
+            bot: { type: 'boolean' },
+            // Optional colour pick, validated against this game's palette + the other seats' picks.
+            color: { type: 'string' },
+          },
         },
       },
     },
@@ -669,8 +789,50 @@ export function buildApp(options: AppOptions): FastifyInstance {
       if (seat === -1) {
         return reply.code(409).send({ error: { code: 'LOBBY_FULL', message: 'All seats are taken' } });
       }
-      const claimed: LobbyMember = { name: request.body.name.trim(), bot: request.body.bot === true };
+      const color = request.body.color;
+      if (color !== undefined && rejectColor(reply, paletteOf(lobby), color, lobby.members, seat)) return reply;
+      const claimed: LobbyMember = {
+        name: request.body.name.trim(),
+        bot: request.body.bot === true,
+        ...(color !== undefined ? { color } : {}),
+      };
       const members = lobby.members.map((member, i) => (i === seat ? claimed : member));
+      const updated: Lobby = { ...lobby, members };
+      lobbies.update(updated);
+      return reply.send({ lobby: updated, seat });
+    },
+  );
+
+  /**
+   * Change a seat's colour while waiting in the lobby (the waiting room polls, so a re-pick shows up
+   * live for everyone). Seats aren't authenticated — the client names the seat it's changing, the same
+   * trusted-LAN bargain as resuming a game or rejoining a lobby. The pick is validated against the
+   * palette + the other seats, so two seats can't end up the same colour.
+   */
+  app.post<{ Params: { id: string }; Body: { seat: number; color: string } }>(
+    '/lobbies/:id/color',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['seat', 'color'],
+          properties: { seat: { type: 'number' }, color: { type: 'string' } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const lobby = lobbies.get(request.params.id);
+      if (!lobby) return lobbyNotFound(reply, request.params.id);
+      if (lobby.status !== 'open') {
+        return reply.code(409).send({ error: { code: 'LOBBY_STARTED', message: 'This game has already started' } });
+      }
+      const { seat, color } = request.body;
+      const member = lobby.members[seat];
+      if (!Number.isInteger(seat) || seat < 0 || seat >= lobby.members.length || !member) {
+        return reply.code(409).send({ error: { code: 'SEAT_NOT_CLAIMED', message: `Seat ${seat} is not claimed` } });
+      }
+      if (rejectColor(reply, paletteOf(lobby), color, lobby.members, seat)) return reply;
+      const members = lobby.members.map((existing, i) => (i === seat ? { ...member, color } : existing));
       const updated: Lobby = { ...lobby, members };
       lobbies.update(updated);
       return reply.send({ lobby: updated, seat });
@@ -699,7 +861,10 @@ export function buildApp(options: AppOptions): FastifyInstance {
     }
     try {
       const members = lobby.members as LobbyMember[];
-      const started = startGame(module, members.map((member) => ({ name: member.name, bot: member.bot })));
+      const started = startGame(
+        module,
+        members.map((member) => ({ name: member.name, bot: member.bot, color: member.color })),
+      );
       const gameId = module.summarize(started).id;
       lobbies.update({ ...lobby, status: 'started', gameId });
       return reply

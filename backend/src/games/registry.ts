@@ -22,6 +22,8 @@ export interface GameInfo {
   readonly name: string;
   readonly minPlayers: number;
   readonly maxPlayers: number;
+  /** The game's player-colour palette (ordered colour ids), so the lobby can offer the pick. */
+  readonly colors: readonly string[];
 }
 
 /**
@@ -56,11 +58,12 @@ export class GameRegistry {
 
   /** Every registered game, for the picker. Registration order. */
   list(): GameInfo[] {
-    return [...this.modules.values()].map(({ id, name, minPlayers, maxPlayers }) => ({
+    return [...this.modules.values()].map(({ id, name, minPlayers, maxPlayers, colors }) => ({
       id,
       name,
       minPlayers,
       maxPlayers,
+      colors,
     }));
   }
 }
