@@ -225,6 +225,104 @@ describe('Saint Petersburg bootstrap', () => {
     }
   });
 
+  // The backend deals with the app's real rng (Math.random by default), so which seat opens the worker
+  // phase and the card costs vary run to run — these tests act as whichever seat is on the clock.
+  type HandView = {
+    phase: string;
+    activePlayerIndex: number;
+    players: { id: string; rubles: number | null; playArea: { worker: unknown[] }; hand: { id: string; cost: number }[] | null; handCount: number }[];
+    board: { upper: unknown[] };
+  };
+
+  it('adds a card to hand over REST — the row slot empties; opponents see the count, owner the contents (SP3)', async () => {
+    const id = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game.id as string;
+    const read = async (viewer: string) => (await app.inject({ method: 'GET', url: `/games/${id}?viewer=${viewer}` })).json().game as HandView;
+
+    // The active seat adds an upper-row card to its hand — free.
+    const start = await read('p1');
+    const owner = start.players[start.activePlayerIndex]!.id;
+    const opp = start.players.find((p) => p.id !== owner)!.id;
+    const res = await app.inject({ method: 'POST', url: `/games/${id}/actions?viewer=${owner}`, payload: { playerId: owner, action: { type: 'ADD_TO_HAND', row: 'upper', index: 0 } } });
+    expect(res.statusCode).toBe(200);
+
+    // Owner's own view: contents visible, rubles unchanged (add is free), the row slot emptied.
+    const own = await read(owner);
+    const ownerView = own.players.find((p) => p.id === owner)!;
+    expect(ownerView.hand).toHaveLength(1);
+    expect(ownerView.handCount).toBe(1);
+    expect(ownerView.rubles).toBe(25); // free
+    expect(own.board.upper).toHaveLength(3); // 4 seeded − 1 taken (rows compact)
+    const takenId = ownerView.hand![0]!.id;
+
+    // Opponent's view: the owner's hand is a COUNT only — contents null, and the taken card's instance id
+    // is nowhere on the opponent's wire (it left the shared row and the hand is redacted).
+    const oppRaw = (await app.inject({ method: 'GET', url: `/games/${id}?viewer=${opp}` })).json();
+    const oppOwner = (oppRaw.game.players as { id: string; hand: unknown; handCount: number }[]).find((p) => p.id === owner)!;
+    expect(oppOwner.hand).toBeNull();
+    expect(oppOwner.handCount).toBe(1);
+    expect(JSON.stringify(oppRaw.game)).not.toContain(takenId);
+    // The take itself is public: the feed NAMES the taken card (everyone at the table sees which card you take).
+    expect(oppRaw.game.log.at(-1).payload.cardName).toBeTruthy();
+  });
+
+  it('plays a card from hand in a later phase over REST — the cost is charged (SP3)', async () => {
+    const id = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game.id as string;
+    const act = async (playerId: string, action: unknown) =>
+      (await app.inject({ method: 'POST', url: `/games/${id}/actions?viewer=${playerId}`, payload: { playerId, action } })).json();
+    const read = async (viewer: string) => (await app.inject({ method: 'GET', url: `/games/${id}?viewer=${viewer}` })).json().game as HandView;
+    const activeId = (g: HandView) => g.players[g.activePlayerIndex]!.id;
+
+    // The active seat (the "holder") adds a worker to hand in the worker phase.
+    let game = await read('p1');
+    const holder = activeId(game);
+    await act(holder, { type: 'ADD_TO_HAND', row: 'upper', index: 0 });
+    // The held card's printed cost — the holder owns no matching card, so hand-play cost equals it.
+    const heldCost = (await read(holder)).players.find((p) => p.id === holder)!.hand![0]!.cost;
+
+    // Everyone passes until the worker phase closes → the building phase (a genuinely later phase).
+    game = await read(holder);
+    while (game.phase === 'worker') {
+      await act(activeId(game), { type: 'PASS' });
+      game = await read(holder);
+    }
+    expect(game.phase).toBe('building');
+    // Get the holder back on the clock (2-player: one pass flips the active seat).
+    if (activeId(game) !== holder) {
+      await act(activeId(game), { type: 'PASS' });
+      game = await read(holder);
+    }
+    expect(activeId(game)).toBe(holder);
+
+    // The holder plays the held worker in the building phase — charged exactly its cost (it scored nothing
+    // at worker-close: it was in hand, not the play area).
+    const played = (await act(holder, { type: 'PLAY_FROM_HAND', index: 0 })).game as HandView;
+    const me = played.players.find((p) => p.id === holder)!;
+    expect(me.playArea.worker).toHaveLength(1); // now face-up in the play area
+    expect(me.handCount).toBe(0); // left the hand
+    expect(me.rubles).toBe(25 - heldCost); // 25 − the card's cost
+  });
+
+  it('refuses an add over the hand limit with 409 HAND_FULL (SP3)', async () => {
+    const id = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game.id as string;
+    const act = async (playerId: string, action: unknown) =>
+      app.inject({ method: 'POST', url: `/games/${id}/actions?viewer=${playerId}`, payload: { playerId, action } });
+    const read = async () => (await app.inject({ method: 'GET', url: `/games/${id}?viewer=p1` })).json().game as HandView;
+    const add = { type: 'ADD_TO_HAND', row: 'upper', index: 0 } as const;
+
+    // The holder fills its hand to the limit of 3, handing the turn back through the other seat each time.
+    const start = await read();
+    const holder = start.players[start.activePlayerIndex]!.id;
+    const opp = start.players.find((p) => p.id !== holder)!.id;
+    for (let i = 0; i < 3; i += 1) {
+      expect((await act(holder, add)).statusCode).toBe(200);
+      await act(opp, { type: 'PASS' }); // return the turn to the holder without closing the phase
+    }
+    // A 4th add is refused — the hand is full.
+    const overflow = await act(holder, add);
+    expect(overflow.statusCode).toBe(409);
+    expect(overflow.json().error.code).toBe('HAND_FULL');
+  });
+
   it('creates via a lobby and enforces the 2–4 seat range', async () => {
     const tooMany = await app.inject({ method: 'POST', url: '/lobbies', payload: { seats: 5, gameType: 'stpetersburg' } });
     expect(tooMany.statusCode).toBe(400);
@@ -273,6 +371,7 @@ describe('mapStPetersburgError', () => {
     expect(mapStPetersburgError(new GameError('INSUFFICIENT_RUBLES', 'x'))?.status).toBe(409);
     expect(mapStPetersburgError(new GameError('INVALID_CARD_SLOT', 'x'))?.status).toBe(409);
     expect(mapStPetersburgError(new GameError('TRADING_NOT_BUYABLE', 'x'))?.status).toBe(409);
+    expect(mapStPetersburgError(new GameError('HAND_FULL', 'x'))?.status).toBe(409);
     expect(mapStPetersburgError(new Error('not ours'))).toBeNull();
   });
 });

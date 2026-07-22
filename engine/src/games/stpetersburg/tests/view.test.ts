@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { addToHand, playFromHand } from '../actions';
 import type { StPetersburgPlayer } from '../core';
 import { viewFor } from '../view';
 import { card, makeState, newGame } from './helpers';
@@ -64,6 +65,31 @@ describe('viewFor redaction', () => {
 
     const empty = viewFor(state, []);
     expect(empty.players.every((p) => p.rubles === null)).toBe(true);
+  });
+
+  it('keeps a NON-EMPTY hand redacted across an add → play round-trip (owner: contents; opponent: count only)', () => {
+    // Drive the real SP3 mechanics: p1 adds a building into hand, then plays it. At every step an opponent
+    // sees only the hand COUNT, never its contents; the owner sees the cards. (The §B1-style wire test for
+    // the hidden hand — now exercised with the hand actually non-empty, not just the SP0 zero-length case.)
+    const base = newGame(['Ann', 'Bob']);
+    const mkt = card({ id: 'market-hidden-1', key: 'market', kind: 'building', name: 'Market', cost: 5, points: 1 });
+    const start = makeState({ ...base, board: { ...base.board, upper: [mkt] } });
+
+    const added = addToHand(start, 'p1', 'upper', 0);
+    // Owner: the card is visible in hand. Opponent: count only, contents null, and the id isn't on the wire.
+    expect(viewFor(added, 'p1').players[0]!.hand).toHaveLength(1);
+    expect(viewFor(added, 'p1').players[0]!.handCount).toBe(1);
+    const oppAdded = viewFor(added, 'p2');
+    expect(oppAdded.players[0]!.hand).toBeNull();
+    expect(oppAdded.players[0]!.handCount).toBe(1);
+    expect(JSON.stringify(oppAdded)).not.toContain('market-hidden-1');
+
+    // Play it from hand — the hand empties, the card becomes public in the play area, and redaction holds.
+    const played = playFromHand(added, 'p1', 0);
+    expect(viewFor(played, 'p1').players[0]!.hand).toEqual([]); // owner sees an empty hand
+    expect(viewFor(played, 'p2').players[0]!.handCount).toBe(0); // opponent sees the count drop to 0
+    expect(played.players[0]!.playArea.building.map((c) => c.id)).toEqual(['market-hidden-1']); // now public
+    expect(viewFor(played, 'p2').players[0]!.rubles).toBeNull(); // the ruble cost stays the owner's secret
   });
 
   it('reveals everything once the game has ended (final scoring is public)', () => {

@@ -116,17 +116,23 @@ describe('roundTransition (pg. 5)', () => {
     expect(changes.activePlayerIndex).toBe(1);
   });
 
-  it('skips the worker refill when no card was taken during trading (pg. 8), but still slides + discards', () => {
-    // Round 1 trading close, nobody having bought all round: lower empty, upper = the 4 seeded workers.
+  it('deals workers to 8 unconditionally at round end, even when no card was taken during trading (pg. 5 — the drain-spiral fix)', () => {
+    // Round 1 trading close, nobody having bought all round (`tookCardThisPhase` false). pg. 8's special
+    // case gates only the mid-round phase refills; pg. 5's round-setup worker deal runs regardless. Under
+    // SP2's original (incorrect) gate this was skipped and the board drained round over round — the live
+    // play-test bug this corrects. lower empty, upper = the 4 seeded workers, worker stack has 6 to give.
     const upper = Array.from({ length: 4 }, (_, i) => card({ id: `w-${i}`, key: 'lumberjack' }));
-    const before = game({}, { upper, lower: [], discard: 0, stacks: { worker: [], building: [], aristocrat: [], trading: [] } }, {
+    const workers = Array.from({ length: 6 }, (_, i) => card({ id: `ws-${i}`, key: 'lumberjack' }));
+    const before = game({}, { upper, lower: [], discard: 0, stacks: { worker: workers, building: [], aristocrat: [], trading: [] } }, {
       phase: 'trading',
       tookCardThisPhase: false,
     });
     const changes = roundTransition(before);
     expect(changes.board!.discard).toBe(0); // nothing in the lower row to discard
-    expect(changes.board!.lower).toEqual(upper); // slid down
-    expect(changes.board!.upper).toHaveLength(0); // no workers dealt (special case) — board runs short
+    expect(changes.board!.lower).toEqual(upper); // the 4 slid down to become the new lower row
+    expect(changes.board!.upper).toHaveLength(4); // dealt back to 8 total (4 lower + 4 new) despite no take
+    expect(changes.board!.upper.every((c) => c.key === 'lumberjack')).toBe(true);
+    expect(changes.board!.stacks.worker).toHaveLength(2); // 6 − 4 dealt
     expect(changes.round).toBe(2);
   });
 });

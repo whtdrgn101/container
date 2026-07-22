@@ -1,4 +1,4 @@
-import { PHASES, effectiveCost } from '@game-hub/engine/stpetersburg';
+import { PHASES, effectiveCost, handCost, handLimit } from '@game-hub/engine/stpetersburg';
 import type { Card, CardKind, Phase, PlayerView, StPetersburgView } from '@game-hub/engine/stpetersburg';
 import { Button } from '@/components/ui/button';
 import { ActivityFeed } from '@/components/ActivityFeed';
@@ -131,11 +131,89 @@ function PlayerPanel({
         </span>
       </div>
       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-        <span data-testid={`sp-hand-${player.id}`}>Hand: {player.handCount}</span>
+        <span data-testid={`sp-handcount-${player.id}`} className="inline-flex items-center gap-1" title={`${player.handCount} card(s) in hand — face down`}>
+          Hand:
+          {player.handCount === 0 ? (
+            <span className="italic">0</span>
+          ) : (
+            <span className="inline-flex items-center gap-0.5" aria-hidden>
+              {Array.from({ length: player.handCount }, (_, i) => (
+                <span key={i} className="inline-block h-3 w-2 rounded-[1px] border border-muted-foreground/50 bg-muted-foreground/20" />
+              ))}
+            </span>
+          )}
+          <span className="tabular-nums">{player.handCount}</span>
+        </span>
         <span>Workers: {player.playArea.worker.length}</span>
         <span>Buildings: {player.playArea.building.length}</span>
         <span>Aristocrats: {player.playArea.aristocrat.length}</span>
         {played === 0 ? <span className="italic">empty play area</span> : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The viewer's own hidden hand (pg. 3), rendered as playable cards. Only the active driving seat can play
+ * (`playable`); an own but off-turn seat still sees its cards, greyed. A **trading** card can be *held*
+ * but not *played* until displacement exists (SP4), so it shows a disabled "needs SP4" state. Effective
+ * play cost is shown (printed struck through when reductions apply) — the same `handCost` the engine charges.
+ */
+function HandSection({
+  player,
+  playable,
+  busy,
+  onPlay,
+}: {
+  player: PlayerView;
+  playable: boolean;
+  busy: boolean;
+  onPlay: (index: number) => void;
+}) {
+  const hand = player.hand ?? [];
+  return (
+    <div data-testid={`sp-hand-panel-${player.id}`} className="rounded-lg border bg-card p-3">
+      <div className="mb-1 text-xs font-medium text-muted-foreground">
+        Your hand ({hand.length}/{handLimit(player)})
+      </div>
+      <div className="flex min-h-[5.5rem] flex-wrap gap-1.5">
+        {hand.length === 0 ? (
+          <span className="text-xs italic text-muted-foreground">empty — take a card from a row into your hand</span>
+        ) : (
+          hand.map((card, index) => {
+            const trading = card.kind === 'trading';
+            const cost = handCost(player, card);
+            const reduced = cost !== card.cost;
+            const canPlay = playable && !trading && player.rubles !== null && player.rubles >= cost;
+            const title = trading
+              ? `${card.name} — trading cards can't be played yet (needs SP4)`
+              : `${card.name} — play for ${cost}${reduced ? ` (was ${card.cost})` : ''}`;
+            return (
+              <button
+                key={card.id}
+                type="button"
+                data-testid={`sp-play-${index}`}
+                className={cn(
+                  'flex h-20 w-16 shrink-0 flex-col justify-between rounded border p-1 text-left text-[10px]',
+                  KIND_CLASS[card.kind],
+                  canPlay
+                    ? 'cursor-pointer ring-offset-1 transition hover:ring-2 hover:ring-primary focus-visible:ring-2 focus-visible:ring-primary'
+                    : 'opacity-60',
+                )}
+                title={title}
+                disabled={!canPlay || busy}
+                onClick={() => onPlay(index)}
+              >
+                <span className="self-start rounded bg-background/70 px-1 font-semibold tabular-nums">
+                  {reduced ? <s className="mr-0.5 opacity-50">{card.cost}</s> : null}
+                  {cost}
+                </span>
+                <span className="text-center font-medium leading-tight">{card.name}</span>
+                <span className="self-end text-[9px] text-muted-foreground">{trading ? 'needs SP4' : 'play'}</span>
+              </button>
+            );
+          })
+        )}
       </div>
     </div>
   );
@@ -175,10 +253,21 @@ export default function StPetersburgBoard({
     if (!canDrive || !active) return;
     void run(() => spApi.act(gameId, active.id, { type: 'BUY', row, index }, viewer));
   };
+  const doAdd = (row: 'upper' | 'lower', index: number) => {
+    if (!canDrive || !active) return;
+    void run(() => spApi.act(gameId, active.id, { type: 'ADD_TO_HAND', row, index }, viewer));
+  };
+  const doPlay = (index: number) => {
+    if (!canDrive || !active) return;
+    void run(() => spApi.act(gameId, active.id, { type: 'PLAY_FROM_HAND', index }, viewer));
+  };
   const doPass = () => {
     if (!canDrive || !active) return;
     void run(() => spApi.act(gameId, active.id, { type: 'PASS' }, viewer));
   };
+
+  // The active driving seat may add ANY row card to its hand (free, pg. 3) while under the hand limit.
+  const canAddToHand = canDrive && !!active && active.handCount < handLimit(active);
 
   // The active player's effective cost for a card (public — reads only its play area). A card is buyable
   // when this client drives, the game is live, it isn't a trading card (SP4), and the active seat can afford it.
@@ -193,15 +282,31 @@ export default function StPetersburgBoard({
     game.board[row].map((card, index) => {
       const affordableCost = buyableCost(card, row);
       return (
-        <CardTile
-          key={card.id}
-          card={card}
-          effective={costOf(card, row)}
-          onBuy={affordableCost !== undefined ? () => doBuy(row, index) : undefined}
-          disabled={busy}
-        />
+        <div key={card.id} className="flex shrink-0 flex-col gap-1">
+          <CardTile
+            card={card}
+            effective={costOf(card, row)}
+            onBuy={affordableCost !== undefined ? () => doBuy(row, index) : undefined}
+            disabled={busy}
+          />
+          {canAddToHand ? (
+            <button
+              type="button"
+              data-testid={`sp-hand-${card.id}`}
+              className="rounded border border-dashed border-muted-foreground/50 px-1 py-0.5 text-[9px] text-muted-foreground transition hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-primary"
+              title={`Add ${card.name} to your hand (free)`}
+              disabled={busy}
+              onClick={() => doAdd(row, index)}
+            >
+              + Hand
+            </button>
+          ) : null}
+        </div>
       );
     });
+
+  // The viewer's own hand(s): seats whose hand contents are visible (never redacted for the viewer).
+  const ownHands = game.players.filter((p) => p.hand !== null);
 
   return (
     <div data-testid="board" className="space-y-4">
@@ -288,6 +393,12 @@ export default function StPetersburgBoard({
         )}
       </div>
 
+      {/* The viewer's own hidden hand (pg. 3) — playable cards. Opponents' hands show only as a face-down
+          count on their panel below. */}
+      {ownHands.map((player) => (
+        <HandSection key={player.id} player={player} playable={canDrive && player.id === active?.id} busy={busy} onPlay={doPlay} />
+      ))}
+
       {/* Players — rubles are the game's secret, so opponents show a lock, not a number. */}
       <div className="grid gap-2 sm:grid-cols-2">
         {game.players.map((player, seatIndex) => (
@@ -309,6 +420,16 @@ export default function StPetersburgBoard({
           if (entry.type === 'BUY') {
             const p = entry.payload as { cardName?: string; cost?: number } | undefined;
             return p ? `bought the ${p.cardName} for ${p.cost}₽` : 'bought a card';
+          }
+          if (entry.type === 'ADD_TO_HAND') {
+            // The take is public — everyone at the table sees which card you take from the open rows — so
+            // the feed NAMES it. The hand is secret only as a *set* afterward (see the engine's addToHand).
+            const p = entry.payload as { cardName?: string } | undefined;
+            return p?.cardName ? `took the ${p.cardName} into hand` : 'took a card into hand';
+          }
+          if (entry.type === 'PLAY_FROM_HAND') {
+            const p = entry.payload as { cardName?: string; cost?: number } | undefined;
+            return p ? `played the ${p.cardName} from hand for ${p.cost}₽` : 'played a card from hand';
           }
           if (entry.type === 'PASS') {
             const p = entry.payload as { closedPhase?: string; nextRound?: number } | undefined;

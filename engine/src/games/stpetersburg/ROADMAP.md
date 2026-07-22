@@ -138,28 +138,78 @@ non-trading buys (trading cards stay refused until SP4) — asserted explicitly.
   a marker at seat `i` moves to `i+1`. New starting player for each phase = the successor of the old.
 - **The pg. 8 special-case reading (cited in `phase.ts`):** "Special case: no cards are bought or added…
   the administrator will **add no new cards to the board**. He will, however, **turn the card stacks**…"
-  My reading: a per-phase **`tookCardThisPhase`** flag (set by a buy — and, from SP3, an add-to-hand;
-  reset when a phase begins) gates *only the refill* — the step that "adds new cards to the board." If no
-  card left the board during a phase's actions, **that phase's refill is skipped** but the stacks still
-  turn (the phase still advances and, for scoring phases, still scores). This applies to the mid-round
-  refills **and** to the worker deal at the round transition (trading→worker): if nobody took a card
-  during the trading phase, no workers are dealt back — but the **discard and the upper→lower slide still
-  happen**, because those rearrange cards already on the board rather than adding new ones. A short board
-  is not an end trigger (SP6 owns that); it just means "eventually players buy again" (pg. 8).
+  A per-phase **`tookCardThisPhase`** flag (set by a buy — and, from SP3, an add-to-hand; reset when a
+  phase begins) gates the **mid-round phase refill** — the step that "adds new cards to the board." If no
+  card left the board during a *scoring* phase's actions, **that phase's refill is skipped** but the
+  stacks still turn (the phase advances and still scores). A short board is not an end trigger (SP6 owns
+  that); it just means "eventually players buy again" (pg. 8).
+  - **⚠️ Correction (a live play-test bug, fixed in SP3 — do not restore the old reading).** SP2
+    *originally* extended this gate to the **worker deal at the round transition** too: if nobody took a
+    card during the trading phase, no workers were dealt back. That was **wrong**, and it drained the
+    board permanently — the trading phase currently can take **no** cards (trading buys refused until SP4;
+    ADD_TO_HAND arrives only in SP3), so every trading phase ended card-less → every rollover skipped the
+    worker deal while still discarding the lower row → the board shrank to empty and never recovered (the
+    owner reproduced it). The correct reading, now in `roundTransition`: **pg. 8's special case modifies
+    the mid-round phase-end refill only; pg. 5's round-end sequence — discard lower, slide upper→lower,
+    deal workers to 8 — is the *new round's setup* and runs unconditionally.** So the pg. 8 gate stays on
+    `scoreAndRefill` (mid-round) but is gone from `roundTransition` (round-end). Regression:
+    `round.test.ts` "deals workers at every rollover even when no card is ever taken".
 - **Multi-round proof:** `tests/round.test.ts` drives a deterministic 4-player game through two full
   rounds via `applyAction`, asserting the slide/discard arithmetic, all-four-marker rotation, and the
-  exact round-2 / round-3 entry state (including the pg. 8 skip compounding across a whole round).
+  exact round-2 / round-3 entry state (with mid-round pg. 8 skips still firing, but the round-end worker
+  deal now unconditional per the SP3 correction above).
 - **Verified green:** engine **411 @ 100%**, bot 157 (untouched), backend **216**, e2e **128**,
   typecheck clean, visual baselines untouched.
 - **UI:** each seat's panel now shows its starting-player marker chips (`sp-marker-<phase>-<playerId>`),
   which visibly hop one seat left at the rollover; the feed narrates it ("passed — Round 2: lower row
   discarded, markers passed left"). The dead "trading phase has ended" SP1 message is gone.
 
-### SP3 — The hand
+### SP3 — The hand ✅
 `ADD_TO_HAND {row, index}` (free, limit 3 — pg. 3) and `PLAY_FROM_HAND {index}` (pay full cost with
 reductions, min 1). Redaction proof: backend test that an opponent's view never contains hand
 contents, only the count (the §B1-style wire test). UI: your hand as cards, opponents as face-down
 count.
+
+**What shipped (SP3):** the hidden hand is live end-to-end.
+- **`ADD_TO_HAND {row, index}`** (`actions/addToHand.ts`) takes a row card into the active seat's hand
+  for **free** (pg. 3), rows compact like a buy, up to `handLimit(player)` cards (over → `HAND_FULL`). It
+  is an action: sets `tookCardThisPhase`, resets the pass counter, passes the turn.
+- **`PLAY_FROM_HAND {index}`** (`actions/playFromHand.ts`) plays a held card into the play area in **any
+  phase** (pg. 3), charged `handCost` (reductions **except** the lower-row discount, min 1). It does
+  **not** set `tookCardThisPhase` (the card came from the hand, not the board), so it triggers no board
+  refill.
+- **Reduction refactor.** `buy.ts` split the row-independent reductions (`baseReductions` — the
+  same-name −1, plus the SP4/SP5 smelter/workshop seam) out of `costReductions` (= base + lower-row −1),
+  with a shared min-1-ruble floor (`afterReductions`). `effectiveCost` (row buy) and the new `handCost`
+  (hand play — base only, no row) both build on it, so the min-1 floor and the reductions live in one
+  place. The hand limit is a **function seam** (`handLimit(player)` → `HAND_LIMIT` = 3) so SP5's Warehouse
+  (limit 4) hooks it without touching callers.
+- **Trading cards in hand — ruling (pg. 3 + pg. 8, cited in `addToHand.ts` / `playFromHand.ts`).**
+  Trading cards **are** hand-eligible for `ADD_TO_HAND`. The **buy** action is worded "1 worker or 1
+  building or 1 aristocrat" (pg. 3) — the three non-trading colours — but **add-to-hand** is worded "takes
+  **1 card** from either card row", the Remember bullet reads "add to his hand **any** of the cards on the
+  board", and the Observatory (pg. 8) lets a drawn card of *any* group be "add[ed] to his hand". So a
+  trading card may be **held**. It just can't be **played**: `PLAY_FROM_HAND` of a trading card is refused
+  with `TRADING_NOT_BUYABLE` (the SP4 displacement seam). This can't wedge the game — passing is always
+  legal, and SP6's −5-per-hand-card scores the stuck card.
+- **Redaction.** Hands were redacted from SP0; the wire test now exercises a **non-empty** hand surviving
+  an add → play round-trip (owner sees contents; opponent sees the count only, never the card id on the
+  wire). `legalActions` derives `PLAY_FROM_HAND` from the **viewer's own hand** only (no leak), offers
+  `ADD_TO_HAND` for every row card while the hand isn't full (free — any card, trading included), and
+  keeps trading cards out of buys/plays.
+- **Log-visibility nuance (documented, cited).** The take is **public at the moment it happens** — on the
+  physical table everyone sees which card you lift from the open rows — so the feed **names** it ("Ann
+  took the Judge into hand"), and `addToHand` logs `cardName`. The hand is secret only as a *set*
+  afterward, which redaction already handles (opponents get a count). Nothing hidden is logged.
+- **pg. 8 flag.** `ADD_TO_HAND` sets `tookCardThisPhase` (SP2 left the hook noted) — a card leaving the
+  board via a hand take now correctly runs that phase's refill, and makes trading-phase takes possible.
+- **Also fixed here:** the round-end board-drain spiral (see the SP2 pg. 8 **Correction** above).
+- **UI:** the viewer's own hand renders as playable cards (`sp-play-<i>`, effective cost shown, trading
+  cards shown disabled with a "needs SP4" state); each row card gains a free **+ Hand** affordance beside
+  Buy (`sp-hand-<cardId>`), hidden once the hand is full; opponents' hands render as a **face-down count**
+  chip (`sp-handcount-<playerId>`). The feed narrates adds (naming the card) and hand plays.
+- **Verified green:** engine **427 @ 100%**, bot 157 (untouched), backend **219**, e2e **132**, typecheck
+  clean, visual baselines untouched.
 
 ### SP4 — Trading cards
 `BUY`/`PLAY_FROM_HAND` of a trading card requires a displacement target (pg. 7): same color; green

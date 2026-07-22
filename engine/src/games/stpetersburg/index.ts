@@ -30,6 +30,8 @@ export {
   CARD_DEFS,
   CARD_KINDS,
   deckCount,
+  HAND_LIMIT,
+  handLimit,
   MAX_PLAYERS,
   MIN_CARD_COST,
   MIN_PLAYERS,
@@ -46,6 +48,7 @@ export type { CreateGameOptions, NewPlayer } from './createGame';
 export { viewFor } from './view';
 export type { BoardView, PlayerView, StPetersburgView, Viewer } from './view';
 
-// Mechanics + turn-aware entry point. `effectiveCost`/`costReductions` are exported so the UI can show a
-// card's real price (printed cost struck through when reductions apply) with the exact rule the buy charges.
-export { applyAction, buy, costReductions, effectiveCost, legalActions, pass } from './actions';
+// Mechanics + turn-aware entry point. `effectiveCost`/`handCost`/`costReductions` are exported so the UI
+// can show a card's real price (printed cost struck through when reductions apply) with the exact rule the
+// buy / hand-play charges.
+export { addToHand, applyAction, buy, costReductions, effectiveCost, handCost, legalActions, pass, playFromHand } from './actions';

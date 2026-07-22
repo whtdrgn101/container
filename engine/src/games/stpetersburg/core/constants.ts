@@ -2,7 +2,7 @@
 // 2009 Rio Grande printing). This is the bootstrap scaffold (roadmap SP0); the mechanics land one
 // slice at a time. Read the cited page before touching a value — do not encode rules from memory.
 
-import type { CardDef, CardKind, Phase } from './types';
+import type { CardDef, CardKind, Phase, PlayArea } from './types';
 
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 4;
@@ -28,6 +28,19 @@ export const BOARD_SIZE = 8;
 
 /** A card must always cost at least 1 ruble, even after reductions (pg. 6). */
 export const MIN_CARD_COST = 1;
+
+/** A player may hold at most **3 cards** in hand (pg. 3). The Warehouse raises its owner's limit to 4 (SP5). */
+export const HAND_LIMIT = 3;
+
+/**
+ * The most cards `player` may hold in hand right now (pg. 3: "at most 3 cards"). A **function, not a bare
+ * constant**, so SP5's **Warehouse** — which raises *its owner's* limit to 4 (pg. 8) — has a seam to hook
+ * without touching the callers (`addToHand`, `legalActions`). At SP3 nothing changes the limit, so it
+ * always returns `HAND_LIMIT`; the `PlayArea` parameter is the seam the warehouse check will read.
+ */
+export function handLimit(_player: { readonly playArea: PlayArea }): number {
+  return HAND_LIMIT;
+}
 
 /** Aristocrat final-scoring table, indexed by count of *distinct* aristocrats (pg. 5–6). */
 export const ARISTOCRAT_SCORE: readonly number[] = [0, 1, 3, 6, 10, 15, 21, 28, 36, 45, 55];

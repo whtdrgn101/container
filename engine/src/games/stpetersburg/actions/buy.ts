@@ -6,32 +6,58 @@ import { nextSeatIndex, record, seatOf, withPlayer } from '../internal';
 type Row = 'upper' | 'lower';
 
 /**
- * The cumulative cost reduction on `card` for this player (pg. 6 — "All cost reductions are cumulative"):
+ * The cost reductions on `card` that apply **wherever it is played from** — everything *except* the
+ * lower-row discount (pg. 6 — "All cost reductions are cumulative"):
  *
  *  - **−1 per same-named card** already in the play area. "Same name" is the same `key`; a key only ever
  *    appears in the group matching its kind, so scanning all three groups is equivalent and kind-agnostic.
- *  - **−1 when bought from the lower card row.**
+ *
+ * Split out from `costReductions` so `PLAY_FROM_HAND` can reuse it (SP3): a hand card is in **no row**, so
+ * it gets these reductions but not the lower-row −1. `costReductions` = these + the row discount.
  *
  * **SP4/SP5 seam:** a **gold smelter** (−1 per aristocrat bought after it) and a **carpenter workshop**
  * (−1 per building) also reduce cost cumulatively (pg. 6). Those are trading cards that can't be owned
- * until SP4/SP5, so there is nothing to count yet — the hook is this note plus the cumulative sum below;
- * add their terms here when those cards land.
+ * until SP4/SP5, so there is nothing to count yet — the hook is this note; add their terms here when
+ * those cards land (they reduce hand-plays too, so they belong in *this* base, not the row discount).
  */
-export function costReductions(player: { readonly playArea: PlayArea }, card: Card, row: Row): number {
+export function baseReductions(player: { readonly playArea: PlayArea }, card: Card): number {
   const owned = [...player.playArea.worker, ...player.playArea.building, ...player.playArea.aristocrat];
-  const sameNamed = owned.filter((c) => c.key === card.key).length;
-  const fromLower = row === 'lower' ? 1 : 0;
-  return sameNamed + fromLower;
+  return owned.filter((c) => c.key === card.key).length;
 }
 
 /**
- * What `card` costs this player from `row` — the printed cost minus cumulative reductions, but **never
- * below `MIN_CARD_COST` (1 ruble)** (pg. 6: "must always pay at least 1 ruble, even when its cost is 0 or
- * less"). Pure and side-effect-free, so the UI can show the effective price with the printed one struck
- * through, and `legalActions` can test affordability with the same rule the buy charges.
+ * The full cumulative cost reduction on `card` bought from `row` (pg. 6): the row-independent
+ * `baseReductions` **plus −1 when bought from the lower card row**.
+ */
+export function costReductions(player: { readonly playArea: PlayArea }, card: Card, row: Row): number {
+  return baseReductions(player, card) + (row === 'lower' ? 1 : 0);
+}
+
+/**
+ * Apply the **min-1-ruble floor** to a printed cost after `reductions` (pg. 6: "must always pay at least 1
+ * ruble, even when its cost is 0 or less"). The single home for that rule, shared by the row-buy price
+ * (`effectiveCost`) and the hand-play price (`handCost`).
+ */
+function afterReductions(printedCost: number, reductions: number): number {
+  return Math.max(MIN_CARD_COST, printedCost - reductions);
+}
+
+/**
+ * What `card` costs this player bought from `row` — the printed cost minus cumulative reductions, floored
+ * at 1 ruble. Pure and side-effect-free, so the UI can show the effective price with the printed one
+ * struck through, and `legalActions` can test affordability with the same rule the buy charges.
  */
 export function effectiveCost(player: { readonly playArea: PlayArea }, card: Card, row: Row): number {
-  return Math.max(MIN_CARD_COST, card.cost - costReductions(player, card, row));
+  return afterReductions(card.cost, costReductions(player, card, row));
+}
+
+/**
+ * What `card` costs this player to **play from hand** (pg. 3 "play from his hand": "he now pays the cost
+ * of the card") — the printed cost minus the **row-independent** reductions (`baseReductions`), floored at
+ * 1 ruble. **No lower-row discount** — a hand card isn't in a row. Shared by `playFromHand` and the UI.
+ */
+export function handCost(player: { readonly playArea: PlayArea }, card: Card): number {
+  return afterReductions(card.cost, baseReductions(player, card));
 }
 
 /**

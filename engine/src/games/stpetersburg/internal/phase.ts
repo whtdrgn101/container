@@ -98,13 +98,19 @@ export function rotateMarkersLeft(
  *  1. **Discard the lower row** (pg. 5): every card in the lower row leaves the game (the discard count
  *     grows). Round 1's lower row is empty, so nothing is discarded then.
  *  2. **Slide upper → lower** (pg. 5): the remaining upper-row cards become the new lower row.
- *  3. **Refill workers to 8** from the worker stack (pg. 5) — **unless** the pg. 8 special case applies:
- *     if **no card left the board during the trading phase** (`tookCardThisPhase === false`), *no new
- *     cards are placed*. My reading (pg. 8, "Special case: no cards are bought or added…": "the
- *     administrator will add no new cards to the board. He will, however, turn the card stacks…"): the
- *     round still ends and the stacks still turn, but the *worker deal* — the only step that "adds new
- *     cards to the board" — is skipped, exactly as a mid-round refill is. The discard and the slide are
- *     rearrangements of cards already on the board, not additions, so they **always** happen.
+ *  3. **Refill workers to 8** from the worker stack (pg. 5) — **unconditionally**. This is the new
+ *     round's *setup*, not a mid-round phase handoff, so the pg. 8 special case does **not** gate it.
+ *
+ *     ⚠️ **Correction (folded into SP3 from a live play-test bug).** SP2 originally gated this deal on
+ *     `tookCardThisPhase`, reading pg. 8's "add no new cards to the board" as covering the round-end
+ *     worker deal too. That was wrong, and it drained the board permanently: the trading phase currently
+ *     can take **no** cards (trading buys are refused until SP4; ADD_TO_HAND arrives in SP3), so every
+ *     trading phase ended card-less → every rollover skipped the worker deal while still discarding the
+ *     lower row → the board shrank to empty and never recovered. The correct reading: **pg. 8's special
+ *     case modifies the mid-round phase-end refill only** ("the administrator will add no new cards … he
+ *     will, however, turn the card stacks", i.e. the phase handoffs handled by `scoreAndRefill`). **pg.
+ *     5's round-end sequence — discard lower, slide upper→lower, deal workers to 8 — is the next round's
+ *     setup and runs regardless.** So `scoreAndRefill` keeps the pg. 8 gate; `roundTransition` does not.
  *  4. **Rotate markers left** (pg. 5) and **increment the round**; the new worker phase's starting player
  *     is up, passes reset, and `tookCardThisPhase` resets.
  */
@@ -117,8 +123,8 @@ export function roundTransition(state: StPetersburgState): Partial<StPetersburgS
     lower: state.board.upper,
     discard: state.board.discard + discarded,
   };
-  // pg. 8: only deal workers if a card was taken during the trading phase; else the board just slides.
-  const board = state.tookCardThisPhase ? refillUpper(slid, 'worker') : slid;
+  // pg. 5: the round-end worker deal is unconditional (the new round's setup, not a mid-round refill).
+  const board = refillUpper(slid, 'worker');
   const startingPlayers = rotateMarkersLeft(state.startingPlayers, state.players.length);
 
   return {

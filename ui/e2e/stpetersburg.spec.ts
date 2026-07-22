@@ -95,8 +95,62 @@ test('SP2: drive a full round (mostly passes) into round 2 — the round transit
   await expect(page.getByTestId('sp-phase-worker')).toHaveAttribute('aria-current', 'step');
   await expect(page.getByTestId('sp-log')).toContainText('markers passed left');
 
-  // The round-1 rows slid down: the upper row is empty (no workers dealt back — nobody bought this trading
-  // phase, pg. 8 special case) and the lower row now holds the slid cards (buyable at −1, so buttons).
+  // The round-1 rows slid down: the board holds 8 across both rows (the round-end worker deal is
+  // unconditional — pg. 5; here the 8 slid cards already fill it, so the upper row shows empty) and the
+  // lower row holds the slid cards (buyable at −1, so buttons). The board must never drain (drain-spiral fix).
   await expect(page.getByTestId('sp-upper-row')).toContainText('empty');
   await expect(page.getByTestId('sp-lower-row').locator('[data-testid^="sp-buy-"]').first()).toBeVisible();
+});
+
+test('SP3: add a card to hand, then play it in a later phase — the slot empties, the feed narrates, the cost is charged', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('pick-game-stpetersburg').click();
+  await page.getByTestId('remove-player-2').click(); // 2-seat game (Ann, Bob)
+  await page.getByTestId('start-game').click();
+  await expect(page.getByTestId('board')).toBeVisible();
+
+  // Each of the 4 upper-row cards carries a free "+ Hand" affordance beside its Buy. The active seat adds one.
+  const addButtons = page.getByTestId('sp-upper-row').locator('[data-testid^="sp-hand-"]');
+  await expect(addButtons).toHaveCount(4);
+  await addButtons.first().click();
+
+  // The taken card left the row (4 → 3 buyable), and the feed NAMES the take (public at the table, pg. 3).
+  await expect(page.getByTestId('sp-upper-row').locator('[data-testid^="sp-buy-"]')).toHaveCount(3);
+  await expect(page.getByTestId('sp-log')).toContainText('into hand');
+
+  // Close the worker phase (two consecutive passes) and land in the building phase — a genuinely later
+  // phase — while the added card stays in hand.
+  await page.getByTestId('sp-pass').click();
+  await page.getByTestId('sp-pass').click();
+  await expect(page.getByTestId('sp-phase-building')).toHaveAttribute('aria-current', 'step');
+
+  // A play button appears only for the active hand-holder; in hotseat one pass flips the active seat.
+  if ((await page.getByTestId('sp-play-0').count()) === 0) {
+    await page.getByTestId('sp-pass').click();
+  }
+  await expect(page.getByTestId('sp-play-0')).toBeVisible();
+
+  // Play the held card — it moves into the play area and the feed narrates the cost charged.
+  await page.getByTestId('sp-play-0').click();
+  await expect(page.getByTestId('sp-log')).toContainText('from hand');
+  await expect(page.getByTestId('sp-play-0')).toHaveCount(0); // the card left the hand
+});
+
+test('SP3: the hand limit (3) blocks a 4th add', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('pick-game-stpetersburg').click();
+  await page.getByTestId('remove-player-2').click(); // 2-seat game (Ann, Bob)
+  await page.getByTestId('start-game').click();
+  await expect(page.getByTestId('board')).toBeVisible();
+
+  // The active seat adds three cards, handing the turn back through the other seat each time (a pass keeps
+  // the phase open). The "+ Hand" affordance persists while under the limit.
+  for (let i = 0; i < 3; i += 1) {
+    await page.getByTestId('sp-upper-row').locator('[data-testid^="sp-hand-"]').first().click();
+    await page.getByTestId('sp-pass').click(); // return the turn to the adder without closing the phase
+  }
+
+  // The hand now holds 3 cards (three play buttons) and — at the limit — NO "+ Hand" affordance remains.
+  await expect(page.locator('[data-testid^="sp-play-"]')).toHaveCount(3);
+  await expect(page.getByTestId('sp-upper-row').locator('[data-testid^="sp-hand-"]')).toHaveCount(0);
 });

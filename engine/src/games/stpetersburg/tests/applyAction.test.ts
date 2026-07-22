@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { applyAction } from '../actions';
 import type { Action } from '../actions';
-import { expectError, makeState, newGame } from './helpers';
+import { card, expectError, makeState, newGame } from './helpers';
 
 const pass: Action = { type: 'PASS' };
 const buyUpper0: Action = { type: 'BUY', row: 'upper', index: 0 };
+const addUpper0: Action = { type: 'ADD_TO_HAND', row: 'upper', index: 0 };
+const playHand0: Action = { type: 'PLAY_FROM_HAND', index: 0 };
 
-describe('applyAction (dispatcher — SP1)', () => {
+describe('applyAction (dispatcher — SP1–SP3)', () => {
   it('dispatches BUY and PASS for the active seat', () => {
     const game = newGame(); // p1 (seat 0) opens the worker phase deterministically
     const bought = applyAction(game, 'p1', buyUpper0);
@@ -16,6 +18,17 @@ describe('applyAction (dispatcher — SP1)', () => {
     const passed = applyAction(game, 'p1', pass);
     expect(passed.consecutivePasses).toBe(1);
     expect(passed.activePlayerIndex).toBe(1);
+  });
+
+  it('dispatches ADD_TO_HAND and PLAY_FROM_HAND for the active seat', () => {
+    const added = applyAction(newGame(), 'p1', addUpper0);
+    expect(added.players[0]!.hand).toHaveLength(1); // took the upper-row card into hand
+    expect(added.board.upper).toHaveLength(3);
+
+    const withHand = makeState({ players: newGame().players.map((p, i) => (i === 0 ? { ...p, hand: [card({ key: 'market', kind: 'building', name: 'Market', cost: 5 })] } : p)) });
+    const played = applyAction(withHand, 'p1', playHand0);
+    expect(played.players[0]!.playArea.building).toHaveLength(1);
+    expect(played.players[0]!.hand).toHaveLength(0);
   });
 
   it('enforces the turn/seat pipeline before dispatching', () => {
