@@ -49,6 +49,9 @@ export function makePlayer(overrides: Partial<PlayerState> & Pick<PlayerState, '
   };
 }
 
+// The cast bridges the end-state discriminated union: the base is the active arm (no `results`/
+// `winnerIds`), and spreading `Partial<GameState>` over it can't be proven to land on one arm — but a
+// fixture builder's whole job is to fabricate an arbitrary position (e.g. `{ status: 'ended', ... }`).
 export function makeGame(players: PlayerState[], overrides: Partial<GameState> = {}): GameState {
   return {
     id: 'g1',
@@ -59,12 +62,10 @@ export function makeGame(players: PlayerState[], overrides: Partial<GameState> =
     supply: makeSupply(),
     bank: makeBank(),
     status: 'active',
-    results: [],
-    winnerIds: [],
     version: 0,
     log: [],
     ...overrides,
-  };
+  } as GameState;
 }
 
 /** Assert that `fn` throws a GameError with the given code. */

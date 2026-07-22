@@ -62,7 +62,7 @@ describe('winner determination', () => {
   it('picks the highest total', () => {
     const players = [makePlayer({ id: 'p1', money: 30 }), makePlayer({ id: 'p2', money: 20 }), makePlayer({ id: 'p3', money: 10 })];
     const { extra } = endGame(makeGame(players), players, makeBank());
-    expect(extra.status).toBe('ended');
+    if (extra.status !== 'ended') throw new Error(`expected ended, got ${extra.status}`);
     expect(extra.winnerIds).toEqual(['p1']);
     expect(extra.results).toHaveLength(3);
   });
@@ -73,12 +73,16 @@ describe('winner determination', () => {
       makePlayer({ id: 'p2', money: 20 }),
       makePlayer({ id: 'p3', money: 10 }),
     ];
-    expect(endGame(makeGame(players), players, makeBank()).extra.winnerIds).toEqual(['p1']);
+    const { extra } = endGame(makeGame(players), players, makeBank());
+    if (extra.status !== 'ended') throw new Error('expected ended');
+    expect(extra.winnerIds).toEqual(['p1']);
   });
 
   it('shares victory when still tied after the factory tiebreak', () => {
     const players = [makePlayer({ id: 'p1', money: 20 }), makePlayer({ id: 'p2', money: 20 }), makePlayer({ id: 'p3', money: 10 })];
-    expect(endGame(makeGame(players), players, makeBank()).extra.winnerIds).toEqual(['p1', 'p2']);
+    const { extra } = endGame(makeGame(players), players, makeBank());
+    if (extra.status !== 'ended') throw new Error('expected ended');
+    expect(extra.winnerIds).toEqual(['p1', 'p2']);
   });
 
   it('awards open Bank auctions to their high bidder before scoring', () => {
@@ -110,6 +114,7 @@ describe('game end trigger', () => {
 
     state = applyAction(state, 'p1', { type: 'END_TURN' });
     expect(state.status).toBe('ended');
+    if (state.status !== 'ended') throw new Error('expected ended');
     expect(state.winnerIds).toEqual(['p1']); // $29 after the $1 wage vs $21 / $20
     expect(state.results).toHaveLength(3);
 

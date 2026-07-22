@@ -36,6 +36,9 @@ export default function App() {
   // Hotseat setup.
   const [names, setNames] = useState<string[]>([]);
   const [seatIsBot, setSeatIsBot] = useState<boolean[]>([]);
+  // Each hotseat seat's chosen player colour (a palette id), or undefined for the palette-order default.
+  // Kept sparse: an unpicked seat stays undefined so a colour-less quick-start reproduces today's tints.
+  const [seatColors, setSeatColors] = useState<(string | undefined)[]>([]);
   // Shared-game (lobby) setup + waiting-room state.
   const [lobbySeats, setLobbySeats] = useState(0);
   const [lobby, setLobby] = useState<Lobby | null>(null);
@@ -459,14 +462,22 @@ export default function App() {
             onCreateLobby={() => void createSharedGame()}
             names={names}
             seatIsBot={seatIsBot}
+            seatColors={seatColors}
             onNamesChange={setNames}
             onSeatIsBotChange={setSeatIsBot}
+            onSeatColorsChange={setSeatColors}
             onStartHotseat={() =>
               selected &&
               void run(() =>
                 api.createGame(
                   selected.id,
-                  names.map((name, index) => ({ name: name.trim(), bot: seatIsBot[index] === true })),
+                  names.map((name, index) => ({
+                    name: name.trim(),
+                    bot: seatIsBot[index] === true,
+                    // Omit an unpicked seat's colour entirely, so the server applies its palette-order
+                    // default — a colour-less quick-start stays byte-identical to before this feature.
+                    ...(seatColors[index] !== undefined ? { color: seatColors[index] } : {}),
+                  })),
                 ),
               )
             }

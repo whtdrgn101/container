@@ -39,11 +39,11 @@ That's a high floor. Two things qualify it:
   - [x] 2.2 Linux visual baselines — generated in the pinned Playwright container; e2e now gates the push
   - [x] 2.3 backend coverage gate
   - [x] 2.4 SPA-fallback test
-- [~] **Tier 3 — kernel/board/bot extraction** (do before game 4)
+- [x] **Tier 3 — kernel/board/bot extraction** (do before game 4) — complete
   - [x] 3.2 kernel extraction — `record()` + seat helpers
   - [x] 3.4 hoist the bot drive-loop (+ the two safe bot-package extractions)
   - [x] 3.3 UI shell fields + shared board components
-  - [ ] 3.1 end-state discriminated union (the one Tier 3 item still open)
+  - [x] 3.1 end-state discriminated union
 - [~] **Tier 4 — ops hardening** — 4.3 (lobby poll bounds + retention) and 4.4 (graceful shutdown,
   DB-checking health, WAL-safe backups) done; 4.1/4.2/4.5/4.6/4.7 open
 - [ ] **Tier 5 — worth knowing**
@@ -198,7 +198,28 @@ highest-severity/zero-detection gap in the repo.
 
 Each of these gets more expensive per game added.
 
-### 3.1 Three games disagree on how "the game is over" is represented
+### 3.1 Three games disagree on how "the game is over" is represented ✅
+
+> **Done.** The kernel now owns the end-state shape as two type-only discriminated unions in
+> `engine/src/kernel/endState.ts`: `GameEndState<R>` (`{ status: 'active' }` | `{ status: 'ended';
+> results: readonly R[]; winnerIds: readonly string[] }`) for games that tabulate a per-player result,
+> and `WinnersEndState` (same `active` arm, `ended` carries `winnerIds` only) for **Can't Stop**, whose
+> claimed-columns race produces a winner and nothing to score — an always-empty `results: []` there
+> would be invented data, so it gets the honest minimal arm. Each game's state type became a `type`
+> intersecting its own fields with the union (Container `& GameEndState<PlayerScore>`, Stone Age
+> `& GameEndState<StoneAgeResult>`, Can't Stop `& WinnersEndState`); `createGame` no longer emits
+> `results`/`winnerIds` at all while active. `{ status: 'ended', results: [] }` and the empty-vs-null
+> split are now **unconstructable**. Every read site narrows on `status` for real — engine internals +
+> tests, the bot (self-play/benchmark readers, `decide`'s ended checks), the backend, and the UI
+> (`ResultsPanel` + all three boards, whose existing `status === 'ended'` branches now type-narrow
+> instead of trusting always-present fields). The two view types that wrap state (`GameView`,
+> `CantStopView`/`StoneAgeView`) re-intersect the union so a plain `Omit`/`interface extends` can't
+> collapse it and silently drop `results`/`winnerIds`. Type-only file excluded from the 100% gate, which
+> still holds. **No migration:** old persisted blobs carry the legacy keys as harmless extra JSON
+> properties (an active Container blob's stale `results: []`, Stone Age's `results: null`, Can't Stop's
+> `winnerIds: []`) — proven by `backend/src/tests/persistedCompat.test.ts`, which seeds real old-shape
+> blobs through the repository and plays an action / renders summaries with no migration step. Engine
+> 349 / bot 157 / backend 206 tests green; all 118 e2e untouched.
 
 | Game | End-state fields |
 |---|---|

@@ -43,7 +43,7 @@ describe('decide — contract', () => {
   });
 
   it('refuses to act in a finished game', () => {
-    const state = { ...newGame(3), status: 'ended' as const };
+    const state: GameState = { ...newGame(3), status: 'ended', results: [], winnerIds: [] };
     expect(() => decide(viewOf(state, 'p1'), 'p1')).toThrow(/has ended/);
   });
 

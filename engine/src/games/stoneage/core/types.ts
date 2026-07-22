@@ -1,4 +1,4 @@
-import type { MoveRecord } from '../../../kernel';
+import type { GameEndState, MoveRecord } from '../../../kernel';
 
 // The append-only move-log entry is a kernel primitive; re-exported so Stone Age's modules import it
 // from `../core` alongside the domain types.
@@ -149,8 +149,12 @@ export interface StoneAgePlayer {
  * lands in its own stage. Fields that only later stages need (building/card decks, dice awaiting a
  * roll, per-place tool spend) are added when those stages arrive — the state grows one slice at a time,
  * exactly as Container's did.
+ *
+ * Intersected with the kernel `GameEndState` discriminated union (REVIEW.md §3.1): while `status` is
+ * `'active'` there is no `results`/`winnerIds` at all; once `status` is `'ended'` (SA11) both are
+ * present and typed. Narrow on `status` before reading them.
  */
-export interface StoneAgeState {
+export type StoneAgeState = {
   readonly id: string;
   readonly players: readonly StoneAgePlayer[];
   /** Round counter (starts at 1). */
@@ -185,11 +189,6 @@ export interface StoneAgeState {
    * turn is locked to finishing it.
    */
   readonly pendingGather: PendingGather | null;
-  readonly status: 'active' | 'ended';
-  /** Winner(s) once scored — empty until the game ends. */
-  readonly winnerIds: readonly string[];
-  /** Per-player final-score breakdown once the game ends (SA11); `null` while active. */
-  readonly results: readonly StoneAgeResult[] | null;
   readonly version: number;
   readonly log: readonly MoveRecord[];
-}
+} & GameEndState<StoneAgeResult>;

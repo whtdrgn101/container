@@ -42,8 +42,8 @@ export function createGame(options: CreateGameOptions): CantStopState {
     phase: 'rolling',
     rollsThisTurn: 0,
     dice: null,
+    // Active arm of the kernel end-state union: no `winnerIds` exists until the game ends.
     status: 'active',
-    winnerIds: [],
     version: 0,
     log: [],
   };

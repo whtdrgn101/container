@@ -9,9 +9,11 @@ export type { Viewer } from '../../kernel';
  * runner and die is on the board for all to see — so a view is just the state plus a note of who it
  * was built for, kept for parity with the platform's `viewFor` contract (and games that do redact).
  */
-export interface CantStopView extends CantStopState {
+// Intersection (not `interface extends`) so it distributes over `CantStopState`'s end-state union and
+// keeps the `status` discriminant — an interface can't extend a union.
+export type CantStopView = CantStopState & {
   readonly viewerId: Viewer;
-}
+};
 
 /** Project `state` for `viewer`. A no-op redaction: nothing here is secret. */
 export function viewFor(state: CantStopState, viewer: Viewer): CantStopView {

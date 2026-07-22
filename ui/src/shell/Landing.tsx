@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { swatchColor } from '@/shell/WaitingRoom';
 import { cn } from '@/lib/utils';
 import type { GameInfo, GameSummary, Lobby, LobbyMember } from '@/lib/api';
 
@@ -47,8 +48,11 @@ export interface LandingProps {
 
   readonly names: string[];
   readonly seatIsBot: boolean[];
+  /** Each seat's chosen player colour (a palette id), or undefined to take the palette-order default. */
+  readonly seatColors: (string | undefined)[];
   readonly onNamesChange: (names: string[]) => void;
   readonly onSeatIsBotChange: (flags: boolean[]) => void;
+  readonly onSeatColorsChange: (colors: (string | undefined)[]) => void;
   readonly onStartHotseat: () => void;
 
   readonly joinCode: string;
@@ -81,8 +85,10 @@ export function Landing({
   onCreateLobby,
   names,
   seatIsBot,
+  seatColors,
   onNamesChange,
   onSeatIsBotChange,
+  onSeatColorsChange,
   onStartHotseat,
   joinCode,
   onJoinCodeChange,
@@ -93,6 +99,9 @@ export function Landing({
   // nonsense — the server validates the real bounds anyway.
   const minPlayers = selected?.minPlayers ?? 1;
   const maxPlayers = selected?.maxPlayers ?? 8;
+  // The selected game's player-colour palette (from its catalog entry), for the per-seat hotseat picker.
+  // Empty until the catalog loads, or if a game declares none — the picker simply doesn't render then.
+  const palette = selected?.colors ?? [];
 
   // The display name for a game type (e.g. "stoneage" → "Stone Age"), from the catalog the server
   // returns. Falls back to the raw id if the catalog hasn't loaded or the game is unknown to this build.
@@ -402,48 +411,98 @@ export function Landing({
           </div>
 
           <div className="space-y-2">
-            {names.map((name, index) => (
-              // eslint-disable-next-line react/no-array-index-key -- rows are positional seats
-              <div key={index} className="flex items-center gap-2">
-                <span className="w-14 shrink-0 text-xs text-muted-foreground">Seat {index + 1}</span>
-                <input
-                  aria-label={`Player ${index + 1} name`}
-                  data-testid={`player-name-${index}`}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  value={name}
-                  onChange={(event) => onNamesChange(names.map((value, j) => (j === index ? event.target.value : value)))}
-                />
-                <Button
-                  variant={seatIsBot[index] ? 'default' : 'outline'}
-                  size="sm"
-                  aria-label={`Seat ${index + 1} is played by ${seatIsBot[index] ? 'the AI' : 'a person'}`}
-                  aria-pressed={seatIsBot[index] === true}
-                  title="Let the AI play this seat"
-                  data-testid={`toggle-bot-${index}`}
-                  disabled={busy}
-                  onClick={() => {
-                    const next = names.map((_, j) => seatIsBot[j] === true);
-                    next[index] = !next[index];
-                    onSeatIsBotChange(next);
-                  }}
-                >
-                  🤖
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  aria-label={`Remove seat ${index + 1}`}
-                  data-testid={`remove-player-${index}`}
-                  disabled={busy || names.length <= minPlayers}
-                  onClick={() => {
-                    onNamesChange(names.filter((_, j) => j !== index));
-                    onSeatIsBotChange(names.map((_, j) => seatIsBot[j] === true).filter((_, j) => j !== index));
-                  }}
-                >
-                  ✕
-                </Button>
-              </div>
-            ))}
+            {names.map((name, index) => {
+              // Colours already claimed by *other* seats — disabled here so two seats can't share one
+              // (the same uniqueness the waiting-room picker and the server both enforce).
+              const takenByOthers = new Set(
+                seatColors.filter((color, j): color is string => j !== index && color !== undefined),
+              );
+              return (
+                // eslint-disable-next-line react/no-array-index-key -- rows are positional seats
+                <div key={index} className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="w-14 shrink-0 text-xs text-muted-foreground">Seat {index + 1}</span>
+                    <input
+                      aria-label={`Player ${index + 1} name`}
+                      data-testid={`player-name-${index}`}
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      value={name}
+                      onChange={(event) => onNamesChange(names.map((value, j) => (j === index ? event.target.value : value)))}
+                    />
+                    <Button
+                      variant={seatIsBot[index] ? 'default' : 'outline'}
+                      size="sm"
+                      aria-label={`Seat ${index + 1} is played by ${seatIsBot[index] ? 'the AI' : 'a person'}`}
+                      aria-pressed={seatIsBot[index] === true}
+                      title="Let the AI play this seat"
+                      data-testid={`toggle-bot-${index}`}
+                      disabled={busy}
+                      onClick={() => {
+                        const next = names.map((_, j) => seatIsBot[j] === true);
+                        next[index] = !next[index];
+                        onSeatIsBotChange(next);
+                      }}
+                    >
+                      🤖
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Remove seat ${index + 1}`}
+                      data-testid={`remove-player-${index}`}
+                      disabled={busy || names.length <= minPlayers}
+                      onClick={() => {
+                        onNamesChange(names.filter((_, j) => j !== index));
+                        onSeatIsBotChange(names.map((_, j) => seatIsBot[j] === true).filter((_, j) => j !== index));
+                        onSeatColorsChange(names.map((_, j) => seatColors[j]).filter((_, j) => j !== index));
+                      }}
+                    >
+                      ✕
+                    </Button>
+                  </div>
+                  {/*
+                    Compact per-seat colour picker (the hotseat parallel of the waiting-room one). A dot
+                    per palette colour; the current pick is ringed, colours other seats hold are disabled.
+                    Clicking the ringed dot clears back to the palette-order default — with no picks at
+                    all the created game is byte-identical to before this feature, so visual baselines hold.
+                  */}
+                  {palette.length > 0 && (
+                    <div
+                      className="flex flex-wrap items-center gap-1.5 pl-16"
+                      data-testid={`hotseat-color-row-${index}`}
+                    >
+                      {palette.map((color) => {
+                        const taken = takenByOthers.has(color);
+                        const picked = seatColors[index] === color;
+                        return (
+                          <button
+                            key={color}
+                            type="button"
+                            data-testid={`hotseat-color-${index}-${color}`}
+                            data-color={color}
+                            aria-label={`Seat ${index + 1} colour ${color}${picked ? ' (selected)' : taken ? ' (taken)' : ''}`}
+                            aria-pressed={picked}
+                            title={color}
+                            disabled={busy || taken}
+                            onClick={() =>
+                              // Map over `names` (not `seatColors`) so the array always has one entry
+                              // per seat, even though Add seat doesn't extend it (default is undefined).
+                              onSeatColorsChange(names.map((_, j) => (j === index ? (picked ? undefined : color) : seatColors[j])))
+                            }
+                            className={cn(
+                              'h-5 w-5 rounded-full border transition-transform',
+                              picked && 'ring-2 ring-primary ring-offset-1',
+                              taken ? 'cursor-not-allowed opacity-30' : 'hover:scale-110',
+                            )}
+                            style={{ backgroundColor: swatchColor(color) }}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           <Button

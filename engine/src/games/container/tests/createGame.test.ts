@@ -23,7 +23,9 @@ describe('createGame', () => {
     expect(state.players[1]?.scoringCard.id).toBe('sc2');
     expect(p1?.loans).toBe(0);
     expect(state.status).toBe('active');
-    expect(state.results).toEqual([]);
+    // The active arm of the end-state union carries no `results`/`winnerIds` at all (REVIEW.md §3.1).
+    expect('results' in state).toBe(false);
+    expect('winnerIds' in state).toBe(false);
 
     expect(state.supply.factories).toEqual({ white: 1, red: 1, green: 1, blue: 2, yellow: 2 });
     expect(state.supply.warehouses).toBe(12 - 3);

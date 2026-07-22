@@ -41,6 +41,7 @@ describe('stop', () => {
     const next = stop(state, 'p1');
     expect(next.claimed).toEqual({ 5: 'p1', 9: 'p1', 2: 'p1' });
     expect(next.status).toBe('ended');
+    if (next.status !== 'ended') throw new Error('expected ended');
     expect(next.winnerIds).toEqual(['p1']);
     // The winning stop does not advance the seat.
     expect(next.activePlayerIndex).toBe(0);

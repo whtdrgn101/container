@@ -22,6 +22,7 @@ describe('playSelfPlay', () => {
     expect(exhausted).toBeGreaterThanOrEqual(2);
 
     // And it produced a real result, not a degenerate one.
+    if (result.state.status !== 'ended') throw new Error('expected ended');
     expect(result.state.results).toHaveLength(playerCount);
     expect(result.state.winnerIds.length).toBeGreaterThan(0);
   });
@@ -77,6 +78,7 @@ describe('playSelfPlay', () => {
 describe('playSelfPlay — the finished game holds together', () => {
   it('scores every seat by the engine and picks a real winner', () => {
     const result = playSelfPlay(newGame(4));
+    if (result.state.status !== 'ended') throw new Error('expected ended');
     const totals = new Map(result.state.results.map((score) => [score.playerId, score.total]));
     const best = Math.max(...totals.values());
 

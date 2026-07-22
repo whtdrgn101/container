@@ -6,8 +6,8 @@
 // engine. The backend applies it at every response boundary; an AI bot (Track A) can use the same
 // projection as its "view" of the game.
 
-import type { Viewer } from '../../kernel';
-import type { GameState, PlayerState, ScoringCard } from './core';
+import type { GameEndState, Viewer } from '../../kernel';
+import type { GameState, PlayerScore, PlayerState, ScoringCard } from './core';
 
 // `Viewer` is a kernel primitive (every game projects against the same notion of a viewer); re-export
 // it so Container's consumers keep importing it from the engine's Container surface.
@@ -19,12 +19,19 @@ export interface PlayerView extends Omit<PlayerState, 'scoringCard'> {
   readonly scoringCard: ScoringCard | null;
 }
 
-/** A full game state projected for a viewer. Structurally a GameState with redacted players. */
-export interface GameView extends Omit<GameState, 'players'> {
+/**
+ * A full game state projected for a viewer. Structurally a GameState with redacted players.
+ *
+ * Written as an intersection that re-adds the kernel end-state union (`GameEndState`), because a plain
+ * `Omit<GameState, 'players'>` collapses that union to its common keys — silently dropping
+ * `results`/`winnerIds` and destroying the `status` discriminant. Re-intersecting keeps the view a
+ * discriminated union, so `ResultsPanel` and the backend narrow on `status` exactly as they do on state.
+ */
+export type GameView = Omit<GameState, 'players' | 'status'> & {
   readonly players: readonly PlayerView[];
   /** Who this projection was built for (`null`/`[]` for a spectator with no seat). */
   readonly viewerId: Viewer;
-}
+} & GameEndState<PlayerScore>;
 
 /**
  * Project `state` for `viewer`, hiding every non-viewer player's scoring card. A card is revealed

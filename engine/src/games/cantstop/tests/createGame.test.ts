@@ -18,10 +18,11 @@ describe('createGame', () => {
       rollsThisTurn: 0,
       dice: null,
       status: 'active',
-      winnerIds: [],
       version: 0,
       log: [],
     });
+    // The active arm of the end-state union carries no `winnerIds` (REVIEW.md §3.1).
+    expect('winnerIds' in state).toBe(false);
   });
 
   it('supports up to four players', () => {

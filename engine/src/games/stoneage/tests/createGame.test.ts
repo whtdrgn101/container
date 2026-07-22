@@ -20,10 +20,12 @@ describe('createGame', () => {
       startPlayerIndex: 0,
       activePlayerIndex: 0,
       status: 'active',
-      winnerIds: [],
       version: 0,
       log: [],
     });
+    // The active arm of the end-state union carries no `results`/`winnerIds` (REVIEW.md §3.1).
+    expect('results' in state).toBe(false);
+    expect('winnerIds' in state).toBe(false);
     // Every place (fixed + building slots) exists and is empty.
     expect(Object.keys(state.placements).sort()).toEqual([...ALL_PLACES].sort());
     expect(Object.values(state.placements).every((p) => Object.keys(p).length === 0)).toBe(true);

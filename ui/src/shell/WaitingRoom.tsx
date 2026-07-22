@@ -28,7 +28,8 @@ const SWATCH: Record<string, string> = {
   sky: '#0ea5e9',
   emerald: '#10b981',
 };
-const swatchColor = (id: string): string => SWATCH[id] ?? id;
+/** Draw an arbitrary palette id as a CSS colour. Shared with the landing's hotseat colour picker. */
+export const swatchColor = (id: string): string => SWATCH[id] ?? id;
 
 export interface WaitingRoomProps {
   readonly lobby: Lobby;

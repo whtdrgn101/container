@@ -12,7 +12,7 @@ const rollDice = (n: number) => Array.from({ length: n }, () => 3);
 
 describe('decide', () => {
   it('refuses an ended game and an off-turn seat', () => {
-    expect(() => decide(view({ ...base(), status: 'ended' }), 'p1')).toThrow(/ended/);
+    expect(() => decide(view({ ...base(), status: 'ended', results: [], winnerIds: [] }), 'p1')).toThrow(/ended/);
     expect(() => decide(view(base()), 'p2')).toThrow(/not bot seat/);
   });
 

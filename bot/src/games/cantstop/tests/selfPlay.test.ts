@@ -15,6 +15,7 @@ describe('playSelfPlay', () => {
 
       expect(result.completed).toBe(true);
       expect(result.state.status).toBe('ended');
+      if (result.state.status !== 'ended') throw new Error('expected ended');
       expect(result.state.winnerIds).toHaveLength(1);
 
       const winner = result.state.winnerIds[0]!;
@@ -26,6 +27,7 @@ describe('playSelfPlay', () => {
   it('is deterministic for a given seed', () => {
     const once = playSelfPlay(newGame(), { rng: seededRng(99) });
     const twice = playSelfPlay(newGame(), { rng: seededRng(99) });
+    if (once.state.status !== 'ended' || twice.state.status !== 'ended') throw new Error('expected ended');
     expect(once.state.winnerIds).toEqual(twice.state.winnerIds);
     expect(once.actions).toBe(twice.actions);
   });

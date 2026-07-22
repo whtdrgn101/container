@@ -173,6 +173,26 @@ describe('colours across the platform', () => {
     await socket.terminate();
   });
 
+  it('rejects a create-time colour outside the palette (INVALID_COLOR, 400)', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/games',
+      payload: { gameType: 'cantstop', players: [{ name: 'Ann', color: 'indigo' }, { name: 'Bob' }] },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.code).toBe('INVALID_COLOR');
+  });
+
+  it('rejects two create-time seats picking the same colour (COLOR_TAKEN, 409)', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/games',
+      payload: { gameType: 'cantstop', players: [{ name: 'Ann', color: 'amber' }, { name: 'Bob', color: 'amber' }] },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error.code).toBe('COLOR_TAKEN');
+  });
+
   it('carries colours into a rematch (same table, same colours)', async () => {
     // An all-bot Can't Stop game finishes on create (given an rng that lets a bot win), then a watcher
     // restarts it in one click — and the same colours must ride into the fresh game, like bot seats do.

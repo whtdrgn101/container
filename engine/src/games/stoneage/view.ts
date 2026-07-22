@@ -10,9 +10,11 @@ export type { Viewer } from '../../kernel';
  * who it's for. (The undrawn card/building decks are the only secret, and those aren't modelled until
  * their stages; redact them here then if it matters.)
  */
-export interface StoneAgeView extends StoneAgeState {
+// Intersection (not `interface extends`) so it distributes over `StoneAgeState`'s end-state union and
+// keeps the `status` discriminant — an interface can't extend a union.
+export type StoneAgeView = StoneAgeState & {
   readonly viewerId: Viewer;
-}
+};
 
 /** Project `state` for `viewer`. A near-identity redaction at the scaffold stage. */
 export function viewFor(state: StoneAgeState, viewer: Viewer): StoneAgeView {

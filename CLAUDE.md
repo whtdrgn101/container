@@ -92,9 +92,11 @@ abandon, rematch) live in the core with no `GameModule` hook, so every game gets
 **Player colours** are the worked example of this pattern (like bots): each game's `GameModule`
 declares an ordered palette (`colors: readonly string[]`, lowercase ids — Container's are its five hull
 tints, Stone Age's four seat tints, Can't Stop's four). The platform offers the pick (lobby join takes
-an optional `color`; `POST /lobbies/:id/color` changes it while waiting — validated against the
-palette, `400 INVALID_COLOR` / `409 COLOR_TAKEN` on a bad or taken pick), assigns colours on
-create/start (picks honoured, the rest defaulted in **palette order** — which reproduces each board's
+an optional `color`; the waiting-room *and* the landing's hotseat quick-start show a per-seat swatch
+picker; `POST /lobbies/:id/color` changes it while waiting, and `POST /games` takes each seat's `color`
+alongside its name — all validated against the palette, `400 INVALID_COLOR` / `409 COLOR_TAKEN` on a
+bad or taken pick), assigns colours on create/start (picks honoured, the rest defaulted in **palette
+order** — which reproduces each board's
 old per-seat-index tints, so visual baselines don't move), and persists them beside the game in
 `game_colors` (`colors.ts`, exactly the `bots.ts` shape). Colours ride **every** state payload as
 `colors: Record<playerId, colorId>` (GET, the action reply, create/start 201s, a module route's own
@@ -215,19 +217,24 @@ the module from the row, never a default". Both consumers transpile the TS sourc
 `engine` also has a real `build` (`tsc -p tsconfig.build.json` → `dist/`) used for typecheck/
 distribution; consumers may switch to `dist` later if we ever publish.
 
-**The kernel is tiny on purpose** (`engine/src/kernel/`): only `GameError` (generic in its code
-union), `MoveRecord`, and `Viewer` — the primitives every game *and* the backend `GameModule` contract
-share. Each game currently keeps its **own** `record()`, state types, constants and `viewFor` — we did
-**not** extract a shared `record`/state off two examples, the same discipline as not building a
-sealed-bid framework off one.
+**The kernel is tiny on purpose** (`engine/src/kernel/`): only the primitives every game *and* the
+backend `GameModule` contract share — `GameError` (generic in its code union), `MoveRecord`, `Viewer`,
+the `record()` version/log mechanism, the `makeSeating` seat helpers, and the end-state discriminated
+union (`GameEndState<R>` / `WinnersEndState`). Each game still keeps its **own** state types, constants
+and `viewFor` — we did **not** extract a shared state or `viewFor`, the same discipline as not building
+a sealed-bid framework off one.
 
-⚠️ **That restraint rule has now fired: the third game arrived.** `record()` and the seat helpers
-(`seatOf`/`withPlayer`/`activePlayer`) turned out **byte-identical across all three games**, and the
-end-state shape drifted three different ways — so extraction into the kernel (with the error-class trap
-noted there) is warranted and is tracked in **[`REVIEW.md`](./REVIEW.md) Tier 3**, not yet done. What
-should stay per-game even so: `viewFor` (redaction must be an explicit per-game decision, not a shared
-no-op) and the `legalActions` preamble (Container deliberately admits off-turn `REQUEST_LOAN`). Extract
-the genuinely-common shapes; resist the coincidental ones.
+⚠️ **That restraint rule fired once the third game arrived, and its extractions have landed:** `record()`
+and the seat helpers (`seatOf`/`withPlayer`/`activePlayer`) were **byte-identical across all three games**
+(REVIEW.md §3.2), and the "game is over" shape drifted three different ways — Container `results: []`
+while active, Stone Age `results: null`, Can't Stop no `results` at all — so it became the kernel
+end-state union (§3.1). A game's state type now *intersects* that union with its own fields
+(`… & GameEndState<PlayerScore>`), so the `active` arm carries no `results`/`winnerIds` and
+`{ status: 'ended', results: [] }` is unconstructable; read sites narrow on `status`. Can't Stop, having
+nothing to tabulate, takes the winners-only `WinnersEndState` arm rather than an invented empty
+`results`. What deliberately stays per-game even so: `viewFor` (redaction must be an explicit per-game
+decision, not a shared no-op) and the `legalActions` preamble (Container admits off-turn `REQUEST_LOAN`).
+Extract the genuinely-common shapes; resist the coincidental ones.
 
 ### The bot package (`@game-hub/bot`, per-game like the engine)
 
@@ -499,7 +506,9 @@ sessions). The Container summary below is retained for context; the per-game roa
 - **Slice 7 — Game end & final scoring ✅** ends when the supply runs out of 2 colors (checked at
   turn-advance); open Bank auctions awarded, then `finalScoring` (discard most-common w/ two-value
   rule, island score by card, leftover $3/$2/$0, −$11/loan) and winner (total → factory tiebreak →
-  shared). `status: 'active' | 'ended'` + `results` + `winnerIds`; UI shows a results screen.
+  shared). End state is the kernel `GameEndState` discriminated union (REVIEW.md §3.1): while `active`
+  there is no `results`/`winnerIds`, and `{ status: 'ended'; results; winnerIds }` is the only other arm
+  — narrow on `status` to read them. UI shows a results screen.
 - 🎉 **Core game complete — fully playable hotseat.** Optional remaining work: Track A (AI),
   Track B (online multiplayer). Keep the 100% engine coverage gate for any new mechanics.
 - **Track B / B1 ✅ (server-authoritative views).** Hidden info is now enforced server-side: the engine

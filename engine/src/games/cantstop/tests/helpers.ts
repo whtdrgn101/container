@@ -8,9 +8,13 @@ export function newGame(names: string[] = ['Ann', 'Bob']): CantStopState {
   return createGame({ id: 'g1', players: names.map((name) => ({ name })) });
 }
 
-/** A game with fields overridden — the quick way to build a mid-turn position. */
+/**
+ * A game with fields overridden — the quick way to build a mid-turn position. The cast bridges the
+ * end-state discriminated union: spreading `Partial<CantStopState>` over the active base can't be
+ * proven to land on one arm, but a fixture builder's whole job is to fabricate an arbitrary position.
+ */
 export function makeState(overrides: Partial<CantStopState> = {}, names?: string[]): CantStopState {
-  return { ...newGame(names), ...overrides };
+  return { ...newGame(names), ...overrides } as CantStopState;
 }
 
 /** Assert that `fn` throws a GameError with the given code. */

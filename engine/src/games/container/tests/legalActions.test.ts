@@ -105,7 +105,7 @@ describe('legalActions', () => {
     });
 
     it('offers nothing to anyone once the game has ended', () => {
-      const state = { ...newGame(3), status: 'ended' as const };
+      const state: GameState = { ...newGame(3), status: 'ended', results: [], winnerIds: [] };
       expect(legalActions(state, 'p2')).toEqual([]);
     });
 

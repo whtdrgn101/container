@@ -1,4 +1,4 @@
-import type { MoveRecord } from '../../../kernel';
+import type { MoveRecord, WinnersEndState } from '../../../kernel';
 
 // The append-only move-log entry is a kernel primitive shared by every game; re-exported here so
 // Can't Stop's own modules import it from `../core` alongside the rest of the domain types.
@@ -19,8 +19,15 @@ export interface CantStopPlayer {
   readonly progress: Readonly<Record<number, number>>;
 }
 
-/** The complete, serializable state of a Can't Stop game. Plain data — safe to JSON round-trip. */
-export interface CantStopState {
+/**
+ * The complete, serializable state of a Can't Stop game. Plain data — safe to JSON round-trip.
+ *
+ * Intersected with the kernel `WinnersEndState` (REVIEW.md §3.1): a claimed-columns race produces a
+ * winner and nothing to tabulate, so — unlike Container/Stone Age — the `ended` arm carries only
+ * `winnerIds`, not a per-player `results` record (manufacturing an always-empty one would be invented
+ * data). While `status` is `'active'` there is no `winnerIds` at all; narrow on `status` before reading.
+ */
+export type CantStopState = {
   readonly id: string;
   readonly players: readonly CantStopPlayer[];
   /** Index into `players` of whose turn it is. */
@@ -44,10 +51,7 @@ export interface CantStopState {
   readonly rollsThisTurn: number;
   /** The four dice awaiting a SELECT, or `null` in the `rolling` phase. */
   readonly dice: readonly [number, number, number, number] | null;
-  readonly status: 'active' | 'ended';
-  /** Winner(s) — a single id once someone claims `WIN_COLUMNS` columns; empty until then. */
-  readonly winnerIds: readonly string[];
   /** Monotonic version, incremented once per applied action. Used for optimistic concurrency. */
   readonly version: number;
   readonly log: readonly MoveRecord[];
-}
+} & WinnersEndState;

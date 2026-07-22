@@ -52,6 +52,9 @@ export function makePlayer(overrides: Partial<PlayerState> & Pick<PlayerState, '
   };
 }
 
+// The cast bridges the end-state discriminated union: the base is the active arm (no `results`/
+// `winnerIds`), and a fixture builder fabricates an arbitrary position — spreading `Partial<GameState>`
+// over the base can't be proven to land on a single arm.
 export function makeGame(players: PlayerState[], overrides: Partial<GameState> = {}): GameState {
   return {
     id: 'g1',
@@ -62,12 +65,10 @@ export function makeGame(players: PlayerState[], overrides: Partial<GameState> =
     supply: makeSupply(),
     bank: makeBank(),
     status: 'active',
-    results: [],
-    winnerIds: [],
     version: 0,
     log: [],
     ...overrides,
-  };
+  } as GameState;
 }
 
 /** A fresh N-player game via createGame (deterministic — createGame takes no randomness). */

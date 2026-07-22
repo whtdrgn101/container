@@ -25,7 +25,8 @@ function headToHead(): { wins: number; meanMargin: number } {
       policies: new Map([[legacySeat, legacyDecide]]),
     });
     if (!result.completed) throw new Error(`Benchmark game for seed ${seed} did not complete`);
-    const totals = new Map(result.state.results!.map((r) => [r.playerId, r.total]));
+    if (result.state.status !== 'ended') throw new Error(`Benchmark game for seed ${seed} did not end`);
+    const totals = new Map(result.state.results.map((r) => [r.playerId, r.total]));
     margin += totals.get(newSeat)! - totals.get(legacySeat)!;
     if (result.state.winnerIds.includes(newSeat)) wins += result.state.winnerIds.length === 1 ? 1 : 0.5;
   }
@@ -50,6 +51,7 @@ describe('Stone Age policy strength benchmark', () => {
       ]),
     });
     expect(result.completed).toBe(true);
-    expect(result.state.results).not.toBeNull();
+    if (result.state.status !== 'ended') throw new Error('expected ended');
+    expect(result.state.results).toHaveLength(3);
   });
 });

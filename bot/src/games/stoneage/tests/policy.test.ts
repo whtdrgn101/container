@@ -32,7 +32,9 @@ const base = () => createGame({ id: 'g', players: [{ name: 'Ann' }, { name: 'Bob
 /** `base()` with player 1 replaced — the view most tests score placements against. */
 const viewWith = (p1: Partial<StoneAgePlayer>, over: Partial<StoneAgeState> = {}): StoneAgeView => {
   const s = base();
-  return viewFor({ ...s, ...over, players: s.players.map((p, i) => (i === 0 ? { ...p, ...p1 } : p)) }, 'p1');
+  // Cast bridges the end-state discriminated union — this fixture fabricates an arbitrary position.
+  const state = { ...s, ...over, players: s.players.map((p, i) => (i === 0 ? { ...p, ...p1 } : p)) } as StoneAgeState;
+  return viewFor(state, 'p1');
 };
 const p1Of = (view: StoneAgeView) => view.players[0]!;
 /** Gross placement value at a fresh board, full horizon. */

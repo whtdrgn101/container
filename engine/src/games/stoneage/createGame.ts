@@ -71,9 +71,8 @@ export function createGame(options: CreateGameOptions): StoneAgeState {
     cardDisplay: display,
     cardDeck: deck,
     pendingGather: null,
+    // Active arm of the kernel end-state union: no `results`/`winnerIds` exist until the game ends.
     status: 'active',
-    winnerIds: [],
-    results: null,
     version: 0,
     log: [],
   };

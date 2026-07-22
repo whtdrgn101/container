@@ -127,9 +127,8 @@ export function createGame(options: CreateGameOptions): GameState {
     turn: 1,
     supply,
     bank,
+    // Active arm of the kernel end-state union: no `results`/`winnerIds` exist until the game ends.
     status: 'active',
-    results: [],
-    winnerIds: [],
     version: 0,
     log: [],
   };

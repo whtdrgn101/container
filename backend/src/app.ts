@@ -273,6 +273,35 @@ export function buildApp(options: AppOptions): FastifyInstance {
       colorSeats.listForGame(gameId),
     );
 
+  /**
+   * Reject a per-seat colour list on create (`POST /games`) that names a colour outside the game's
+   * palette (`INVALID_COLOR`, 400) or picks the same colour for two seats (`COLOR_TAKEN`, 409).
+   *
+   * The same two failures the lobby's `rejectColor` guards, but over a whole list at once rather than
+   * one seat against the others — the hotseat quick-start hands every seat's pick up front. Unpicked
+   * seats (`undefined`) are skipped, so a colour-less create is a no-op here and keeps today's default
+   * assignment byte-identical. Returns the sent reply to reject, or `null` to accept. `assignColors`
+   * would *silently* drop a bad pick; on the explicit create path we say so instead.
+   */
+  const rejectColorPicks = (
+    reply: FastifyReply,
+    palette: readonly string[],
+    picks: readonly (string | undefined)[],
+  ): FastifyReply | null => {
+    const seen = new Set<string>();
+    for (const pick of picks) {
+      if (pick === undefined) continue;
+      if (!palette.includes(pick)) {
+        return reply.code(400).send({ error: { code: 'INVALID_COLOR', message: `"${pick}" is not a colour in this game` } });
+      }
+      if (seen.has(pick)) {
+        return reply.code(409).send({ error: { code: 'COLOR_TAKEN', message: `Colour "${pick}" is already taken` } });
+      }
+      seen.add(pick);
+    }
+    return null;
+  };
+
   /** Deal a new game of one type and record which of its seats an AI holds and each seat's colour. */
   const startGame = (module: AnyGameModule, seats: readonly NewSeat[]): unknown => {
     const state = module.createGame({
@@ -431,6 +460,10 @@ export function buildApp(options: AppOptions): FastifyInstance {
           error: { code: 'UNKNOWN_GAME_TYPE', message: `This server does not host a game called "${gameType}"` },
         });
       }
+      // Validate each seat's colour pick against this game's palette (invalid → 400) and for duplicates
+      // (→ 409), rather than let `assignColors` quietly default a bad pick. An absent/all-unpicked list
+      // passes untouched, so a colour-less create still behaves exactly as it did before this feature.
+      if (rejectColorPicks(reply, module.colors, request.body.players.map((seat) => seat.color))) return reply;
       try {
         const started = startGame(module, request.body.players);
         const gameId = module.summarize(started).id;

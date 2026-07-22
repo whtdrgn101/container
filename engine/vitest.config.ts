@@ -12,6 +12,7 @@ export default defineConfig({
         'src/**/index.ts', // public + folder barrels (kernel, each game, core/internal/actions)
         'src/kernel/moveRecord.ts', // compile-time only (MoveRecord interface)
         'src/kernel/viewer.ts', // compile-time only (Viewer type alias)
+        'src/kernel/endState.ts', // compile-time only (GameEndState / WinnersEndState unions)
         'src/games/*/core/types.ts', // compile-time only (each game's domain interfaces)
         'src/games/*/actions/action.ts', // compile-time only (each game's Action union)
       ],

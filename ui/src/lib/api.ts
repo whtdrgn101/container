@@ -89,10 +89,12 @@ export interface GameSummary {
   bots: string[];
 }
 
-/** A seat in a new game: a name, plus whether the AI should play it. */
+/** A seat in a new game: a name, plus whether the AI should play it and an optional player-colour pick. */
 export interface NewSeat {
   name: string;
   bot?: boolean;
+  /** A palette id (from the game's catalog entry). Honoured if valid/unique; omit for the default. */
+  color?: string;
 }
 
 /** Throw an Error carrying the server's message (used for any non-2xx response). */

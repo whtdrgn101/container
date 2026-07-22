@@ -1,5 +1,5 @@
 import type { Color } from './colors';
-import type { MoveRecord } from '../../../kernel';
+import type { GameEndState, MoveRecord } from '../../../kernel';
 
 // The append-only move-log entry is a kernel primitive shared by every game; re-exported here so
 // Container's own modules keep importing it from `../core` alongside the rest of the domain types.
@@ -132,8 +132,14 @@ export interface PlayerScore {
   readonly discardedColor: Color | null;
 }
 
-/** The complete, serializable state of a game. Plain data — safe to JSON round-trip. */
-export interface GameState {
+/**
+ * The complete, serializable state of a game. Plain data — safe to JSON round-trip.
+ *
+ * Intersected with the kernel `GameEndState` discriminated union (REVIEW.md §3.1): while `status` is
+ * `'active'` there is no `results`/`winnerIds` at all; once `status` is `'ended'` both are present and
+ * typed. Narrow on `status` before reading them. The game ends when the supply of 2 colors is exhausted.
+ */
+export type GameState = {
   readonly id: string;
   readonly players: readonly PlayerState[];
   /** Index into `players` of whose turn it is. */
@@ -146,13 +152,7 @@ export interface GameState {
   readonly supply: Supply;
   /** The Off-Shore Bank board. */
   readonly bank: BankState;
-  /** Whether the game is still in progress or has ended (supply of 2 colors exhausted). */
-  readonly status: 'active' | 'ended';
-  /** Final-scoring breakdown per player; empty until the game ends. */
-  readonly results: readonly PlayerScore[];
-  /** Winner(s) — more than one on a shared victory; empty until the game ends. */
-  readonly winnerIds: readonly string[];
   /** Monotonic version, incremented once per applied action. Used for optimistic concurrency. */
   readonly version: number;
   readonly log: readonly MoveRecord[];
-}
+} & GameEndState<PlayerScore>;

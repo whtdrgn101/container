@@ -1157,6 +1157,7 @@ describe('Bot seats — the runner', () => {
   it('plays an all-bot game to the end on its own', async () => {
     const { game } = await createWithBots([true, true, true]);
     expect(game.status).toBe('ended');
+    if (game.status !== 'ended') throw new Error('expected ended');
     expect(game.winnerIds.length).toBeGreaterThan(0);
     // Every card is revealed once the game is over, so this is a full, scored result.
     expect(game.results).toHaveLength(3);

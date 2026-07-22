@@ -79,7 +79,8 @@ describe('feed', () => {
     const base = feeding({}, { activePlayerIndex: 1, startPlayerIndex: 0 });
     const next = feed({ ...base, buildings: [[], base.buildings[1]!] }, 'p2');
     expect(next.status).toBe('ended');
-    expect(next.results).not.toBeNull();
+    if (next.status !== 'ended') throw new Error('expected ended');
+    expect(next.results).toHaveLength(next.players.length);
     expect(next.winnerIds.length).toBeGreaterThanOrEqual(1);
     expect(next.round).toBe(1); // no new round started
   });
@@ -90,6 +91,7 @@ describe('feed', () => {
     const short = { ...base, cardDeck: [], cardDisplay: [base.cardDisplay[0]!, null, null, base.cardDisplay[3]!] };
     const next = feed(short, 'p2');
     expect(next.status).toBe('ended');
-    expect(next.results).not.toBeNull();
+    if (next.status !== 'ended') throw new Error('expected ended');
+    expect(next.results).toHaveLength(next.players.length);
   });
 });
