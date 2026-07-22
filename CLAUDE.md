@@ -10,9 +10,10 @@ shared engine/backend/UI seams. Games built on it:
 - **Container** (10th Anniversary Edition) — the first game; a 3–5 player economic supply-chain game.
 - **Can't Stop** — the second game; a 2–4 player push-your-luck dice game (added as roadmap C3, the
   honest test that the platform seams generalize).
-- **Stone Age** — the third game; a 2–4 player worker-placement Euro. **Complete** (SA0–SA13): placement →
+- **Stone Age** — the third game; a 2–4 player worker-placement Euro. **Complete** (SA0–SA14): placement →
   gather-with-tools / buildings / civilization cards → feeding → round loop → game end + final scoring,
-  an illustrated zoomable board, and an AI bot. Built one action per stage — see its roadmap.
+  an illustrated zoomable board, and an AI bot, plus the pg. 8 **2–3-player restrictions** (village lock +
+  resource-place player caps). Built one action per stage — see its roadmap.
 
 This is a learning project: the owner is an experienced software engineer who wants **good engineering
 practices** throughout — clean separation of concerns, strong typing, and high test coverage. Note the
@@ -474,7 +475,8 @@ game's folder. Read the relevant one before starting a phase.
 - **[`engine/src/games/cantstop/ROADMAP.md`](./engine/src/games/cantstop/ROADMAP.md)** — Can't Stop:
   complete (playable + its bot, CS1); only optional variants remain.
 - **[`engine/src/games/stoneage/ROADMAP.md`](./engine/src/games/stoneage/ROADMAP.md)** — Stone Age:
-  complete (SA0–SA13) — full worker-placement game, illustrated board, and a bot.
+  complete (SA0–SA14) — full worker-placement game, illustrated board, a bot, and the pg. 8
+  2–3-player restrictions.
 
 We build each game as **vertical slices** (engine → API → UI → tests), not big-bang layers. Each slice
 ends green and demoable, so it's a safe stopping point (and a clean place to check plan usage between

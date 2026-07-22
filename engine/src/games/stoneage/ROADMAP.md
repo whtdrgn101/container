@@ -311,10 +311,27 @@ artifact before the port. Also in this pass:
   randomized stacks/display render outside `board-map`. All 8 stoneage e2e specs passed unchanged
   (every testid and text assertion preserved).
 
-### Later (optional)
+### ✅ SA14 — 2–3-player restrictions (shipped)
 
-- **2–3-player rules** (pg. 8): restrict tool-maker/hut/field to 2 of 3, and the resource places' player
-  counts — if not folded into SA1.
+The pg. 8 "Changes for 3 or 2 players" rules, deferred at SA1 (which used the 4-player capacities for
+all counts), now apply. All of it funnels through the one placement choke point,
+`internal/placement.ts` `countRange`:
+
+- **Village lock:** with ≤3 players, only **2 of the 3** places tool maker / hut / field may be filled
+  each round — a still-empty third becomes unplaceable once the other two are occupied (which one is
+  locked is first-come and can differ every round). 4-player games are unchanged.
+- **Resource-place player caps:** each of forest / clay pit / quarry / river admits at most **1 player**
+  with 2 players, **2 players** with 3 (on top of the existing 7-total cap); 4-player games keep the
+  7-total cap only. The **hunt is explicitly uncapped** at every player count.
+
+Everything downstream (`legalPlacements` / `canPlace` / `nextPlacer`, the `PLACE` action,
+`legalActions`, the bot) flows through `countRange`, so the bot stays legal automatically and the hunt
+is always left available (proven by a test) — placement can never deadlock. **UI**: a locked village
+place loses its Place affordance automatically (via `legalActions`) and its plaque shows a **"locked"**
+hint (with a title/aria explanation) in place of the `n/m` line. **Bot**: no strength regression — the
+2-player benchmark re-measured at 29/32 (was 30/32 pre-caps), since the new limits bind both policies
+symmetrically; the bar was re-committed to 25/32 per the calibrate-then-commit rule. 100% engine
+coverage held; a new e2e (`stoneage.spec.ts`) demonstrates the lock.
 
 ## Notes / scope
 

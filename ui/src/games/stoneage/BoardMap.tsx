@@ -76,6 +76,18 @@ export function BoardMap({ game, canDrive, busy, onPlace, onGather, onUse, seatC
       options.set(place, { min: Math.min(cur?.min ?? a.count, a.count), max: Math.max(cur?.max ?? a.count, a.count) });
     }
   }
+  // pg. 8 village lock (2–3 players): only 2 of tool maker / hut / field may be filled each round, so a
+  // still-empty third is locked once the other two are occupied. A public board fact (same for every
+  // viewer), so it's derived straight from the board rather than from the active seat's legal actions.
+  const occOf = (place: FixedPlaceId) => Object.values(game.placements[place] ?? {}).reduce((s, n) => s + n, 0);
+  const VILLAGE: readonly FixedPlaceId[] = ['toolMaker', 'hut', 'field'];
+  const isLocked = (place: FixedPlaceId) =>
+    game.players.length <= 3 &&
+    VILLAGE.includes(place) &&
+    occOf(place) === 0 &&
+    VILLAGE.filter((p) => occOf(p) > 0).length >= 2;
+  const LOCK_HINT = 'Only 2 of the tool maker, hut, and field can be used each round (2–3 players); this one is locked for the rest of the round.';
+
   const countFor = (place: FixedPlaceId, min: number, max: number) => Math.max(min, Math.min(max, counts[place] ?? max));
   const bump = (place: FixedPlaceId, by: number, min: number, max: number) =>
     setCounts((c) => ({ ...c, [place]: Math.max(min, Math.min(max, (c[place] ?? max) + by)) }));
@@ -110,6 +122,7 @@ export function BoardMap({ game, canDrive, busy, onPlace, onGather, onUse, seatC
         const canGather = acting && canDrive && mine && isGatherPlace(place) && !pending;
         const canUse = acting && canDrive && mine && isUsePlace(place) && !pending;
         const count = opt ? countFor(place, opt.min, opt.max) : 0;
+        const locked = isLocked(place);
         const Icon = PLACE_ICON[place];
         return (
           <div
@@ -123,14 +136,21 @@ export function BoardMap({ game, canDrive, busy, onPlace, onGather, onUse, seatC
             style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
             role={opt ? 'button' : undefined}
             tabIndex={opt ? 0 : undefined}
-            aria-label={opt ? `Place ${count} on ${PLACE_LABEL[place]}` : PLACE_LABEL[place]}
+            aria-label={opt ? `Place ${count} on ${PLACE_LABEL[place]}` : locked ? `${PLACE_LABEL[place]} — locked this round` : PLACE_LABEL[place]}
+            title={locked ? LOCK_HINT : undefined}
             onClick={opt ? () => onPlace(place, count) : undefined}
           >
             <div className="flex items-center justify-center gap-1">
               <Icon className="h-4 w-4" />
               <span className="text-xs font-semibold">{PLACE_LABEL[place]}</span>
             </div>
-            <div className="text-[10px] tabular-nums text-[#7a6a4d]">{used}/{cap === null ? '∞' : cap}</div>
+            {locked ? (
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#a05a24]" title={LOCK_HINT}>
+                locked
+              </div>
+            ) : (
+              <div className="text-[10px] tabular-nums text-[#7a6a4d]">{used}/{cap === null ? '∞' : cap}</div>
+            )}
             {used > 0 && <div className="mt-0.5 flex flex-wrap items-center justify-center gap-0.5">{meeplesFor(here)}</div>}
 
             {opt && (

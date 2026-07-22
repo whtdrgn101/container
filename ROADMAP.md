@@ -9,9 +9,30 @@ game, and the higher-level "which games, and what's left of them" view. Game-spe
 | **Container** | core game complete; AI A0–A2 shipped, A3–A5 remain | [`engine/src/games/container/ROADMAP.md`](engine/src/games/container/ROADMAP.md) |
 | **Can't Stop** | complete: playable, AI (CS1) + art/a11y polish (CS2) shipped; only optional variants (CS3) remain | [`engine/src/games/cantstop/ROADMAP.md`](engine/src/games/cantstop/ROADMAP.md) |
 | **Stone Age** | **complete** (SA0–SA13): full worker-placement game — placement, gather+tools, buildings, civ cards, feeding, game end + scoring, an illustrated zoomable board, and an AI bot | [`engine/src/games/stoneage/ROADMAP.md`](engine/src/games/stoneage/ROADMAP.md) |
+| **Saint Petersburg** | **planned** (game 4, 1st edition): sliced SP0–SP9 — the first game with real hidden information (hands *and* rubles are secret) and continuous deck randomness | [`engine/src/games/stpetersburg/ROADMAP.md`](engine/src/games/stpetersburg/ROADMAP.md) |
 
 Adding a game is **additive** — implement the seams, register, done (proven three times now — Container,
 Can't Stop, Stone Age). See CLAUDE.md → "Building a new game" for the recipe.
+
+## Direction (owner, 2026-07-22)
+
+The near-term order, decided while play-testing:
+
+1. **Stone Age polish** — the pg. 8 two/three-player rules (the one knowing rules deviation left in a
+   shipped game), including bot benchmark recalibration under the harder 2-player game. *(In progress.)*
+2. **Game 4 — Saint Petersburg (1st ed.)** — chosen 2026-07-22 over Russian Railroads (which is queued
+   as the Track D pilot: a heavyweight is the right stress test once adding games is smoother). Sliced
+   SP0–SP9 in its roadmap; the first game exercising real `viewFor` redaction (hidden hands + hidden
+   rubles) and continuous deck randomness.
+3. **Schema versioning for state transitions** (REVIEW §4.1) — `schemaVersion` on persisted state + a
+   `migrate` hook on `GameModule`, so iterating on shipped engines can't strand in-flight games.
+4. **Track D (new, core) — externalize games.** Three games have tested the engine and the seams; the
+   long-term goal is making games easier to add — and eventually addable from *outside* this repo.
+   Needs design thought before code: what a game package must export (engine surface, module, client,
+   bot?), how registration/discovery works (build-time registry today; plugin loading later?), what the
+   version-compat contract with the kernel is, and what the seams still assume about living in one
+   workspace (vite aliases, subpath exports, the one registry cast). Start as a written design doc, not
+   an implementation.
 
 ## Principles
 

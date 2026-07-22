@@ -36,9 +36,12 @@ function headToHead(): { wins: number; meanMargin: number } {
 describe('Stone Age policy strength benchmark', () => {
   it(`beats the frozen legacy policy over ${SEEDS} seeded head-to-head games`, () => {
     const { wins, meanMargin } = headToHead();
-    // Measured at commit time (with the pg. 2 people/food-track caps): 30/32 wins, mean margin
-    // +72 pts. Bar set ≥10 percentage points under measured.
-    expect(wins).toBeGreaterThanOrEqual(26); // 81.25%
+    // Re-measured after the pg. 8 2–3-player restrictions landed (this benchmark is a 2-player game, so
+    // the resource-place 1-player cap and the 2-of-3 village lock now both apply): 29/32 wins, mean
+    // margin +72.7 pts — essentially unchanged from the pre-caps 30/32, since the new limits bind both
+    // policies symmetrically. Bar re-committed ≥10 percentage points under measured (90.6% − 10 →
+    // 25/32 = 78.1%; 26/32 would leave only 9.4 pts of headroom).
+    expect(wins).toBeGreaterThanOrEqual(25); // 78.125%
     expect(meanMargin).toBeGreaterThan(20);
   });
 

@@ -161,6 +161,26 @@ test('SA4b: spend a tool to boost a gather roll', async ({ page }) => {
   await expect(page.getByTestId('sa-log')).toContainText('took');
 });
 
+test('SA (pg. 8): the village lock — only 2 of tool maker / hut / field can be filled per round', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('pick-game-stoneage').click();
+  await page.getByTestId('remove-player-2').click(); // 2-player game → the 2-of-3 village lock applies
+  await page.getByTestId('start-game').click();
+  await expect(page.getByTestId('board')).toBeVisible();
+
+  // Nothing placed yet → the field is open: it shows its 0/1 capacity and offers a Place button.
+  await expect(page.getByTestId('place-field')).toContainText('0/1');
+  await expect(page.getByTestId('place-field-go')).toBeVisible();
+
+  // Fill two of the three village places: Ann → tool maker, Bob → hut.
+  await page.getByTestId('place-toolMaker-go').click();
+  await page.getByTestId('place-hut-go').click();
+
+  // The third (field) is now locked for the round: the plaque says so and offers no Place button.
+  await expect(page.getByTestId('place-field')).toContainText('locked');
+  await expect(page.getByTestId('place-field-go')).toHaveCount(0);
+});
+
 test('SA10: place a worker on a card, gather a resource, and buy the card', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('pick-game-stoneage').click();
