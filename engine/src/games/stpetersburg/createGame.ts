@@ -74,6 +74,10 @@ export function createGame(options: CreateGameOptions): StPetersburgState {
     consecutivePasses: 0,
     // No card has been taken yet this (opening worker) phase — the pg. 8 refill flag.
     tookCardThisPhase: false,
+    // The game is not yet in its final round; a refill placing a group's last card sets this (pg. 5, SP6).
+    finalRound: false,
+    // No Observatory used yet (pg. 8, SP5); the Pub/Observatory interludes are inactive at setup.
+    observatoryUsed: [],
     // Active arm of the kernel end-state union: no `results`/`winnerIds` exist until the game ends (SP6).
     status: 'active',
     version: 0,

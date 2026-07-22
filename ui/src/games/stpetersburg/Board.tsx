@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { PHASES, displacementCost, effectiveCost, handCost, handLimit, legalDisplaceTargets } from '@game-hub/engine/stpetersburg';
+import { CARD_KINDS, PHASES, PUB_MAX_POINTS, PUB_POINT_COST, displacementCost, effectiveCost, handCost, handLimit, legalDisplaceTargets, unusedObservatories } from '@game-hub/engine/stpetersburg';
 import type { Card, CardKind, Phase, PlayerView, StPetersburgView } from '@game-hub/engine/stpetersburg';
 import { Button } from '@/components/ui/button';
 import { ActivityFeed } from '@/components/ActivityFeed';
+import { GameOver } from '@/components/GameOver';
 import { TurnBanner } from '@/components/TurnBanner';
 import { seatIdentity } from '@/components/seatIdentity';
 import { cn } from '@/lib/utils';
@@ -26,6 +27,23 @@ const KIND_LABEL: Record<CardKind, string> = {
 
 /** Short phase label for a starting-player marker chip (a single letter keeps the chip tiny). */
 const PHASE_MARK: Record<Phase, string> = { worker: 'W', building: 'B', aristocrat: 'A', trading: 'T' };
+
+/**
+ * The seat palette (the cross-game player-colour feature). The ids are the module's own catalog colours
+ * (pg. 1's four wood-figure colours), in seat order; each maps to a Tailwind fill (literal strings so the
+ * build keeps them). A seat with no picked colour falls back to its seat-index default.
+ */
+const SEAT_PALETTE = ['blue', 'yellow', 'green', 'red'] as const;
+const SEAT_CLASS: Record<string, string> = {
+  blue: 'bg-blue-500',
+  yellow: 'bg-yellow-500',
+  green: 'bg-green-500',
+  red: 'bg-red-500',
+  rose: 'bg-rose-500',
+  sky: 'bg-sky-500',
+  amber: 'bg-amber-500',
+  emerald: 'bg-emerald-500',
+};
 
 /**
  * A single face-up card. When `onBuy` is given (the active driving seat can afford it) it renders as a
@@ -87,11 +105,13 @@ function PlayerPanel({
   isActive,
   isBot,
   startsPhases,
+  colorId,
 }: {
   player: PlayerView;
   isActive: boolean;
   isBot: boolean;
   startsPhases: readonly Phase[];
+  colorId: string;
 }) {
   const played = player.playArea.worker.length + player.playArea.building.length + player.playArea.aristocrat.length;
   return (
@@ -101,6 +121,13 @@ function PlayerPanel({
     >
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1.5 font-medium">
+          {/* The seat's chosen player colour (the cross-game palette feature). */}
+          <span
+            data-testid={`seat-legend-${player.id}`}
+            data-color={colorId}
+            aria-hidden
+            className={cn('inline-block h-3 w-3 shrink-0 rounded-full', SEAT_CLASS[colorId] ?? 'bg-muted-foreground')}
+          />
           {isBot ? '🤖 ' : ''}
           {player.name}
           {isActive ? ' ←' : ''}
@@ -252,13 +279,25 @@ export default function StPetersburgBoard({
   gameId,
   game,
   bots,
+  colors,
   controlledIds,
   viewer,
   busy,
   guard,
   onPayload,
+  onLeave,
 }: BoardProps<StPetersburgView>) {
   const active = game.players[game.activePlayerIndex];
+  const ended = game.status === 'ended';
+  const playerName = (id: string) => game.players.find((p) => p.id === id)?.name ?? id;
+  // The colour a seat picked (colors[id] → a palette id), or its seat-index default — the same
+  // fallback the other games use so an un-picked game still shows distinct seat colours.
+  const colorIdOf = (playerId: string): string => {
+    const picked = colors[playerId];
+    if (picked !== undefined && SEAT_CLASS[picked]) return picked;
+    const seat = game.players.findIndex((p) => p.id === playerId);
+    return SEAT_PALETTE[(seat < 0 ? 0 : seat) % SEAT_PALETTE.length]!;
+  };
   const { canDrive, myNames } = seatIdentity({
     players: game.players,
     activePlayerId: active?.id ?? null,
@@ -293,6 +332,28 @@ export default function StPetersburgBoard({
     void run(() => spApi.act(gameId, active.id, { type: 'PASS' }, viewer));
   };
 
+  // ── SP5 special-card interludes (pg. 8) ──
+  // While a Pub buy-points window or an Observatory draw is pending, the active seat's turn is locked to
+  // resolving it — the normal buy/add/play/pass affordances are hidden and a focused prompt shows instead.
+  const interlude = !!game.pendingPubBuy || !!game.pendingDraw;
+  // No affordances once the game has ended (pg. 5): the engine refuses every move with GAME_OVER, so the
+  // board offers none — the results screen renders instead.
+  const acting = canDrive && !interlude && !ended;
+
+  const doPubBuy = (points: number) => {
+    if (!canDrive || !active) return;
+    void run(() => spApi.act(gameId, active.id, { type: 'PUB_BUY', points }, viewer));
+  };
+  const doObservatoryDraw = (stack: CardKind) => {
+    if (!canDrive || !active) return;
+    void run(() => spApi.act(gameId, active.id, { type: 'OBSERVATORY_DRAW', stack }, viewer));
+  };
+  const doResolve = (choice: 'buy' | 'hand' | 'discard', displace?: string) => {
+    if (!canDrive || !active) return;
+    setPicker(null);
+    void run(() => spApi.act(gameId, active.id, { type: 'OBSERVATORY_RESOLVE', choice, ...(displace ? { displace } : {}) }, viewer));
+  };
+
   // Buy/play a trading card by displacement (pg. 7): with a single legal target act at once, otherwise open
   // the picker so the driver chooses which card of theirs to discard.
   const startTrade = (title: string, options: TradeOption[], act: (targetId: string) => void) => {
@@ -306,22 +367,27 @@ export default function StPetersburgBoard({
     startTrade(`Play ${card.name} — choose a card to displace`, options, (targetId) => doPlay(index, targetId));
 
   // The active driving seat may add ANY row card to its hand (free, pg. 3) while under the hand limit.
-  const canAddToHand = canDrive && !!active && active.handCount < handLimit(active);
+  const canAddToHand = acting && !!active && active.handCount < handLimit(active);
 
   // The active player's effective cost for a card (public — reads only its play area). A card is buyable
   // when this client drives, the game is live, it isn't a trading card (SP4), and the active seat can afford it.
   const costOf = (card: Card, row: 'upper' | 'lower') => (active ? effectiveCost(active, card, row) : card.cost);
   const buyableCost = (card: Card, row: 'upper' | 'lower'): number | undefined => {
-    if (!canDrive || !active || card.kind === 'trading') return undefined;
+    if (!acting || !active || card.kind === 'trading') return undefined;
     const cost = costOf(card, row);
     return active.rubles !== null && active.rubles >= cost ? cost : undefined;
   };
+
+  // Observatory (pg. 8): the active driving seat may draw (instead of a normal action) in the building phase
+  // if it owns an unflipped one; a stack is drawable only when it holds ≥2 cards ("not the last card").
+  const myObservatories = acting && active && game.phase === 'building' ? unusedObservatories(active, game.observatoryUsed) : [];
+  const canUseObservatory = myObservatories.length > 0;
 
   const renderRow = (row: 'upper' | 'lower') =>
     game.board[row].map((card, index) => {
       const trading = card.kind === 'trading';
       // A trading card is bought by displacement (pg. 7): its options + cheapest affordable price.
-      const rowTradeOpts = trading && canDrive && active ? tradeOptions(active, card, row) : [];
+      const rowTradeOpts = trading && acting && active ? tradeOptions(active, card, row) : [];
       const tradingCost = rowTradeOpts.length ? Math.min(...rowTradeOpts.map((o) => o.cost)) : undefined;
       const affordableCost = trading ? tradingCost : buyableCost(card, row);
       const onBuy =
@@ -359,6 +425,47 @@ export default function StPetersburgBoard({
 
   return (
     <div data-testid="board" className="space-y-4">
+      {/* Final scoring (pg. 5–6, SP6): the shared end-of-game frame with the per-player breakdown —
+          base points + distinct-aristocrat table + 1 pt per 10₽ − 5 per hand card = total. */}
+      {ended && game.status === 'ended' && (
+        <GameOver winnerNames={game.winnerIds.map((id) => playerName(id))} onNewGame={onLeave}>
+          <table className="w-full text-sm" data-testid="sp-results">
+            <thead>
+              <tr className="text-left text-xs text-muted-foreground">
+                <th className="py-1 pr-2 font-medium">Player</th>
+                <th className="px-1 font-medium" title="Points already banked on the score track">Base</th>
+                <th className="px-1 font-medium" title="Distinct aristocrats, scored by the board table">Aristocrats</th>
+                <th className="px-1 font-medium" title="1 point per full 10 rubles">Money</th>
+                <th className="px-1 font-medium" title="−5 per card still in hand">Hand</th>
+                <th className="pl-1 text-right font-semibold">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...game.results]
+                .sort((a, b) => b.total - a.total)
+                .map((r) => {
+                  const won = game.status === 'ended' && game.winnerIds.includes(r.playerId);
+                  return (
+                    <tr key={r.playerId} data-testid={`sp-result-${r.playerId}`} className={cn('border-t', won && 'font-semibold text-primary')}>
+                      <td className="py-1 pr-2 font-medium">
+                        {playerName(r.playerId)}
+                        {won ? ' 🏁' : ''}
+                      </td>
+                      <td className="px-1 tabular-nums text-muted-foreground">{r.base}</td>
+                      <td className="px-1 tabular-nums text-muted-foreground" title={`${r.distinctAristocrats} distinct`}>
+                        {r.aristocrats}
+                        <span className="ml-0.5 text-[10px]">×{r.distinctAristocrats}</span>
+                      </td>
+                      <td className="px-1 tabular-nums text-muted-foreground">{r.money}</td>
+                      <td className="px-1 tabular-nums text-muted-foreground">{r.handPenalty > 0 ? `−${r.handPenalty}` : '0'}</td>
+                      <td className="pl-1 text-right font-semibold tabular-nums">{r.total}</td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        </GameOver>
+      )}
       <TurnBanner testId="sp-banner" canDrive={canDrive} className="mb-0">
         <span>
           {myNames ? (
@@ -458,19 +565,121 @@ export default function StPetersburgBoard({
         </div>
       </div>
 
-      {/* Controls: the active driving seat buys by clicking a card above, or passes here. */}
-      <div className="flex items-center justify-center gap-3 rounded-lg border bg-card p-3">
-        {!canDrive ? (
-          <span className="text-sm text-muted-foreground">Waiting for {active?.name ?? 'the other player'}…</span>
-        ) : (
-          <>
-            <span className="text-sm text-muted-foreground">Buy a card above, or</span>
-            <Button variant="outline" size="sm" data-testid="sp-pass" disabled={busy} onClick={doPass}>
-              Pass
-            </Button>
-          </>
-        )}
-      </div>
+      {/* Pub interlude (pg. 8): after building scoring, the Pub owner on the clock buys up to 5 points. */}
+      {game.pendingPubBuy && active ? (
+        <div data-testid="sp-pub-prompt" className="rounded-lg border border-primary bg-primary/5 p-3">
+          {canDrive ? (
+            <>
+              <div className="mb-2 text-sm font-medium">
+                Pub — buy up to {PUB_MAX_POINTS} points at {PUB_POINT_COST}₽ each ({active.name})
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {Array.from({ length: PUB_MAX_POINTS + 1 }, (_, points) => {
+                  const cost = points * PUB_POINT_COST;
+                  const affordable = active.rubles !== null && active.rubles >= cost;
+                  return (
+                    <Button
+                      key={points}
+                      variant={points === 0 ? 'ghost' : 'outline'}
+                      size="sm"
+                      data-testid={`sp-pub-buy-${points}`}
+                      disabled={busy || !affordable}
+                      title={points === 0 ? 'Decline' : `Buy ${points} point(s) for ${cost}₽`}
+                      onClick={() => doPubBuy(points)}
+                    >
+                      {points === 0 ? 'Decline' : `+${points}★ · ${cost}₽`}
+                    </Button>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <span className="text-sm text-muted-foreground">Waiting for {active.name} to use the Pub…</span>
+          )}
+        </div>
+      ) : null}
+
+      {/* Observatory resolve (pg. 8): the drawn card is public; its owner buys / hands / discards it. */}
+      {game.pendingDraw && active ? (
+        <div data-testid="sp-observatory-prompt" className="rounded-lg border border-primary bg-primary/5 p-3">
+          {canDrive ? (
+            (() => {
+              const card = game.pendingDraw.card;
+              const trading = card.kind === 'trading';
+              const opts = trading ? tradeOptions(active, card) : [];
+              const buyCost = trading ? (opts.length ? Math.min(...opts.map((o) => o.cost)) : undefined) : handCost(active, card);
+              const canBuy = trading ? opts.length > 0 : active.rubles !== null && buyCost !== undefined && active.rubles >= buyCost;
+              const canHand = active.handCount < handLimit(active);
+              return (
+                <>
+                  <div className="mb-2 text-sm font-medium">
+                    Observatory — drew the <span className="capitalize">{card.name}</span> ({active.name})
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CardTile card={card} effective={buyCost ?? card.cost} />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      data-testid="sp-observatory-buy"
+                      disabled={busy || !canBuy}
+                      title={canBuy ? `Buy and place${buyCost !== undefined ? ` for ${buyCost}₽` : ''}` : 'Cannot afford / nothing to displace'}
+                      onClick={() =>
+                        trading
+                          ? startTrade(`Buy ${card.name} — choose a card to displace`, opts, (targetId) => doResolve('buy', targetId))
+                          : doResolve('buy')
+                      }
+                    >
+                      Buy{buyCost !== undefined ? ` · ${buyCost}₽` : ''}
+                    </Button>
+                    <Button variant="outline" size="sm" data-testid="sp-observatory-hand" disabled={busy || !canHand} title={canHand ? 'Add to hand (free)' : 'Hand full'} onClick={() => doResolve('hand')}>
+                      Add to hand
+                    </Button>
+                    <Button variant="ghost" size="sm" data-testid="sp-observatory-discard" disabled={busy} onClick={() => doResolve('discard')}>
+                      Discard
+                    </Button>
+                  </div>
+                </>
+              );
+            })()
+          ) : (
+            <span className="text-sm text-muted-foreground">Waiting for {active.name} to resolve the Observatory draw…</span>
+          )}
+        </div>
+      ) : null}
+
+      {/* Controls: the active driving seat buys by clicking a card above, may use the Observatory, or passes. */}
+      {!interlude && !ended ? (
+        <div className="flex flex-wrap items-center justify-center gap-3 rounded-lg border bg-card p-3">
+          {!canDrive ? (
+            <span className="text-sm text-muted-foreground">Waiting for {active?.name ?? 'the other player'}…</span>
+          ) : (
+            <>
+              <span className="text-sm text-muted-foreground">Buy a card above, or</span>
+              {canUseObservatory ? (
+                <span className="flex items-center gap-1" data-testid="sp-observatory-draw">
+                  <span className="text-sm text-muted-foreground">Observatory — draw:</span>
+                  {(CARD_KINDS as readonly CardKind[]).map((kind) => (
+                    <Button
+                      key={kind}
+                      variant="outline"
+                      size="sm"
+                      data-testid={`sp-observatory-draw-${kind}`}
+                      disabled={busy || game.board.stacks[kind] < 2}
+                      title={game.board.stacks[kind] < 2 ? `The ${kind} stack has too few cards` : `Draw the top ${kind} card`}
+                      onClick={() => doObservatoryDraw(kind)}
+                    >
+                      {kind[0]!.toUpperCase()}
+                    </Button>
+                  ))}
+                </span>
+              ) : null}
+              <Button variant="outline" size="sm" data-testid="sp-pass" disabled={busy} onClick={doPass}>
+                Pass
+              </Button>
+            </>
+          )}
+        </div>
+      ) : null}
 
       {/* The viewer's own hidden hand (pg. 3) — playable cards. Opponents' hands show only as a face-down
           count on their panel below. */}
@@ -478,7 +687,7 @@ export default function StPetersburgBoard({
         <HandSection
           key={player.id}
           player={player}
-          playable={canDrive && player.id === active?.id}
+          playable={acting && player.id === active?.id}
           busy={busy}
           onPlay={doPlay}
           onTrade={startHandTrade}
@@ -494,6 +703,7 @@ export default function StPetersburgBoard({
             isActive={player.id === active?.id}
             isBot={bots.includes(player.id)}
             startsPhases={markersFor(seatIndex)}
+            colorId={colorIdOf(player.id)}
           />
         ))}
       </div>
@@ -520,9 +730,26 @@ export default function StPetersburgBoard({
             return p ? `played the ${p.cardName} from hand for ${p.cost}₽` : 'played a card from hand';
           }
           if (entry.type === 'PASS') {
-            const p = entry.payload as { closedPhase?: string; nextRound?: number } | undefined;
+            const p = entry.payload as { closedPhase?: string; nextRound?: number; pubPending?: boolean } | undefined;
             if (p?.nextRound) return `passed — Round ${p.nextRound}: lower row discarded, markers passed left`;
+            if (p?.pubPending) return 'passed — buildings scored; the Pub is open';
             return p?.closedPhase ? `passed — ${p.closedPhase} phase scored` : 'passed';
+          }
+          if (entry.type === 'PUB_BUY') {
+            const p = entry.payload as { points?: number; cost?: number } | undefined;
+            return p && p.points ? `bought ${p.points} point(s) at the Pub for ${p.cost}₽` : 'declined the Pub';
+          }
+          if (entry.type === 'OBSERVATORY_DRAW') {
+            const p = entry.payload as { stack?: string; cardName?: string } | undefined;
+            return p?.cardName ? `drew the ${p.cardName} from the ${p.stack} stack (Observatory)` : 'drew from a stack (Observatory)';
+          }
+          if (entry.type === 'OBSERVATORY_RESOLVE') {
+            const p = entry.payload as { choice?: string; cardName?: string; cost?: number; displacedName?: string } | undefined;
+            if (!p) return 'resolved the Observatory draw';
+            if (p.choice === 'discard') return `discarded the ${p.cardName} (Observatory)`;
+            if (p.choice === 'hand') return `took the ${p.cardName} into hand (Observatory)`;
+            if (p.displacedName) return `upgraded the ${p.displacedName} to the ${p.cardName} (Observatory, ${p.cost}₽)`;
+            return `bought the ${p.cardName} for ${p.cost}₽ (Observatory)`;
           }
           return entry.type.toLowerCase();
         }}

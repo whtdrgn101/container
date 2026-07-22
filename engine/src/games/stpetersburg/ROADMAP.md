@@ -254,24 +254,183 @@ trading cards never displace trading cards; Czar Peter displaceable by any green
 - **Verified green:** engine **445 @ 100%**, bot 157 (untouched), backend **222**, e2e **134** (incl. a full
   UI displacement flow; visual baselines untouched), typecheck clean.
 
-### SP5 — Special cards
+### SP5 — Special cards ✅
 The six specials (pg. 7–8), each behind its own mechanic: **Pub** (after each building scoring, buy up
 to 5 points at 2 rubles each — a small decision window, modeled as an interlude the engine offers only
 to pub owners), **Warehouse** (hand limit 4), **Mariinskij Theater** (+1 ruble per aristocrat at
 building scoring), **Tax man** (+1 ruble per worker at aristocrat scoring), **Potjomkin's Village**
 (pay 2 on buy; worth 6 when displaced), **Observatory** (skip its point to draw the top of any chosen
-stack — a server-side reveal route feeding a forced buy/hand/discard follow-up, `pendingDraw` state;
-flips until round end). This is the slice most likely to split — Observatory last within it.
+stack — a forced buy/hand/discard follow-up, `pendingDraw` state; flips until round end).
 
-### SP6 — Game end + final scoring
+**What shipped (SP5):** all six specials are live end to end, each in its own mechanic, with **no**
+backend routes / `pendingStep` / per-turn rng — every special is a *rule*, so it lives in the engine.
+Engine **476 @ 100%**, bot 157 (untouched), backend **225**, e2e **134**, typecheck clean, visual
+baselines untouched.
+
+- **Two engine-level turn locks** (like Stone Age's `pendingGather`), both refusing every other `/actions`
+  move with a typed 409 and both projected **public** (no secret to redact):
+  - **`pendingPubBuy { queue: number[] }`** — the Pub window. When the building phase's actions close, `pass`
+    **scores first** (`internal/phase.ts` split into `scorePlayers` + `advanceAfterScoring`), then — if any
+    seat owns a Pub — pauses with the pub-owner seats queued in seat order; the head is `activePlayerIndex`.
+    `PUB_BUY { points }` (0 = decline) charges `2 × points`, adds the points, pops the head; when the queue
+    empties the deferred `advanceAfterScoring` (refill + next phase) finally runs. `actions/pubBuy.ts`.
+  - **`pendingDraw { seat, stack, card, observatoryId }`** — a rolled Observatory draw awaiting its forced
+    follow-up. `OBSERVATORY_DRAW { stack }` (building phase, instead of a normal action) pops the stack top
+    into `pendingDraw` and locks the seat; `OBSERVATORY_RESOLVE { choice, displace? }` buys / hands /
+    discards it, flips the Observatory, and passes the turn. `actions/observatory.ts`.
+
+Rulings (each cited in code):
+- **Pub — 5 points *per player*, not per card** (there are 2 Pub copies). The sheet reads "*the* player can
+  buy up to 5 points" (per-player wording), so `pubOwnerSeats` lists a seat once even with two Pubs. Whole
+  points only ("cannot buy 2 rubles for 1 point"): `points` is an integer 0–5, `INVALID_PUB_POINTS` otherwise.
+- **Warehouse — hand limit 4, not a forced discard.** `handLimit(player)` (the SP3 seam) returns 4 if the
+  play area holds a Warehouse. It reads the *current* play area, so the limit drops back to 3 the instant a
+  Warehouse is displaced — but `addToHand` only refuses an *add* at/over the limit, so a player holding 4
+  when their Warehouse leaves play simply can't ADD until they play back under 3 (no rule forces shedding).
+- **Mariinskij Theater — +1₽ per aristocrat at *building* scoring** (`mariinskijBonus`); **Tax man — +1₽ per
+  worker at *aristocrat* scoring** (`taxmanBonus`). Both count the whole colour group (plain cards + trading
+  upgrades). The cards themselves score nothing (income/points 0).
+- **Potjomkin's Village — printed buy cost 2 (ordinary, reducible, min-1); worth 6 when displaced.** The
+  "pays 2 rubles when he buys/places" text is just its printed cost (the card box shows 2/6); only the
+  displacement value is special — `displaceValueOf` returns 6, so a trading card upgrading a Potjomkin
+  computes its difference against 6 (`POTEMKIN_DISPLACE_VALUE`), matching "it is worth 6 rubles".
+- **Observatory — scores its 1 point only if unused this round; flipped ones score 0 and may not be
+  upgraded.** Per-instance flip tracked in `observatoryUsed: string[]` (2 copies exist), reset to `[]` at the
+  round transition ("to begin the next round, he turns it face-up"). A flipped Observatory is excluded as a
+  displacement target (`legalDisplaceTargets` — "may not upgrade it while flipped"). The chosen stack "may
+  not be the last card": a draw needs ≥2 cards (`STACK_TOO_SMALL`). The buy path pays with base reductions
+  and **no lower-row discount** (the card came from a stack, not a row); a trading draw needs a `displace`
+  target.
+- **Observatory draw is a *pure engine action* (visibility ruling).** The stack top is deterministic
+  (shuffled once at setup), so no server-side rng route is needed — `OBSERVATORY_DRAW` is an ordinary client
+  action. The drawn `card` is otherwise a stack secret (pg. 2), but the draw happens **openly at the table**
+  exactly like an SP3 hand *take*, so `viewFor` **reveals** `pendingDraw` (the card is public the moment it's
+  drawn) and the log names it. A to-hand card then merges into the secret hand set afterward (opponents keep
+  only the count going forward), identical to SP3. A backend wire test asserts the opponent sees the same
+  `pendingDraw.card.id`. **Observatory does not set `tookCardThisPhase`** — the card left a *stack*, not the
+  board rows, so the pg. 8 board-refill gate is untouched.
+- **`legalActions`** handles all three windows: the Pub branch (PUB_BUY 0..min(5, affordable)), the pending
+  draw branch (discard always; hand if room; buy per legal target), the Observatory-draw offer (building
+  phase, unflipped Observatory owned, per ≥2-card stack), and the flipped-Observatory displacement refusal.
+
+Testing choices (documented):
+- **Engine 100%** is the correctness guarantee — `tests/{specials,pub,observatory}.test.ts` exhaustively
+  cover every rule and rejection deterministically (constructed states, no rng).
+- **Backend REST** proves parseAction + routing + error mapping (clean 409 refusals out of context, 400 on
+  bad shapes) and — via a **seeded** greedy driver (`makeRng(7)`) — a **real Pub buy**, an **Observatory
+  draw+resolve** with **pendingDraw revealed to the opponent**, and a **4-card Warehouse hand**.
+- **e2e does NOT drive a Pub/Observatory** to completion. A paid Pub buy is not reliably reachable (Saint
+  Petersburg's permanent money shortage, pg. 8) and a two-heavy-driver e2e stressed the shared in-memory
+  backend into flakiness — exactly the "if not reliably reachable… no flaky specs" caveat. So SP5's UI is
+  wired + typechecked, its correctness lives at the engine/backend levels, and the SP4 displacement e2e was
+  updated to skip special buildings (so it never triggers an interlude and stays reliable). The `sp-pub-*` /
+  `sp-observatory-*` affordances exist for a future seeded/e2e harness.
+
+### SP6 — Game end + final scoring ✅
 Trigger (pg. 5): a group's last card dealt to the board → finish all phases of this round → final
 scoring: distinct-aristocrat table (1/3/6/10/15/21/28/36/45/55), +1 per full 10 rubles, −5 per hand
 card; kernel `GameEndState<R>`; ties by money (then shared). Results UI via the shared `GameOver`.
 
-### SP7 — Playable-game hardening
+**What shipped (SP6):** the game ends and scores.
+
+- **The trigger is a `finalRound: boolean` flag on the state** (created `false`), armed **the moment a board
+  refill places the last card of any group** (pg. 5: "when the administrator places the **last card of a
+  group** … play continues through **all phases of this round**"). `internal/phase.ts` `refillUpper` now
+  returns `{ board, placedLast }` — `placedLast` is true iff the deal drew **≥1 card and emptied the stack**,
+  i.e. the group's final card was actually placed. **Dealing short of 8 when the stack was already empty
+  (drawing zero) is *not* the trigger** — "if there are not enough cards … he places as many as there are"
+  (pg. 5) is the shortage clause, distinct from placing the last card. Both refill sites fold it in:
+  `advanceAfterScoring` (mid-round phase handoff, gated by the pg. 8 `tookCardThisPhase`) and
+  `roundTransition` (the unconditional round-end worker deal). The flag is **sticky** once set.
+- **Between-rounds ruling (cited in `roundTransition`):** if the round-end worker deal itself places the
+  last worker, that deal seeds the **new** round's worker phase — so the round about to be played out **is**
+  "this round" (the round in which the last card was placed), and the game continues through all its phases
+  before ending. The alternative (ending the round that just finished) would contradict "play continues
+  through all phases of this round." (`roundTransition` runs only when `finalRound` was still false — `pass`
+  ends the game instead of rolling over once it is set — so the deal is the only way the flag flips at a
+  rollover; no sticky-OR needed there, keeping branch coverage clean.)
+- **The end fires when the FINAL round's trading phase closes** (pg. 5). `pass`'s trading branch: if
+  `finalRound`, run `finalScoring` (the kernel `GameEndState` `ended` arm) instead of `roundTransition`.
+  A **Pub interlude can never straddle the trading close** — the Pub window opens and resolves entirely
+  inside the *building* phase, and `applyAction` refuses a `PASS` while `pendingPubBuy` is set — so the
+  trading close is always free to end (asserted in `gameEnd.test.ts`).
+- **Final scoring (`internal/scoring.ts`, pg. 5–6):** per player `base` (banked track) + `aristocrats`
+  (distinct aristocrats by card **identity `key`** across the whole aristocrat group — plain aristocrats
+  *and* orange aristocrat trading cards, which both live in `playArea.aristocrat` — scored by the board
+  table `ARISTOCRAT_SCORE` = the triangular numbers 1/3/6/10/15/21/28/36/45/55, verified against pg. 6's
+  worked example "6 different aristocrats → 21 points") + `money` (`floor(rubles/10)`, pg. 6) − `handPenalty`
+  (`5 × hand.length`, pg. 6). **No clamp:** the rulebook states none, so a total can be **negative** if hand
+  penalties outweigh the rest (asserted). The table stops at 10 distinct; more (possible only with the
+  ADAPTED orange trading deck) scores the max 55 — respecting the board's domain, not an invented tier.
+  `StPetersburgResult` carries the full breakdown `{ playerId, base, aristocrats, distinctAristocrats, money,
+  handPenalty, total }`. `winnerIds`: highest `total`; tie → **most rubles** (pg. 6); still tied → **shared**.
+- **`viewFor` at `ended`** reveals everything (rubles + hands) — established SP0, verified here by a REST
+  test asserting redaction *lifts* across the transition (an opponent's rubles/hand go from `null` to the
+  real values in the closing move's reply and every later read, spectators included).
+- **Backend:** `summarize` already flows `status` through (unchanged — matches the other three games), so an
+  ended game drops out of the in-progress resume list. Two REST tests seed near-end states through the
+  repository seam (the `persistedCompat.test.ts` pattern, deterministic/fast): one asserts the exact
+  breakdown arithmetic + winners + redaction lifting at the final trading close; the other drives the
+  **trigger→final-round→ended sequence** from a real board deal (a phase-close refill emptying the trading
+  stack arms `finalRound`, the round plays out, the trading close ends it).
+- **UI:** the shared `components/GameOver` frame with a `sp-results` breakdown table (per-player
+  `sp-result-<id>` rows: base / aristocrats ×distinct / money / −hand / total, winner highlighted). The
+  board gates every affordance off `ended` (the controls block and `acting` both check it) — the engine
+  refuses moves with `GAME_OVER`, so the board offers none.
+- **e2e (documented choice):** driving a whole game to its end through the UI is long and shuffle-dependent,
+  so (the roadmap's no-flaky-specs caveat) `e2e/stpetersburg.spec.ts` reaches the end **deterministically
+  over HTTP** — an all-pass game empties the worker stack after a fixed number of rollovers *regardless of
+  the deck order* (the round-end worker deal is unconditional, pg. 5) — then **loads that ended game in the
+  real UI by code** and asserts the GameOver frame + the breakdown table render and that no affordances remain.
+- **Verified green:** engine **494 @ 100%**, bot 157 (untouched), backend **227**, e2e **136**, typecheck
+  clean, visual baselines untouched.
+
+### SP7 — Playable-game hardening ✅
 Backend REST suite playing full seeded games; the honest four-games-coexist check; hotseat + lobby +
 colors + resume all work (they're platform-free wins, but the e2e proves it); `describe(move)` for the
 shared activity feed; seat palette.
+
+**What shipped (SP7):** the game is now trustworthy, not just rules-complete.
+
+- **Full seeded games over REST (`backend/.../stpetersburg.test.ts`).** One acquisitive driver plays
+  **complete** games at **2p / seed 777, 3p / seed 7, 4p / seed 20260722**, each reproducibly touching the
+  *whole* surface in a single game — buys from **both rows**, **add-to-hand → play-from-hand**, a
+  **trading-card displacement**, a **paying Pub buy**, and an **Observatory draw + resolve** (the driver
+  asserts that seven-path coverage, so a future deck/rule change that stops reaching a path fails loudly).
+  Each game asserts it **ends** into final scoring, the breakdown is **coherent** (`total = base +
+  aristocrats + money − handPenalty`, `winnerIds` obeys the pg. 6 tie rule — highest total, ties on rubles,
+  still-tied ⇒ shared — checked against the revealed rubles), **version strictly increases** by one per
+  action, and the **move log replays sanely** (contiguous `seq` 1..N, one entry per version, every entry a
+  known action type). Seeds were chosen by a coverage probe; all three cover all seven paths.
+- **Four-games coexistence, honestly (`module-seam.test.ts`).** All **four** real games *and* the counter
+  stub run in one app instance: create one of each, drive a real move into each game's own engine (Container
+  PRODUCE / Can't Stop roll-route / Stone Age PLACE / Saint Petersburg PASS / counter BUMP), list all five
+  tagged by type. Saint Petersburg declares **no module routes**, so its `/games/:id/stpetersburg/*`
+  namespace **404s cleanly** (nothing registered there — asserted for its own row *and* another game's),
+  while a cross-game call (`/games/:spId/container/auction`) is still refused by the type guard
+  (`WRONG_GAME_TYPE`).
+- **Platform features proven in e2e (`e2e/stpetersburg-platform.spec.ts`).** Lobby: two contexts join a
+  shared 2-seat game, **pick colours** (blue/yellow), start, and **each sees its own seat identity**
+  (`sp-banner` "You are Ann/Bob") **with the colours reflected on the board**. Resume: rejoin an in-progress
+  game as a seat — **own rubles visible, opponent's redacted**. Abandon: soft-deleted game stays readable
+  but a move returns **409 `GAME_ABANDONED`**.
+- **Seat palette on the board.** The Saint Petersburg board now consumes the `colors` prop (it ignored it
+  before — the real gap behind "colours reflected"): each player panel shows a `seat-legend-<id>` swatch
+  with `data-color`, picked colour or seat-index fallback, matching the Can't Stop / Stone Age pattern.
+- **`describe(move)` audit.** Every logged action type renders a sensible feed line
+  (BUY / ADD_TO_HAND / PLAY_FROM_HAND / PASS incl. its phase-close & round-rollover & pub-pending variants /
+  PUB_BUY / OBSERVATORY_DRAW / OBSERVATORY_RESOLVE); the `type.toLowerCase()` fallthrough is **unreachable**
+  — the full-game REST test's `KNOWN_TYPES` assertion proves the logged-type set is exactly those seven, so
+  nothing reaches the feed as a raw type. (No UI unit test: the UI package has no vitest harness and the
+  other three games keep `describe` inline in their board with e2e feed coverage — matched here.)
+- **Sweep.** A cheap **legalActions⊆applyAction fuzz** (`tests/fuzz.test.ts`, 2/3/4p × 5 seeds) applies
+  *every* offered action at every step of a full game and asserts none throw (and each game ends) — the
+  honest check that no illegal move is ever advertised. `mapError` needs no fix (its `: 409` catch-all
+  covers every code; the mapping test enumerates them). UI affordances are all gated on `canDrive`
+  (`acting = canDrive && !interlude && !ended`, and every `do*` handler guards). Two stale future-tense
+  seam comments corrected (applyAction "arrive in SP4"; the UI client "action loop lands in SP1").
+- **Verified green:** engine **509 @ 100%**, bot 157 (untouched), backend **232**, e2e **142**, typecheck
+  clean, visual baselines untouched.
 
 ### SP8 — Art & board polish *(moved ahead of the bot, owner call 2026-07-22: playability before bots)*
 The comps-on-artifact flow (like Morning Valley / the parchment chart): a proper board with the two

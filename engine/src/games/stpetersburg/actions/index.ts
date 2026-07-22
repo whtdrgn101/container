@@ -6,3 +6,5 @@ export { baseReductions, buy, costReductions, displacementCost, effectiveCost, h
 export { addToHand } from './addToHand';
 export { playFromHand } from './playFromHand';
 export { pass } from './pass';
+export { pubBuy } from './pubBuy';
+export { observatoryDraw, observatoryResolve } from './observatory';

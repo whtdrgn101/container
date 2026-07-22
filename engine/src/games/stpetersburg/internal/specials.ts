@@ -1,5 +1,5 @@
 import { POTEMKIN_DISPLACE_VALUE } from '../core';
-import type { Card, StPetersburgPlayer, StPetersburgState } from '../core';
+import type { Card, PlayArea, StPetersburgPlayer, StPetersburgState } from '../core';
 
 // The passive hooks for the six special cards (pg. 7–8, SP5). Each is a tiny pure function so its owning
 // mechanic — displacement cost (`buy.ts`), phase scoring (`phase.ts`), the Pub/Observatory interludes —
@@ -38,7 +38,7 @@ export function taxmanBonus(player: StPetersburgPlayer): number {
  * The **Observatory** cards a player owns that are **not** flipped (used) this round (pg. 8) — the ones
  * still available for the mid-phase draw *and* still scoring their 1 point. `used` is `state.observatoryUsed`.
  */
-export function unusedObservatories(player: StPetersburgPlayer, used: readonly string[]): readonly Card[] {
+export function unusedObservatories(player: { readonly playArea: PlayArea }, used: readonly string[]): readonly Card[] {
   return player.playArea.building.filter((c) => c.special === 'observatory' && !used.includes(c.id));
 }
 

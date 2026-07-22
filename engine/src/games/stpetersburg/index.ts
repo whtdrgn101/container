@@ -9,6 +9,8 @@ export type {
   CardDef,
   CardKind,
   MoveRecord,
+  PendingDraw,
+  PendingPubBuy,
   Phase,
   PlayArea,
   SpecialId,
@@ -36,7 +38,11 @@ export {
   MIN_CARD_COST,
   MIN_PLAYERS,
   PHASES,
+  POTEMKIN_DISPLACE_VALUE,
+  PUB_MAX_POINTS,
+  PUB_POINT_COST,
   STARTING_RUBLES,
+  WAREHOUSE_HAND_LIMIT,
   WORKER_ROW_SEED,
 } from './core';
 
@@ -53,4 +59,4 @@ export type { BoardView, PlayerView, StPetersburgView, Viewer } from './view';
 // the trading-card difference math) with the exact rule the buy / hand-play charges. `legalDisplaceTargets`
 // lets the UI build a trading card's displacement picker (pg. 7).
 export { addToHand, applyAction, buy, costReductions, displacementCost, effectiveCost, handCost, legalActions, pass, playFromHand } from './actions';
-export { legalDisplaceTargets } from './internal';
+export { legalDisplaceTargets, unusedObservatories } from './internal';

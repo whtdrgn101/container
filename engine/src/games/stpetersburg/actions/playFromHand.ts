@@ -42,7 +42,7 @@ export function playFromHand(
     if (displace === undefined) {
       throw new GameError('DISPLACE_REQUIRED', `${card.name} is a trading card — name a card of yours to displace (pg. 7)`);
     }
-    displaced = validateDisplacement(player, card, displace);
+    displaced = validateDisplacement(player, card, displace, state.observatoryUsed);
     cost = displacementCost(player, card, displaced, undefined);
   } else {
     if (displace !== undefined) {

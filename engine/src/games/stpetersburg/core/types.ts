@@ -116,9 +116,26 @@ export interface Board {
   readonly discard: number;
 }
 
-/** One player's final result (pg. 5–6, SP6). Minimal at the scaffold; the breakdown fleshes out later. */
+/**
+ * One player's final-scoring result (pg. 5–6, SP6) — the full breakdown the results screen renders.
+ *
+ * `total = base + aristocrats + money − handPenalty`, computed with **no clamp** (the rulebook states none;
+ * pg. 6's minus-points example simply subtracts). A total can therefore be negative if hand penalties
+ * outweigh a small banked score — preserved faithfully rather than floored at 0.
+ */
 export interface StPetersburgResult {
   readonly playerId: string;
+  /** Points already banked on the public scoring track when the game ended (pg. 4). */
+  readonly base: number;
+  /** Points for **distinct** aristocrats, from the board table (pg. 5–6): `ARISTOCRAT_SCORE[distinct]`. */
+  readonly aristocrats: number;
+  /** How many distinct aristocrats (by card identity) drove `aristocrats` — surfaced for the results UI. */
+  readonly distinctAristocrats: number;
+  /** 1 point per full 10 rubles left (pg. 6): `floor(rubles / 10)`. */
+  readonly money: number;
+  /** −5 per card still in hand (pg. 6), as a **positive** magnitude subtracted from the total. */
+  readonly handPenalty: number;
+  /** The final score: `base + aristocrats + money − handPenalty` (unclamped). */
   readonly total: number;
 }
 
@@ -201,6 +218,15 @@ export type StPetersburgState = {
    * has been used.
    */
   readonly observatoryUsed: readonly string[];
+  /**
+   * Whether the game is in its **final round** (pg. 5, SP6). Set `true` the moment a board refill places
+   * the **last card of any group** onto the board (the last worker / building / aristocrat / trading card);
+   * once set it stays set. The game then "continues through all phases of this round" and, when the trading
+   * phase closes, ends into final scoring instead of rolling over. Set at a phase-handoff refill
+   * (`advanceAfterScoring`) or the round-end worker deal (`roundTransition`) — see `internal/phase.ts` for
+   * the trigger detection and the between-rounds ruling. Starts `false`.
+   */
+  readonly finalRound: boolean;
   /**
    * A rolled-but-unresolved Observatory draw (pg. 8, SP5), or absent. While present the drawing seat's
    * turn is **locked**: the only legal move is `OBSERVATORY_RESOLVE` (buy / hand / discard), the same way

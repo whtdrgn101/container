@@ -1,6 +1,6 @@
 import { GameError, MIN_CARD_COST } from '../core';
 import type { Card, PlayArea, StPetersburgState } from '../core';
-import { groupOf, nextSeatIndex, placeInPlayArea, record, seatOf, validateDisplacement, withPlayer } from '../internal';
+import { displaceValueOf, groupOf, nextSeatIndex, placeInPlayArea, record, seatOf, validateDisplacement, withPlayer } from '../internal';
 
 /** Which board row a card is bought from — the `-1 ruble` lower row, or the upper row (pg. 6). */
 type Row = 'upper' | 'lower';
@@ -74,7 +74,8 @@ export function handCost(player: { readonly playArea: PlayArea }, card: Card): n
  * the effective price and `legalActions` can test affordability with the same rule the buy charges.
  *
  * Worked examples (pg. 7–8): wharf 12−7 = 5; St Isaac's 15−5 = 10, then −1 (lower row) −1 (carpenter
- * workshop) = 8; the senator (cheaper than the aristocrat it displaces) = 1.
+ * workshop) = 8; the senator (cheaper than the aristocrat it displaces) = 1. A displaced **Potjomkin's
+ * Village** counts as 6 rubles, not its printed 2 (`displaceValueOf`, pg. 8).
  */
 export function displacementCost(
   player: { readonly playArea: PlayArea },
@@ -82,7 +83,8 @@ export function displacementCost(
   target: Card,
   fromRow?: Row,
 ): number {
-  const difference = card.cost > target.cost ? card.cost - target.cost : MIN_CARD_COST;
+  const targetValue = displaceValueOf(target);
+  const difference = card.cost > targetValue ? card.cost - targetValue : MIN_CARD_COST;
   const reductions = baseReductions(player, card) + (fromRow === 'lower' ? 1 : 0);
   return afterReductions(difference, reductions);
 }
@@ -122,7 +124,7 @@ export function buy(
     if (displace === undefined) {
       throw new GameError('DISPLACE_REQUIRED', `${card.name} is a trading card — name a card of yours to displace (pg. 7)`);
     }
-    displaced = validateDisplacement(player, card, displace);
+    displaced = validateDisplacement(player, card, displace, state.observatoryUsed);
     cost = displacementCost(player, card, displaced, row);
   } else {
     if (displace !== undefined) {

@@ -5,8 +5,9 @@ import { GAME_TYPE } from './api';
 import { StPetersburgStatus } from './Status';
 
 /**
- * Saint Petersburg, as a `GameClient` (roadmap SP0) — the fourth game in the room. A read-only board
- * plugs into the same seam the other three use; the action loop lands in SP1.
+ * Saint Petersburg, as a `GameClient` (roadmap SP0–SP6) — the fourth game in the room. Its board plugs
+ * into the same seam the other three use, driving the full game: the phase spine, hidden hand,
+ * trading-card displacement, the six special cards, and final scoring.
  *
  * The board is **lazy** so the home screen doesn't ship it (it carries the Saint Petersburg engine
  * slice). Keep this file tiny — importing anything heavy here would defeat the point of the plugin being

@@ -1,5 +1,5 @@
 import type { GameEndState, Viewer } from '../../kernel';
-import type { Card, CardKind, Phase, PlayArea, StPetersburgState, StPetersburgResult } from './core';
+import type { Card, CardKind, PendingDraw, PendingPubBuy, Phase, PlayArea, StPetersburgState, StPetersburgResult } from './core';
 
 // `Viewer` is a kernel primitive; re-export it so consumers import it from this surface.
 export type { Viewer } from '../../kernel';
@@ -50,6 +50,17 @@ export type StPetersburgView = {
   readonly startingPlayers: Readonly<Record<Phase, number>>;
   readonly activePlayerIndex: number;
   readonly consecutivePasses: number;
+  /** Whether the game is in its final round (pg. 5, SP6) — public (the board/stacks everyone sees drive it). */
+  readonly finalRound: boolean;
+  /** Instance ids of Observatories flipped (used) this round (pg. 8, SP5) — public. */
+  readonly observatoryUsed: readonly string[];
+  /**
+   * A pending Observatory draw (pg. 8, SP5), or absent. **Public** — including the drawn `card`: the draw
+   * happens openly at the table (see `actions/observatory.ts`), so `viewFor` does not redact it.
+   */
+  readonly pendingDraw?: PendingDraw;
+  /** A pending Pub buy-points window (pg. 8, SP5), or absent — just seat indices, so nothing to redact. */
+  readonly pendingPubBuy?: PendingPubBuy;
   readonly viewerId: Viewer;
   readonly version: number;
   readonly log: StPetersburgState['log'];

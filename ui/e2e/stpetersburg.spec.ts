@@ -146,7 +146,7 @@ test('SP3: add a card to hand, then play it in a later phase — the slot emptie
 test('SP4: play a trading card by displacement — the play area swaps and the feed narrates the upgrade', async ({ page, request }) => {
   test.setTimeout(120_000);
 
-  type SpCard = { id: string; key: string; kind: string; name: string; cost: number; ware?: string; tradingGroup?: 'worker' | 'building' | 'aristocrat' };
+  type SpCard = { id: string; key: string; kind: string; name: string; cost: number; ware?: string; tradingGroup?: 'worker' | 'building' | 'aristocrat'; special?: string };
   type SpView = {
     activePlayerIndex: number;
     round: number;
@@ -178,12 +178,36 @@ test('SP4: play a trading card by displacement — the play area swaps and the f
     const res = await request.get(`/api/games/${gameId}?viewer=${seat}`);
     return (await res.json()).game as SpView;
   };
-  const settle = () => expect(page.getByTestId('sp-pass')).toBeEnabled();
   const has = async (testId: string) => (await page.getByTestId(testId).count()) > 0;
   const enabled = async (testId: string) => (await has(testId)) && (await page.getByTestId(testId).first().isEnabled());
+  // The controls are ready when Pass is enabled OR an SP5 interlude prompt is showing (which hides Pass).
+  const settle = () =>
+    expect(async () => {
+      const passReady = await page.getByTestId('sp-pass').isEnabled().catch(() => false);
+      const prompt = (await has('sp-pub-prompt')) || (await has('sp-observatory-prompt'));
+      expect(passReady || prompt).toBe(true);
+    }).toPass({ timeout: 20_000 });
+  // If an SP5 interlude blocks play (a Pub window / a pending Observatory draw), resolve it so the
+  // displacement hunt can continue — this exercises the SP5 UI prompts through the real board. It declines
+  // the Pub (points 0, to preserve money for the upgrade) and discards a drawn card; the *paying* Pub-buy
+  // and Observatory-resolve paths are proven deterministically at the engine (100%) and backend levels.
+  const clearInterlude = async () => {
+    if (await has('sp-pub-prompt')) {
+      await page.getByTestId('sp-pub-buy-0').click();
+      await settle();
+      return true;
+    }
+    if (await has('sp-observatory-prompt')) {
+      await page.getByTestId('sp-observatory-discard').click();
+      await settle();
+      return true;
+    }
+    return false;
+  };
 
   let upgraded = false;
   for (let step = 0; step < 400 && !upgraded; step += 1) {
+    if (await clearInterlude()) continue;
     // The board follows the active seat (hotseat); read that seat's own view (its rubles + hand visible).
     const cursor = await readAs('p1');
     const seat = cursor.players[cursor.activePlayerIndex]!.id;
@@ -255,11 +279,13 @@ test('SP4: play a trading card by displacement — the play area swaps and the f
       }
     }
 
-    // P3 — otherwise buy the cheapest affordable non-trading card. Until we hold a ready trading card, taking
-    // a card every turn keeps the pg. 8 mid-round refills firing (so fresh trading cards keep flowing) and
-    // stocks displacement targets + income; once ready, we stop buying (readyToWait) so money can build.
+    // P3 — otherwise buy the cheapest affordable non-trading, **non-special** card. Until we hold a ready
+    // trading card, taking a card every turn keeps the pg. 8 mid-round refills firing (so fresh trading
+    // cards keep flowing) and stocks displacement targets + income; once ready, we stop buying (readyToWait)
+    // so money can build. Special buildings (Pub/Observatory) are skipped — this spec targets displacement,
+    // not the SP5 interludes (which have deterministic engine/backend coverage), so it never triggers one.
     if (!acted && !readyToWait) {
-      for (const c of [...rowCards].filter((x) => x.kind !== 'trading').sort((a, b) => a.cost - b.cost)) {
+      for (const c of [...rowCards].filter((x) => x.kind !== 'trading' && !x.special).sort((a, b) => a.cost - b.cost)) {
         if (await has(`sp-buy-${c.id}`)) {
           await page.getByTestId(`sp-buy-${c.id}`).first().click();
           acted = true;
@@ -294,4 +320,43 @@ test('SP3: the hand limit (3) blocks a 4th add', async ({ page }) => {
   // The hand now holds 3 cards (three play buttons) and — at the limit — NO "+ Hand" affordance remains.
   await expect(page.locator('[data-testid^="sp-play-"]')).toHaveCount(3);
   await expect(page.getByTestId('sp-upper-row').locator('[data-testid^="sp-hand-"]')).toHaveCount(0);
+});
+
+test('SP6: an ended game renders the final-scoring results screen (GameOver)', async ({ page, request }) => {
+  // Driving a whole Saint Petersburg game to its end through the UI is long and shuffle-dependent, so — per
+  // the roadmap's caveat (no flaky specs) — we reach the end DETERMINISTICALLY over HTTP: an all-pass game
+  // empties the worker stack after a fixed number of rollovers regardless of the deck order (the round-end
+  // worker deal is unconditional, pg. 5), so the trigger→final-round→ended sequence is reproducible without
+  // depending on the shuffle. We then LOAD that ended game in the real UI by code and assert the shared
+  // GameOver frame + the per-player breakdown render (the SP6 results screen).
+  const created = await request.post('/api/games', {
+    data: { gameType: 'stpetersburg', players: [{ name: 'Ann' }, { name: 'Bob' }] },
+  });
+  expect(created.ok()).toBeTruthy();
+  const gameId = (await created.json()).game.id as string;
+
+  type S = { status: string; activePlayerIndex: number; players: { id: string }[] };
+  let state = (await (await request.get(`/api/games/${gameId}`)).json()).game as S;
+  for (let i = 0; i < 400 && state.status !== 'ended'; i += 1) {
+    const seat = state.players[state.activePlayerIndex]!.id;
+    const res = await request.post(`/api/games/${gameId}/actions`, { data: { playerId: seat, action: { type: 'PASS' } } });
+    state = (await res.json()).game as S;
+  }
+  expect(state.status).toBe('ended');
+
+  // Load the ended game in the UI by its code (a bare game id → getGame, controlling every seat).
+  await page.goto('/');
+  await page.getByTestId('join-code').fill(gameId);
+  await page.getByTestId('join-game').click();
+
+  await expect(page.getByTestId('board')).toBeVisible();
+  // The shared end-of-game frame with the winner(s).
+  await expect(page.getByTestId('results')).toBeVisible();
+  await expect(page.getByTestId('winner')).toContainText('win');
+  // Saint Petersburg's own final-scoring breakdown table (base / aristocrats / money / hand / total).
+  await expect(page.getByTestId('sp-results')).toBeVisible();
+  await expect(page.getByTestId('sp-result-p1')).toBeVisible();
+  await expect(page.getByTestId('sp-result-p2')).toBeVisible();
+  // Affordances are gone at ended — no Pass control on an over game.
+  await expect(page.getByTestId('sp-pass')).toHaveCount(0);
 });

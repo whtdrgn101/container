@@ -356,6 +356,61 @@ describe('hosting two games at once', () => {
     expect(response.json()).toEqual({ auction: null }); // nobody is at the island yet
   });
 
+  // The honest four-games check (SP7): all FOUR real games *and* the counter stub, live in one app
+  // instance at once — create one of each, drive a real move into each game's own engine, and list them
+  // all side by side. If the core had any per-game assumption left, a fourth game hosted beside three
+  // others is where it would surface.
+  it('hosts all four real games plus the counter stub at once — create, act, list', async () => {
+    const container = await createOf('container', threeNames);
+    const cantstop = await createOf('cantstop', [{ name: 'Ann' }, { name: 'Bo' }]);
+    const stoneage = await createOf('stoneage', [{ name: 'Ann' }, { name: 'Bo' }]);
+    const stpetersburg = await createOf('stpetersburg', [{ name: 'Ann' }, { name: 'Bo' }]);
+    const counter = await createOf('counter', [{ name: 'Ann' }, { name: 'Bo' }]);
+
+    // The active seat of a freshly-dealt game, from the module's own summary (no field read off state).
+    const activeOf = async (id: string) => (await app.inject({ method: 'GET', url: `/games/${id}` })).json().activePlayerId as string;
+    const act = (id: string, playerId: string, action: unknown) =>
+      app.inject({ method: 'POST', url: `/games/${id}/actions`, payload: { playerId, action } });
+
+    // A real move into each game's own rules, driven as that game's active seat — each routed by the
+    // row's game_type to its own engine, none of which the core understands.
+    expect((await act(container.id, await activeOf(container.id), { type: 'PRODUCE' })).statusCode).toBe(200);
+    // Can't Stop's dice are server-only — the roll is its module route, not a client `/actions` move.
+    expect((await app.inject({ method: 'POST', url: `/games/${cantstop.id}/cantstop/roll`, payload: { playerId: await activeOf(cantstop.id) } })).statusCode).toBe(200);
+    expect((await act(stoneage.id, await activeOf(stoneage.id), { type: 'PLACE', place: 'forest', count: 1 })).statusCode).toBe(200);
+    expect((await act(stpetersburg.id, await activeOf(stpetersburg.id), { type: 'PASS' })).statusCode).toBe(200);
+    expect((await act(counter.id, 'p1', { type: 'BUMP', by: 1 })).statusCode).toBe(200);
+
+    // All five are in the in-progress list, each tagged with its own type.
+    const listed = (await app.inject({ method: 'GET', url: '/games' })).json().games as { id: string; gameType: string }[];
+    const byId = new Map(listed.map((g) => [g.id, g.gameType]));
+    expect(byId.get(container.id)).toBe('container');
+    expect(byId.get(cantstop.id)).toBe('cantstop');
+    expect(byId.get(stoneage.id)).toBe('stoneage');
+    expect(byId.get(stpetersburg.id)).toBe('stpetersburg');
+    expect(byId.get(counter.id)).toBe('counter');
+  });
+
+  // Saint Petersburg declares **no module routes** (every special is an engine rule), so its
+  // `/games/:id/stpetersburg/*` namespace has nothing registered under it. A request there must 404
+  // cleanly — not fall through to the SPA handler or be misrouted — whether the row is a Saint Petersburg
+  // game or not, and a *cross-game* call to another game's real endpoint is refused by the type guard.
+  it('404s the routeless stpetersburg namespace cleanly, and guards cross-game calls', async () => {
+    const stpetersburg = await createOf('stpetersburg', [{ name: 'Ann' }, { name: 'Bo' }]);
+    const container = await createOf('container', threeNames);
+
+    // Its own namespace has no routes → a plain 404 (there is no endpoint to hit), for its own row…
+    expect((await app.inject({ method: 'GET', url: `/games/${stpetersburg.id}/stpetersburg/auction` })).statusCode).toBe(404);
+    // …and for another game's row too (still nothing registered there).
+    expect((await app.inject({ method: 'GET', url: `/games/${container.id}/stpetersburg/anything` })).statusCode).toBe(404);
+
+    // The reverse — a Saint Petersburg row asked for Container's real endpoint — is refused by the guard,
+    // not served, so a namespaced URL can never hand one game's state to another's module.
+    const cross = await app.inject({ method: 'GET', url: `/games/${stpetersburg.id}/container/auction` });
+    expect(cross.statusCode).toBe(404);
+    expect(cross.json().error.code).toBe('WRONG_GAME_TYPE');
+  });
+
   it('rejects creating a game nobody hosts', async () => {
     const response = await app.inject({
       method: 'POST',

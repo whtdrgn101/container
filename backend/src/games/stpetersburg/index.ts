@@ -6,10 +6,15 @@ import { mapStPetersburgError } from './errors';
 import { parseStPetersburgAction } from './parseAction';
 
 /**
- * Saint Petersburg, as a `GameModule` — the fourth game on the platform (roadmap SP0). A registered,
- * creatable, viewable scaffold that coexists with Container, Can't Stop and Stone Age; its actions are
- * refused until SP1. No routes, bots, or side-channels yet — those arrive with the mechanics that need
- * them (`routes` for the Observatory's server-side draw, `createBotDriver` at SP8).
+ * Saint Petersburg, as a `GameModule` — the fourth game on the platform. The full game plays over
+ * `/actions`: the phase spine (SP1), round loop (SP2), hidden hand (SP3), trading-card displacement (SP4)
+ * and the six special cards (SP5). It coexists with Container, Can't Stop and Stone Age.
+ *
+ * **No `routes`, `pendingStep`, side-channels or per-turn rng** — deliberately. Every special card is a
+ * *rule*, so it lives in the engine: the Pub and Observatory interludes are **engine-level turn locks**
+ * (`pendingPubBuy`/`pendingDraw`, like Stone Age's `pendingGather`) that refuse other `/actions` moves with
+ * a typed error, and the Observatory draw is a **pure engine action** (the stack top is deterministic —
+ * shuffled once at setup), so it needs no server-side dice route. `createBotDriver` still arrives at SP9.
  */
 export const stPetersburgModule: GameModule<StPetersburgState, Action> = {
   id: 'stpetersburg',
