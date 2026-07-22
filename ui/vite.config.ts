@@ -20,6 +20,9 @@ export default defineConfig({
       '@game-hub/engine/stoneage': fileURLToPath(
         new URL('../engine/src/games/stoneage/index.ts', import.meta.url),
       ),
+      '@game-hub/engine/stpetersburg': fileURLToPath(
+        new URL('../engine/src/games/stpetersburg/index.ts', import.meta.url),
+      ),
     },
   },
   server: {

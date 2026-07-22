@@ -14,6 +14,10 @@ shared engine/backend/UI seams. Games built on it:
   gather-with-tools / buildings / civilization cards → feeding → round loop → game end + final scoring,
   an illustrated zoomable board, and an AI bot, plus the pg. 8 **2–3-player restrictions** (village lock +
   resource-place player caps). Built one action per stage — see its roadmap.
+- **Saint Petersburg** (1st edition) — the fourth game; a 2–4 player card-buying engine game. **SP0
+  shipped** (registered, creatable, viewable scaffold): the 116-card deck data, `createGame`, and a
+  **redacting `viewFor`** from day one — the first game with *real hidden information* (both a player's
+  **hand** and their **rubles** are secret). Inert until SP1 (the phase spine). See its roadmap.
 
 This is a learning project: the owner is an experienced software engineer who wants **good engineering
 practices** throughout — clean separation of concerns, strong typing, and high test coverage. Note the
@@ -61,12 +65,12 @@ container/
 ├── engine/     @game-hub/engine  — pure, deterministic rules cores (NO I/O, NO randomness)
 │   └── src/                        — a per-game platform, mirroring the backend/UI:
 │       ├── kernel/                 — the tiny shared kernel: GameError, MoveRecord, Viewer
-│       └── games/                  — one folder per game (container/, cantstop/, stoneage/), each its
+│       └── games/                  — one folder per game (container/, cantstop/, stoneage/, stpetersburg/), each its
 │                                     own subpath export `@game-hub/engine/<game>`
-├── bot/        @game-hub/bot     — AI players; pure policies over a redacted GameView (all three games)
+├── bot/        @game-hub/bot     — AI players; pure policies over a redacted GameView (Container, Can't Stop, Stone Age; St Petersburg's bot lands at SP8)
 ├── backend/    @game-hub/backend — Fastify REST API; persists to SQLite; runs the AI (BotRunner)
 │   └── src/games/                 — the GameModule seam: module.ts (contract), registry.ts,
-│                                    container/ + cantstop/ + stoneage/ (each a registered game)
+│                                    container/ + cantstop/ + stoneage/ + stpetersburg/ (each a registered game)
 ├── ui/         @game-hub/ui      — React + Tailwind + shadcn; talks to the API
 │   └── src/
 │       ├── App.tsx                — the Game Hub shell: routing + seat binding (knows no game)
@@ -74,8 +78,8 @@ container/
 │       ├── hooks/                 — useGameTransport (one socket), useHomeLists
 │       ├── lib/api.ts             — the platform API client (generic)
 │       └── games/                 — the GameClient seam: types.ts, registry.ts,
-│                                    container/ + cantstop/ + stoneage/ (board + its own api.ts)
-└── reference_materials/           — the rulebook PDFs (Container, Can't Stop, Stone Age)
+│                                    container/ + cantstop/ + stoneage/ + stpetersburg/ (board + its own api.ts)
+└── reference_materials/           — the rulebook PDFs (Container, Can't Stop, Stone Age, Saint Petersburg)
 ```
 
 **Data flow:** UI → REST → backend → **engine** (authoritative) → SQLite snapshot + move log.
@@ -109,8 +113,8 @@ one is missing. **The engine never learns a colour** — it is presentation, sam
 
 The backend hosts **games**, plural, through one contract: `backend/src/games/module.ts`. Container is
 one registered module (`games/container/`), not the only thing the server can do — and since C1 that is
-literal: **three games** (Container, Can't Stop, Stone Age) run side by side on one server, proven by
-`tests/module-seam.test.ts`.
+literal: **four games** (Container, Can't Stop, Stone Age, Saint Petersburg) run side by side on one
+server, proven by `tests/module-seam.test.ts`.
 
 - **`games.game_type` says whose rules a row plays by.** A game's state is an opaque blob, so this
   column is the only thing tying it to an engine. **Every route resolves its module from the row**
@@ -205,14 +209,15 @@ opponents** later (both just drive the same engine).
 
 `@game-hub/engine` exports **TypeScript source** (not a build), and is a **per-game platform**:
 there is deliberately **no `.` entry**. Consumers import a specific game's surface by subpath —
-`@game-hub/engine/container`, `@game-hub/engine/cantstop`, `@game-hub/engine/stoneage` — over a tiny
+`@game-hub/engine/container`, `@game-hub/engine/cantstop`, `@game-hub/engine/stoneage`,
+`@game-hub/engine/stpetersburg` — over a tiny
 shared `@game-hub/engine/kernel`. No game is a privileged default, mirroring the backend rule "resolve
 the module from the row, never a default". Both consumers transpile the TS source directly:
 
 - **backend** — `tsx` (dev/prod-start) and Vitest (`server.deps.inline: [/@game-hub\/engine/]`)
   transform the TS source across the workspace boundary; the subpath `exports` map resolves each game.
 - **ui** — `vite.config.ts` has **one alias per subpath** (`/container`, `/cantstop`, `/stoneage`,
-  `/kernel`) → the matching `engine/src/…` file, so Vite bundles it as project source. This also gives
+  `/stpetersburg`, `/kernel`) → the matching `engine/src/…` file, so Vite bundles it as project source. This also gives
   the **frontend shared types** (`CantStopState`, `StoneAgeState`, `Color`, …) for free.
 
 `engine` also has a real `build` (`tsc -p tsconfig.build.json` → `dist/`) used for typecheck/
@@ -330,9 +335,10 @@ engine/src/
 
 ### Building a new game (the platform recipe)
 
-Container, Can't Stop and Stone Age are three registered games on one platform; a fourth is
-**additive**, touching no shared core. The seams are the same at every layer — engine, backend, UI —
-and each has an "only the game knows this" rule. To add a game `foo`:
+Container, Can't Stop, Stone Age and Saint Petersburg are four registered games on one platform (SP was
+added additively as SP0 — the recipe below, proven again); a fifth is **additive**, touching no shared
+core. The seams are the same at every layer — engine, backend, UI — and each has an "only the game knows
+this" rule. To add a game `foo`:
 
 1. **Engine** — `engine/src/games/foo/` with the layout above; export its surface from
    `index.ts`, add `"./foo": "./src/games/foo/index.ts"` to `engine/package.json`'s `exports`, and a
@@ -736,8 +742,9 @@ sessions). The Container summary below is retained for context; the per-game roa
   `pnpm-workspace.yaml`.
 - **Container is fully modelled** — factory + harbor districts, ships, the trade chain, delivery
   auctions, the Off-Shore Bank, and final scoring (the "factory district only" note from Slice 0 is long
-  obsolete). All three games are feature-complete; remaining work is platform hardening (see `REVIEW.md`),
-  not core mechanics.
+  obsolete). The first three games (Container, Can't Stop, Stone Age) are feature-complete; the fourth,
+  Saint Petersburg, is a registered SP0 scaffold with its slices ahead of it. Remaining platform work is
+  hardening (see `REVIEW.md`).
 - **Stone Age caps population and the food track at 10** (`MAX_PEOPLE`/`MAX_FOOD_TRACK`, decided
   2026-07-21): the rulebook's caps are physical (10 figures per color — 5 start + 5 supply; the track
   is printed 0–10, pg. 2), so the engine clamps the *gain* (no-op at cap, like the 13th tool) while

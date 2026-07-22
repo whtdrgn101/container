@@ -1,6 +1,7 @@
 import { cantstopClient } from './cantstop';
 import { containerClient } from './container';
 import { stoneAgeClient } from './stoneage';
+import { stPetersburgClient } from './stpetersburg';
 import type { GameClient } from './types';
 
 /**
@@ -31,6 +32,7 @@ const CLIENTS: readonly AnyGameClient[] = [
   containerClient as unknown as AnyGameClient,
   cantstopClient as unknown as AnyGameClient,
   stoneAgeClient as unknown as AnyGameClient,
+  stPetersburgClient as unknown as AnyGameClient,
 ];
 
 export const clientFor = (gameType: string): AnyGameClient | undefined =>

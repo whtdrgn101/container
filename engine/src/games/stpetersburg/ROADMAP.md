@@ -50,7 +50,7 @@ The first three games barely used two seams this one lives on:
 
 ## The build plan — vertical slices
 
-### SP0 — Bootstrap
+### SP0 — Bootstrap ✅
 Registered, creatable, viewable fourth game beside the other three. State shape (players: rubles,
 play area grouped worker/building/aristocrat, hand; board: upper/lower rows, four stacks, discard
 count; round, phase, per-phase starting players, consecutive-pass count), `createGame` (25 rubles,
@@ -58,6 +58,23 @@ shuffled stacks from `rng`, marker deal, seed the upper row with workers — **8
 pg. 2 & 8), **redacting `viewFor` from the start** (opponent hands → count, rubles → hidden, stacks →
 counts). Inert `applyAction` (`NOT_IMPLEMENTED`), module registered (palette + seat bounds 2–4),
 read-only UI board, landing blurb/rules. Engine 100%; backend coexistence suite; e2e picks it.
+
+**What shipped (SP0):** the full engine scaffold under `engine/src/games/stpetersburg/` (kernel
+`record`/`makeSeating`/`GameEndState<R>` from day one), the **116-card deck data** in `core/constants.ts`
+(31/28/27/30 by group — pg. 1's "120 cards" is 116 game cards + the 4 starting-player cards, which we
+model as `startingPlayers` seat markers, not deck cards; all costs/incomes/points read off the rulebook
+art at 600 DPI, with the building/aristocrat *trading* cards a documented adaptation since the rulebook
+enumerates only Mariinskij/Tax-man/Abbot). **Redacting `viewFor`** proven by a serialized wire test
+(no opponent card ids / ruble values on the wire) and a backend REST+WS test. Backend `GameModule`
+registered (palette `['blue','yellow','green','red']`, seat bounds 2–4, `parseAction` refuses all until
+SP1); a read-only UI board renders the two rows, stack counts + phase indicator, and each seat's rubles
+(own) / 🔒 (opponents). Verified green: engine 384 @ 100%, bot 157, backend 214, e2e 124, typecheck clean.
+
+- **Deck decision (worker income):** all six workers pay **income 3** (verified off the 600-DPI render —
+  lumberjack cost 3/income 3, gold miner cost 4/income 3, proving coin=income≠cost); weaving mill & wharf
+  upgrade to 6. This 2009 Rio Grande printing differs from what one might recall — the rulebook art wins.
+- **Deferred to SP4** (documented `ADAPTED` inline): exact cost/reward of the nine non-Mariinskij building
+  trading cards and the eight non-exemplar aristocrat trading cards. Right counts/colours; plausible spread.
 
 ### SP1 — The phase spine: buy, pass, score, refill
 The action loop (pg. 3): `BUY {row, index}` and `PASS`, turn order from the phase's starting player,
@@ -67,11 +84,76 @@ actions end on all-pass-consecutively. Buying (pg. 3, 6): pay cost with **cumula
 the phase's type pays its money/points. **Refill** (pg. 4): upper row from the *next* stack to 8 total
 on board. The worker phase is playable end-to-end and rests at the building phase.
 
-### SP2 — Full round loop + trading-phase frame
+**What shipped (SP1):** the phase spine is live end-to-end. Two client actions — `BUY {row, index}` and
+`PASS` — flow through `applyAction` in turn order from the phase's starting player, clockwise, wrapping
+(a passed player still gets turns). A **buy** charges `effectiveCost` = printed cost − cumulative
+reductions (−1 per same-*named* card owned, −1 from the lower row), floored at **1 ruble** (pg. 6), moves
+the card into the play area grouped by kind, resets the consecutive-pass counter and passes the turn. A
+**pass** counts toward `consecutivePasses`; when it reaches the player count the phase's actions end and
+the closing pass folds in a single deterministic transition (`internal/phase.ts` `scoreAndRefill`):
+**score** every player's cards of the phase kind (coin → secret `rubles`, shield → public `points` — a new
+player field), then **refill** the upper row from the *next* phase's stack to 8 on board (dealing short
+without ending — SP6 owns the end trigger), then advance the phase and seat its starting player.
+`legalActions` enumerates the active seat's affordable non-trading buys + pass, reading only own-seat
+knowledge (no hidden-info leak). Backend `parseAction` accepts BUY/PASS; the new error codes
+(`INSUFFICIENT_RUBLES`, `INVALID_CARD_SLOT`, `TRADING_NOT_BUYABLE`, `PHASE_CLOSED`) map to 409. The UI board
+is interactive — affordable cards are buttons showing the effective cost with the printed cost struck
+through when reduced, a Pass button, both gated on `canDrive`; the activity feed narrates buys ("Ann bought
+the Lumberjack for 3₽") and phase-close scoring. Verified green: engine **406 @ 100%**, bot 157 (untouched),
+backend **215**, e2e **126**, typecheck clean, visual baselines untouched.
+
+- **Row model — compaction (decided).** A bought card is spliced out of its row, so a row is always a
+  dense list and `BUY.index` is a position in the *current* row, not a fixed slot. The rulebook's "slide
+  the remaining cards to the right" is physical bookkeeping the engine needn't model; the view and UI both
+  read the compacted rows, so they stay consistent. Refills append to the upper row.
+- **Trading-buy refusal is an SP4 seam.** Buying a trading card throws `TRADING_NOT_BUYABLE` — trading
+  cards are bought by *displacing* a same-colour card you own (pg. 7), which the engine can't do until SP4.
+  `legalActions` omits them and the UI never makes them buttons.
+- **Smelter / workshop reductions are a documented seam** in `costReductions` (a comment + the cumulative
+  sum), not yet implemented — those reducing cards are trading cards that can't be owned until SP4/SP5.
+- **SP1 boundary — the trading phase rests.** SP1 stops after the aristocrat→trading handoff: aristocrats
+  score and the board refills from the trading stack, then the trading phase runs on the same machine
+  (leftover non-trading cards are still buyable; trading cards refused). When the trading phase's actions
+  end, SP1 applies **no scoring** and does **not** advance (SP2 owns the round transition). It rests with
+  `consecutivePasses === player count` marking the phase closed; `applyAction`/`legalActions` treat that as
+  terminal (`PHASE_CLOSED`). This is the SA1 "rests at the next phase" pattern.
+
+### SP2 — Full round loop + trading-phase frame ✅
 Building and aristocrat phases (same machine), the no-scoring trading phase (pg. 5), and the round
 transition (pg. 5): discard the lower row, slide upper → lower, refill workers to 8, rotate all four
 markers left, next round. The pg. 8 special case (nobody takes a card → no refill, but stacks still
 turn) included. A full multi-round game loops (no end trigger yet).
+
+**What shipped (SP2):** the round loop is closed. The trading phase's actions now run on the same
+all-pass machine and — with **no scoring** (pg. 5) — its close runs `internal/phase.ts`
+`roundTransition`: **discard the lower row** (discard count grows), **slide upper → lower**, **refill
+workers to 8** from the worker stack, **rotate all four starting-player markers one seat left**
+(`rotateMarkersLeft`), and open the next round's worker phase (round++). The SP1 "trading rests closed"
+seam is gone — `PHASE_CLOSED` and its `applyAction`/`legalActions` guards were removed (a
+now-unreachable dead-end). `legalActions` in the trading phase offers only `PASS` plus any leftover
+non-trading buys (trading cards stay refused until SP4) — asserted explicitly.
+
+- **Marker rotation direction (pg. 5, verified):** "give their starting player markers to their **left
+  neighbors**" = the next seat in turn order (the pg. 5 diagram arrow runs B→C, i.e. in play order), so
+  a marker at seat `i` moves to `i+1`. New starting player for each phase = the successor of the old.
+- **The pg. 8 special-case reading (cited in `phase.ts`):** "Special case: no cards are bought or added…
+  the administrator will **add no new cards to the board**. He will, however, **turn the card stacks**…"
+  My reading: a per-phase **`tookCardThisPhase`** flag (set by a buy — and, from SP3, an add-to-hand;
+  reset when a phase begins) gates *only the refill* — the step that "adds new cards to the board." If no
+  card left the board during a phase's actions, **that phase's refill is skipped** but the stacks still
+  turn (the phase still advances and, for scoring phases, still scores). This applies to the mid-round
+  refills **and** to the worker deal at the round transition (trading→worker): if nobody took a card
+  during the trading phase, no workers are dealt back — but the **discard and the upper→lower slide still
+  happen**, because those rearrange cards already on the board rather than adding new ones. A short board
+  is not an end trigger (SP6 owns that); it just means "eventually players buy again" (pg. 8).
+- **Multi-round proof:** `tests/round.test.ts` drives a deterministic 4-player game through two full
+  rounds via `applyAction`, asserting the slide/discard arithmetic, all-four-marker rotation, and the
+  exact round-2 / round-3 entry state (including the pg. 8 skip compounding across a whole round).
+- **Verified green:** engine **411 @ 100%**, bot 157 (untouched), backend **216**, e2e **128**,
+  typecheck clean, visual baselines untouched.
+- **UI:** each seat's panel now shows its starting-player marker chips (`sp-marker-<phase>-<playerId>`),
+  which visibly hop one seat left at the rollover; the feed narrates it ("passed — Round 2: lower row
+  discarded, markers passed left"). The dead "trading phase has ended" SP1 message is gone.
 
 ### SP3 — The hand
 `ADD_TO_HAND {row, index}` (free, limit 3 — pg. 3) and `PLAY_FROM_HAND {index}` (pay full cost with
