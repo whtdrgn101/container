@@ -1,0 +1,12 @@
+# Local-development override — auto-merged by the compose CLI (`docker compose up --build`), never
+# deployed: Portainer stacks are pointed at docker-compose.yml alone and don't read this file.
+#
+# Adds the build context so a local `--build` compiles the image from your working tree. Note the
+# built image is tagged with the same name the deploy file pulls (whtdrgn101/game-hub:latest), so it
+# shadows the Docker Hub tag on YOUR machine until a `docker compose pull` — handy for testing the
+# exact image the NAS would run, harmless otherwise (nothing pushes it).
+services:
+  game-hub:
+    build:
+      context: .
+      dockerfile: Dockerfile

@@ -1,13 +1,20 @@
 # Deploy Game Hub on a home server (e.g. via Portainer). One service, one port, one volume.
 # The game will be reachable at http://<your-nas-ip>:8080 — change the left-hand port if 8080 is taken.
+#
+# This file references the CI-built image on Docker Hub (pushed on every main merge), which is what
+# lets Watchtower auto-update the running stack. There is deliberately NO `build:` block here —
+# local play-testing keeps `docker compose up --build` working via docker-compose.override.yml,
+# which the compose CLI auto-merges (and Portainer, pointed at this file, never sees).
 services:
   game-hub:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: game-hub:latest
+    image: whtdrgn101/game-hub:latest
     container_name: game-hub
     restart: unless-stopped
+    labels:
+      # The owner's Watchtower runs label-scoped (WATCHTOWER_LABEL_ENABLE) so it can't surprise
+      # version-pinned services (Jellyfin, Gitea). Game Hub tracks :latest on purpose — CI owns the
+      # tag and the /data volume carries the games — so it opts in explicitly.
+      com.centurylinklabs.watchtower.enable: "true"
     ports:
       - "8080:3001"
     environment:

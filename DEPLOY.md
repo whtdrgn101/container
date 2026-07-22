@@ -24,17 +24,34 @@ LAN and share the URL with family/friends.
 
 ---
 
-## Option A — Portainer "Stack" (recommended)
+## Option A — Portainer "Stack" + Watchtower (recommended)
 
-Portainer can build straight from this repo using the included `docker-compose.yml`.
+`docker-compose.yml` references the **CI-built image** (`whtdrgn101/game-hub:latest`, pushed to
+Docker Hub on every main merge) — the NAS never builds from source.
 
 1. In Portainer: **Stacks → Add stack**.
 2. Name it `game-hub`.
-3. Choose a build method:
+3. Choose a method:
    - **Repository:** point it at your Git repo URL; set the Compose path to `docker-compose.yml`.
+     (The repo's `docker-compose.override.yml` is local-dev only; Portainer reads just the file you
+     name here.)
    - **Web editor:** paste the contents of `docker-compose.yml`.
-4. **Deploy the stack.** Portainer builds the image and starts the service.
+4. **Deploy the stack.** Portainer pulls the image from Docker Hub and starts the service.
 5. Open `http://<your-nas-ip>:8080`.
+
+**Updates are automatic with Watchtower**: the compose sets
+`com.centurylinklabs.watchtower.enable: "true"` (required — the owner's Watchtower is label-scoped so
+that version-pinned services like Jellyfin/Gitea are never auto-updated). CI pushes a new `:latest`
+on merge; Watchtower's next poll pulls it and recreates the container (the `/data` volume — your games — survives, and the server's
+`SIGTERM` handler shuts it down cleanly inside Watchtower's stop timeout). Without Watchtower, use the
+stack's **"Re-pull image and redeploy"** button. **Rollback**: CI also pushes an immutable `:v<run>`
+tag per build — edit the stack to pin one (`whtdrgn101/game-hub:v123`) to step back a version; note
+Watchtower will then leave it alone (it only follows moving tags like `:latest`), which is exactly
+what you want mid-rollback.
+
+**Local play-testing is unchanged**: `docker compose up --build` in the repo still builds from your
+working tree — the compose CLI auto-merges `docker-compose.override.yml`, which carries the `build:`
+block the deploy file deliberately lacks.
 
 The compose file maps host **8080** → container **3001** and creates a named volume
 `game-hub-game-data` for the SQLite database. Change the left side of `"8080:3001"` if 8080 is
