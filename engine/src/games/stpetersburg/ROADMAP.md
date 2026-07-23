@@ -432,11 +432,11 @@ shared activity feed; seat palette.
 - **Verified green:** engine **509 @ 100%**, bot 157 (untouched), backend **232**, e2e **142**, typecheck
   clean, visual baselines untouched.
 
-### SP8 — Art & board polish *(moved ahead of the bot, owner call 2026-07-22: playability before bots)*
+### SP8 — Art & board polish ✅ *(moved ahead of the bot, owner call 2026-07-22: playability before bots)*
 The comps-on-artifact flow (like Morning Valley / the parchment chart): a proper board with the two
 rows, stack/phase indicator, grouped play areas, hand fans. Original art only.
 
-Owner-requested scope (2026-07-22), to be comped before porting:
+Owner-requested scope (2026-07-22), comped before porting:
 - **Card iconography**: kind identity as color banding (green/blue/orange, tri-color for trading),
   **ware symbols as real icons on the green pairs** (they gate displacement legality, so visual =
   rules clarity), coin-vs-shield income/point marks, and effective-cost badges. Original glyphs on
@@ -445,6 +445,38 @@ Owner-requested scope (2026-07-22), to be comped before porting:
   Container mat pattern) — the viewer's own seat gets a full tableau (play area grouped by kind with
   per-phase income/point summaries, hand as cards), opponents collapse to one-line rows (tableau
   counts per kind, hand count, public score). Seat colors throughout.
+
+**What shipped (SP8):** the **"Malachite & Gilt"** direction, approved on the comps artifact (rev 2 —
+three directions comped; the owner chose C with two glyph revisions — fur = splayed skinned-pelt,
+wool = rough ball of yarn — and the row ruling below). All diegetic art is **hardcoded-color original
+SVG** (no dark-mode re-theme — the Scene/Chart rule); engine and backend untouched.
+
+- **`art/` primitives** (work package ①): `icons.tsx` (the five 24×24 ware glyphs + `CoinMark`
+  income / `ShieldMark` points / the Czar's `AnyWareRosette` "any green may displace"),
+  `CardFace.tsx` (kind header band — trading = three **stacked** tri-color strips — effective-cost
+  badge with the printed cost struck, ware glyph, abstract per-kind vignette, coin/shield marks),
+  `Salon.tsx` (`MalachiteBoard` stretch-safe backdrop, `GiltRail`, `StackCabinet`, `PhaseMedallion`).
+- **Board integration** (work package ②): `Board.tsx` 760 → 362 lines (orchestration only) + new
+  `CardRow.tsx` (the salon surface — **upper row left-aligned, lower row right-aligned**, the owner's
+  rev-2 ruling: the rows pull apart as the round ages, echoing pg. 5's "slide the remaining cards to
+  the right"), `PlayerPanel.tsx` (the tableau split), `Results.tsx`, `feed.ts`. Every card renders as
+  a `CardFace`; buy/hand/displace/pub/observatory affordances keep their testids and `canDrive`
+  gating. Chrome sitting on the malachite uses the art's cream/gilt tones (owner fix folded in: the
+  "+ Hand" affordance brightened to the cream family — the muted token had no contrast on the stone).
+- **Tableaus (owner ruling):** all players always listed — the viewer's own seat(s) expanded (three
+  tinted kind columns with phase-pay chips, the aristocrat column priced from the engine's
+  `ARISTOCRAT_SCORE` export, hand as a fan of faces); opponents as compact rows (🔒 rubles always —
+  redaction is the rule) that **expand read-only** via `sp-expand-<playerId>`.
+- **Semantics kept beside the art:** the `sp-stack-<kind>`/`sp-discard` "N left" counts ride as
+  `sr-only` spans under the `StackCabinet` visual, and the `sp-phase-<phase>`/`aria-current` pill
+  track stays as the semantic layer beside the `PhaseMedallion` — screen-reader parity without
+  duplicate visible numbers.
+- **Verified green:** typecheck clean; UI build (the board stays a lazy chunk, 53 kB); SP + platform
+  + architecture e2e 26/26; full e2e 141 passed plus one **pre-existing** environmental failure
+  (Stone Age mobile visual on the bare dev box — fails identically on a clean tree; baselines are
+  container-generated and CI's pinned-container e2e is the enforcement environment). No visual
+  baselines regenerated; Saint Petersburg deliberately has **no** visual baseline (its board deal is
+  rng-dependent at start, unlike the deterministic Container/Stone Age snapshots).
 
 ### SP9 — Bot
 Last, once the game is winnable **and playable-polished**. The first bot deciding from a **redacted**
