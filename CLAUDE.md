@@ -14,10 +14,11 @@ shared engine/backend/UI seams. Games built on it:
   gather-with-tools / buildings / civilization cards → feeding → round loop → game end + final scoring,
   an illustrated zoomable board, and an AI bot, plus the pg. 8 **2–3-player restrictions** (village lock +
   resource-place player caps). Built one action per stage — see its roadmap.
-- **Saint Petersburg** (1st edition) — the fourth game; a 2–4 player card-buying engine game. **SP0
-  shipped** (registered, creatable, viewable scaffold): the 116-card deck data, `createGame`, and a
-  **redacting `viewFor`** from day one — the first game with *real hidden information* (both a player's
-  **hand** and their **rubles** are secret). Inert until SP1 (the phase spine). See its roadmap.
+- **Saint Petersburg** (1st edition) — the fourth game; a 2–4 player card-buying engine game.
+  **Complete** (SP0–SP9): the full four-phase loop, hidden hands, trading-card displacement, the six
+  specials, game end + final scoring, the "Malachite & Gilt" original board art, and an AI bot — the
+  first game with *real hidden information* (a player's **hand** and **rubles** are secret; `viewFor`
+  redacts both, and its bot decides from that redacted view). See its roadmap.
 
 This is a learning project: the owner is an experienced software engineer who wants **good engineering
 practices** throughout — clean separation of concerns, strong typing, and high test coverage. Note the
@@ -67,7 +68,7 @@ container/
 │       ├── kernel/                 — the tiny shared kernel: GameError, MoveRecord, Viewer
 │       └── games/                  — one folder per game (container/, cantstop/, stoneage/, stpetersburg/), each its
 │                                     own subpath export `@game-hub/engine/<game>`
-├── bot/        @game-hub/bot     — AI players; pure policies over a redacted GameView (Container, Can't Stop, Stone Age; St Petersburg's bot lands at SP8)
+├── bot/        @game-hub/bot     — AI players; pure policies over a redacted GameView (all four games)
 ├── backend/    @game-hub/backend — Fastify REST API; persists to SQLite; runs the AI (BotRunner)
 │   └── src/games/                 — the GameModule seam: module.ts (contract), registry.ts,
 │                                    container/ + cantstop/ + stoneage/ + stpetersburg/ (each a registered game)
@@ -742,9 +743,8 @@ sessions). The Container summary below is retained for context; the per-game roa
   `pnpm-workspace.yaml`.
 - **Container is fully modelled** — factory + harbor districts, ships, the trade chain, delivery
   auctions, the Off-Shore Bank, and final scoring (the "factory district only" note from Slice 0 is long
-  obsolete). The first three games (Container, Can't Stop, Stone Age) are feature-complete; the fourth,
-  Saint Petersburg, is a registered SP0 scaffold with its slices ahead of it. Remaining platform work is
-  hardening (see `REVIEW.md`).
+  obsolete). All four games (Container, Can't Stop, Stone Age, Saint Petersburg) are feature-complete
+  — playable, illustrated, and botted. Remaining platform work is hardening (see `REVIEW.md`).
 - **Stone Age caps population and the food track at 10** (`MAX_PEOPLE`/`MAX_FOOD_TRACK`, decided
   2026-07-21): the rulebook's caps are physical (10 figures per color — 5 start + 5 supply; the track
   is printed 0–10, pg. 2), so the engine clamps the *gain* (no-op at cap, like the 13th tool) while

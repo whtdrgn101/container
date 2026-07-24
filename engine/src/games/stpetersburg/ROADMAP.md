@@ -478,12 +478,47 @@ SVG** (no dark-mode re-theme — the Scene/Chart rule); engine and backend untou
   baselines regenerated; Saint Petersburg deliberately has **no** visual baseline (its board deal is
   rng-dependent at start, unlike the deterministic Container/Stone Age snapshots).
 
-### SP9 — Bot
+### SP9 — Bot ✅
 Last, once the game is winnable **and playable-polished**. The first bot deciding from a **redacted**
 view (no opponent rubles or hands): value cards by payback horizon (the pg. 8 tips are the seed
 heuristics — 2 workers early, expensive cards have better ratios, keep trading-phase money),
 hand-speculation risk (−5), displacement chains. Self-play 2–4p seeded; strength benchmark per the
 calibrate-then-commit convention (baseline: a frozen greedy first cut, the Stone Age pattern).
+
+**What shipped (SP9):** the frozen greedy baseline, live end to end (`@game-hub/bot/stpetersburg` +
+`createBotDriver` on the shared `runBotLoop`). **The platform's first bot with real hidden
+information** — `decide(viewFor(state, botId), botId)` sees opponents' rubles as `null` and hands as
+counts, asserted in tests (own secrets visible, theirs not).
+
+- **Policy = argmax of one evaluator over `legalActions`.** Everything is priced in final victory
+  points: recurring income/points over a horizon estimated from the tightest stack (1 in the final
+  round), the **marginal** distinct-aristocrat bonus simulated exactly against the triangular table
+  (displacement included), minus a cost weight and a **reserve penalty** that keeps ~8₽ for
+  trading-phase upgrades (the anti-hoard/anti-broke brake). `ADD_TO_HAND` is a discounted deferred
+  acquisition (−∞ in the final round); `PLAY_FROM_HAND` gets a shed bonus late (the −5 tail);
+  `PUB_BUY` declines early, converts near the end; `PASS` is the zero baseline. Since `legalActions`
+  fully parameterises every move, ranking them *is* the policy and every choice is legal by
+  construction (the SP7 fuzz's other half).
+- **Observatory ruling (v1, documented):** the bot never takes a draw. Mechanically, `legalActions`
+  driven off a **view** never offers `OBSERVATORY_DRAW` — the offer reads the draw stacks' `.length`,
+  and a view redacts stacks to *counts* — and by policy a greedy baseline doesn't gamble on a blind
+  draw; it scores the Observatory's flat point instead. The defensive `OBSERVATORY_RESOLVE` scoring
+  path is kept and unit-tested. *(Note for a future slice: legalActions-on-a-view silently omitting
+  the draw is an engine ergonomics quirk — the UI builds the human affordance from view counts
+  instead — worth folding into any SP10 calibration work.)*
+- **Conditional specials are valued only at printed income/points** (Mariinskij / Tax-man / Pub /
+  Warehouse / Potemkin effects aren't modeled in the evaluator) — the documented tuning seam for a
+  later calibration slice.
+- **Self-play (2p/777, 3p/7, 4p/20260722):** all end properly; e.g. 2p runs 8 rounds to 126–136 pts
+  with 0 hand cards left; average end-of-game hand penalty 0.33 cards/seat. The **behavioural
+  assertions** (the Stone Age pattern — the anti-myopia guard): across the seeded games the bots hit
+  upper-row and lower-row buys, ADD_TO_HAND, PLAY_FROM_HAND, and a displacement, and stay under the
+  hand-penalty bar. Redaction asserted in the same suite.
+- **Backend:** `botRunner.ts` on the shared loop (no rng — Saint Petersburg has no dice), +2 REST
+  tests: an all-bot game finishes server-side (read-path ticks), and a mixed human+bot game moves
+  with redaction intact.
+- **Verified green:** typecheck clean; bot **180 tests**, stpetersburg 100% stmts/funcs/lines,
+  94.25% branch (gate 90%); engine 509 @ 100% (untouched); backend **234**.
 
 ## Scope notes
 

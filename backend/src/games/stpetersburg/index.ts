@@ -1,6 +1,7 @@
 import { applyAction, legalActions, MAX_PLAYERS, MIN_PLAYERS, viewFor } from '@game-hub/engine/stpetersburg';
 import type { Action, StPetersburgState, Viewer } from '@game-hub/engine/stpetersburg';
-import type { GameModule, GameSummary } from '../module';
+import type { BotDriver, GameModule, GameSummary, ModuleContext } from '../module';
+import { BotRunner } from './botRunner';
 import { newStPetersburgGame } from './createGame';
 import { mapStPetersburgError } from './errors';
 import { parseStPetersburgAction } from './parseAction';
@@ -14,7 +15,9 @@ import { parseStPetersburgAction } from './parseAction';
  * *rule*, so it lives in the engine: the Pub and Observatory interludes are **engine-level turn locks**
  * (`pendingPubBuy`/`pendingDraw`, like Stone Age's `pendingGather`) that refuse other `/actions` moves with
  * a typed error, and the Observatory draw is a **pure engine action** (the stack top is deterministic —
- * shuffled once at setup), so it needs no server-side dice route. `createBotDriver` still arrives at SP9.
+ * shuffled once at setup), so it needs no server-side dice route. The only optional hook it uses is
+ * `createBotDriver` (SP9) — its AI seats, driven by the same policy as self-play from a **redacted** view;
+ * a bot needs no injected randomness here (no dice), so unlike the other three the runner takes no rng.
  */
 export const stPetersburgModule: GameModule<StPetersburgState, Action> = {
   id: 'stpetersburg',
@@ -50,4 +53,14 @@ export const stPetersburgModule: GameModule<StPetersburgState, Action> = {
   movesOf: (state) => state.log,
 
   mapError: (error) => mapStPetersburgError(error),
+
+  // AI seats (SP9). The first bot on the platform deciding from a genuinely redacted view — it reads only
+  // its own seat's rubles/hand. Same policy as self-play, same `applyAction` a human takes; no rng to
+  // inject (Saint Petersburg has no dice), so the runner takes none.
+  createBotDriver: (ctx: ModuleContext): BotDriver =>
+    new BotRunner(
+      { get: (id) => ctx.games.get(id) as StPetersburgState | undefined, update: (state) => ctx.games.update(state) },
+      ctx.botSeats,
+      (state) => ctx.pushGame(state.id, state),
+    ),
 };

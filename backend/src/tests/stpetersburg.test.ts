@@ -966,3 +966,67 @@ describe('mapStPetersburgError', () => {
     expect(mapStPetersburgError(new Error('not ours'))).toBeNull();
   });
 });
+
+/**
+ * SP9 — AI seats end-to-end. The bot runs server-side (roadmap SP9): creating an all-bot game ticks it
+ * forward to a finish with no client, and a mixed human+bot game lets the bot take its turn after a human
+ * acts. Proves the bot's moves are legal over REST, that it decides from a redacted view, and that a game
+ * moves with no browser open — the same shape as the Stone Age bot suite, minus the injected dice Saint
+ * Petersburg has no need of.
+ */
+describe('Saint Petersburg bots (SP9)', () => {
+  let db: DB;
+  let app: FastifyInstance;
+
+  beforeEach(async () => {
+    db = createDatabase();
+    app = buildApp({ db, rng: makeRng(0x5a5a) });
+    await app.ready();
+  });
+
+  afterEach(async () => {
+    await app.close();
+    db.close();
+  });
+
+  it('plays an all-bot game to a finish on its own (server-side, no client)', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/games',
+      payload: { gameType: 'stpetersburg', players: [{ name: 'Ann', bot: true }, { name: 'Bob', bot: true }] },
+    });
+    expect(response.statusCode).toBe(201);
+    const game = response.json().game;
+    expect(game.status).toBe('ended'); // the runner played it out with no human ever on the clock
+    expect(game.results).not.toBeNull();
+    expect(game.winnerIds.length).toBeGreaterThanOrEqual(1);
+    expect(response.json().bots).toEqual(['p1', 'p2']); // both seats recorded as AI
+  });
+
+  it('lets a bot take its turn after a human acts', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/games',
+      payload: { gameType: 'stpetersburg', players: [{ name: 'Human' }, { name: 'Bot', bot: true }] },
+    });
+    expect(created.json().bots).toEqual(['p2']);
+    const id = created.json().game.id as string;
+
+    // Human (p1) passes; the bot (p2) then plays its own turn(s) server-side before handing back a state.
+    const acted = await app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId: 'p1', action: { type: 'PASS' } },
+    });
+    expect(acted.statusCode).toBe(200);
+    const game = acted.json().game;
+    // The bot moved the game forward off p1's pass: either it acted (a version past p1's single move) or a
+    // phase advanced — in every case the world caught up without a second human request.
+    expect(game.version).toBeGreaterThan(1);
+    // A human client still sees only its own rubles; the bot seat's are redacted (the SP redaction rule).
+    const asHuman = await app.inject({ method: 'GET', url: `/games/${id}?viewer=p1` });
+    const seats = asHuman.json().game.players as { id: string; rubles: number | null }[];
+    expect(seats.find((s) => s.id === 'p1')!.rubles).not.toBeNull();
+    expect(seats.find((s) => s.id === 'p2')!.rubles).toBeNull();
+  });
+});
