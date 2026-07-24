@@ -4,4 +4,5 @@ export * from './record';
 export * from './setup';
 export * from './round';
 export * from './track';
+export * from './locomotives';
 export * from './scoring';

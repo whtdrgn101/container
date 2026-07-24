@@ -129,9 +129,25 @@ export interface SpacePlacement {
 }
 
 /**
+ * The shared locomotive/factory supply (pg. 4, 10–12). One pool, because **a factory is a flipped
+ * locomotive** (pg. 11) — the binding "one component model" decision. `stacks` are the per-number piles
+ * #2–#9 (each starts at the player count, pg. 12); `tens` are the two distinct #10 piles (pg. 4), which
+ * become available **only once the #9 stack is empty** (pg. 10). `returnedFactories` counts locomotives
+ * that were flipped to their **factory** side and returned to the supply during an upgrade chain (pg. 11);
+ * RR5 draws factories from here (and RR4 only ever *adds* to it via `FLIP_LOCO`).
+ */
+export interface LocomotiveSupply {
+  /** Per-number stacks #2–#9 (pg. 12): `number → remaining`. A number absent/0 is an exhausted stack. */
+  readonly stacks: Readonly<Record<number, number>>;
+  /** The two #10 stacks (pg. 4, 10), `[a, b]`. Both open only once every #2–#9 stack is empty. */
+  readonly tens: readonly [number, number];
+  /** Locomotives flipped to their factory side and returned to the supply (pg. 11). RR5 consumes these. */
+  readonly returnedFactories: number;
+}
+
+/**
  * The general supplies near the board (pg. 6–7). Coins are explicitly **unlimited** (pg. 14: "Coins are
- * not limited"), so they aren't tracked here. RR1 has nothing finite to track yet; `doublers` is present
- * for the shape (RR3 sets the real starting count when doublers land — RR1 never reads it).
+ * not limited"), so they aren't tracked here.
  */
 export interface RussianRailroadsSupplies {
   /**
@@ -139,6 +155,23 @@ export interface RussianRailroadsSupplies {
    * down by the `doubler` action. When it hits 0 the doubler space can no longer be chosen (pg. 14).
    */
   readonly doublers: number;
+  /** The shared locomotive/factory supply (pg. 4, 10–12) — per-number stacks + the two #10 piles + returns. */
+  readonly locomotives: LocomotiveSupply;
+}
+
+/**
+ * The pending **locomotive** placement/upgrade lock (pg. 10–11; the SECOND engine-lock kind, alongside
+ * `PendingMoves`). Acquiring a locomotive from a loco action space sets this and **keeps the turn**: the
+ * active player must resolve the held locomotive before doing anything else (`applyAction` refuses every
+ * non-loco-resolution action while it is set). It resolves via `PLACE_LOCO` (onto an empty route slot —
+ * ends the chain), `REPLACE_LOCO` (upgrade a lower-numbered loco — the displaced loco becomes the new
+ * `PendingLoco`, the "chain reaction" of pg. 11), or `FLIP_LOCO` (turn it to its factory side and return it
+ * to the supply — legal **only when no empty locomotive space remains on any board**, pg. 11). It always
+ * belongs to the active player. `null` when no loco is held.
+ */
+export interface PendingLoco {
+  /** The printed number of the locomotive currently awaiting placement (pg. 10–11). */
+  readonly number: number;
 }
 
 /**
@@ -183,6 +216,12 @@ export type RussianRailroadsState = {
    * refuses everything but `MOVE_TRACK` — the single-step resolution of a track-extension action.
    */
   readonly pendingMoves: PendingMoves | null;
+  /**
+   * The active player's pending **locomotive** placement/upgrade lock (pg. 10–11), or `null`. While set,
+   * `applyAction` refuses everything but the loco-resolution actions (`PLACE_LOCO` / `REPLACE_LOCO` /
+   * `FLIP_LOCO`). Mutually exclusive with `pendingMoves` — a turn holds at most one lock.
+   */
+  readonly pendingLoco: PendingLoco | null;
   /** The current round (1-based). */
   readonly round: number;
   /** Total rounds this game (pg. 7, 22–23): 7 at 4 players, 6 at 2–3. */

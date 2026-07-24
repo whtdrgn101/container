@@ -78,7 +78,24 @@ describe('createGame', () => {
     expect(state.version).toBe(0);
     expect(state.log).toEqual([]);
     expect(state.actionSpaces).toEqual({});
-    expect(state.supplies).toEqual({ doublers: 30 }); // the shared doubler supply (pg. 14)
+    // The shared doubler supply (pg. 14) + the locomotive/factory supply (pg. 4, 10–12): 4 players ⇒ 4 per
+    // stack for #2–#9, and two #10 stacks of 4, with no returned factories yet.
+    expect(state.supplies).toEqual({
+      doublers: 30,
+      locomotives: {
+        stacks: { 2: 4, 3: 4, 4: 4, 5: 4, 6: 4, 7: 4, 8: 4, 9: 4 },
+        tens: [4, 4],
+        returnedFactories: 0,
+      },
+    });
     expect(state.pendingMoves).toBeNull();
+    expect(state.pendingLoco).toBeNull();
+  });
+
+  it.each([2, 3, 4])('sizes each locomotive stack to the player count (%i players, pg. 12)', (count) => {
+    const supply = newGame(count).supplies.locomotives;
+    for (const n of [2, 3, 4, 5, 6, 7, 8, 9]) expect(supply.stacks[n]).toBe(count);
+    expect(supply.tens).toEqual([count, count]);
+    expect(supply.returnedFactories).toBe(0);
   });
 });

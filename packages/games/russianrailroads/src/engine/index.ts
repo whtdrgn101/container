@@ -12,7 +12,9 @@ export type {
   EngineerStack,
   Industry,
   Locomotive,
+  LocomotiveSupply,
   MoveRecord,
+  PendingLoco,
   PendingMoves,
   Route,
   RouteDef,
@@ -40,6 +42,9 @@ export {
   DOUBLER_SUPPLY,
   END_BONUS_CARDS,
   ENGINEERS,
+  LOCO_CAPACITY,
+  LOCO_STACK_NUMBERS,
+  LOCO_TEN,
   MAX_PLAYERS,
   MIN_PLAYERS,
   ROUNDS,
@@ -57,6 +62,10 @@ export {
 // Track-extension helpers the client shares (which routes a lock can advance) — DRY with the engine.
 export { legalSteps } from './internal';
 export type { TrackStep } from './internal';
+
+// Locomotive helpers the client shares (per-route locos, the place/upgrade/flip resolutions) — DRY.
+export { locoResolutions, locosOnRoute } from './internal';
+export type { LocoResolution } from './internal';
 
 // Setup
 export { createGame } from './createGame';

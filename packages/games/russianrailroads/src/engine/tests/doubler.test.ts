@@ -37,7 +37,8 @@ describe('doubler action (pg. 14)', () => {
   });
 
   it('refuses the doubler space when the supply is empty', () => {
-    const state = { ...newGame(2), supplies: { doublers: 0 } };
+    const base = newGame(2);
+    const state = { ...base, supplies: { ...base.supplies, doublers: 0 } };
     expectError(() => place(state, activeId(state), 'doubler'), 'DOUBLER_UNAVAILABLE');
     // …and legalActions omits it.
     expect(legalActions(state).some((a) => a.type === 'PLACE' && a.space === 'doubler')).toBe(false);

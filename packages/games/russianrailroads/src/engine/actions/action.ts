@@ -32,6 +32,33 @@ export type Action =
        */
       readonly color?: TrackColor;
     }
+  | {
+      /**
+       * Place the held locomotive on a route with an empty slot (pg. 10) — ends the pending-loco chain.
+       * Only legal while a `pendingLoco` lock is set (RR4).
+       */
+      readonly type: 'PLACE_LOCO';
+      /** Which route to place the held locomotive on (must have an empty slot, pg. 10). */
+      readonly route: RouteId;
+    }
+  | {
+      /**
+       * Upgrade a lower-numbered locomotive on a route with the held one (pg. 10): the displaced loco
+       * becomes the new held locomotive (the pg. 11 chain reaction). Only legal under a `pendingLoco` lock.
+       */
+      readonly type: 'REPLACE_LOCO';
+      /** The route holding the locomotive to upgrade (pg. 10). */
+      readonly route: RouteId;
+      /** The printed number of the locomotive to replace — must exist on the route and be lower (pg. 10). */
+      readonly number: number;
+    }
+  | {
+      /**
+       * Flip the held locomotive to its factory side and return it to the supply (pg. 11) — ends the chain.
+       * Only legal under a `pendingLoco` lock **and** when no empty locomotive slot remains (pg. 11).
+       */
+      readonly type: 'FLIP_LOCO';
+    }
   | { readonly type: 'PASS' };
 
 export type ActionType = Action['type'];

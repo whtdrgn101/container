@@ -1,6 +1,6 @@
 import { ACTION_SPACES, DOUBLER_SPACES } from '../core';
 import type { RussianRailroadsState } from '../core';
-import { accessibleColors, legalSteps, seatOf } from '../internal';
+import { accessibleColors, legalSteps, locoResolutions, lowestAvailableLoco, seatOf } from '../internal';
 import type { Action } from './action';
 
 /**
@@ -32,6 +32,17 @@ export function legalActions(state: RussianRailroadsState, playerId?: string): A
     }));
   }
 
+  // Holding a locomotive (pg. 10–11): only the legal place / upgrade / flip resolutions.
+  if (state.pendingLoco) {
+    return locoResolutions(player, state.pendingLoco.number).map((r) =>
+      r.kind === 'place'
+        ? { type: 'PLACE_LOCO', route: r.route }
+        : r.kind === 'replace'
+          ? { type: 'REPLACE_LOCO', route: r.route, number: r.number }
+          : { type: 'FLIP_LOCO' },
+    );
+  }
+
   const actions: Action[] = [{ type: 'PASS' }];
   const access = accessibleColors(player);
 
@@ -46,6 +57,9 @@ export function legalActions(state: RussianRailroadsState, playerId?: string): A
     }
     // The doubler space needs a tile in the supply and an empty doubler space (pg. 14).
     if (space.kind === 'doubler' && (state.supplies.doublers <= 0 || player.doublers >= DOUBLER_SPACES)) continue;
+    // A locomotive space needs a locomotive left in the supply (pg. 10, 12); the acquired loco is always
+    // resolvable (place / upgrade / flip), so no further gate is needed here.
+    if (space.kind === 'locomotive' && lowestAvailableLoco(state.supplies.locomotives) === null) continue;
 
     const coinCost = space.coinCost ?? 0;
     if (coinCost > 0) {

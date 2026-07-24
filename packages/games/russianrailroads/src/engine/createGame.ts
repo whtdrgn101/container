@@ -10,7 +10,13 @@ import {
   STARTING_WORKERS,
 } from './core';
 import type { Route, RussianRailroadsPlayer, RussianRailroadsState, TrackColor } from './core';
-import { dealEndBonusPile, dealEngineerStrip, dealTurnOrderCards, turnOrderFromCards } from './internal';
+import {
+  dealEndBonusPile,
+  dealEngineerStrip,
+  dealTurnOrderCards,
+  initialLocoSupply,
+  turnOrderFromCards,
+} from './internal';
 
 /** Input for a single seat when creating a game. */
 export interface NewPlayer {
@@ -100,9 +106,11 @@ export function createGame(options: CreateGameOptions): RussianRailroadsState {
     // The round opens with the turn-order starting seat (the player holding card "1", pg. 5).
     activePlayerIndex: turnOrder[0]!,
     pendingMoves: null,
+    pendingLoco: null,
     round: 1,
     rounds: ROUNDS[count]!,
-    supplies: { doublers: DOUBLER_SUPPLY },
+    // The shared doubler supply (pg. 14) + the locomotive/factory supply (pg. 4, 10–12: `count` per stack).
+    supplies: { doublers: DOUBLER_SUPPLY, locomotives: initialLocoSupply(count) },
     // Active arm of the kernel end-state union: no results/winnerIds until the game ends.
     status: 'active',
     version: 0,

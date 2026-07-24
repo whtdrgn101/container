@@ -202,6 +202,47 @@ describe('Russian Railroads (Track D package)', () => {
     expect(ts.spaces[0]).toBe('green'); // a new colour enters at space 1 (pg. 9)
   });
 
+  it('acquires a locomotive and drives an upgrade chain over the wire (pg. 10–11)', async () => {
+    const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    const first = await activeOf(game.id);
+    const post = (playerId: string, action: unknown) =>
+      app.inject({ method: 'POST', url: `/games/${game.id}/actions`, payload: { playerId, action } });
+
+    // Place on the 1-worker loco space → acquire the lowest (#2) and open the pending-loco lock; turn kept.
+    const acquired = await post(first, { type: 'PLACE', space: 'loco-1' });
+    expect(acquired.statusCode).toBe(200);
+    const afterAcquire = acquired.json().game as {
+      pendingLoco: { number: number } | null;
+      supplies: { locomotives: { stacks: Record<number, number>; returnedFactories: number } };
+      activePlayerId?: string;
+    };
+    expect(afterAcquire.pendingLoco).toEqual({ number: 2 });
+    expect(afterAcquire.supplies.locomotives.stacks[2]).toBe(1); // one #2 left the 2-player stack
+
+    // Everything but a loco resolution is refused while the lock is set.
+    const refused = await post(first, { type: 'PASS' });
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json().error.code).toBe('LOCO_PENDING');
+
+    // Upgrade the starting #1 on the Trans-Siberian with the #2 → the #1 cascades into the lock.
+    const upgraded = await post(first, { type: 'REPLACE_LOCO', route: 'transsiberian', number: 1 });
+    expect(upgraded.statusCode).toBe(200);
+    expect((upgraded.json().game as { pendingLoco: { number: number } }).pendingLoco).toEqual({ number: 1 });
+
+    // Place the displaced #1 on an empty route (Kyiv): the chain ends and the turn passes to Bob.
+    const placed = await post(first, { type: 'PLACE_LOCO', route: 'kyiv' });
+    expect(placed.statusCode).toBe(200);
+    const done = placed.json().game as {
+      pendingLoco: unknown;
+      players: { id: string; locomotives: { number: number; route: string }[] }[];
+    };
+    expect(done.pendingLoco).toBeNull();
+    const locos = done.players.find((p) => p.id === first)!.locomotives;
+    expect(locos).toContainEqual({ number: 2, route: 'transsiberian' });
+    expect(locos).toContainEqual({ number: 1, route: 'kyiv' });
+    expect(await activeOf(game.id)).not.toBe(first);
+  });
+
   it("maps a wrong-turn move to 409, and reports the module's error code", async () => {
     const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
     const active = await activeOf(game.id);

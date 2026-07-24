@@ -31,7 +31,19 @@ export type RussianRailroadsErrorCode =
   | 'ILLEGAL_TRACK_MOVE'
   // A PLACE on the doubler space when no doubler tile can be taken — the shared supply is empty or every
   // Trans-Siberian doubler space is filled (pg. 14).
-  | 'DOUBLER_UNAVAILABLE';
+  | 'DOUBLER_UNAVAILABLE'
+  // A PLACE on a locomotive action space when the locomotive supply is exhausted (pg. 10, 12).
+  | 'LOCO_SUPPLY_EMPTY'
+  // A non-loco-resolution action attempted while a locomotive is held (pg. 10–11): finish placing it first.
+  | 'LOCO_PENDING'
+  // A PLACE_LOCO / REPLACE_LOCO / FLIP_LOCO with no locomotive held — nothing to resolve.
+  | 'NO_PENDING_LOCO'
+  // A PLACE_LOCO onto a route with no empty locomotive slot (pg. 10 capacity: Trans-Sib 2, others 1).
+  | 'ILLEGAL_LOCO_PLACEMENT'
+  // A REPLACE_LOCO whose target isn't on the route or isn't strictly lower-numbered (pg. 10 upgrade rule).
+  | 'ILLEGAL_LOCO_UPGRADE'
+  // A FLIP_LOCO while the player still has an empty locomotive slot somewhere (pg. 11 constraint).
+  | 'LOCO_FLIP_NOT_ALLOWED';
 
 /**
  * Thrown when a Russian Railroads action is illegal. Subclasses the shared kernel `GameError` and pins

@@ -80,7 +80,16 @@ export function closeRound(state: RussianRailroadsState): RoundClose {
     const top = Math.max(...players.map((p) => p.score));
     const winnerIds = players.filter((p) => p.score === top).map((p) => p.id);
     return {
-      changes: { players, actionSpaces: {}, engineerStrip, pendingMoves: null, status: 'ended', results, winnerIds },
+      changes: {
+        players,
+        actionSpaces: {},
+        engineerStrip,
+        pendingMoves: null,
+        pendingLoco: null,
+        status: 'ended',
+        results,
+        winnerIds,
+      },
       scores,
     };
   }
@@ -91,6 +100,7 @@ export function closeRound(state: RussianRailroadsState): RoundClose {
       actionSpaces: {},
       engineerStrip,
       pendingMoves: null,
+      pendingLoco: null,
       round: state.round + 1,
       activePlayerIndex: state.turnOrder[0]!,
     },

@@ -260,10 +260,47 @@ inside the package, like RR2 — no host file touched, registries unchanged).
 key / new-worker / bonus-star spaces along the routes, and exact St. Pete/Kyiv lengths are RR6; locomotives
 RR4; industry (the doubler's cousin on the industry track) RR5.
 
-### RR4 — Locomotives
-Lowest-available acquisition, route capacity (2/1/1), reach-gates-scoring (pg. 10), **upgrade
-chains as a pending-placement lock** (displaced locos cascade; can stop anytime; forced
-flip-to-factory only when no empty loco space remains, pg. 10–11), the #10 double-stack rule.
+### RR4 — Locomotives ✅ *(shipped)*
+The engine-building spine (pg. 10–11). Shipped: the shared **locomotive/factory supply** (per-number
+stacks #2–#9 + the two #10 stacks + a returned-factory pool — one model, because a factory is a flipped
+loco); the two RR4 **locomotive action spaces** (1 worker / 2 workers, each acquiring the lowest-numbered
+loco); **lowest-available acquisition** with the **#10 double-stack rule** (both #10 stacks open only once
+#9 is empty); the **second engine lock** `pendingLoco`, resolved by single actions `PLACE_LOCO`
+(onto an empty route slot — capacity Trans-Sib 2 / others 1, reach = sum) / `REPLACE_LOCO` (upgrade a
+lower loco, the displaced one **cascading** into the lock — the pg. 11 chain reaction) / `FLIP_LOCO` (turn
+to a factory and return to the supply, **only when no empty loco space remains** — the exact pg. 11
+constraint); `legalActions` enumerating the place/upgrade/flip resolutions and refusing all else while the
+lock is set; and **reach-gates-scoring** already honoured (RR2's `locoReach` = sum). Engine 100% (**111
+tests**, up from 85 — a new `locomotive.test.ts` incl. the pg. 11 examples 3–4 chain reaction verbatim); a
+backend REST test drives an acquire→upgrade→place chain over the wire; the client gained loco action
+spaces, a **pending-loco panel** (place/upgrade/flip buttons), per-route loco readouts and feed narration
+("took the #2 locomotive", "placed the #2 on Kyiv", "upgraded the #1 to the #2 …", "flipped the #1 to a
+factory"); `e2e/russianrailroads.spec.ts` gained an acquire-and-place test (desktop + mobile). Rulings
+below. **Track D findings: none new** — the whole slice landed inside the package (engine, module
+`parseAction`, client), touching **zero** host files (no `games.config.ts`, no registry regen, no
+vite/tsconfig/vitest edits), the RR2/RR3 pattern holding.
+
+**RR4 rulings (with evidence):**
+- **Stack size = player count — LANDED (pg. 12, verbatim).** The scope brief said "#2–#9 (4 each) + two #10
+  (4+4)"; pg. 12 is explicit that each stack holds *player-count* locomotives ("4× #2, 4× #3 … in a
+  4-player game"), so the model is `count`-per-stack — which **is** the brief's "4 each" at 4 players and
+  correctly scales to 2/3 players (the SA14 "differences land with the mechanic" discipline). The two #10
+  stacks are a real component split (pg. 4) that matters only for their *factory* action (pg. 48, RR5); RR4
+  draws a #10 from whichever stack still has tiles.
+- **Factory-building lands in RR5, not RR4 — LANDED (pg. 12–13).** The loco action spaces' "loco **or**
+  factory" option and the third (3-worker) "loco **and** factory" space are **deferred to RR5**, because
+  building a factory means placing it on the **industry track** (the wrench / left-to-right gaps, pg. 13) —
+  the mechanic the roadmap already assigns to RR5. Same "add only spaces usable this slice" discipline
+  RR2/RR3 used for the colour spaces. RR4 ships the two loco spaces as **locomotive-acquisition only**.
+- **The flip-to-factory of RR4 is a *supply return*, not an industry placement (pg. 11).** A displaced/
+  unwanted loco during an upgrade chain flips to its factory side and returns to the **supply pool**
+  (`returnedFactories++`) — it does **not** touch the industry track. That is entirely an RR4 concern
+  (pg. 11); RR5 later *draws* factories from that pool onto the industry track.
+- **The flip is a gated *choice*, exactly as printed (pg. 11).** "As long as you have any empty spaces for
+  locomotives left on any of your boards, you cannot choose to return an upgraded locomotive to the supply
+  as a factory." Encoded literally: `FLIP_LOCO` throws `LOCO_FLIP_NOT_ALLOWED` while any loco slot is open,
+  and `legalActions` only offers it when none is. A held loco is **always** resolvable (place if a slot is
+  open; else upgrade a lower loco; else — nothing lower, no slot — flip), so the chain never wedges.
 
 ### RR5 — Industry: factories + the wrench
 The shared loco/factory pool flips (pg. 11–12), left-to-right gap filling + replacement rules,

@@ -1,5 +1,5 @@
-import { ACTION_SPACES, legalActions, legalSteps } from '../engine';
-import type { PlayerView, RouteId, RussianRailroadsState, RussianRailroadsView, TrackColor } from '../engine';
+import { ACTION_SPACES, legalActions, legalSteps, locoResolutions, locosOnRoute } from '../engine';
+import type { Action, PlayerView, RouteId, RussianRailroadsState, RussianRailroadsView, TrackColor } from '../engine';
 import { Button } from '@/components/ui/button';
 import { ActivityFeed } from '@/components/ActivityFeed';
 import { GameOver } from '@/components/GameOver';
@@ -41,8 +41,10 @@ export default function RussianRailroadsBoard({
   });
   const acting = canDrive && !ended && !!active;
   const pending = game.pendingMoves;
+  const pendingLoco = game.pendingLoco;
   const resolving = acting && !!pending; // holding a track-extension lock: resolve it before anything else
-  const placing = acting && !pending; // free to place a worker or pass
+  const resolvingLoco = acting && !!pendingLoco; // holding a locomotive: place / upgrade / flip it
+  const placing = acting && !pending && !pendingLoco; // free to place a worker or pass
 
   const run = (work: () => Promise<rrApi.RussianRailroadsPayload>) => guard(async () => onPayload(await work()));
   const doPlace = (space: string, coins?: number) => {
@@ -57,10 +59,17 @@ export default function RussianRailroadsBoard({
       rrApi.act(gameId, active.id, { type: 'MOVE_TRACK', route, ...(color ? { color } : {}) }, viewer, game.version),
     );
   };
+  const doLoco = (action: Action) => {
+    if (!resolvingLoco || !active) return;
+    void run(() => rrApi.act(gameId, active.id, action, viewer, game.version));
+  };
   const doPass = () => {
     if (!placing || !active) return;
     void run(() => rrApi.act(gameId, active.id, { type: 'PASS' }, viewer, game.version));
   };
+
+  // The legal place / upgrade / flip resolutions for the held locomotive (pg. 10–11), driving the panel.
+  const locoOptions = resolvingLoco && active && pendingLoco ? locoResolutions(active, pendingLoco.number) : [];
 
   const nameOf = (id: string) => game.players.find((p) => p.id === id)?.name ?? id;
   const winnerNames = game.status === 'ended' ? game.winnerIds.map(nameOf) : [];
@@ -119,6 +128,56 @@ export default function RussianRailroadsBoard({
       {resolving && pending ? (
         <div data-testid="rr-pending" className="rounded-lg border border-primary bg-primary/5 p-3 text-sm font-medium">
           {pending.remaining} track move{pending.remaining > 1 ? 's' : ''} left — click a route below to build.
+        </div>
+      ) : null}
+
+      {/* The locomotive lock prompt (pg. 10–11): place the held loco, upgrade a lower one (a chain
+          reaction), or — only when no slot is free — flip it to a factory. */}
+      {resolvingLoco && pendingLoco ? (
+        <div
+          data-testid="rr-pending-loco"
+          className="rounded-lg border border-primary bg-primary/5 p-3 text-sm font-medium"
+        >
+          <div>Locomotive #{pendingLoco.number} in hand — place it, upgrade a lower one, or flip it to a factory.</div>
+          <div className="mt-2 flex flex-wrap gap-2 font-normal">
+            {locoOptions.map((opt) =>
+              opt.kind === 'place' ? (
+                <Button
+                  key={`place-${opt.route}`}
+                  variant="outline"
+                  size="sm"
+                  data-testid={`rr-loco-place-${opt.route}`}
+                  disabled={busy}
+                  onClick={() => doLoco({ type: 'PLACE_LOCO', route: opt.route })}
+                >
+                  Place on {opt.route}
+                </Button>
+              ) : opt.kind === 'replace' ? (
+                <Button
+                  key={`replace-${opt.route}-${opt.number}`}
+                  variant="outline"
+                  size="sm"
+                  data-testid={`rr-loco-replace-${opt.route}-${opt.number}`}
+                  disabled={busy}
+                  onClick={() => doLoco({ type: 'REPLACE_LOCO', route: opt.route, number: opt.number })}
+                >
+                  Upgrade #{opt.number} on {opt.route}
+                </Button>
+              ) : (
+                <Button
+                  key="flip"
+                  variant="ghost"
+                  size="sm"
+                  data-testid="rr-loco-flip"
+                  disabled={busy}
+                  title="Return it to the supply as a factory (pg. 11)"
+                  onClick={() => doLoco({ type: 'FLIP_LOCO' })}
+                >
+                  Flip to factory
+                </Button>
+              ),
+            )}
+          </div>
         </div>
       ) : null}
 
@@ -313,7 +372,18 @@ function PlayerCard({
               ))}
             </span>
           );
-          const label = <span className="w-28 shrink-0 capitalize text-muted-foreground">{route.id}</span>;
+          // Locomotives on this route (pg. 10) — their numbers, shown beside the route name; reach = their sum.
+          const locos = locosOnRoute(player, route.id);
+          const label = (
+            <span className="flex w-36 shrink-0 items-baseline gap-1 text-muted-foreground">
+              <span className="capitalize">{route.id}</span>
+              {locos.length ? (
+                <span data-testid={`rr-locos-${player.id}-${route.id}`} className="text-primary" title="Locomotives">
+                  🚂{locos.map((l) => l.number).join(' ')}
+                </span>
+              ) : null}
+            </span>
+          );
 
           // Single-colour lock: the whole row is one build button (keeps the `rr-build-<route>` testid).
           if (legalColors.length > 0 && !multiColor) {

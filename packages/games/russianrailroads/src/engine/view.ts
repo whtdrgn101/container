@@ -4,6 +4,7 @@ import type {
   Engineer,
   Industry,
   Locomotive,
+  PendingLoco,
   PendingMoves,
   Route,
   RussianRailroadsResult,
@@ -62,6 +63,8 @@ export type RussianRailroadsView = {
   readonly activePlayerIndex: number;
   /** The active player's pending track-extension lock (pg. 8–9), or `null` — public information. */
   readonly pendingMoves: PendingMoves | null;
+  /** The active player's pending locomotive placement/upgrade lock (pg. 10–11), or `null` — public. */
+  readonly pendingLoco: PendingLoco | null;
   readonly round: number;
   readonly rounds: number;
   readonly supplies: RussianRailroadsSupplies;

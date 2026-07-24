@@ -12,10 +12,20 @@ describe('legalActions', () => {
     const state = newGame(4); // 5 workers, 1 coin
     const actions = legalActions(state);
     expect(actions.some((a) => a.type === 'PASS')).toBe(true);
-    // At setup only wood is accessible, so the higher-colour spaces are omitted; the doubler and
-    // temporary-worker auxiliary spaces are open.
+    // At setup only wood is accessible, so the higher-colour spaces are omitted; the doubler,
+    // temporary-worker and (supply non-empty) locomotive spaces are open.
     expect(placedSpaces(actions)).toEqual(
-      new Set(['coins', 'track-wood-1', 'track-wood-2', 'track-coin', 'track-bottom', 'doubler', 'temp-workers']),
+      new Set([
+        'coins',
+        'track-wood-1',
+        'track-wood-2',
+        'track-coin',
+        'track-bottom',
+        'doubler',
+        'temp-workers',
+        'loco-1',
+        'loco-2',
+      ]),
     );
     // The coins space offers a worker and a coin variant.
     const coinsPlacements = actions.filter((a) => a.type === 'PLACE' && a.space === 'coins');
@@ -49,7 +59,10 @@ describe('legalActions', () => {
           : p,
       ),
     };
-    expect(placedSpaces(legalActions(maxed))).toEqual(new Set(['coins', 'doubler', 'temp-workers']));
+    // Track spaces all drop out; the coin, doubler, temp-worker and locomotive spaces remain.
+    expect(placedSpaces(legalActions(maxed))).toEqual(
+      new Set(['coins', 'doubler', 'temp-workers', 'loco-1', 'loco-2']),
+    );
   });
 
   it('drops an occupied space but keeps the never-occupied bottom space', () => {

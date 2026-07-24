@@ -73,3 +73,25 @@ test('pick Russian Railroads and play track extension: place, lock, two clicks, 
   // Score is visible on every player card.
   await expect(page.getByTestId('rr-score-p1')).toContainText('Score:');
 });
+
+/**
+ * RR4 — locomotives. Pick the game, acquire the lowest locomotive from a loco action space (which opens the
+ * pending-loco lock), then place it on an empty route from the pending panel — the feed narrating both.
+ */
+test('acquire a locomotive and place it on a route (pg. 10–11)', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('pick-game-russianrailroads').click();
+  await page.getByTestId('start-game').click();
+  await expect(page.getByTestId('board')).toBeVisible();
+
+  // The 1-worker locomotive space is present; using it acquires the lowest loco (#2) and opens the lock.
+  await expect(page.getByTestId('rr-space-loco-1')).toBeVisible();
+  await page.getByTestId('rr-place-loco-1').click();
+  await expect(page.getByTestId('rr-pending-loco')).toContainText('Locomotive #2');
+  await expect(page.getByTestId('rr-log')).toContainText('took the #2 locomotive');
+
+  // Place it on the empty Kyiv route → the panel closes and the feed narrates the placement.
+  await page.getByTestId('rr-loco-place-kyiv').click();
+  await expect(page.getByTestId('rr-pending-loco')).toBeHidden();
+  await expect(page.getByTestId('rr-log')).toContainText('placed the #2 on Kyiv');
+});

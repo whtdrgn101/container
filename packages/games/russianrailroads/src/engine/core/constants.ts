@@ -124,7 +124,38 @@ export const routeColors = (routeId: RouteId): readonly TrackColor[] =>
   ROUTES.find((r) => r.id === routeId)?.colors ?? [];
 
 /** Which section of the board an action space belongs to (pg. 7). */
-export type ActionSpaceKind = 'coins' | 'track' | 'doubler' | 'temp-workers';
+export type ActionSpaceKind = 'coins' | 'track' | 'doubler' | 'temp-workers' | 'locomotive';
+
+/**
+ * Locomotive supply (pg. 4, 10, 12). Locomotives are numbered **#2–#10** in the supply (the #1 every
+ * player starts with, pg. 6, is *not* in the supply). They are sorted into per-number stacks; **each stack
+ * holds one locomotive per player** (pg. 12: "the same number of locomotives in it as the number of
+ * players — i.e. 4× #2, 4× #3 … in a 4-player game"). So the "4 each" in a 4-player game is the general
+ * `count`-per-stack rule; `initialLocoSupply(count)` sets it (a 2-player game has 2 of each).
+ *
+ * **Ruling (RR4, pg. 12).** The scope brief said "#2–#9 (4 each) + two #10 (4+4)"; the rulebook (pg. 12) is
+ * explicit that a stack holds *player-count* locomotives, so the model is `count`-per-stack — which **is**
+ * 4 each at 4 players (the brief's case) and correctly scales to 2/3 players. The **two #10 stacks** are a
+ * real component split (pg. 4: "There are two kinds of #10 locomotives … sort these into separate piles";
+ * they differ only in their *factory* action, pg. 48 — irrelevant until RR5), and **both open only once the
+ * #9 stack is empty** (pg. 10, the "!" note). One #9 goes onto an idea card at setup (pg. 4) — an idea-card
+ * detail deferred to RR6; RR4 keeps the full `count` in the #9 stack.
+ */
+export const LOCO_STACK_NUMBERS: readonly number[] = [2, 3, 4, 5, 6, 7, 8, 9];
+
+/** The number every #10 locomotive prints (pg. 4, 10). Both #10 stacks carry this reach. */
+export const LOCO_TEN = 10;
+
+/**
+ * How many locomotives a route can hold (pg. 10): **2** on the Trans-Siberian (their reaches sum), **1** on
+ * St. Petersburg and Kyiv. Placing a loco needs an empty slot here; a full route can only be *upgraded*
+ * (replace a lower-numbered loco).
+ */
+export const LOCO_CAPACITY: Readonly<Record<RouteId, number>> = {
+  transsiberian: 2,
+  stpetersburg: 1,
+  kyiv: 1,
+};
 
 /**
  * Doubler tiles (pg. 14). The shared supply is **30** tiles; a base-game player board has doubler spaces
@@ -251,6 +282,14 @@ export const ACTION_SPACES: readonly ActionSpaceDef[] = [
   },
   { id: 'doubler', label: 'Take a doubler', kind: 'doubler', workers: 1, neverOccupies: false },
   { id: 'temp-workers', label: 'Take 2 temporary workers', kind: 'temp-workers', workers: 1, neverOccupies: false },
+  // The two RR4 locomotive action spaces (pg. 12): 1 worker and 2 workers, each acquires the lowest-numbered
+  // locomotive and opens the placement/upgrade lock. **RR4 ruling (pg. 12–13):** the board's upper/middle
+  // spaces are "loco **or** factory"; RR4 ships the *locomotive* option only, and the third (3-worker) space
+  // — "1 locomotive **and** 1 factory" — and the factory option both wait for **RR5**, because building a
+  // factory means placing it on the *industry track* (the wrench / left-to-right gaps, pg. 13), which RR5
+  // owns. Same "add only spaces usable this slice" discipline RR2/RR3 used for the colour spaces.
+  { id: 'loco-1', label: 'Build locomotive', kind: 'locomotive', workers: 1, neverOccupies: false },
+  { id: 'loco-2', label: 'Build locomotive', kind: 'locomotive', workers: 2, neverOccupies: false },
 ];
 
 /** Look up an action-space definition by id, or `undefined` if none. */

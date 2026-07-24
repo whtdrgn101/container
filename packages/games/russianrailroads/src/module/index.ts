@@ -3,20 +3,49 @@ import { applyAction, createGame, GameError, legalActions, MAX_PLAYERS, MIN_PLAY
 import type { Action, RouteId, RussianRailroadsState, TrackColor } from '../engine';
 
 /**
- * Validate opaque JSON into a typed Russian Railroads `Action` (RR2: `PLACE` / `MOVE_TRACK` / `PASS`). The
- * core route accepts arbitrary JSON and delegates *all* action validation here. There are **no server-only
- * actions** in RR2 (no dice, no shuffles mid-game — base-game randomness is setup-only), so every action a
- * client may send is validated here. The engine does the domain validation (route/colour legality, the
- * pending lock); this only shapes the JSON.
+ * Validate opaque JSON into a typed Russian Railroads `Action` (RR4: `PLACE` / `MOVE_TRACK` / the loco
+ * resolutions `PLACE_LOCO` / `REPLACE_LOCO` / `FLIP_LOCO` / `PASS`). The core route accepts arbitrary JSON
+ * and delegates *all* action validation here. There are **no server-only actions** (no dice, no shuffles
+ * mid-game — base-game randomness is setup-only), so every action a client may send is validated here. The
+ * engine does the domain validation (route/colour/loco legality, the pending locks); this only shapes JSON.
  */
 function parseAction(raw: unknown): ParseResult<Action> {
   if (typeof raw !== 'object' || raw === null) {
     return { ok: false, message: 'action must be an object' };
   }
-  const action = raw as { type?: unknown; space?: unknown; coins?: unknown; route?: unknown; color?: unknown };
+  const action = raw as {
+    type?: unknown;
+    space?: unknown;
+    coins?: unknown;
+    route?: unknown;
+    color?: unknown;
+    number?: unknown;
+  };
 
   if (action.type === 'PASS') {
     return { ok: true, action: { type: 'PASS' } };
+  }
+
+  if (action.type === 'FLIP_LOCO') {
+    return { ok: true, action: { type: 'FLIP_LOCO' } };
+  }
+
+  if (action.type === 'PLACE_LOCO') {
+    if (typeof action.route !== 'string') {
+      return { ok: false, message: 'PLACE_LOCO.route must be a string' };
+    }
+    // The engine validates the route id + slot capacity, so an unknown value becomes a typed engine error.
+    return { ok: true, action: { type: 'PLACE_LOCO', route: action.route as RouteId } };
+  }
+
+  if (action.type === 'REPLACE_LOCO') {
+    if (typeof action.route !== 'string') {
+      return { ok: false, message: 'REPLACE_LOCO.route must be a string' };
+    }
+    if (typeof action.number !== 'number' || !Number.isInteger(action.number)) {
+      return { ok: false, message: 'REPLACE_LOCO.number must be an integer' };
+    }
+    return { ok: true, action: { type: 'REPLACE_LOCO', route: action.route as RouteId, number: action.number } };
   }
 
   if (action.type === 'PLACE') {

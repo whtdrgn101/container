@@ -1,6 +1,6 @@
 import { actionSpace, COINS_PER_ACTION, DOUBLER_SPACES, GameError, TEMP_WORKERS } from '../core';
 import type { RussianRailroadsState, SpacePlacement } from '../core';
-import { accessibleColors, legalSteps, nextActiveSeat, record, seatOf, withPlayer } from '../internal';
+import { accessibleColors, legalSteps, nextActiveSeat, record, seatOf, takeLowestLoco, withPlayer } from '../internal';
 
 /**
  * Place workers (and/or coins) on an action space and resolve it (pg. 7, 9, 14). The turn/turn-order and
@@ -112,6 +112,25 @@ export function place(state: RussianRailroadsState, playerId: string, space: str
         activePlayerIndex: nextActiveSeat(state)!,
       },
       { space, label: def.label, doubler: updated.doublers },
+    );
+  }
+
+  // A locomotive action space (pg. 10, 12): take the lowest-numbered locomotive from the supply and open the
+  // pending-loco lock, keeping the turn — the placer resolves it via PLACE_LOCO / REPLACE_LOCO / FLIP_LOCO.
+  // (`legalActions` only offers the space when the supply is non-empty, so a resolution always exists.)
+  if (def.kind === 'locomotive') {
+    const { number, supply } = takeLowestLoco(state.supplies.locomotives);
+    return record(
+      state,
+      'PLACE',
+      playerId,
+      {
+        players: withPlayer(state, seat, paid),
+        actionSpaces,
+        supplies: { ...state.supplies, locomotives: supply },
+        pendingLoco: { number },
+      },
+      { space, label: def.label, acquired: number },
     );
   }
 

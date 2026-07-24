@@ -4,4 +4,5 @@ export { applyAction } from './applyAction';
 export { legalActions } from './legalActions';
 export { place } from './place';
 export { moveTrack } from './moveTrack';
+export { flipLoco, placeLoco, replaceLoco } from './locomotive';
 export { pass } from './pass';

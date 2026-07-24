@@ -44,6 +44,15 @@ describe('viewFor', () => {
     expect(asSpectator.viewerId).toBeNull();
   });
 
+  it('projects the locomotive lock and the loco/factory supply publicly (pg. 10–12)', () => {
+    const base = newGame(2);
+    const state: RussianRailroadsState = { ...base, pendingLoco: { number: 4 } };
+    const view = viewFor(state, 'p1');
+    expect(view.pendingLoco).toEqual({ number: 4 }); // the held loco is public information
+    expect(view.supplies.locomotives.stacks[2]).toBe(2); // the shared supply is public
+    expect(view.supplies.locomotives.tens).toEqual([2, 2]);
+  });
+
   it('reveals everything once the game has ended', () => {
     const secret = withSecret(2);
     const ended: RussianRailroadsState = { ...secret, status: 'ended', results: [], winnerIds: ['p1', 'p2'] };

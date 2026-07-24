@@ -1,5 +1,13 @@
 import type { RussianRailroadsView } from '../engine';
 
+/** Pretty route names for the feed (pg. 8): "Kyiv" reads better than the id "kyiv". */
+function routeLabel(route?: string): string {
+  if (route === 'transsiberian') return 'Trans-Siberian';
+  if (route === 'stpetersburg') return 'St. Petersburg';
+  if (route === 'kyiv') return 'Kyiv';
+  return route ?? 'a route';
+}
+
 /** One player's per-round scoring entry, as logged on the closing PASS (pg. 20–21). */
 interface RoundScore {
   readonly playerId: string;
@@ -15,17 +23,38 @@ interface RoundScore {
 export function describeMove(entry: RussianRailroadsView['log'][number], nameOf?: (id: string) => string): string {
   if (entry.type === 'PLACE') {
     const p = entry.payload as
-      { label?: string; gainedCoins?: number; moves?: number; doubler?: number; tempWorkers?: number } | undefined;
+      | {
+          label?: string;
+          gainedCoins?: number;
+          moves?: number;
+          doubler?: number;
+          tempWorkers?: number;
+          acquired?: number;
+        }
+      | undefined;
     if (!p?.label) return 'placed a worker';
     if (p.gainedCoins) return `placed a worker — ${p.label} (+${p.gainedCoins} coins)`;
     if (p.doubler) return `placed a worker — took a doubler (×2 on space ${p.doubler})`;
     if (p.tempWorkers) return `placed a worker — took ${p.tempWorkers} temporary workers`;
+    if (p.acquired) return `placed a worker — took the #${p.acquired} locomotive`;
     if (p.moves === 0) return `placed a worker — ${p.label} (no move possible)`;
     return `placed a worker — ${p.label}`;
   }
   if (entry.type === 'MOVE_TRACK') {
     const p = entry.payload as { route?: string; color?: string } | undefined;
     return `built ${p?.color ?? 'wood'} track on ${p?.route ?? 'a route'}`;
+  }
+  if (entry.type === 'PLACE_LOCO') {
+    const p = entry.payload as { route?: string; number?: number } | undefined;
+    return `placed the #${p?.number ?? '?'} on ${routeLabel(p?.route)}`;
+  }
+  if (entry.type === 'REPLACE_LOCO') {
+    const p = entry.payload as { route?: string; number?: number; replaced?: number } | undefined;
+    return `upgraded the #${p?.replaced ?? '?'} to the #${p?.number ?? '?'} on ${routeLabel(p?.route)}`;
+  }
+  if (entry.type === 'FLIP_LOCO') {
+    const p = entry.payload as { number?: number } | undefined;
+    return `flipped the #${p?.number ?? '?'} to a factory`;
   }
   if (entry.type === 'PASS') {
     const p = entry.payload as { gameEnded?: boolean; nextRound?: number; scores?: readonly RoundScore[] } | undefined;
