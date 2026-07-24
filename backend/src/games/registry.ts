@@ -24,6 +24,8 @@ export interface GameInfo {
   readonly maxPlayers: number;
   /** The game's player-colour palette (ordered colour ids), so the lobby can offer the pick. */
   readonly colors: readonly string[];
+  /** The AI difficulty tiers this game offers (CS4), or absent if it has just one. Drives the picker. */
+  readonly botDifficulties?: readonly string[];
 }
 
 /**
@@ -58,12 +60,15 @@ export class GameRegistry {
 
   /** Every registered game, for the picker. Registration order. */
   list(): GameInfo[] {
-    return [...this.modules.values()].map(({ id, name, minPlayers, maxPlayers, colors }) => ({
+    return [...this.modules.values()].map(({ id, name, minPlayers, maxPlayers, colors, botDifficulties }) => ({
       id,
       name,
       minPlayers,
       maxPlayers,
       colors,
+      // Only surface the field when a game declares tiers, so a game without them stays exactly as it
+      // was on the wire (no `botDifficulties` key) and the UI shows no dead picker.
+      ...(botDifficulties ? { botDifficulties } : {}),
     }));
   }
 }

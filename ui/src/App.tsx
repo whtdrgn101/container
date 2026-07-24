@@ -39,6 +39,11 @@ export default function App() {
   // Each hotseat seat's chosen player colour (a palette id), or undefined for the palette-order default.
   // Kept sparse: an unpicked seat stays undefined so a colour-less quick-start reproduces today's tints.
   const [seatColors, setSeatColors] = useState<(string | undefined)[]>([]);
+  // Each hotseat bot seat's chosen AI difficulty tier (CS4), or undefined for the default ('normal').
+  // Sparse like seatColors: a seat with no explicit pick omits `difficulty` entirely from the request.
+  const [seatDifficulties, setSeatDifficulties] = useState<(string | undefined)[]>([]);
+  // The AI difficulty to hand a bot added in the waiting room (CS4). Defaults to 'normal'.
+  const [botDifficulty, setBotDifficulty] = useState('normal');
   // Shared-game (lobby) setup + waiting-room state.
   const [lobbySeats, setLobbySeats] = useState(0);
   const [lobby, setLobby] = useState<Lobby | null>(null);
@@ -243,8 +248,18 @@ export default function App() {
   async function addBotSeat() {
     if (!lobby) return;
     const taken = lobby.members.filter((member) => member !== null).length;
+    // The game's tiers, if any (CS4). Only send a difficulty when the game declares one — otherwise
+    // the server rejects it, and a game with no tiers must add a bot exactly as before.
+    const tiers = catalog.find((entry) => entry.id === lobby.gameType)?.botDifficulties;
+    const difficulty = tiers && tiers.includes(botDifficulty) ? botDifficulty : undefined;
     await guard(async () => {
-      const { lobby: updated } = await api.joinLobby(lobby.id, BOT_NAMES[taken % BOT_NAMES.length]!, true);
+      const { lobby: updated } = await api.joinLobby(
+        lobby.id,
+        BOT_NAMES[taken % BOT_NAMES.length]!,
+        true,
+        undefined,
+        difficulty,
+      );
       setLobby(updated);
     });
   }
@@ -437,6 +452,9 @@ export default function App() {
             lobby={lobby}
             mySeats={mySeats}
             palette={catalog.find((entry) => entry.id === lobby.gameType)?.colors ?? []}
+            botDifficulties={catalog.find((entry) => entry.id === lobby.gameType)?.botDifficulties ?? []}
+            botDifficulty={botDifficulty}
+            onBotDifficultyChange={setBotDifficulty}
             onPickColor={(seat, color) => void pickColor(seat, color)}
             seatName={seatName}
             onSeatNameChange={setSeatName}
@@ -474,9 +492,11 @@ export default function App() {
             names={names}
             seatIsBot={seatIsBot}
             seatColors={seatColors}
+            seatDifficulties={seatDifficulties}
             onNamesChange={setNames}
             onSeatIsBotChange={setSeatIsBot}
             onSeatColorsChange={setSeatColors}
+            onSeatDifficultiesChange={setSeatDifficulties}
             onStartHotseat={() =>
               selected &&
               void run(() =>
@@ -488,6 +508,11 @@ export default function App() {
                     // Omit an unpicked seat's colour entirely, so the server applies its palette-order
                     // default — a colour-less quick-start stays byte-identical to before this feature.
                     ...(seatColors[index] !== undefined ? { color: seatColors[index] } : {}),
+                    // A difficulty only rides along for a bot seat that picked one (CS4); the server
+                    // rejects a tier on a human seat, and an unset tier defaults to 'normal'.
+                    ...(seatIsBot[index] === true && seatDifficulties[index] !== undefined
+                      ? { difficulty: seatDifficulties[index] }
+                      : {}),
                   })),
                 ),
               )

@@ -21,6 +21,10 @@ export const cantStopModule: GameModule<CantStopState, Action> = {
   // The four seat tints the board already colours squares/runners with, in seat order (see the UI board).
   colors: ['rose', 'sky', 'amber', 'emerald'],
 
+  // The AI difficulty tiers (CS4). Ordered easy→hard; the UI defaults its picker to 'normal'. The
+  // bot package owns what each tier *means* (probability-scaled policies); the module only names them.
+  botDifficulties: ['easy', 'normal', 'hard'],
+
   createGame: (opts) => newCantStopGame(opts),
 
   applyAction: (state, playerId, action) => applyAction(state, playerId, action),

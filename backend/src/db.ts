@@ -77,6 +77,11 @@ CREATE TABLE IF NOT EXISTS delivery_auctions (
 CREATE TABLE IF NOT EXISTS game_bots (
   game_id   TEXT NOT NULL,
   player_id TEXT NOT NULL,
+  -- Which difficulty tier this AI seat plays by (CS4). A module declares its tiers
+  -- (GameModule.botDifficulties); a game with none stores the default and its driver ignores the
+  -- column. Defaults to 'normal' so every bot seat written before this column backfills to the tier
+  -- that was the only behaviour there was — the same game_type lesson (assert column AND value).
+  difficulty TEXT NOT NULL DEFAULT 'normal',
   PRIMARY KEY (game_id, player_id),
   FOREIGN KEY (game_id) REFERENCES games(id)
 );
@@ -152,6 +157,15 @@ const ADDED_COLUMNS: readonly { readonly table: string; readonly column: string;
     table: 'games',
     column: 'schema_version',
     ddl: `ALTER TABLE games ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1`,
+  },
+  // Per-seat bot difficulty (CS4). The backfill *is* the DEFAULT: SQLite stamps every existing bot
+  // seat 'normal' as the column is added — before this column, every bot played the one (normal)
+  // policy. Must live here as well as in the schema string, or an already-deployed database (the
+  // whole point of the `/data` volume) never grows it.
+  {
+    table: 'game_bots',
+    column: 'difficulty',
+    ddl: `ALTER TABLE game_bots ADD COLUMN difficulty TEXT NOT NULL DEFAULT 'normal'`,
   },
   // Promote `status` out of the JSON blob into a real, indexable column (REVIEW §4.3). The DEFAULT
   // stamps every existing row 'open' as the column is added; the second statement then backfills the

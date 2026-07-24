@@ -29,6 +29,8 @@ export interface LobbyMember {
   bot: boolean;
   /** The player colour this seat picked (a palette id), or undefined until one is chosen. */
   color?: string;
+  /** For a bot seat, the AI difficulty tier it plays by (CS4), or undefined for the game's default. */
+  difficulty?: string;
 }
 
 /** A pre-game lobby: a shareable room whose seats players claim by name before the game starts. */
@@ -74,6 +76,11 @@ export interface GameInfo {
   maxPlayers: number;
   /** The game's player-colour palette (ordered ids), so the lobby can offer the pick. */
   colors: string[];
+  /**
+   * The AI difficulty tiers this game offers (CS4), ordered easy→hard, or absent if it has just one.
+   * Present ⇒ the bot-seat affordances show a difficulty picker; absent ⇒ exactly today's UI.
+   */
+  botDifficulties?: string[];
 }
 
 /** A secret-free summary of an in-progress game (for the home-screen "resume" list). */
@@ -95,6 +102,8 @@ export interface NewSeat {
   bot?: boolean;
   /** A palette id (from the game's catalog entry). Honoured if valid/unique; omit for the default. */
   color?: string;
+  /** For a bot seat, a difficulty tier (from the game's catalog entry). Omit for the default ('normal'). */
+  difficulty?: string;
 }
 
 /** Throw an Error carrying the server's message (used for any non-2xx response). */
@@ -266,18 +275,25 @@ export async function getLobby(id: string): Promise<Lobby> {
 
 /**
  * Claim the next open seat in a lobby with `name`; returns the updated lobby and your seat index.
- * Pass `bot` to hand the seat to the AI instead of a person, and `color` to pick a player colour.
+ * Pass `bot` to hand the seat to the AI instead of a person, `color` to pick a player colour, and
+ * `difficulty` (bot seats only) to pick an AI tier.
  */
 export async function joinLobby(
   id: string,
   name: string,
   bot = false,
   color?: string,
+  difficulty?: string,
 ): Promise<{ lobby: Lobby; seat: number }> {
   const response = await fetch(`${BASE_URL}/lobbies/${id}/join`, {
     method: 'POST',
     headers: JSON_HEADERS,
-    body: JSON.stringify({ name, bot, ...(color !== undefined ? { color } : {}) }),
+    body: JSON.stringify({
+      name,
+      bot,
+      ...(color !== undefined ? { color } : {}),
+      ...(difficulty !== undefined ? { difficulty } : {}),
+    }),
   });
   if (!response.ok) await fail(response);
   return (await response.json()) as { lobby: Lobby; seat: number };

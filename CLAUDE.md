@@ -290,6 +290,20 @@ authoritative — it just produces an `Action` that the engine validates like an
 - **Greedy bots cannot see multi-action payoffs.** The delivery run is 4+ actions; score long chains
   against the *goal*, not the hop, or ships never leave port (this actually happened — see ROADMAP A0).
   Stone Age hit the same class of bug (a myopic food heuristic hunted forever); watch for it in any new bot.
+- **Difficulty tiers (Can't Stop, CS4) are probability-parameterized, not different algorithms.** One
+  `DifficultyParams` set per tier over the *same* exact-`bustProbability` EV model (`decide`'s
+  `options.difficulty`, default `'normal'`): `normal` is the frozen baseline (byte-identical — every
+  no-tier call defaults to it, so self-play and the bench baselines never shift), `easy` banks early
+  (a `stopThreshold` + lower `expectedAdvance`), `hard` adds endgame urgency (an `urgencyBoost` scaling
+  the roll-on incentive and claim bonus once any seat is one claim from winning). **The ordering is
+  harness-proven**, the calibrate-then-commit convention's first real use: `difficulty.bench.test.ts`
+  asserts a fast directional bound (normal > easy, hard > normal) and an env-gated `CANTSTOP_BENCH_GAMES`
+  run proves significance (at 1200 games hard beats normal 53%, CI lower bound clear of 50% — the edge
+  is small but real; don't weaken `normal` to inflate it). **Which tier a seat plays is coordination
+  state** (`game_bots.difficulty`, defaulting `'normal'`), never engine state — the wire `bots` payload
+  stays `string[]`; the module *declares* its tiers via `GameModule.botDifficulties` (only Can't Stop
+  does), exposed on `GET /games/catalog`, validated at `POST /games` / lobby join (`INVALID_DIFFICULTY`),
+  and read back by the runner. Other games declare no tiers and their drivers ignore the column.
 
 ### Engine module layout
 

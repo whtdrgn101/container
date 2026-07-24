@@ -13,6 +13,7 @@ import { createGame } from '@game-hub/engine/cantstop';
 import type { CantStopState } from '@game-hub/engine/cantstop';
 import { mulberry32, runBenchmark, type BenchmarkResult } from '../../kernel';
 import { decide } from './decide';
+import type { CantStopDifficulty } from './policy';
 import { playSelfPlay } from './selfPlay';
 import type { DecideFn } from './types';
 
@@ -22,6 +23,15 @@ export interface StrengthBenchOptions {
   readonly candidate?: DecideFn;
   readonly baseline?: DecideFn;
 }
+
+/**
+ * `decide` bound to a difficulty tier (CS4) as a `DecideFn`, for pitting tiers against each other in
+ * the strength harness. The bench threads `rollDice` in through `options`; this only fixes `difficulty`.
+ */
+export const decideAt =
+  (difficulty: CantStopDifficulty): DecideFn =>
+  (view, playerId, options) =>
+    decide(view, playerId, { ...options, difficulty });
 
 interface Setup {
   readonly state: CantStopState;

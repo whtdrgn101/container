@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { bustProbability, pickPairing, scorePairing, shouldRoll, turnProgress } from '../policy';
+import { DIFFICULTIES, bustProbability, pickPairing, scorePairing, shouldRoll, turnProgress } from '../policy';
 import { makeState } from './helpers';
+
+const { easy: EASY, normal: NORMAL, hard: HARD } = DIFFICULTIES;
 
 describe('bustProbability', () => {
   it('is 0 at the start of a turn (any roll can place a marker)', () => {
@@ -75,5 +77,72 @@ describe('pickPairing', () => {
     const claim = scorePairing(state, [2]); // 2→3 tops column 2 (height 3)
     const ordinary = scorePairing(state, [7]);
     expect(claim).toBeGreaterThan(ordinary);
+  });
+});
+
+// The CS4 difficulty tiers — parameter sets over the *same* bust-probability EV machinery. The strength
+// *ordering* is proven by `difficulty.bench.test.ts`; these assert the mechanism each tier turns.
+describe('difficulty tiers', () => {
+  it('the default (no params) is byte-identical to the frozen NORMAL tier', () => {
+    // The whole point of the tiers: `normal` must not shift, or self-play and the baselines move.
+    const state = makeState({ runners: { 2: 3, 3: 5, 12: 2 } });
+    expect(shouldRoll(state)).toBe(shouldRoll(state, NORMAL));
+    expect(pickPairing(makeState({ phase: 'selecting', dice: [1, 1, 3, 4], runners: { 2: 2 } }))).toEqual(
+      pickPairing(makeState({ phase: 'selecting', dice: [1, 1, 3, 4], runners: { 2: 2 } }), NORMAL),
+    );
+    expect(scorePairing(state, [2])).toBe(scorePairing(state, [2], NORMAL));
+  });
+
+  it('easy banks the moment bust probability crosses its threshold (even where normal would too)', () => {
+    // p ≈ 0.87 here (two markers topped, only column 12 advanceable): easy stops on the threshold line.
+    const state = makeState({ runners: { 2: 3, 3: 5, 12: 1 } });
+    expect(bustProbability(state)).toBeGreaterThan(EASY.stopThreshold!);
+    expect(shouldRoll(state, EASY)).toBe(false);
+  });
+
+  it('easy still rolls below its threshold (falls through to the EV line)', () => {
+    // p ≈ 0.004: under the threshold, so easy decides on EV like normal — and rolls.
+    const state = makeState({ runners: { 2: 3, 3: 5 } });
+    expect(bustProbability(state)).toBeLessThan(EASY.stopThreshold!);
+    expect(shouldRoll(state, EASY)).toBe(true);
+  });
+
+  it('hard rolls on where normal stops when an opponent is one claim from winning (urgency 1)', () => {
+    // p ≈ 0.47, three steps at risk: normal banks, but Bob holding two columns makes hard race.
+    const state = makeState({
+      runners: { 2: 1, 3: 1, 11: 1 },
+      claimed: { 5: 'p2', 9: 'p2' },
+    });
+    expect(shouldRoll(state, NORMAL)).toBe(false);
+    expect(shouldRoll(state, HARD)).toBe(true);
+  });
+
+  it('hard races harder still when that opponent is also within reach of a third column (urgency 2)', () => {
+    // p ≈ 0.56: normal and urgency-1 both bank; only the level-2 boost (opponent near a third top) rolls.
+    const state = makeState({
+      runners: { 2: 1, 3: 1, 12: 1 },
+      claimed: { 5: 'p2', 9: 'p2' },
+      players: [
+        { id: 'p1', name: 'Ann', progress: {} },
+        { id: 'p2', name: 'Bob', progress: { 2: 1 } }, // column 2 (height 3) is two steps from its top
+      ],
+    });
+    expect(shouldRoll(state, NORMAL)).toBe(false);
+    expect(shouldRoll(state, HARD)).toBe(true);
+  });
+
+  it('hard prefers completing a column more sharply while racing (scaled claim bonus)', () => {
+    // The active seat itself holds two columns and a runner one below a third top — its live runner
+    // counts toward urgency, so hard values the claiming pairing above the same pairing at normal.
+    const state = makeState({
+      runners: { 2: 2 }, // column 2 (height 3): the pairing [2] tops it
+      claimed: { 5: 'p1', 9: 'p1' },
+    });
+    expect(scorePairing(state, [2], HARD)).toBeGreaterThan(scorePairing(state, [2], NORMAL));
+  });
+
+  it('no urgency when no seat is close (hard falls back to the plain EV rule)', () => {
+    const state = makeState({ runners: { 2: 1, 3: 1, 11: 1 } }); // nobody has any claims
+    expect(shouldRoll(state, HARD)).toBe(shouldRoll(state, NORMAL));
   });
 });

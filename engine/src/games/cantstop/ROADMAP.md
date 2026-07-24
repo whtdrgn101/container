@@ -92,6 +92,36 @@ game's board):
   baselines are per-OS `-darwin` and would just fail on Linux CI, as Container's already does; the
   robust overflow assertion covers the responsive requirement.)*
 
+## ✅ CS4 — AI difficulty tiers (shipped)
+
+The complaint was a one-note bot ("busts a lot, or wins by two rounds"). The fix scales on **probability
+levels** rather than swapping the model — three parameter sets (`DifficultyParams`) over the *same*
+exact-`bustProbability` EV machinery, selected by `decide`'s `options.difficulty` (default `'normal'`):
+
+- **normal** — the frozen pre-CS4 policy, **byte-identical**. Every no-tier call defaults to it, so
+  self-play and the strength baselines never shifted (a hard rule: don't retune normal to flatter hard).
+- **easy** — risk-shy: a `stopThreshold` (~0.28) banks the moment bust probability crosses it even when
+  EV says roll on, plus a lower `expectedAdvance`. It visibly banks early — the human-beatable "feel".
+- **hard** — the full EV rule **plus endgame urgency**: an `urgencyBoost` scales both the roll-on
+  incentive and the claim bonus once any seat is one claim from winning (and harder still when that seat
+  is within two steps of a third column), read from public state. Sweeps showed stop-calibration alone
+  can't beat normal (1.75 is near-optimal) — the racing *direction* is the only real lever.
+
+**Harness-proven ordering** — the calibrate-then-commit convention's first real use.
+`difficulty.bench.test.ts` runs the seat-rotated strength bench: a fast in-suite directional bound
+(normal > easy, hard > normal at a fixed, deterministic 40-game count) plus an env-gated
+`CANTSTOP_BENCH_GAMES` significance run. At 1200 games **normal beats easy 59.0%** (CI [0.562, 0.618])
+and **hard beats normal 53.0%** (CI [0.502, 0.558], lower bound clear of 50%). The hard edge is small
+but real and reproducible; a bigger urgency boost plateaus (direction matters, magnitude doesn't).
+
+**Difficulty is coordination state**, the `bots.ts` pattern: a `game_bots.difficulty` column (default
+`'normal'`, migrated in like `game_type`), the wire `bots` payload still `string[]`. The module
+*declares* its tiers (`GameModule.botDifficulties = ['easy','normal','hard']` — only Can't Stop does),
+exposed on `GET /games/catalog`, validated at `POST /games` and lobby join (`400 INVALID_DIFFICULTY` on
+a bad tier, a tier on a human seat, or any tier for a game that declares none), carried across rematch,
+and read back by `createBotDriver`. The UI shows a per-seat picker (hotseat) / add-bot picker (lobby)
+**only** where tiers exist. Other games are entirely untouched.
+
 ## Remaining to finish
 
 ### CS3 — Variants (optional)  · **S**

@@ -86,13 +86,17 @@ function claimsIfStopped(state: CantStopState): number {
  * race at all, which is what keeps them byte-identical to the pre-CS4 policy.
  */
 function endgameUrgency(state: CantStopState): number {
+  const active = state.players[state.activePlayerIndex]!.id;
   let level = 0;
   for (const player of state.players) {
     if (claimsBy(state, player.id) < WIN_COLUMNS - 1) continue;
     level = Math.max(level, 1);
     const nearThird = COLUMNS.some((col) => {
       if (state.claimed[col] !== undefined) return false;
-      const at = player.progress[col] ?? 0;
+      const banked = player.progress[col] ?? 0;
+      // The active seat's live runners count too: a marker near a would-be third column's top means
+      // "push to finish it this turn", not "bank two claims and stall a step short".
+      const at = player.id === active ? Math.max(banked, state.runners[col] ?? 0) : banked;
       return at > 0 && COLUMN_HEIGHTS[col]! - at <= 2;
     });
     if (nearThird) level = Math.max(level, 2);

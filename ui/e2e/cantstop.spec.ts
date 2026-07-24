@@ -67,6 +67,29 @@ test("a Can't Stop game with an AI seat plays the bot's turn automatically", asy
   await expect(page.getByTestId('cantstop-roll')).toBeEnabled();
 });
 
+test('choose an AI difficulty for a bot seat and play (CS4)', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('pick-game-cantstop').click();
+
+  // No bot seats yet → no difficulty picker anywhere.
+  await expect(page.getByTestId('bot-difficulty-1')).toHaveCount(0);
+
+  // Hand seat 2 to the AI: the tier picker appears (Can't Stop declares tiers). Choose Easy.
+  await page.getByTestId('toggle-bot-1').click();
+  const tier = page.getByTestId('bot-difficulty-1');
+  await expect(tier).toBeVisible();
+  await tier.selectOption('easy');
+
+  await page.getByTestId('start-game').click();
+  await expect(page.getByTestId('board')).toBeVisible();
+
+  // Play the human's turn; the easy bot then plays its whole turn server-side and hands back a roll.
+  await page.getByTestId('cantstop-roll').click();
+  await page.locator('[data-testid^="cantstop-select-"]').first().click();
+  await page.getByTestId('cantstop-stop').click();
+  await expect(page.getByTestId('cantstop-roll')).toBeEnabled();
+});
+
 test('rematch: finish a game and start a new one with the same players', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('pick-game-cantstop').click();

@@ -32,4 +32,15 @@ describe('decide', () => {
   it('throws once the game has ended', () => {
     expect(() => decide(viewOf(makeState({ status: 'ended', winnerIds: ['p1'] })), 'p1')).toThrow(BotError);
   });
+
+  it('routes the difficulty tier through to the risk model (easy banks where normal rolls on)', () => {
+    // p ≈ 0.34: above easy's stop threshold but still EV-positive for normal — so normal rolls and
+    // easy banks on the very same view. Proves `difficulty` reaches the policy.
+    const state = makeState({ runners: { 3: 1, 4: 1, 11: 1 } });
+    expect(decide(viewOf(state), 'p1', { rollDice: dice, difficulty: 'normal' })).toEqual({
+      type: 'ROLL',
+      dice: [1, 2, 3, 4],
+    });
+    expect(decide(viewOf(state), 'p1', { rollDice: dice, difficulty: 'easy' })).toEqual({ type: 'STOP' });
+  });
 });

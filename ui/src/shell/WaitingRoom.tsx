@@ -37,6 +37,11 @@ export interface WaitingRoomProps {
   readonly mySeats: number[];
   /** The game's colour palette (ordered ids), from its catalog entry. Empty ⇒ no picker. */
   readonly palette: readonly string[];
+  /** The game's AI difficulty tiers (CS4), from its catalog entry. Empty ⇒ no difficulty picker. */
+  readonly botDifficulties: readonly string[];
+  /** The difficulty a newly-added AI seat gets (CS4). */
+  readonly botDifficulty: string;
+  readonly onBotDifficultyChange: (difficulty: string) => void;
   /** Pick a colour for one of your claimed seats. */
   readonly onPickColor: (seat: number, color: string) => void;
   readonly seatName: string;
@@ -52,6 +57,9 @@ export function WaitingRoom({
   lobby,
   mySeats,
   palette,
+  botDifficulties,
+  botDifficulty,
+  onBotDifficultyChange,
   onPickColor,
   seatName,
   onSeatNameChange,
@@ -163,11 +171,31 @@ export function WaitingRoom({
           </div>
         )}
 
-        {/* Fill the rest of the table with AI rather than waiting for people to show up. */}
+        {/* Fill the rest of the table with AI rather than waiting for people to show up. The tier
+            picker shows only when the game declares tiers (CS4); otherwise the button is exactly as
+            before and every added bot plays the game's one behaviour. */}
         {hasEmptySeat && (
-          <Button variant="outline" className="w-full" data-testid="add-bot-seat" disabled={busy} onClick={onAddBot}>
-            🤖 Add an AI player
-          </Button>
+          <div className="flex gap-2">
+            {botDifficulties.length > 0 && (
+              <select
+                data-testid="add-bot-difficulty"
+                aria-label="AI difficulty for the next bot"
+                className="rounded-md border bg-background px-2 py-1 text-sm capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={botDifficulty}
+                disabled={busy}
+                onChange={(event) => onBotDifficultyChange(event.target.value)}
+              >
+                {botDifficulties.map((tier) => (
+                  <option key={tier} value={tier}>
+                    {tier}
+                  </option>
+                ))}
+              </select>
+            )}
+            <Button variant="outline" className="flex-1" data-testid="add-bot-seat" disabled={busy} onClick={onAddBot}>
+              🤖 Add an AI player
+            </Button>
+          </div>
         )}
 
         <Button className="w-full" data-testid="start-lobby" disabled={busy || hasEmptySeat} onClick={onStart}>

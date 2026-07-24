@@ -1,9 +1,13 @@
 import { decide } from '@game-hub/bot/cantstop';
+import type { CantStopDifficulty } from '@game-hub/bot/cantstop';
 import { applyAction, viewFor } from '@game-hub/engine/cantstop';
 import type { CantStopState } from '@game-hub/engine/cantstop';
 import { runBotLoop } from '../../botLoop';
 import type { BotRepository } from '../../bots';
 import { rollFourDice } from './dice';
+
+/** The tiers `decide` accepts. Anything else stored (a legacy/unknown value) falls back to 'normal'. */
+const TIERS: ReadonlySet<string> = new Set<CantStopDifficulty>(['easy', 'normal', 'hard']);
 
 /** Told that a bot changed the game, so the world can be brought up to date. Injected — no transport here. */
 export type BotChangeListener = (state: CantStopState) => void;
@@ -39,6 +43,13 @@ export class CantStopBotRunner {
 
   tick(gameId: string): void {
     const rollDice = () => rollFourDice(this.rng);
+    // Each seat's stored tier (CS4). Read once per tick, keyed by seat, and passed to `decide`; a game
+    // with no difficulties recorded (or an unknown legacy value) just plays 'normal'.
+    const difficulties = this.bots.difficultiesForGame(gameId);
+    const tierOf = (seatId: string): CantStopDifficulty => {
+      const stored = difficulties[seatId];
+      return stored !== undefined && TIERS.has(stored) ? (stored as CantStopDifficulty) : 'normal';
+    };
     runBotLoop<CantStopState>({
       gameId,
       maxSteps: MAX_STEPS,
@@ -46,7 +57,7 @@ export class CantStopBotRunner {
       get: (id) => this.repo.get(id),
       botSeats: (id) => this.bots.listForGame(id),
       step: (state, seatId) => {
-        const action = decide(viewFor(state, seatId), seatId, { rollDice });
+        const action = decide(viewFor(state, seatId), seatId, { rollDice, difficulty: tierOf(seatId) });
         const next = applyAction(state, seatId, action);
         this.repo.update(next);
         this.onChange(next);

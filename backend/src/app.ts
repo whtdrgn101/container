@@ -76,6 +76,8 @@ interface NewSeat {
   name: string;
   bot?: boolean;
   color?: string;
+  /** For a bot seat, the difficulty tier it plays by (CS4). Validated against the game's declared tiers. */
+  difficulty?: string;
 }
 
 interface CreateGameBody {
@@ -389,6 +391,45 @@ export function buildApp(options: AppOptions): FastifyInstance {
     return null;
   };
 
+  /**
+   * Reject a bot-difficulty pick a game doesn't allow (CS4). A tier may be set only on a **bot** seat,
+   * must be one the module declares in `botDifficulties`, and cannot appear at all for a game that
+   * declares none — all `400 INVALID_DIFFICULTY`. An unset tier is always fine (the seat stores the
+   * `'normal'` default), so a game with no difficulty concept is completely unaffected. Returns the
+   * sent reply to reject, or `null` to accept. `tiers` is the module's declared list (or `undefined`).
+   */
+  const rejectDifficulty = (
+    reply: FastifyReply,
+    tiers: readonly string[] | undefined,
+    difficulty: string | undefined,
+    isBot: boolean,
+  ): FastifyReply | null => {
+    if (difficulty === undefined) return null;
+    if (!isBot) {
+      return reply
+        .code(400)
+        .send({ error: { code: 'INVALID_DIFFICULTY', message: 'Only a bot seat can have a difficulty' } });
+    }
+    if (!tiers?.includes(difficulty)) {
+      return reply
+        .code(400)
+        .send({ error: { code: 'INVALID_DIFFICULTY', message: `"${difficulty}" is not a difficulty in this game` } });
+    }
+    return null;
+  };
+
+  /** The whole-list form of `rejectDifficulty` for `POST /games` (every seat's pick at once). */
+  const rejectDifficultyPicks = (
+    reply: FastifyReply,
+    tiers: readonly string[] | undefined,
+    seats: readonly NewSeat[],
+  ): FastifyReply | null => {
+    for (const seat of seats) {
+      if (rejectDifficulty(reply, tiers, seat.difficulty, seat.bot === true)) return reply;
+    }
+    return null;
+  };
+
   /** Deal a new game of one type and record which of its seats an AI holds and each seat's colour. */
   const startGame = (module: AnyGameModule, seats: readonly NewSeat[]): unknown => {
     const state = module.createGame({
@@ -404,9 +445,12 @@ export function buildApp(options: AppOptions): FastifyInstance {
 
     const { id: gameId, players } = module.summarize(state);
     // Seat i is always the i-th player (see createGame), so a seat's bot flag maps straight to an id.
-    // Recorded outside the game state — the engine never learns which seats are bots.
-    const botIds = players.filter((_, seat) => seats[seat]?.bot === true).map((player) => player.id);
-    if (botIds.length > 0) botSeats.setForGame(gameId, botIds);
+    // Recorded outside the game state — the engine never learns which seats are bots (nor their
+    // difficulty, CS4). A seat with no explicit tier stores 'normal' (BotRepository's default).
+    const botEntries = players
+      .map((player, seat) => ({ id: player.id, difficulty: seats[seat]?.difficulty }))
+      .filter((_, seat) => seats[seat]?.bot === true);
+    if (botEntries.length > 0) botSeats.setForGame(gameId, botEntries);
 
     // Assign colours: honour each seat's pick, fill the rest with the first free palette colour in
     // order (so a table with no picks reproduces today's seat-order tints — visual baselines hold).
@@ -579,6 +623,8 @@ export function buildApp(options: AppOptions): FastifyInstance {
                   // A player-colour pick (a palette id). Honoured if valid/unique, else defaulted.
                   color: { type: 'string' },
                   bot: { type: 'boolean' },
+                  // A bot seat's difficulty tier (CS4), validated against the game's declared tiers.
+                  difficulty: { type: 'string' },
                 },
               },
             },
@@ -605,6 +651,9 @@ export function buildApp(options: AppOptions): FastifyInstance {
         )
       )
         return reply;
+      // Validate each bot seat's difficulty against this game's declared tiers (CS4). A game with no
+      // tiers rejects any difficulty at all; an unset tier always passes.
+      if (rejectDifficultyPicks(reply, module.botDifficulties, request.body.players)) return reply;
       try {
         const started = startGame(module, request.body.players);
         const gameId = module.summarize(started).id;
@@ -695,12 +744,15 @@ export function buildApp(options: AppOptions): FastifyInstance {
       const threshold = humanSeats.length === 0 ? 0 : Math.min(2, humanSeats.length);
       let newGameId: string | null = null;
       if (agreed.length >= threshold) {
-        // Carry colours over too, the same way bot assignments carry: the rematch is the same table.
+        // Carry colours and bot difficulties over too, the same way bot assignments carry: the rematch
+        // is the same table (CS4).
         const oldColors = colorSeats.listForGame(request.params.id);
+        const oldDifficulties = botSeats.difficultiesForGame(request.params.id);
         const seats: NewSeat[] = summary.players.map((p) => ({
           name: p.name,
           bot: botIds.has(p.id),
           ...(oldColors[p.id] !== undefined ? { color: oldColors[p.id] } : {}),
+          ...(botIds.has(p.id) && oldDifficulties[p.id] !== undefined ? { difficulty: oldDifficulties[p.id] } : {}),
         }));
         newGameId = module.summarize(startGame(module, seats)).id;
       }
@@ -902,6 +954,9 @@ export function buildApp(options: AppOptions): FastifyInstance {
    */
   const paletteOf = (lobby: Lobby): readonly string[] => registry.get(lobby.gameType)?.colors ?? [];
 
+  /** The AI difficulty tiers a lobby's game offers (CS4), or `undefined` if it declares none. */
+  const difficultiesOf = (lobby: Lobby): readonly string[] | undefined => registry.get(lobby.gameType)?.botDifficulties;
+
   /**
    * Reject a colour pick that isn't in the palette (`INVALID_COLOR`, 400) or is already held by
    * another seat (`COLOR_TAKEN`, 409). `exceptSeat` is the seat doing the picking, so re-selecting your
@@ -976,7 +1031,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
     return reply.send({ lobby });
   });
 
-  app.post<{ Params: { id: string }; Body: { name: string; bot?: boolean; color?: string } }>(
+  app.post<{ Params: { id: string }; Body: { name: string; bot?: boolean; color?: string; difficulty?: string } }>(
     '/lobbies/:id/join',
     {
       schema: {
@@ -989,6 +1044,8 @@ export function buildApp(options: AppOptions): FastifyInstance {
             bot: { type: 'boolean' },
             // Optional colour pick, validated against this game's palette + the other seats' picks.
             color: { type: 'string' },
+            // Optional bot-difficulty tier (CS4), validated against this game's declared tiers.
+            difficulty: { type: 'string' },
           },
         },
       },
@@ -1005,10 +1062,14 @@ export function buildApp(options: AppOptions): FastifyInstance {
       }
       const color = request.body.color;
       if (color !== undefined && rejectColor(reply, paletteOf(lobby), color, lobby.members, seat)) return reply;
+      const isBot = request.body.bot === true;
+      const difficulty = request.body.difficulty;
+      if (rejectDifficulty(reply, difficultiesOf(lobby), difficulty, isBot)) return reply;
       const claimed: LobbyMember = {
         name: request.body.name.trim(),
-        bot: request.body.bot === true,
+        bot: isBot,
         ...(color !== undefined ? { color } : {}),
+        ...(difficulty !== undefined ? { difficulty } : {}),
       };
       const members = lobby.members.map((member, i) => (i === seat ? claimed : member));
       const updated: Lobby = { ...lobby, members };
@@ -1077,7 +1138,12 @@ export function buildApp(options: AppOptions): FastifyInstance {
       const members = lobby.members as LobbyMember[];
       const started = startGame(
         module,
-        members.map((member) => ({ name: member.name, bot: member.bot, color: member.color })),
+        members.map((member) => ({
+          name: member.name,
+          bot: member.bot,
+          color: member.color,
+          difficulty: member.difficulty,
+        })),
       );
       const gameId = module.summarize(started).id;
       lobbies.update({ ...lobby, status: 'started', gameId });

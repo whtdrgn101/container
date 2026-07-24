@@ -8,7 +8,7 @@
  */
 export { decide } from './decide';
 export { playSelfPlay } from './selfPlay';
-export { benchmark } from './bench';
+export { benchmark, decideAt } from './bench';
 export type { StrengthBenchOptions } from './bench';
 export { bustProbability, pickPairing, scorePairing, shouldRoll, turnProgress, DIFFICULTIES } from './policy';
 export type { CantStopDifficulty, DifficultyParams } from './policy';

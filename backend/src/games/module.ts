@@ -50,6 +50,17 @@ export interface GameModule<S, A> {
   readonly colors: readonly string[];
 
   /**
+   * The difficulty tiers this game offers its AI seats (CS4), an ordered list of tier ids (e.g. Can't
+   * Stop's `['easy','normal','hard']`). Absent ⇒ the game has one behaviour and no picker: a bot seat
+   * stores the `'normal'` default and its driver ignores difficulty entirely (Container, Stone Age).
+   *
+   * The platform validates a requested tier against this list (`POST /games`, `POST /lobbies/:id/join`)
+   * and publishes it on `GET /games/catalog` so the UI shows a picker **only** where tiers exist. The
+   * contract stays game-import-free: these are opaque ids the module declares, exactly like `colors`.
+   */
+  readonly botDifficulties?: readonly string[];
+
+  /**
    * Build a fresh game. **`rng` is injected, never reached for.** Every engine here is pure and
    * deterministic; the module must not call `Math.random` itself, or replay and reproducible tests
    * both die. (Container shuffles its scoring deck with this.)

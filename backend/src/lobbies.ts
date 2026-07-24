@@ -22,6 +22,8 @@ export interface LobbyMember {
   readonly bot: boolean;
   /** The player colour this seat picked (a palette id), or undefined until one is chosen. */
   readonly color?: string;
+  /** For a bot seat, the difficulty tier it plays by (CS4). Undefined ⇒ the game's default ('normal'). */
+  readonly difficulty?: string;
 }
 
 export interface Lobby {
@@ -52,6 +54,7 @@ const readMember = (raw: unknown): LobbyMember | null => {
     name: String(member.name ?? ''),
     bot: member.bot === true,
     ...(typeof member.color === 'string' ? { color: member.color } : {}),
+    ...(typeof member.difficulty === 'string' ? { difficulty: member.difficulty } : {}),
   };
 };
 

@@ -50,9 +50,12 @@ export interface LandingProps {
   readonly seatIsBot: boolean[];
   /** Each seat's chosen player colour (a palette id), or undefined to take the palette-order default. */
   readonly seatColors: (string | undefined)[];
+  /** Each bot seat's chosen AI difficulty tier, or undefined for the default ('normal'). CS4. */
+  readonly seatDifficulties: (string | undefined)[];
   readonly onNamesChange: (names: string[]) => void;
   readonly onSeatIsBotChange: (flags: boolean[]) => void;
   readonly onSeatColorsChange: (colors: (string | undefined)[]) => void;
+  readonly onSeatDifficultiesChange: (difficulties: (string | undefined)[]) => void;
   readonly onStartHotseat: () => void;
 
   readonly joinCode: string;
@@ -86,9 +89,11 @@ export function Landing({
   names,
   seatIsBot,
   seatColors,
+  seatDifficulties,
   onNamesChange,
   onSeatIsBotChange,
   onSeatColorsChange,
+  onSeatDifficultiesChange,
   onStartHotseat,
   joinCode,
   onJoinCodeChange,
@@ -102,6 +107,9 @@ export function Landing({
   // The selected game's player-colour palette (from its catalog entry), for the per-seat hotseat picker.
   // Empty until the catalog loads, or if a game declares none — the picker simply doesn't render then.
   const palette = selected?.colors ?? [];
+  // The selected game's AI difficulty tiers (CS4). Empty ⇒ the game has one behaviour and no bot-seat
+  // difficulty picker renders at all — an undeclared game shows exactly today's UI.
+  const botTiers = selected?.botDifficulties ?? [];
 
   // The display name for a game type (e.g. "stoneage" → "Stone Age"), from the catalog the server
   // returns. Falls back to the raw id if the catalog hasn't loaded or the game is unknown to this build.
@@ -475,6 +483,9 @@ export function Landing({
                         onNamesChange(names.filter((_, j) => j !== index));
                         onSeatIsBotChange(names.map((_, j) => seatIsBot[j] === true).filter((_, j) => j !== index));
                         onSeatColorsChange(names.map((_, j) => seatColors[j]).filter((_, j) => j !== index));
+                        onSeatDifficultiesChange(
+                          names.map((_, j) => seatDifficulties[j]).filter((_, j) => j !== index),
+                        );
                       }}
                     >
                       ✕
@@ -520,6 +531,34 @@ export function Landing({
                           />
                         );
                       })}
+                    </div>
+                  )}
+                  {/*
+                    AI difficulty picker — shown only for a seat handed to the bot, and only when the
+                    chosen game declares tiers (CS4). A game with no tiers renders nothing here, so its
+                    setup is exactly as before. Default 'normal'.
+                  */}
+                  {seatIsBot[index] && botTiers.length > 0 && (
+                    <div className="flex items-center gap-2 pl-16" data-testid={`bot-difficulty-row-${index}`}>
+                      <span className="text-xs text-muted-foreground">🤖 level</span>
+                      <select
+                        data-testid={`bot-difficulty-${index}`}
+                        aria-label={`Seat ${index + 1} AI difficulty`}
+                        className="rounded-md border bg-background px-2 py-1 text-xs capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        value={seatDifficulties[index] ?? 'normal'}
+                        disabled={busy}
+                        onChange={(event) =>
+                          onSeatDifficultiesChange(
+                            names.map((_, j) => (j === index ? event.target.value : seatDifficulties[j])),
+                          )
+                        }
+                      >
+                        {botTiers.map((tier) => (
+                          <option key={tier} value={tier}>
+                            {tier}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   )}
                 </div>
