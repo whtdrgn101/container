@@ -1,6 +1,6 @@
 import type { Action, CantStopView } from '@game-hub/engine/cantstop';
 import { BotError, assertBotTurn } from '../../kernel';
-import { pickPairing, shouldRoll } from './policy';
+import { DIFFICULTIES, pickPairing, shouldRoll } from './policy';
 import type { DecideOptions } from './types';
 
 /**
@@ -12,15 +12,20 @@ import type { DecideOptions } from './types';
  * - **rolling** → roll again or `STOP`, per the risk model. Rolling needs dice the bot can't invent, so
  *   it calls `options.rollDice` (the caller's injected randomness) and throws a `BotError` without it —
  *   the same contract Container's `decide` has for `collectBids`.
+ *
+ * `options.difficulty` (default `'normal'`, so every existing caller is unchanged) selects the
+ * parameter set the risk model runs under (CS4) — the tiers scale probability thresholds, never swap
+ * the model.
  */
 export function decide(view: CantStopView, playerId: string, options: DecideOptions = {}): Action {
   assertBotTurn(view, playerId);
+  const params = DIFFICULTIES[options.difficulty ?? 'normal'];
 
   if (view.phase === 'selecting') {
-    return { type: 'SELECT', columns: pickPairing(view) };
+    return { type: 'SELECT', columns: pickPairing(view, params) };
   }
 
-  if (shouldRoll(view)) {
+  if (shouldRoll(view, params)) {
     if (!options.rollDice) {
       throw new BotError(
         `Bot seat "${playerId}" chose to roll, but no rollDice was supplied. Dice are randomness the ` +
