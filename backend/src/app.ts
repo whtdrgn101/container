@@ -54,6 +54,13 @@ export interface AppOptions {
    */
   rateLimit?: { max: number; timeWindow: number | string };
   /**
+   * Per-IP concurrent live-stream socket cap (REVIEW §4.7). Defaults to `WS_MAX_CONNECTIONS_PER_IP`
+   * (32) — far above any honest client, but the e2e harness funnels a whole suite through one IP via
+   * the Vite proxy (whose documented ECONNRESET resets can orphan sockets), so it raises this via
+   * `WS_MAX_PER_IP` rather than flaking on a starved cap.
+   */
+  wsMaxConnectionsPerIp?: number;
+  /**
    * Extra origins the live-stream WebSocket accepts an upgrade from, beyond same-origin and
    * no-Origin clients (REVIEW §4.7). Each entry is a full origin (`https://play.lan`) or a bare host.
    * Populated from `ALLOWED_ORIGINS` in production; empty by default (same-origin only).
@@ -121,7 +128,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
   }
   const allowedOrigins = options.allowedOrigins ?? [];
   // Per-IP cap on concurrent live-stream sockets (§4.7); the hub's room map is otherwise unbounded.
-  const wsConnections = new WsConnectionLimiter();
+  const wsConnections = new WsConnectionLimiter(options.wsMaxConnectionsPerIp);
   const registry = options.registry ?? createDefaultRegistry();
   const repo = new GameRepository(options.db);
   const lobbies = new LobbyRepository(options.db);
@@ -503,7 +510,19 @@ export function buildApp(options: AppOptions): FastifyInstance {
           socket.close(1013, 'Too many concurrent connections'); // 1013 = Try Again Later
           return;
         }
-        socket.on('close', () => wsConnections.release(ip));
+        // Release on 'error' as well as 'close': a proxy reset (the Vite dev proxy's documented
+        // ECONNRESET under load) can error a socket without a clean close, and the deferred WS
+        // heartbeat means nothing else reaps it — an orphan would then count against the IP forever.
+        // `release` is idempotent per acquire only if called once, so guard against double-fire.
+        let released = false;
+        const releaseOnce = () => {
+          if (!released) {
+            released = true;
+            wsConnections.release(ip);
+          }
+        };
+        socket.on('close', releaseOnce);
+        socket.on('error', releaseOnce);
         const module = moduleOf(request.params.id);
         if (!module) {
           socket.close(1008, `No game with id "${request.params.id}"`);

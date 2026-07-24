@@ -40,6 +40,9 @@ export default defineConfig({
         // origin so the proxied live-stream WebSocket (browser Origin 5173, backend Host 3001) is not
         // refused as cross-origin. Both keep the hardening code paths exercised without crippling e2e.
         RATE_LIMIT_MAX: '1000000',
+        // The whole suite's sockets arrive from one IP through the Vite proxy, whose documented
+        // ECONNRESET resets can orphan server-side sockets — a fixed 32 cap starves later specs.
+        WS_MAX_PER_IP: '10000',
         ALLOWED_ORIGINS: BASE_URL,
       },
     },

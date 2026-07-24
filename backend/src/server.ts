@@ -17,6 +17,9 @@ const allowedOrigins = (process.env['ALLOWED_ORIGINS'] ?? '')
 // Per-IP rate-limit ceiling (§4.7), overridable so a deployment (or the e2e harness, which out-requests
 // any human from a single IP) can raise it. Defaults to the generous production cap.
 const rateLimitMax = Number(process.env['RATE_LIMIT_MAX'] ?? DEFAULT_RATE_LIMIT.max);
+// Per-IP WS connection cap (§4.7), overridable for the same reason — e2e's whole suite arrives from
+// one IP, and a proxy-reset orphan counting against a fixed 32 would starve later specs.
+const wsMaxPerIp = process.env['WS_MAX_PER_IP'] ? Number(process.env['WS_MAX_PER_IP']) : undefined;
 
 const db = createDatabase(databasePath);
 // Production opts into the generous per-IP rate limit (§4.7); the in-process test suites leave it off.
@@ -25,6 +28,7 @@ const app = buildApp({
   logger: true,
   rateLimit: { max: rateLimitMax, timeWindow: DEFAULT_RATE_LIMIT.timeWindow },
   allowedOrigins,
+  ...(wsMaxPerIp !== undefined ? { wsMaxConnectionsPerIp: wsMaxPerIp } : {}),
   ...(staticDir ? { staticDir } : {}),
 });
 
