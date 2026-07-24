@@ -95,3 +95,29 @@ test('acquire a locomotive and place it on a route (pg. 10–11)', async ({ page
   await expect(page.getByTestId('rr-pending-loco')).toBeHidden();
   await expect(page.getByTestId('rr-log')).toContainText('placed the #2 on Kyiv');
 });
+
+/**
+ * RR5 — industry: factories + the wrench. Pick the game, build a factory from the "loco or factory" space
+ * (flipping the lowest locomotive onto the first gap of the industry track), then industrialize to advance
+ * the wrench — the feed and the per-player industry track narrating both.
+ */
+test('build a factory and advance the wrench (pg. 12–14)', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('pick-game-russianrailroads').click();
+  await page.getByTestId('start-game').click();
+  await expect(page.getByTestId('board')).toBeVisible();
+
+  // The active seat chooses "Build factory" on the 1-worker loco/factory space → the factory-build prompt.
+  await expect(page.getByTestId('rr-space-loco-1')).toContainText('locomotive or factory');
+  await page.getByTestId('rr-build-factory-loco-1').click();
+  await expect(page.getByTestId('rr-pending-factory')).toBeVisible();
+
+  // Build it from the lowest locomotive (#2) → it fills the leftmost gap; the feed narrates it.
+  await page.getByTestId('rr-factory-place').click();
+  await expect(page.getByTestId('rr-pending-factory')).toBeHidden();
+  await expect(page.getByTestId('rr-log')).toContainText('built a #2 factory');
+
+  // The turn passed; the next seat industrializes with the 1-worker space → the wrench advances.
+  await page.getByTestId('rr-place-industry-1').click();
+  await expect(page.getByTestId('rr-log')).toContainText('advanced the wrench');
+});

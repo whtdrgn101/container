@@ -4,8 +4,10 @@ import type {
   Engineer,
   Industry,
   Locomotive,
+  PendingFactory,
   PendingLoco,
   PendingMoves,
+  PoolEntry,
   Route,
   RussianRailroadsResult,
   RussianRailroadsState,
@@ -35,7 +37,8 @@ export interface PlayerView {
   readonly locomotives: readonly Locomotive[];
   readonly industry: Industry;
   readonly hiredEngineers: readonly Engineer[];
-  readonly actionPool: readonly string[];
+  /** The per-turn action pool (pg. 13) — track-move credits from factories / industrialization; public. */
+  readonly actionPool: readonly PoolEntry[];
   /** The held end-bonus card when the viewer owns this seat (or the game has ended); `null` otherwise. */
   readonly endBonus: EndBonusCard | null;
   /** How many end-bonus cards this player holds — always visible (0 or 1 in the base game). */
@@ -65,6 +68,10 @@ export type RussianRailroadsView = {
   readonly pendingMoves: PendingMoves | null;
   /** The active player's pending locomotive placement/upgrade lock (pg. 10–11), or `null` — public. */
   readonly pendingLoco: PendingLoco | null;
+  /** The active player's pending factory placement lock (pg. 12–13), or `null` — public. */
+  readonly pendingFactory: PendingFactory | null;
+  /** What the active player owes after the current loco/factory build (pg. 12), or `null` — public. */
+  readonly pendingThen: 'loco' | 'factory' | null;
   readonly round: number;
   readonly rounds: number;
   readonly supplies: RussianRailroadsSupplies;

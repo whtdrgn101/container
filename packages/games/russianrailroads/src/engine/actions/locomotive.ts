@@ -1,10 +1,10 @@
 import { GameError, ROUTES } from '../core';
 import type { Locomotive, RouteId, RussianRailroadsState } from '../core';
 import {
+  afterBuild,
   anyEmptyLocoSlot,
   hasEmptyLocoSlot,
   locosOnRoute,
-  nextActiveSeat,
   record,
   returnFactory,
   seatOf,
@@ -26,9 +26,10 @@ function assertRoute(routeId: RouteId): void {
 }
 
 /**
- * `PLACE_LOCO` — put the held locomotive on a route with an empty slot (pg. 10), **ending** the chain. The
- * route must have capacity (`hasEmptyLocoSlot`; Trans-Siberian 2, others 1 — `ILLEGAL_LOCO_PLACEMENT` when
- * full). The lock clears and the turn passes to the next un-passed seat.
+ * `PLACE_LOCO` — put the held locomotive on a route with an empty slot (pg. 10), **ending** the loco chain.
+ * The route must have capacity (`hasEmptyLocoSlot`; Trans-Siberian 2, others 1 — `ILLEGAL_LOCO_PLACEMENT`
+ * when full). `afterBuild` then settles the turn — opening the owed factory step of a "loco **and** factory"
+ * placement (pg. 12) if one is pending, else passing the turn.
  */
 export function placeLoco(state: RussianRailroadsState, playerId: string, routeId: RouteId): RussianRailroadsState {
   const pending = state.pendingLoco!; // guaranteed set by applyAction's pending gate
@@ -46,7 +47,8 @@ export function placeLoco(state: RussianRailroadsState, playerId: string, routeI
     state,
     'PLACE_LOCO',
     playerId,
-    { players: withPlayer(state, seat, updated), pendingLoco: null, activePlayerIndex: nextActiveSeat(state)! },
+    // Placing a locomotive draws nothing, so `afterBuild` settles from the unchanged supply.
+    { players: withPlayer(state, seat, updated), ...afterBuild(state, seat, state.supplies.locomotives) },
     { route: routeId, number: pending.number },
   );
 }
@@ -117,15 +119,7 @@ export function flipLoco(state: RussianRailroadsState, playerId: string): Russia
     );
   }
 
-  return record(
-    state,
-    'FLIP_LOCO',
-    playerId,
-    {
-      supplies: { ...state.supplies, locomotives: returnFactory(state.supplies.locomotives) },
-      pendingLoco: null,
-      activePlayerIndex: nextActiveSeat(state)!,
-    },
-    { number: pending.number },
-  );
+  // The flipped locomotive returns to the supply as a factory of its own number (pg. 11, 13).
+  const supply = returnFactory(state.supplies.locomotives, pending.number);
+  return record(state, 'FLIP_LOCO', playerId, afterBuild(state, seat, supply), { number: pending.number });
 }

@@ -31,7 +31,7 @@ function withActiveLoco(
 
 /** Empty every #2–#9 stack, keeping the two #10 stacks — the pg. 10 "#10 opens once #9 is empty" case. */
 function tensOnlySupply(a: number, b: number) {
-  return { stacks: {}, tens: [a, b] as const, returnedFactories: 0 };
+  return { stacks: {}, tens: [a, b] as const, returnedFactories: {} };
 }
 
 describe('locomotive supply (pg. 4, 10, 12)', () => {
@@ -39,13 +39,13 @@ describe('locomotive supply (pg. 4, 10, 12)', () => {
     expect(initialLocoSupply(4)).toEqual({
       stacks: { 2: 4, 3: 4, 4: 4, 5: 4, 6: 4, 7: 4, 8: 4, 9: 4 },
       tens: [4, 4],
-      returnedFactories: 0,
+      returnedFactories: {},
     });
     expect(initialLocoSupply(2).stacks[2]).toBe(2);
   });
 
   it('takes the lowest-numbered available locomotive first (pg. 10, 12)', () => {
-    const supply = { stacks: { 2: 0, 3: 0, 4: 2, 5: 1 }, tens: [4, 4] as const, returnedFactories: 0 };
+    const supply = { stacks: { 2: 0, 3: 0, 4: 2, 5: 1 }, tens: [4, 4] as const, returnedFactories: {} };
     expect(lowestAvailableLoco(supply)).toBe(4);
     const drawn = takeLowestLoco(supply);
     expect(drawn.number).toBe(4);
@@ -54,7 +54,7 @@ describe('locomotive supply (pg. 4, 10, 12)', () => {
 
   it('opens BOTH #10 stacks only once every #2–#9 stack is empty (pg. 10)', () => {
     // While any lower stack has tiles, #10 is never the lowest available.
-    expect(lowestAvailableLoco({ stacks: { 9: 1 }, tens: [4, 4], returnedFactories: 0 })).toBe(9);
+    expect(lowestAvailableLoco({ stacks: { 9: 1 }, tens: [4, 4], returnedFactories: {} })).toBe(9);
     // Every #2–#9 empty ⇒ #10 is available (from the first non-empty #10 stack, then the second).
     let supply = tensOnlySupply(2, 3);
     expect(lowestAvailableLoco(supply)).toBe(10);
@@ -72,7 +72,7 @@ describe('locomotive supply (pg. 4, 10, 12)', () => {
   });
 
   it('returns a flipped locomotive to the supply as a factory (pg. 11)', () => {
-    expect(returnFactory(initialLocoSupply(4)).returnedFactories).toBe(1);
+    expect(returnFactory(initialLocoSupply(4), 3).returnedFactories).toEqual({ 3: 1 });
   });
 });
 
@@ -282,10 +282,10 @@ describe('upgrading — REPLACE_LOCO + the pg. 11 chain reaction (verbatim)', ()
     expect(state.pendingLoco).toEqual({ number: 1 });
     expect(legalActions(state, me)).toEqual([{ type: 'FLIP_LOCO' }]); // the only legal resolution
     // The #1 flips to a factory and returns to the supply (example 4).
-    const before = state.supplies.locomotives.returnedFactories;
     state = applyAction(state, me, { type: 'FLIP_LOCO' });
     expect(state.pendingLoco).toBeNull();
-    expect(state.supplies.locomotives.returnedFactories).toBe(before + 1);
+    // The flipped #1 returns to the supply as a #1 factory (keyed by number).
+    expect(state.supplies.locomotives.returnedFactories).toEqual({ 1: 1 });
     expect(state.activePlayerIndex).not.toBe(me); // the chain ended; the turn passes
     const locos = state.players.find((p) => p.id === me)!.locomotives;
     expect(locos).toContainEqual({ number: 4, route: 'stpetersburg' });

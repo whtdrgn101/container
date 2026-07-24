@@ -1,5 +1,6 @@
 import { VALUATION } from '../core';
 import type { Locomotive, Route, RouteId, RussianRailroadsPlayer } from '../core';
+import { industryScore } from './industry';
 
 /**
  * The scoring phase (pg. 20–21), run at the close of every round. Pure functions over a player's board —
@@ -47,12 +48,12 @@ export function scoreRoute(route: Route, reach: number, doublers = 0): number {
 }
 
 /**
- * Industry-track score (pg. 21: the points shown on the space the wrench is on, or the previous space if
- * it's a factory). **RR2 stub: 0** — the wrench starts on the 0-point space and there is no way to move it
- * yet (industrialization is RR5). Kept as a function so RR5 fills in the real track without a reshape.
+ * Industry-track score (pg. 21): the points shown on the space the wrench is on, or the previous numbered
+ * space if it's on a factory / numberless space. RR5 replaces the RR2 stub with the real track (the wrench
+ * starts on the 0-point START space, so a player who never industrialized still scores 0).
  */
-export function scoreIndustry(_player: RussianRailroadsPlayer): number {
-  return 0;
+export function scoreIndustry(player: RussianRailroadsPlayer): number {
+  return industryScore(player.industry);
 }
 
 /**

@@ -10,12 +10,16 @@ export type {
   Engineer,
   EngineerAction,
   EngineerStack,
+  FactoryAction,
   Industry,
+  IndustryEntry,
   Locomotive,
   LocomotiveSupply,
   MoveRecord,
+  PendingFactory,
   PendingLoco,
   PendingMoves,
+  PoolEntry,
   Route,
   RouteDef,
   RouteId,
@@ -42,6 +46,13 @@ export {
   DOUBLER_SUPPLY,
   END_BONUS_CARDS,
   ENGINEERS,
+  FACTORY_ACTIONS,
+  factoryAction,
+  GAP_LANE_INDICES,
+  INDUSTRY_END,
+  INDUSTRY_GAPS,
+  INDUSTRY_LANE,
+  industryPointsAt,
   LOCO_CAPACITY,
   LOCO_STACK_NUMBERS,
   LOCO_TEN,
@@ -66,6 +77,9 @@ export type { TrackStep } from './internal';
 // Locomotive helpers the client shares (per-route locos, the place/upgrade/flip resolutions) — DRY.
 export { locoResolutions, locosOnRoute } from './internal';
 export type { LocoResolution } from './internal';
+
+// Industry helpers the client shares (gap slots, wrench scoring) — DRY with the engine.
+export { allGapsFilled, availableReturnedFactories, firstUnfilledGap, industryScore } from './internal';
 
 // Setup
 export { createGame } from './createGame';

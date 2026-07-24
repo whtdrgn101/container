@@ -243,6 +243,58 @@ describe('Russian Railroads (Track D package)', () => {
     expect(await activeOf(game.id)).not.toBe(first);
   });
 
+  it('builds a factory, then moves the wrench onto it for a pool action (pg. 12–13)', async () => {
+    const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    const post = (playerId: string, action: unknown) =>
+      app.inject({ method: 'POST', url: `/games/${game.id}/actions`, payload: { playerId, action } });
+    const industryOf = async (playerId: string) => {
+      const g = (await app.inject({ method: 'GET', url: `/games/${game.id}?viewer=p1` })).json().game as {
+        players: { id: string; industry: { wrench: number; factories: (number | null)[] }; actionPool: unknown[] }[];
+      };
+      return g.players.find((p) => p.id === playerId)!;
+    };
+
+    const X = await activeOf(game.id); // the round-1 opener keeps the clock once the other passes
+    const Y = X === 'p1' ? 'p2' : 'p1';
+
+    // X builds a factory from the lowest locomotive (#2) into the first gap, ending its turn.
+    await post(X, { type: 'PLACE', space: 'loco-1', build: 'factory' });
+    const built = await post(X, { type: 'PLACE_FACTORY' });
+    expect(built.statusCode).toBe(200);
+    expect((await industryOf(X)).industry.factories[0]).toBe(2);
+
+    // Y passes → X now holds the turn for the rest of the round; advance the wrench to the 5-space (lane 4),
+    // just before the (now-filled) first gap. industry-3 grants a wood pool credit, which X forfeits.
+    await post(Y, { type: 'PASS' });
+    await post(X, { type: 'PLACE', space: 'industry-2' }); // wrench 0 → 2
+    await post(X, { type: 'PLACE', space: 'industry-1' }); // → 3
+    await post(X, { type: 'PLACE', space: 'industry-3' }); // → 4 (+ a wood credit)
+    await post(X, { type: 'SKIP_POOL' });
+    expect((await industryOf(X)).industry.wrench).toBe(4);
+    await post(X, { type: 'PASS' }); // close round 1 → round 2 opens with X again
+
+    // Round 2: advancing 1 moves the wrench ONTO the #2 factory → its move-a-track action enters the pool.
+    const onto = await post(X, { type: 'PLACE', space: 'industry-1' });
+    expect(onto.statusCode).toBe(200);
+    const afterOnto = onto.json().game as {
+      players: { id: string; industry: { wrench: number }; actionPool: { id: string }[] }[];
+      activePlayerIndex: number;
+    };
+    const xView = afterOnto.players.find((p) => p.id === X)!;
+    expect(xView.industry.wrench).toBe(5); // moved onto the factory
+    expect(xView.actionPool).toEqual([{ id: 'factory:2#0', count: 1, colors: ['wood', 'green', 'bronze', 'silver', 'gold'] }]);
+    expect(afterOnto.players[afterOnto.activePlayerIndex]!.id).toBe(X); // turn kept to resolve the pool
+
+    // A non-pool move is refused; resolving the credit opens the track lock, and a MOVE_TRACK spends it.
+    const refused = await post(X, { type: 'PASS' });
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json().error.code).toBe('POOL_PENDING');
+    const resolving = await post(X, { type: 'RESOLVE_POOL', id: 'factory:2#0' });
+    expect((resolving.json().game as { pendingMoves: unknown }).pendingMoves).toEqual({ remaining: 1, colors: ['wood'] });
+    const spent = await post(X, { type: 'MOVE_TRACK', route: 'transsiberian' });
+    expect((spent.json().game as { pendingMoves: unknown }).pendingMoves).toBeNull();
+  });
+
   it("maps a wrong-turn move to 409, and reports the module's error code", async () => {
     const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
     const active = await activeOf(game.id);

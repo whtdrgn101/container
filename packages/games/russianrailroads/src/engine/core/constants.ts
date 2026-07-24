@@ -124,7 +124,7 @@ export const routeColors = (routeId: RouteId): readonly TrackColor[] =>
   ROUTES.find((r) => r.id === routeId)?.colors ?? [];
 
 /** Which section of the board an action space belongs to (pg. 7). */
-export type ActionSpaceKind = 'coins' | 'track' | 'doubler' | 'temp-workers' | 'locomotive';
+export type ActionSpaceKind = 'coins' | 'track' | 'doubler' | 'temp-workers' | 'locomotive' | 'industry';
 
 /**
  * Locomotive supply (pg. 4, 10, 12). Locomotives are numbered **#2–#10** in the supply (the #1 every
@@ -200,6 +200,20 @@ export interface ActionSpaceDef {
   readonly coinCost?: number;
   /** Present iff this is a track-extension space (pg. 8–9): placing sets a pending-moves lock. */
   readonly track?: TrackExtension;
+  /**
+   * Present iff this is an **industrialization** space (pg. 14): placing advances the wrench `advance`
+   * spaces on the industry track, and — for the 3rd (bottom) space — also grants `woodMove` wood-track
+   * step(s) (a pool credit). The upper space is 1 worker → advance 1; the middle 2 workers → advance 2;
+   * the bottom 2 workers → advance 1 + move 1 wood track.
+   */
+  readonly industry?: { readonly advance: number; readonly woodMove?: number };
+  /**
+   * Present iff this is a **locomotive/factory** space (pg. 12): whether this space lets you take a factory
+   * (`'or'` = the upper/middle "loco **or** factory" spaces) and/or forces both (`'and'` = the 3-worker
+   * "loco **and** factory" space). Absent means locomotive-only (there are no such base spaces, but the
+   * field keeps the shape honest).
+   */
+  readonly loco?: 'or' | 'and';
   /**
    * Whether this space **never becomes occupied** — the bottom Track Extension space (pg. 9), the one
    * space any number of workers may use in a round. Every other space is occupied (blocked for the round)
@@ -282,14 +296,20 @@ export const ACTION_SPACES: readonly ActionSpaceDef[] = [
   },
   { id: 'doubler', label: 'Take a doubler', kind: 'doubler', workers: 1, neverOccupies: false },
   { id: 'temp-workers', label: 'Take 2 temporary workers', kind: 'temp-workers', workers: 1, neverOccupies: false },
-  // The two RR4 locomotive action spaces (pg. 12): 1 worker and 2 workers, each acquires the lowest-numbered
-  // locomotive and opens the placement/upgrade lock. **RR4 ruling (pg. 12–13):** the board's upper/middle
-  // spaces are "loco **or** factory"; RR4 ships the *locomotive* option only, and the third (3-worker) space
-  // — "1 locomotive **and** 1 factory" — and the factory option both wait for **RR5**, because building a
-  // factory means placing it on the *industry track* (the wrench / left-to-right gaps, pg. 13), which RR5
-  // owns. Same "add only spaces usable this slice" discipline RR2/RR3 used for the colour spaces.
-  { id: 'loco-1', label: 'Build locomotive', kind: 'locomotive', workers: 1, neverOccupies: false },
-  { id: 'loco-2', label: 'Build locomotive', kind: 'locomotive', workers: 2, neverOccupies: false },
+  // The three locomotive/factory action spaces (pg. 10, 12). RR5 completes them: the upper (1 worker) and
+  // middle (2 workers) spaces are "locomotive **or** factory" (`loco: 'or'`); the bottom (3 workers) is
+  // "locomotive **and** factory" (`loco: 'and'`, pg. 12 — "you may not choose 2 locos or 2 factories … you
+  // may choose whether to add the loco or the factory first"). RR4 shipped the first two as loco-only; the
+  // factory option and the 3-worker space land here now that the industry track (pg. 13) exists.
+  { id: 'loco-1', label: 'Build locomotive or factory', kind: 'locomotive', workers: 1, loco: 'or', neverOccupies: false },
+  { id: 'loco-2', label: 'Build locomotive or factory', kind: 'locomotive', workers: 2, loco: 'or', neverOccupies: false },
+  { id: 'loco-3', label: 'Build locomotive and factory', kind: 'locomotive', workers: 3, loco: 'and', neverOccupies: false },
+  // The three industrialization action spaces (pg. 14): move the wrench forward on the industry track. The
+  // upper is 1 worker → advance 1; the middle 2 workers → advance 2; the bottom 2 workers → advance 1 and
+  // move 1 wood track (a wood pool credit). Advance is capped by unfilled gaps (pg. 13).
+  { id: 'industry-1', label: 'Industrialize — advance 1', kind: 'industry', workers: 1, industry: { advance: 1 }, neverOccupies: false },
+  { id: 'industry-2', label: 'Industrialize — advance 2', kind: 'industry', workers: 2, industry: { advance: 2 }, neverOccupies: false },
+  { id: 'industry-3', label: 'Industrialize — advance 1 + wood track', kind: 'industry', workers: 2, industry: { advance: 1, woodMove: 1 }, neverOccupies: false },
 ];
 
 /** Look up an action-space definition by id, or `undefined` if none. */

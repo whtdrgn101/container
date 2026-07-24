@@ -1,6 +1,7 @@
 import {
   DOUBLER_SUPPLY,
   GameError,
+  INDUSTRY_GAPS,
   MAX_PLAYERS,
   MIN_PLAYERS,
   ROUNDS,
@@ -85,7 +86,8 @@ export function createGame(options: CreateGameOptions): RussianRailroadsState {
     // The #1 loco starts on the Trans-Siberian (pg. 6, step 3) — so only that route reaches space 1 for
     // scoring until more locos are bought (RR4).
     locomotives: [{ number: STARTING_LOCOMOTIVE, route: 'transsiberian' }],
-    industry: { wrench: 0 },
+    // The wrench starts on the START space (pg. 6, step 6); no gaps filled yet (pg. 12–13).
+    industry: { wrench: 0, factories: Array.from({ length: INDUSTRY_GAPS }, () => null) },
     hiredEngineers: [],
     actionPool: [],
     endBonus: null,
@@ -107,6 +109,8 @@ export function createGame(options: CreateGameOptions): RussianRailroadsState {
     activePlayerIndex: turnOrder[0]!,
     pendingMoves: null,
     pendingLoco: null,
+    pendingFactory: null,
+    pendingThen: null,
     round: 1,
     rounds: ROUNDS[count]!,
     // The shared doubler supply (pg. 14) + the locomotive/factory supply (pg. 4, 10–12: `count` per stack).

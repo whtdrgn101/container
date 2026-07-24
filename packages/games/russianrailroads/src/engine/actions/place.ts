@@ -1,6 +1,18 @@
 import { actionSpace, COINS_PER_ACTION, DOUBLER_SPACES, GameError, TEMP_WORKERS } from '../core';
-import type { RussianRailroadsState, SpacePlacement } from '../core';
-import { accessibleColors, legalSteps, nextActiveSeat, record, seatOf, takeLowestLoco, withPlayer } from '../internal';
+import type { PoolEntry, RussianRailroadsState, SpacePlacement } from '../core';
+import {
+  accessibleColors,
+  advanceWrench,
+  canBuildFactory,
+  canBuildLocoAndFactory,
+  legalSteps,
+  nextActiveSeat,
+  record,
+  seatOf,
+  takeLowestLoco,
+  triggerEffect,
+  withPlayer,
+} from '../internal';
 
 /**
  * Place workers (and/or coins) on an action space and resolve it (pg. 7, 9, 14). The turn/turn-order and
@@ -21,7 +33,14 @@ import { accessibleColors, legalSteps, nextActiveSeat, record, seatOf, takeLowes
  * the turn passes immediately ("as many as you are able to" — the Container Produce precedent). Never
  * mutates the input; throws a typed `GameError`.
  */
-export function place(state: RussianRailroadsState, playerId: string, space: string, coins = 0): RussianRailroadsState {
+export function place(
+  state: RussianRailroadsState,
+  playerId: string,
+  space: string,
+  coins = 0,
+  build: 'loco' | 'factory' = 'loco',
+  first: 'loco' | 'factory' = 'loco',
+): RussianRailroadsState {
   const def = actionSpace(space);
   if (!def) throw new GameError('UNKNOWN_SPACE', `No action space "${space}"`);
 
@@ -115,22 +134,98 @@ export function place(state: RussianRailroadsState, playerId: string, space: str
     );
   }
 
-  // A locomotive action space (pg. 10, 12): take the lowest-numbered locomotive from the supply and open the
-  // pending-loco lock, keeping the turn — the placer resolves it via PLACE_LOCO / REPLACE_LOCO / FLIP_LOCO.
-  // (`legalActions` only offers the space when the supply is non-empty, so a resolution always exists.)
+  // A locomotive/factory action space (pg. 10, 12). The upper/middle spaces (`loco: 'or'`) build a
+  // locomotive OR a factory (chosen by `build`); the bottom (`loco: 'and'`) builds both, in the order
+  // `first`. A locomotive is taken now and opens the pending-loco lock; a factory opens the pending-factory
+  // lock (its tile is chosen at resolution — pg. 12, so an upgrade first can feed the just-returned
+  // factory). `legalActions` only offers the option(s) the supply can satisfy, so a resolution always exists.
   if (def.kind === 'locomotive') {
+    const players = withPlayer(state, seat, paid);
+    // The 3-worker "loco AND factory" space (pg. 12): open the first build, owe the other via `pendingThen`.
+    if (def.loco === 'and') {
+      if (!canBuildLocoAndFactory(state.supplies.locomotives)) {
+        throw new GameError('FACTORY_UNAVAILABLE', 'Cannot build both a locomotive and a factory (pg. 12)');
+      }
+      if (first === 'factory') {
+        return record(
+          state,
+          'PLACE',
+          playerId,
+          { players, actionSpaces, pendingFactory: { owed: true }, pendingThen: 'loco' },
+          { space, label: def.label, first },
+        );
+      }
+      const { number, supply } = takeLowestLoco(state.supplies.locomotives);
+      return record(
+        state,
+        'PLACE',
+        playerId,
+        {
+          players,
+          actionSpaces,
+          supplies: { ...state.supplies, locomotives: supply },
+          pendingLoco: { number },
+          pendingThen: 'factory',
+        },
+        { space, label: def.label, first, acquired: number },
+      );
+    }
+    // The "loco OR factory" spaces (pg. 12): a factory owes a placement; a locomotive is taken now.
+    if (build === 'factory') {
+      if (!canBuildFactory(state.supplies.locomotives)) {
+        throw new GameError('FACTORY_UNAVAILABLE', 'No locomotive or returned factory to build (pg. 12)');
+      }
+      return record(
+        state,
+        'PLACE',
+        playerId,
+        { players, actionSpaces, pendingFactory: { owed: true } },
+        { space, label: def.label, build },
+      );
+    }
     const { number, supply } = takeLowestLoco(state.supplies.locomotives);
     return record(
       state,
       'PLACE',
       playerId,
-      {
-        players: withPlayer(state, seat, paid),
-        actionSpaces,
-        supplies: { ...state.supplies, locomotives: supply },
-        pendingLoco: { number },
-      },
+      { players, actionSpaces, supplies: { ...state.supplies, locomotives: supply }, pendingLoco: { number } },
       { space, label: def.label, acquired: number },
+    );
+  }
+
+  // An industrialization action space (pg. 13–14): advance the wrench, resolving each factory it moves onto.
+  // Coin factories auto-resolve (choiceless); track-move factories + the bottom space's wood bonus become
+  // pool credits, resolved this turn via RESOLVE_POOL (keeping the turn) or forfeited with SKIP_POOL.
+  if (def.industry) {
+    const { advance, woodMove } = def.industry;
+    const { wrench, triggered } = advanceWrench(paid.industry, advance);
+    let coinsGained = 0;
+    const pool: PoolEntry[] = [];
+    triggered.forEach((factoryNumber, i) => {
+      const eff = triggerEffect(factoryNumber);
+      coinsGained += eff.coins;
+      if (eff.move) pool.push({ id: `factory:${factoryNumber}#${i}`, count: eff.move.count, colors: eff.move.colors });
+    });
+    if (woodMove) pool.push({ id: `industry-wood#${pool.length}`, count: woodMove, colors: ['wood'] });
+
+    const updated = {
+      ...paid,
+      industry: { ...paid.industry, wrench },
+      coins: paid.coins + coinsGained,
+      actionPool: pool,
+    };
+    const players = withPlayer(state, seat, updated);
+    const payload = { space, label: def.label, advanced: wrench - paid.industry.wrench, wrench, coinsGained };
+    // Pool credits keep the turn (the placer resolves them); otherwise the turn passes now.
+    if (pool.length > 0) {
+      return record(state, 'PLACE', playerId, { players, actionSpaces }, { ...payload, pooled: pool.length });
+    }
+    return record(
+      state,
+      'PLACE',
+      playerId,
+      { players, actionSpaces, activePlayerIndex: nextActiveSeat(state)! },
+      payload,
     );
   }
 

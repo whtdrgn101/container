@@ -13,7 +13,8 @@ describe('legalActions', () => {
     const actions = legalActions(state);
     expect(actions.some((a) => a.type === 'PASS')).toBe(true);
     // At setup only wood is accessible, so the higher-colour spaces are omitted; the doubler,
-    // temporary-worker and (supply non-empty) locomotive spaces are open.
+    // temporary-worker, locomotive/factory and industrialization spaces are open (the wrench can advance
+    // off the START space, and the loco supply can satisfy loco-or-factory and loco-and-factory).
     expect(placedSpaces(actions)).toEqual(
       new Set([
         'coins',
@@ -25,6 +26,10 @@ describe('legalActions', () => {
         'temp-workers',
         'loco-1',
         'loco-2',
+        'loco-3',
+        'industry-1',
+        'industry-2',
+        'industry-3',
       ]),
     );
     // The coins space offers a worker and a coin variant.
@@ -59,9 +64,10 @@ describe('legalActions', () => {
           : p,
       ),
     };
-    // Track spaces all drop out; the coin, doubler, temp-worker and locomotive spaces remain.
+    // Track spaces all drop out; the coin, doubler, temp-worker, locomotive/factory and industrialization
+    // spaces remain (the wrench can still advance regardless of the routes being full).
     expect(placedSpaces(legalActions(maxed))).toEqual(
-      new Set(['coins', 'doubler', 'temp-workers', 'loco-1', 'loco-2']),
+      new Set(['coins', 'doubler', 'temp-workers', 'loco-1', 'loco-2', 'loco-3', 'industry-1', 'industry-2', 'industry-3']),
     );
   });
 

@@ -1,4 +1,4 @@
-import { ACTION_SPACES, legalActions, legalSteps, locoResolutions, locosOnRoute } from '../engine';
+import { ACTION_SPACES, GAP_LANE_INDICES, INDUSTRY_LANE, legalActions, legalSteps, locoResolutions, locosOnRoute } from '../engine';
 import type { Action, PlayerView, RouteId, RussianRailroadsState, RussianRailroadsView, TrackColor } from '../engine';
 import { Button } from '@/components/ui/button';
 import { ActivityFeed } from '@/components/ActivityFeed';
@@ -42,16 +42,27 @@ export default function RussianRailroadsBoard({
   const acting = canDrive && !ended && !!active;
   const pending = game.pendingMoves;
   const pendingLoco = game.pendingLoco;
+  const pendingFactory = game.pendingFactory;
+  const pool = active?.actionPool ?? [];
   const resolving = acting && !!pending; // holding a track-extension lock: resolve it before anything else
   const resolvingLoco = acting && !!pendingLoco; // holding a locomotive: place / upgrade / flip it
-  const placing = acting && !pending && !pendingLoco; // free to place a worker or pass
+  const resolvingFactory = acting && !!pendingFactory; // owing a factory placement (pg. 12)
+  const resolvingPool = acting && !pending && !pendingLoco && !pendingFactory && pool.length > 0; // pool credits
+  // Free to place a worker or pass only when nothing is owed.
+  const placing = acting && !pending && !pendingLoco && !pendingFactory && pool.length === 0;
 
   const run = (work: () => Promise<rrApi.RussianRailroadsPayload>) => guard(async () => onPayload(await work()));
-  const doPlace = (space: string, coins?: number) => {
+  const doPlace = (space: string, opts?: { coins?: number; build?: 'loco' | 'factory'; first?: 'loco' | 'factory' }) => {
     if (!placing || !active) return;
-    void run(() =>
-      rrApi.act(gameId, active.id, { type: 'PLACE', space, ...(coins ? { coins } : {}) }, viewer, game.version),
-    );
+    void run(() => rrApi.act(gameId, active.id, { type: 'PLACE', space, ...opts }, viewer, game.version));
+  };
+  const doFactory = (action: Action) => {
+    if (!resolvingFactory || !active) return;
+    void run(() => rrApi.act(gameId, active.id, action, viewer, game.version));
+  };
+  const doPool = (action: Action) => {
+    if (!resolvingPool || !active) return;
+    void run(() => rrApi.act(gameId, active.id, action, viewer, game.version));
   };
   const doMoveTrack = (route: RouteId, color?: TrackColor) => {
     if (!resolving || !active) return;
@@ -70,6 +81,10 @@ export default function RussianRailroadsBoard({
 
   // The legal place / upgrade / flip resolutions for the held locomotive (pg. 10–11), driving the panel.
   const locoOptions = resolvingLoco && active && pendingLoco ? locoResolutions(active, pendingLoco.number) : [];
+  // The legal factory / pool resolutions (pg. 12–13) — the engine's own enumeration drives each panel.
+  const factoryOptions =
+    resolvingFactory && active ? legalActions(game as unknown as RussianRailroadsState, active.id) : [];
+  const poolOptions = resolvingPool && active ? legalActions(game as unknown as RussianRailroadsState, active.id) : [];
 
   const nameOf = (id: string) => game.players.find((p) => p.id === id)?.name ?? id;
   const winnerNames = game.status === 'ended' ? game.winnerIds.map(nameOf) : [];
@@ -97,6 +112,11 @@ export default function RussianRailroadsBoard({
     new Set(legal.flatMap((a) => (a.type === 'PLACE' && (a.coins !== undefined) === withCoins ? [a.space] : [])));
   const workerSpaces = spaceIds(false);
   const coinSpaces = spaceIds(true);
+  // For locomotive/factory spaces (pg. 12): which build option / order is legal right now.
+  const legalBuild = (spaceId: string, build: 'loco' | 'factory') =>
+    legal.some((a) => a.type === 'PLACE' && a.space === spaceId && a.build === build);
+  const legalFirst = (spaceId: string, first: 'loco' | 'factory') =>
+    legal.some((a) => a.type === 'PLACE' && a.space === spaceId && a.first === first);
 
   return (
     <div data-testid="board" className="space-y-4">
@@ -181,6 +201,82 @@ export default function RussianRailroadsBoard({
         </div>
       ) : null}
 
+      {/* The factory lock prompt (pg. 12): build the owed factory into the leftmost gap, or — once all 5
+          gaps are filled — replace one. Each option is a legal factory source (lowest loco / a returned factory). */}
+      {resolvingFactory && pendingFactory ? (
+        <div
+          data-testid="rr-pending-factory"
+          className="rounded-lg border border-primary bg-primary/5 p-3 text-sm font-medium"
+        >
+          <div>Factory to build{game.pendingThen ? ` (then a ${game.pendingThen})` : ''} — choose a tile:</div>
+          <div className="mt-2 flex flex-wrap gap-2 font-normal">
+            {factoryOptions.map((opt) =>
+              opt.type === 'PLACE_FACTORY' ? (
+                <Button
+                  key={`place-${opt.from ?? 'low'}`}
+                  variant="outline"
+                  size="sm"
+                  data-testid={opt.from === undefined ? 'rr-factory-place' : `rr-factory-place-${opt.from}`}
+                  disabled={busy}
+                  onClick={() => doFactory(opt)}
+                >
+                  Build {opt.from === undefined ? 'lowest loco' : `#${opt.from}`}
+                </Button>
+              ) : opt.type === 'REPLACE_FACTORY' ? (
+                <Button
+                  key={`replace-${opt.slot}-${opt.from ?? 'low'}`}
+                  variant="outline"
+                  size="sm"
+                  data-testid={opt.from === undefined ? `rr-factory-replace-${opt.slot}` : `rr-factory-replace-${opt.slot}-${opt.from}`}
+                  disabled={busy}
+                  onClick={() => doFactory(opt)}
+                >
+                  Replace slot {opt.slot + 1} with {opt.from === undefined ? 'lowest loco' : `#${opt.from}`}
+                </Button>
+              ) : null,
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {/* The action-pool prompt (pg. 13): spend each factory / industrialization track-move credit, or skip
+          the rest (unused credits are lost). */}
+      {resolvingPool ? (
+        <div
+          data-testid="rr-pending-pool"
+          className="rounded-lg border border-primary bg-primary/5 p-3 text-sm font-medium"
+        >
+          <div>Factory actions available this turn — resolve or skip:</div>
+          <div className="mt-2 flex flex-wrap gap-2 font-normal">
+            {poolOptions.map((opt) =>
+              opt.type === 'RESOLVE_POOL' ? (
+                <Button
+                  key={opt.id}
+                  variant="outline"
+                  size="sm"
+                  data-testid={`rr-pool-resolve-${opt.id}`}
+                  disabled={busy}
+                  onClick={() => doPool(opt)}
+                >
+                  Move a track
+                </Button>
+              ) : opt.type === 'SKIP_POOL' ? (
+                <Button
+                  key="skip"
+                  variant="ghost"
+                  size="sm"
+                  data-testid="rr-pool-skip"
+                  disabled={busy}
+                  onClick={() => doPool(opt)}
+                >
+                  Skip remaining
+                </Button>
+              ) : null,
+            )}
+          </div>
+        </div>
+      ) : null}
+
       {/* Shared action spaces (pg. 7–9). Each shows its occupancy; the active driving seat may place on an
           unoccupied one (the bottom track space is never occupied — pg. 9). Locked out while resolving. */}
       <section aria-label="Action spaces">
@@ -221,28 +317,77 @@ export default function RussianRailroadsBoard({
                 ) : (
                   <div className="mt-1 text-xs text-muted-foreground">Empty</div>
                 )}
-                <div className="mt-2 flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    data-testid={`rr-place-${space.id}`}
-                    disabled={busy || !canWorkers}
-                    onClick={() => doPlace(space.id)}
-                  >
-                    {coinCost ? 'Place worker + coin' : 'Place worker'}
-                  </Button>
-                  {coinCost === 0 ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      data-testid={`rr-place-coin-${space.id}`}
-                      disabled={busy || !canCoins}
-                      title="Use a coin instead of a worker (pg. 14)"
-                      onClick={() => doPlace(space.id, space.workers)}
-                    >
-                      Use coin
-                    </Button>
-                  ) : null}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {space.kind === 'locomotive' ? (
+                    // "Loco or factory" / "loco and factory" spaces (pg. 12): pick what to build (or the order).
+                    space.loco === 'and' ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          data-testid={`rr-place-${space.id}`}
+                          disabled={busy || !legalFirst(space.id, 'loco')}
+                          onClick={() => doPlace(space.id, { first: 'loco' })}
+                        >
+                          Loco first
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          data-testid={`rr-build-factory-${space.id}`}
+                          disabled={busy || !legalFirst(space.id, 'factory')}
+                          onClick={() => doPlace(space.id, { first: 'factory' })}
+                        >
+                          Factory first
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          data-testid={`rr-place-${space.id}`}
+                          disabled={busy || !legalBuild(space.id, 'loco')}
+                          onClick={() => doPlace(space.id, { build: 'loco' })}
+                        >
+                          Build loco
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          data-testid={`rr-build-factory-${space.id}`}
+                          disabled={busy || !legalBuild(space.id, 'factory')}
+                          onClick={() => doPlace(space.id, { build: 'factory' })}
+                        >
+                          Build factory
+                        </Button>
+                      </>
+                    )
+                  ) : (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        data-testid={`rr-place-${space.id}`}
+                        disabled={busy || !canWorkers}
+                        onClick={() => doPlace(space.id)}
+                      >
+                        {coinCost ? 'Place worker + coin' : 'Place worker'}
+                      </Button>
+                      {coinCost === 0 ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          data-testid={`rr-place-coin-${space.id}`}
+                          disabled={busy || !canCoins}
+                          title="Use a coin instead of a worker (pg. 14)"
+                          onClick={() => doPlace(space.id, { coins: space.workers })}
+                        >
+                          Use coin
+                        </Button>
+                      ) : null}
+                    </>
+                  )}
                 </div>
               </div>
             );
@@ -433,6 +578,58 @@ function PlayerCard({
           );
         })}
       </ul>
+      <IndustryTrack player={player} />
+    </div>
+  );
+}
+
+/**
+ * A compact read-only render of a player's industry track (pg. 13): the lane of spaces (with printed
+ * points) and gaps, the factories filling them, and the wrench's position. `INDUSTRY_LANE` is the shared
+ * layout; the player's own state is the wrench index + the filled gaps.
+ */
+function IndustryTrack({ player }: { player: PlayerView }) {
+  const { wrench, factories } = player.industry;
+  return (
+    <div className="mt-2" data-testid={`rr-industry-${player.id}`}>
+      <div className="flex items-baseline gap-1 text-xs text-muted-foreground">
+        <span>Industry</span>
+        <span data-testid={`rr-wrench-${player.id}`} className="text-primary">
+          🔧 space {wrench}
+        </span>
+      </div>
+      <div className="mt-0.5 flex flex-wrap gap-0.5">
+        {INDUSTRY_LANE.map((entry, i) => {
+          const here = i === wrench;
+          const factory = entry.kind === 'gap' ? factories[GAP_LANE_INDICES.indexOf(i)] : null;
+          const filled = factory != null;
+          return (
+            <span
+              key={i}
+              title={
+                entry.kind === 'gap'
+                  ? filled
+                    ? `factory #${factory}`
+                    : 'gap — needs a factory'
+                  : entry.points != null
+                    ? `${entry.points} points`
+                    : 'idea space'
+              }
+              className={cn(
+                'inline-flex h-4 min-w-4 items-center justify-center rounded-sm border px-0.5 text-[9px] leading-none',
+                here && 'ring-1 ring-primary',
+                entry.kind === 'gap'
+                  ? filled
+                    ? 'border-primary bg-primary/20'
+                    : 'border-dashed bg-transparent text-muted-foreground'
+                  : 'bg-muted',
+              )}
+            >
+              {entry.kind === 'gap' ? (filled ? `#${factory}` : '·') : (entry.points ?? '💡')}
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 }

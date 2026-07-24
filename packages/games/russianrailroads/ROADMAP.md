@@ -302,11 +302,58 @@ vite/tsconfig/vitest edits), the RR2/RR3 pattern holding.
   and `legalActions` only offers it when none is. A held loco is **always** resolvable (place if a slot is
   open; else upgrade a lower loco; else — nothing lower, no slot — flip), so the chain never wedges.
 
-### RR5 — Industry: factories + the wrench
-The shared loco/factory pool flips (pg. 11–12), left-to-right gap filling + replacement rules,
-the 5-gap industry track, wrench movement + the three industrialization spaces (pg. 13–14),
-**factory indirect actions into the action pool** (pg. 13), industry scoring incl. the
-on-a-factory-score-previous rule (pg. 21).
+### RR5 — Industry: factories + the wrench ✅ *(shipped)*
+The digest's hardest coupling, landed. Shipped: the **industry track** as data (`INDUSTRY_LANE` — 16 lane
+entries, 5 gaps, START/END, read off the pg. 6 board art); **factory building** from the loco/factory action
+spaces ("loco **or** factory" on the 1-/2-worker spaces, "loco **and** factory" on the new 3-worker space,
+pg. 12) — flip the lowest locomotive (or a returned factory) violet and fill the **leftmost gap** left-to-right,
+**replace any** slot once all 5 are filled (the replaced factory returns to the supply); the **shared pool made
+real** — the `returnedFactories` count became a per-number multiset (a factory keeps its number, which decides
+its action); **wrench movement** + the three industrialization spaces (pg. 14: 1w→1, 2w→2, 2w→1+wood), with the
+**gap rule** (the wrench stops before an unfilled gap and can't skip it); **factory triggers into the action
+pool** — the wrench moving *onto* a factory grants its indirect action (coins auto-resolve; track-move credits
+enter `actionPool`, resolved via `RESOLVE_POOL` → the pending-moves lock, or forfeited with `SKIP_POOL` — the
+pg. 13 "lost if unused"); and **industry scoring** (pg. 21: the wrench-space points, or the previous numbered
+space on a factory/numberless space — the RR2 stub retired). Engine 100% (**149 tests**, +38 across new
+`industry`/`factory`/`pool` files); a backend REST test drives build-factory → wrench-onto-factory → pool
+action over the wire; `e2e/russianrailroads.spec.ts` gained a build-a-factory + advance-the-wrench test
+(desktop + mobile). Rulings below. **Track D findings: none new** — the whole slice landed inside the package
+(engine, module `parseAction`, client), touching **zero** host files, the RR2–4 pattern holding.
+
+**RR5 rulings (with evidence):**
+- **Industry-track layout — LANDED (pg. 6 board art @ 300 DPI, cross-checked pg. 13 diagram + pg. 21 example).**
+  The rulebook prose only *describes* the track; the point values + gap positions are a component read. In play
+  order: START(0) · **1 / 2 / 3 / 5** (the "first 4 spaces", pg. 13) · GAP1 · 10 · GAP2 · 15 · GAP3 · a
+  **numberless** space (the pg. 6 idea-token/light-bulb marker, RR6) · GAP4 · 20 · GAP5 · 25 · END(50). The
+  physical board is a hairpin (START tucked top, space 1 to its left, then a run along the bottom); logically it
+  is one ascending lane (`INDUSTRY_LANE`). **5 gaps** at lane indices 5/7/9/11/13; the end (50) sits past GAP5, so
+  it's reachable only once all five are filled (pg. 13). The pg. 21 example — wrench on a factory in the first
+  gap scores 5, "the previous space" — is asserted verbatim and pins the 5-space immediately before GAP1.
+- **Factory actions — RULING (the pg. 48 discovery).** The scope brief expected pg. 48 to tabulate the factory
+  actions; **it does not** — pg. 48 is the *engineer* reference (its tiles carry engineer portraits). Each
+  factory's action is a tiny icon in the **top-left of its locomotive tile** (pg. 11 "as a reminder"), and the
+  rulebook gives no prose table. Read off the pg. 10 loco-supply art @ 300 DPI, only #2/#3 (a track tile /
+  move-a-track pennant → **move a track**) and #6 (a gold coin → **gain a coin**) are confidently legible; #4
+  (a light-bulb = idea token) and #9 (a card = bonus/idea card) clearly reference future mechanics, and #1/#5/#7/#8/#10
+  are illegible. **Faithfulness ruling:** encode the confidently-read icons as real, RR5-resolvable actions
+  (`FACTORY_ACTIONS`) and mark the rest **inert** (granted to the pool but non-resolvable → lost, pg. 13) with a
+  per-number note — rather than invent firm rules from unreadable icons. This keeps the trigger/pool machinery
+  real and tested; reconcile against physical tiles in RR9 (art polish). The two-action #10s are inert for the
+  same reason (undocumented; unreachable in normal RR5 play anyway).
+- **Pool-resolution design — RULING (pg. 7, 13).** `actionPool` became a first-class list of typed track-move
+  **credits**. Choiceless effects (coins) **auto-resolve** when the wrench triggers a factory; choiceful ones
+  (which track/colour) **defer to the pool**, resolved with `RESOLVE_POOL` (which opens the ordinary
+  pending-moves lock — the binding "multi-step choices are engine locks" decision, so a factory move is spent one
+  `MOVE_TRACK` at a time and control returns to the pool when the lock clears) or `SKIP_POOL` (forfeit the rest,
+  pg. 13). The bottom industrialization space's wood bonus (pg. 14) is a wood-only pool credit, resolved the same
+  way. `applyAction` gains a fourth lock tier (pool ⇒ only `RESOLVE_POOL`/`SKIP_POOL`); the pool is only ever
+  non-empty for the seat mid-industrialization and clears before their turn passes.
+- **"Loco AND factory" ordering — LANDED (pg. 12).** The 3-worker space builds both, in the player's chosen
+  order (`first: 'loco' | 'factory'`), modelled with one `pendingThen` field: after the first build resolves, the
+  engine opens the *other* lock (keeping the turn). The factory **tile** is chosen at resolution (`PLACE_FACTORY`/
+  `REPLACE_FACTORY` with a `from`), not at placement, so the pg. 12 note — "first upgrade a locomotive, returning
+  a factory to the supply, and then place the just-returned factory" — works: an earlier flip's factory is
+  available to the later factory step.
 
 ### RR6 — Player-board specials + turn order
 (a) Route special spaces (pg. 18–19): wood-track prerequisites (persist across upgrades), keys, new

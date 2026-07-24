@@ -31,12 +31,35 @@ export interface Locomotive {
 }
 
 /**
- * A player's industry track (pg. 11–13). RR1 tracks only the wrench position (0 = start); the gap-filling
- * factories and scoring land RR5.
+ * A player's industry track (pg. 11–13). The wrench walks the shared `INDUSTRY_LANE`; the player's own
+ * state is the wrench's lane index plus which of the 5 gaps they have filled with factories.
  */
 export interface Industry {
-  /** The wrench's position on the industry track (pg. 13). 0 at setup. */
+  /** The wrench's position — a lane index into `INDUSTRY_LANE` (pg. 13). 0 (START) at setup. */
   readonly wrench: number;
+  /**
+   * The 5 gap slots (pg. 13), left→right, each holding a placed **factory's locomotive number** or `null`
+   * if unfilled. Filled left-to-right until all 5 are set; thereafter any slot may be replaced (pg. 12).
+   * `factories[k]` fills `GAP_LANE_INDICES[k]`; a filled gap is a landing space (a factory) the wrench may
+   * move onto (triggering that factory's action) or past. RR5 setup: all `null`.
+   */
+  readonly factories: readonly (number | null)[];
+}
+
+/**
+ * One entry in the per-turn **action pool** (pg. 7, 13): a deferred, choiceful **track-move credit** granted
+ * this turn (RR5: a factory the wrench moved onto, or the bottom industrialization space's wood-track bonus).
+ * Resolvable in any order, partially, and lost at turn end. `RESOLVE_POOL` pops one and opens the
+ * pending-moves lock for it (the binding "multi-step choices are engine locks" rule); `SKIP_POOL` forfeits
+ * the rest. Choiceless credits (coins) never enter the pool — they auto-resolve when triggered.
+ */
+export interface PoolEntry {
+  /** Stable id within the turn (e.g. `factory:2#0`), used by `RESOLVE_POOL` and the feed. */
+  readonly id: string;
+  /** How many single track-steps this credit is worth (pg. 13). */
+  readonly count: number;
+  /** The colours a step may build — a factory credit allows any accessible colour; the bottom space, wood. */
+  readonly colors: readonly TrackColor[];
 }
 
 /**
@@ -77,11 +100,12 @@ export interface RussianRailroadsPlayer {
   /** Engineers this player has hired (pg. 15–16). RR1: none — hiring lands RR7. */
   readonly hiredEngineers: readonly Engineer[];
   /**
-   * The per-turn **action pool** (pg. 7): actions that became available this turn (engineer actions,
-   * factory triggers), resolvable in any order, partially, and **never saved for the next turn**. A
-   * first-class field from RR1 because three later slices hang off it; empty until RR7 fills it.
+   * The per-turn **action pool** (pg. 7, 13): track-move credits that became available this turn (RR5:
+   * factory triggers + the bottom industrialization space; engineer actions join in RR7), resolvable in any
+   * order, partially, and **never saved for the next turn**. Only ever non-empty for the seat currently on
+   * the clock, and cleared before their turn passes; `resetPlayers` clears it at round end for safety.
    */
-  readonly actionPool: readonly string[];
+  readonly actionPool: readonly PoolEntry[];
   /**
    * This player's held end-bonus card (pg. 22), or `null`. **The game's one secret** — `viewFor` redacts
    * an opponent's to a count. Always `null` in RR1 (drawing end-bonus cards is RR8).
@@ -141,8 +165,14 @@ export interface LocomotiveSupply {
   readonly stacks: Readonly<Record<number, number>>;
   /** The two #10 stacks (pg. 4, 10), `[a, b]`. Both open only once every #2–#9 stack is empty. */
   readonly tens: readonly [number, number];
-  /** Locomotives flipped to their factory side and returned to the supply (pg. 11). RR5 consumes these. */
-  readonly returnedFactories: number;
+  /**
+   * Locomotives flipped to their factory side and returned to the supply (pg. 11), **keyed by number** —
+   * a factory keeps its number (which decides its indirect action, pg. 13), so RR5 must know *which*
+   * factories are available to build (pg. 12: "the lowest-numbered locomotive **or** any returned
+   * factory"), not just a count. `number → how many of that factory sit in the supply`; RR4 only ever
+   * incremented it, RR5 both adds (a flip) and draws (a factory build).
+   */
+  readonly returnedFactories: Readonly<Record<number, number>>;
 }
 
 /**
@@ -172,6 +202,20 @@ export interface RussianRailroadsSupplies {
 export interface PendingLoco {
   /** The printed number of the locomotive currently awaiting placement (pg. 10–11). */
   readonly number: number;
+}
+
+/**
+ * The pending **factory** placement lock (pg. 12–13; the THIRD engine-lock kind). Set when a
+ * locomotive/factory action space is used to build a *factory*: the active player owes one factory
+ * placement onto their industry track. It carries no number — the factory tile (the lowest-numbered
+ * locomotive **or** any returned factory) is chosen at resolution, so an upgrade earlier in a "loco **and**
+ * factory" turn can feed the just-returned factory to this step (pg. 12). Resolved by `PLACE_FACTORY`
+ * (fill the leftmost unfilled gap, left-to-right) or `REPLACE_FACTORY` (once all 5 gaps are filled, swap
+ * any one — the replaced factory returns to the supply, pg. 12). `null` when no factory is owed.
+ */
+export interface PendingFactory {
+  /** Marker field so the lock is a distinct object; the build has no pre-chosen number (see above). */
+  readonly owed: true;
 }
 
 /**
@@ -222,6 +266,19 @@ export type RussianRailroadsState = {
    * `FLIP_LOCO`). Mutually exclusive with `pendingMoves` — a turn holds at most one lock.
    */
   readonly pendingLoco: PendingLoco | null;
+  /**
+   * The active player's pending **factory** placement lock (pg. 12–13), or `null`. While set, `applyAction`
+   * refuses everything but `PLACE_FACTORY` / `REPLACE_FACTORY`. Set by building a factory from a loco/factory
+   * action space; exclusive with the other locks within a single build step.
+   */
+  readonly pendingFactory: PendingFactory | null;
+  /**
+   * For the 3-worker "locomotive **and** factory" space (pg. 12): what the active player still owes *after*
+   * the current loco/factory build resolves — `'factory'` (loco first, factory next) or `'loco'` (factory
+   * first, loco next), else `null`. When a loco or factory placement finishes, this decides whether to open
+   * the *other* lock (keeping the turn) or pass. The pg. 12 ordering choice lives entirely here.
+   */
+  readonly pendingThen: 'loco' | 'factory' | null;
   /** The current round (1-based). */
   readonly round: number;
   /** Total rounds this game (pg. 7, 22–23): 7 at 4 players, 6 at 2–3. */

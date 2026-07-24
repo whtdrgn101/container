@@ -30,6 +30,8 @@ export function describeMove(entry: RussianRailroadsView['log'][number], nameOf?
           doubler?: number;
           tempWorkers?: number;
           acquired?: number;
+          advanced?: number;
+          coinsGained?: number;
         }
       | undefined;
     if (!p?.label) return 'placed a worker';
@@ -37,8 +39,26 @@ export function describeMove(entry: RussianRailroadsView['log'][number], nameOf?
     if (p.doubler) return `placed a worker — took a doubler (×2 on space ${p.doubler})`;
     if (p.tempWorkers) return `placed a worker — took ${p.tempWorkers} temporary workers`;
     if (p.acquired) return `placed a worker — took the #${p.acquired} locomotive`;
+    if (p.advanced !== undefined) {
+      const coins = p.coinsGained ? ` (+${p.coinsGained} coins from a factory)` : '';
+      return `placed a worker — advanced the wrench ${p.advanced}${coins}`;
+    }
     if (p.moves === 0) return `placed a worker — ${p.label} (no move possible)`;
     return `placed a worker — ${p.label}`;
+  }
+  if (entry.type === 'PLACE_FACTORY') {
+    const p = entry.payload as { number?: number } | undefined;
+    return `built a #${p?.number ?? '?'} factory on the industry track`;
+  }
+  if (entry.type === 'REPLACE_FACTORY') {
+    const p = entry.payload as { number?: number; replaced?: number } | undefined;
+    return `replaced a #${p?.replaced ?? '?'} factory with a #${p?.number ?? '?'}`;
+  }
+  if (entry.type === 'RESOLVE_POOL') {
+    return 'used a factory action (move a track)';
+  }
+  if (entry.type === 'SKIP_POOL') {
+    return 'skipped the remaining factory actions';
   }
   if (entry.type === 'MOVE_TRACK') {
     const p = entry.payload as { route?: string; color?: string } | undefined;

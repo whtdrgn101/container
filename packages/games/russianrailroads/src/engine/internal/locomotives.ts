@@ -21,7 +21,7 @@ type LocoBoard = Pick<RussianRailroadsPlayer, 'routes' | 'locomotives'>;
 export function initialLocoSupply(count: number): LocomotiveSupply {
   const stacks: Record<number, number> = {};
   for (const n of LOCO_STACK_NUMBERS) stacks[n] = count;
-  return { stacks, tens: [count, count], returnedFactories: 0 };
+  return { stacks, tens: [count, count], returnedFactories: {} };
 }
 
 /**
@@ -57,9 +57,54 @@ export function takeLowestLoco(supply: LocomotiveSupply): {
   return { number, supply: { ...supply, stacks: { ...supply.stacks, [number]: supply.stacks[number]! - 1 } } };
 }
 
-/** Return a flipped locomotive to the supply as a factory (pg. 11): grows the returned-factory pool by one. */
-export function returnFactory(supply: LocomotiveSupply): LocomotiveSupply {
-  return { ...supply, returnedFactories: supply.returnedFactories + 1 };
+/**
+ * Return a flipped locomotive to the supply as a factory (pg. 11): grows the returned-factory pool for that
+ * **number** by one (a factory keeps its number — pg. 13 — so which number matters for RR5 builds).
+ */
+export function returnFactory(supply: LocomotiveSupply, number: number): LocomotiveSupply {
+  const returnedFactories = { ...supply.returnedFactories, [number]: (supply.returnedFactories[number] ?? 0) + 1 };
+  return { ...supply, returnedFactories };
+}
+
+/** The distinct returned-factory numbers currently in the supply (pg. 12 — the "or any returned factory" set). */
+export function availableReturnedFactories(supply: LocomotiveSupply): number[] {
+  return Object.keys(supply.returnedFactories)
+    .map(Number)
+    .filter((n) => supply.returnedFactories[n]! > 0) // key came from Object.keys, so the value is defined
+    .sort((a, b) => a - b);
+}
+
+/**
+ * Take one returned factory of `number` from the supply (pg. 12): decrements its pool. Throws
+ * `NO_SUCH_FACTORY` if none of that number are available (the caller/`legalActions` only offers real ones).
+ */
+export function takeReturnedFactory(supply: LocomotiveSupply, number: number): LocomotiveSupply {
+  if ((supply.returnedFactories[number] ?? 0) <= 0) {
+    throw new GameError('NO_SUCH_FACTORY', `No returned #${number} factory in the supply`);
+  }
+  return {
+    ...supply,
+    returnedFactories: { ...supply.returnedFactories, [number]: supply.returnedFactories[number]! - 1 },
+  };
+}
+
+/**
+ * Can a factory be built right now (pg. 12)? — either the lowest-numbered locomotive is available, or at
+ * least one returned factory sits in the supply. Gates the "or factory" option on a loco action space.
+ */
+export function canBuildFactory(supply: LocomotiveSupply): boolean {
+  return lowestAvailableLoco(supply) !== null || availableReturnedFactories(supply).length > 0;
+}
+
+/**
+ * Could a loco/factory action space that needs **both** a locomotive and a factory (the 3-worker space,
+ * pg. 12) be satisfied from this supply? The loco takes one lowest tile; the factory then needs another
+ * (a second lowest loco, or a returned factory). A conservative pre-check: the loco is available and,
+ * after taking it, a factory is still buildable.
+ */
+export function canBuildLocoAndFactory(supply: LocomotiveSupply): boolean {
+  if (lowestAvailableLoco(supply) === null) return false;
+  return canBuildFactory(takeLowestLoco(supply).supply);
 }
 
 /** The locomotives a player currently has on a given route (pg. 10). */

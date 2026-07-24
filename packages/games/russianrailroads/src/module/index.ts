@@ -20,6 +20,11 @@ function parseAction(raw: unknown): ParseResult<Action> {
     route?: unknown;
     color?: unknown;
     number?: unknown;
+    build?: unknown;
+    first?: unknown;
+    from?: unknown;
+    slot?: unknown;
+    id?: unknown;
   };
 
   if (action.type === 'PASS') {
@@ -28,6 +33,30 @@ function parseAction(raw: unknown): ParseResult<Action> {
 
   if (action.type === 'FLIP_LOCO') {
     return { ok: true, action: { type: 'FLIP_LOCO' } };
+  }
+
+  if (action.type === 'SKIP_POOL') {
+    return { ok: true, action: { type: 'SKIP_POOL' } };
+  }
+
+  if (action.type === 'RESOLVE_POOL') {
+    if (typeof action.id !== 'string') return { ok: false, message: 'RESOLVE_POOL.id must be a string' };
+    return { ok: true, action: { type: 'RESOLVE_POOL', id: action.id } };
+  }
+
+  if (action.type === 'PLACE_FACTORY' || action.type === 'REPLACE_FACTORY') {
+    // `from` (optional) names a returned factory to use; absent = the lowest locomotive (pg. 12).
+    if (action.from !== undefined && (typeof action.from !== 'number' || !Number.isInteger(action.from))) {
+      return { ok: false, message: `${action.type}.from must be an integer when present` };
+    }
+    const from = action.from as number | undefined;
+    if (action.type === 'REPLACE_FACTORY') {
+      if (typeof action.slot !== 'number' || !Number.isInteger(action.slot)) {
+        return { ok: false, message: 'REPLACE_FACTORY.slot must be an integer' };
+      }
+      return { ok: true, action: { type: 'REPLACE_FACTORY', slot: action.slot, ...(from !== undefined ? { from } : {}) } };
+    }
+    return { ok: true, action: { type: 'PLACE_FACTORY', ...(from !== undefined ? { from } : {}) } };
   }
 
   if (action.type === 'PLACE_LOCO') {
@@ -58,9 +87,23 @@ function parseAction(raw: unknown): ParseResult<Action> {
     ) {
       return { ok: false, message: 'PLACE.coins must be a non-negative integer when present' };
     }
+    // `build` (loco/factory) and `first` (loco/factory) drive the loco-space options (pg. 12); the engine
+    // ignores them on other spaces.
+    if (action.build !== undefined && action.build !== 'loco' && action.build !== 'factory') {
+      return { ok: false, message: "PLACE.build must be 'loco' or 'factory' when present" };
+    }
+    if (action.first !== undefined && action.first !== 'loco' && action.first !== 'factory') {
+      return { ok: false, message: "PLACE.first must be 'loco' or 'factory' when present" };
+    }
     return {
       ok: true,
-      action: { type: 'PLACE', space: action.space, ...(action.coins !== undefined ? { coins: action.coins } : {}) },
+      action: {
+        type: 'PLACE',
+        space: action.space,
+        ...(action.coins !== undefined ? { coins: action.coins } : {}),
+        ...(action.build !== undefined ? { build: action.build as 'loco' | 'factory' } : {}),
+        ...(action.first !== undefined ? { first: action.first as 'loco' | 'factory' } : {}),
+      },
     };
   }
 

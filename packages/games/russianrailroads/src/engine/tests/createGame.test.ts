@@ -31,7 +31,8 @@ describe('createGame', () => {
       expect(route.spaces.slice(1).every((s) => s === null)).toBe(true);
     }
     expect(p.locomotives).toEqual([{ number: 1, route: 'transsiberian' }]);
-    expect(p.industry).toEqual({ wrench: 0 });
+    // Wrench at START, all 5 gaps empty (pg. 12–13).
+    expect(p.industry).toEqual({ wrench: 0, factories: [null, null, null, null, null] });
     expect(p.endBonus).toBeNull();
     expect(p.hiredEngineers).toEqual([]);
     expect(p.actionPool).toEqual([]);
@@ -85,17 +86,19 @@ describe('createGame', () => {
       locomotives: {
         stacks: { 2: 4, 3: 4, 4: 4, 5: 4, 6: 4, 7: 4, 8: 4, 9: 4 },
         tens: [4, 4],
-        returnedFactories: 0,
+        returnedFactories: {},
       },
     });
     expect(state.pendingMoves).toBeNull();
     expect(state.pendingLoco).toBeNull();
+    expect(state.pendingFactory).toBeNull();
+    expect(state.pendingThen).toBeNull();
   });
 
   it.each([2, 3, 4])('sizes each locomotive stack to the player count (%i players, pg. 12)', (count) => {
     const supply = newGame(count).supplies.locomotives;
     for (const n of [2, 3, 4, 5, 6, 7, 8, 9]) expect(supply.stacks[n]).toBe(count);
     expect(supply.tens).toEqual([count, count]);
-    expect(supply.returnedFactories).toBe(0);
+    expect(supply.returnedFactories).toEqual({});
   });
 });

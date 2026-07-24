@@ -44,7 +44,9 @@ export function slideEngineerStrip(strip: readonly (Engineer | null)[]): (Engine
  * roster.
  */
 function resetPlayers(players: readonly RussianRailroadsPlayer[]): RussianRailroadsPlayer[] {
-  return players.map((p) => ({ ...p, workersAvailable: p.workersTotal, tempWorkers: 0, passed: false }));
+  // `actionPool` is cleared too (pg. 7, 13: pool credits are lost at turn end) — it is only ever non-empty
+  // for the seat mid-industrialization, so this is a safety net, not the normal clearing path.
+  return players.map((p) => ({ ...p, workersAvailable: p.workersTotal, tempWorkers: 0, passed: false, actionPool: [] }));
 }
 
 /** What `closeRound` hands back: the state changes to fold into one `record()`, plus the scoring breakdown. */
@@ -86,6 +88,8 @@ export function closeRound(state: RussianRailroadsState): RoundClose {
         engineerStrip,
         pendingMoves: null,
         pendingLoco: null,
+        pendingFactory: null,
+        pendingThen: null,
         status: 'ended',
         results,
         winnerIds,
@@ -101,6 +105,8 @@ export function closeRound(state: RussianRailroadsState): RoundClose {
       engineerStrip,
       pendingMoves: null,
       pendingLoco: null,
+      pendingFactory: null,
+      pendingThen: null,
       round: state.round + 1,
       activePlayerIndex: state.turnOrder[0]!,
     },
