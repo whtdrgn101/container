@@ -1,82 +1,19 @@
-import type { ComponentType, LazyExoticComponent } from 'react';
+import type { BoardProps as KernelBoardProps, GameClient as KernelGameClient } from '@game-hub/kernel/client';
 import type { GameMessage, GamePayload } from '@/lib/api';
 
 /**
- * The `GameClient` seam (roadmap C2) — the UI's mirror of the backend's `GameModule`.
+ * The `GameClient` seam (roadmap C2) — the UI's binding of the shared kernel contract.
  *
- * The shell is a games room: it owns the landing screen, the lobby, navigation, and the transport
- * (one REST client, one WebSocket per game). It knows nothing about any game's rules or shape. A game
- * plugs in a **board** and the shell renders it.
+ * As of Track D / D0 the *interfaces* live in `@game-hub/kernel/client`, so an out-of-repo game
+ * package's UI can build against them. This file pins the kernel contract's generic transport
+ * parameters to *this* shell's concrete DTOs (`GamePayload<S>`, `GameMessage`), which keeps every
+ * board's `BoardProps<S>` and the registry's `GameClient<S>` reading exactly as they did before D0 —
+ * one type argument, fully concrete. The seam rules are unchanged; see the kernel's doc comments.
  *
- * **This file must never import a game.** It is the contract; `games/container/` is one
- * implementation and `registry.ts` is the lookup — same rule as `backend/src/games/module.ts`.
+ * **This file must never import a game** — it is the contract binding; `games/<game>/` is one
+ * implementation and `registry.ts` is the lookup.
  */
-export interface GameClient<S = unknown> {
-  /** Matches the backend module's id and the row's `game_type`. */
-  readonly id: string;
-  /** Human-readable name, for the picker and the page heading. */
-  readonly name: string;
-  /**
-   * A one-line description shown on the landing when this game is selected — what it is, in a sentence.
-   * Presentation content, so it lives here on the UI plugin (not the server catalog). Cheap and
-   * **non-lazy**: the landing shows it without loading the board chunk.
-   */
-  readonly blurb: string;
-  /** A few short "how to play" bullets, shown in a collapsible on the landing. Optional. */
-  readonly rules?: readonly string[];
-  /**
-   * The board. **Lazy on purpose**: a games room shouldn't ship every game's board to someone who
-   * opened the home screen, and Container's board pulls in the whole engine.
-   */
-  readonly Board: LazyExoticComponent<ComponentType<BoardProps<S>>>;
-  /**
-   * The game's status line for the shell header ("Turn 3 · Ann · 2 actions left").
-   *
-   * A slot rather than something the header derives, because only a game knows what its own status
-   * says — actions-remaining is a Container rule, not a platform concept. Keep it cheap and
-   * **non-lazy**: it renders the instant you enter a game, before the board chunk lands.
-   */
-  readonly Status?: ComponentType<{ game: S }>;
-}
+export type GameClient<S = unknown> = KernelGameClient<S, GamePayload<S>, GameMessage>;
 
-/**
- * What the shell hands a board.
- *
- * Generic in `S` so a board is **fully typed against its own engine** — Container's board is a
- * `ComponentType<BoardProps<GameView>>` and never sees an `unknown`. The registry erases `S` to store
- * mixed games together (the same method-bivariance bargain the backend's `AnyGameModule` makes), but
- * the erasure stops at the seam. **Don't widen a board's props to `unknown` to make it fit.**
- */
-export interface BoardProps<S> {
-  readonly gameId: string;
-  /** The current state, projected for this client's seats. */
-  readonly game: S;
-  /** Seats an AI holds. Coordination state — beside the game, never inside it. */
-  readonly bots: readonly string[];
-  /**
-   * Each seat's chosen player colour (playerId → palette id). Coordination state beside the game like
-   * `bots`; a board maps the id to its own tint system, falling back to seat index when one is missing.
-   */
-  readonly colors: Readonly<Record<string, string>>;
-  /**
-   * The seats this client may drive, or `null` for hotseat (drives them all). The shell owns seat
-   * binding because it's a platform concern; the board consumes it to gate its own affordances.
-   */
-  readonly controlledIds: string[] | null;
-  /** `?viewer=` for this client's seats — pass to any call that returns a projected state. */
-  readonly viewer: string | undefined;
-  /** True while the shell has a request in flight; disable affordances rather than double-submit. */
-  readonly busy: boolean;
-  /** Run work with the shell's busy/error handling. Errors surface in the shell's banner. */
-  readonly guard: (work: () => Promise<void>) => Promise<void>;
-  /** Push a new payload up to the shell after an action (version-guarded there). */
-  readonly onPayload: (payload: GamePayload<S>) => void;
-  /** Leave this game and go back to the hub. The game keeps running server-side. */
-  readonly onLeave: () => void;
-  /**
-   * Side-channel pushes from the game's socket — everything that isn't `type: 'state'`. The shell
-   * owns the socket and forwards these verbatim without interpreting them (Container reads
-   * `type: 'auction'`). `null` until one arrives.
-   */
-  readonly lastMessage: GameMessage | null;
-}
+/** What the shell hands a board — the kernel contract with this shell's transport DTOs bound in. */
+export type BoardProps<S> = KernelBoardProps<S, GamePayload<S>, GameMessage>;

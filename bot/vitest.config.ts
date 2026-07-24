@@ -4,8 +4,9 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     // `@game-hub/engine` ships TypeScript source, so Vitest must transform it across the
-    // workspace boundary (same arrangement as the backend).
-    server: { deps: { inline: [/@game-hub\/engine/] } },
+    // workspace boundary (same arrangement as the backend). The engine re-exports `@game-hub/kernel`
+    // (also TS source), so that must be transformed too.
+    server: { deps: { inline: [/@game-hub\/(engine|kernel)/] } },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

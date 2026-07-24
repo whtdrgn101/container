@@ -7,7 +7,7 @@ export default defineConfig({
     // tell Vitest to transform it rather than treat it as an external dep.
     server: {
       deps: {
-        inline: [/@game-hub\/(engine|bot)/],
+        inline: [/@game-hub\/(engine|bot|kernel)/],
       },
     },
     coverage: {

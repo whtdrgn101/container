@@ -27,3 +27,7 @@ export const stPetersburgClient: GameClient<StPetersburgView> = {
   Board: lazy(() => import('./Board')),
   Status: StPetersburgStatus,
 };
+
+// The package-contract entry point (Track D / D0): the generated registry imports each game's client
+// as a default. Still tiny/non-lazy — the default is the same light object, board import unchanged.
+export default stPetersburgClient;

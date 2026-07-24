@@ -50,6 +50,12 @@ jobs:
 
       - run: pnpm format:check # Prettier — style is enforced here, not in ESLint
 
+      # The generated registries (backend/src/games/index.generated.ts, ui/src/games/registry.generated.ts)
+      # are committed. Regenerate from games.config.ts and fail if anything drifted — the committed files
+      # must always match the config (same discipline as format:check).
+      - run: pnpm generate
+      - run: git diff --exit-code -- backend/src/games/index.generated.ts ui/src/games/registry.generated.ts
+
       - run: pnpm test # engine + bot + backend; `ui` has no unit `test` script so it's skipped
 
   e2e:

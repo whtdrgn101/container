@@ -8,6 +8,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // Consume the kernel as source so Vite transpiles it (shared primitives + contracts). The
+      // `/client` subpath (the React-dependent GameClient/BoardProps contract) must come before the
+      // bare entry so the more specific alias wins.
+      '@game-hub/kernel/client': fileURLToPath(new URL('../packages/kernel/src/contracts/client.ts', import.meta.url)),
+      '@game-hub/kernel': fileURLToPath(new URL('../packages/kernel/src/index.ts', import.meta.url)),
       // Consume the engine as source so Vite transpiles it (shared types + logic). One alias per
       // subpath — the engine is a per-game platform now, with no bare `@game-hub/engine` entry.
       '@game-hub/engine/kernel': fileURLToPath(new URL('../engine/src/kernel/index.ts', import.meta.url)),

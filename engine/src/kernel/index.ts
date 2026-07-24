@@ -1,14 +1,18 @@
-// The engine kernel: the small set of primitives every game shares. Deliberately tiny — this is not
-// a game framework. Game *rules* and *state shapes* stay inside each game folder; only what turned out
-// genuinely cross-game lives here: the error type, the move-record/viewer shapes, the end-state
-// discriminated union (REVIEW.md §3.1), and — once a third game proved them identical (REVIEW.md §3.2)
-// — the `record()` version/log mechanism and the seat helpers. Extract on the third example, not the
-// first; resist the coincidental (see `viewFor`).
-export { GameError } from './errors';
-export type { MoveRecord } from './moveRecord';
-export type { Viewer } from './viewer';
-export { record } from './record';
-export type { VersionedState } from './record';
-export { makeSeating } from './seating';
-export type { SeatedState, SeatHelpers } from './seating';
-export type { GameEndState, WinnersEndState } from './endState';
+// Compat shim (Track D / D0): the engine kernel now lives in its own workspace package,
+// `@game-hub/kernel`. Engine games still import their primitives from `'../../kernel'` (this file) and
+// external consumers still import them from `'@game-hub/engine/kernel'` — both resolve here, and this
+// re-export keeps that surface byte-identical to when the primitives lived under `engine/src/kernel/`.
+//
+// Only the framework-free primitives are surfaced here (exactly the old set); the kernel's host
+// contracts (`GameModule`/`GameClient`) are for the backend and UI, which import `@game-hub/kernel`
+// directly. See CLAUDE.md "How the shared engine is consumed".
+export { GameError, record, makeSeating } from '@game-hub/kernel';
+export type {
+  MoveRecord,
+  Viewer,
+  VersionedState,
+  SeatedState,
+  SeatHelpers,
+  GameEndState,
+  WinnersEndState,
+} from '@game-hub/kernel';

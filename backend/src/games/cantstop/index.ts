@@ -66,3 +66,7 @@ export const cantStopModule: GameModule<CantStopState, Action> = {
       (state) => ctx.pushGame(state.id, state),
     ),
 };
+
+// The package-contract entry point (Track D / D0): the generated registry imports each game's module
+// as a default. Keeps the named export for the callers that reference `cantStopModule` directly.
+export default cantStopModule;

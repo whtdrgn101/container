@@ -1,5 +1,18 @@
 @import 'tailwindcss';
 
+/*
+ * Track D / D0: teach Tailwind to scan game packages for utility classes.
+ *
+ * Tailwind v4 auto-detects content by walking up from this stylesheet, but that heuristic skips
+ * `node_modules` and won't cover a game that lives in its own package (the D1+ plan: a board ships from
+ * `packages/games/<game>/` — or, once installed, `node_modules/@game-hub/game-<game>/`). Without an
+ * explicit source, such a board's classes would be silently pruned from the build. `@source` paths are
+ * resolved relative to this file (`ui/src/`), so `../../packages` reaches the workspace `packages/`
+ * dir. Today that holds only `@game-hub/kernel` (no markup, so nothing to scan) — the directive is
+ * here so the first packaged game's styles work with zero UI changes.
+ */
+@source '../../packages';
+
 @custom-variant dark (&:is(.dark *));
 
 :root {

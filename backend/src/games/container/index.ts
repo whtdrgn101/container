@@ -78,3 +78,7 @@ export const containerModule: GameModule<GameState, Action> = {
       (state) => ctx.pushGame(state.id, state),
     ),
 };
+
+// The package-contract entry point (Track D / D0): the generated registry imports each game's module
+// as a default. Keeps the named export for the many callers that reference `containerModule` directly.
+export default containerModule;

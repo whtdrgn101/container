@@ -29,6 +29,9 @@ importers:
       prettier:
         specifier: ^3.9.6
         version: 3.9.6
+      tsx:
+        specifier: ^4.19.0
+        version: 4.23.1
       typescript-eslint:
         specifier: ^8.65.0
         version: 8.65.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
@@ -50,6 +53,9 @@ importers:
       '@game-hub/engine':
         specifier: workspace:*
         version: link:../engine
+      '@game-hub/kernel':
+        specifier: workspace:*
+        version: link:../packages/kernel
       better-sqlite3:
         specifier: ^11.8.0
         version: 11.10.0
@@ -96,7 +102,26 @@ importers:
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)
 
   engine:
+    dependencies:
+      '@game-hub/kernel':
+        specifier: workspace:*
+        version: link:../packages/kernel
     devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^3.2.4
+        version: 3.2.7(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1))
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)
+
+  packages/kernel:
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.17
       '@vitest/coverage-v8':
         specifier: ^3.2.4
         version: 3.2.7(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1))
@@ -112,6 +137,9 @@ importers:
       '@game-hub/engine':
         specifier: workspace:*
         version: link:../engine
+      '@game-hub/kernel':
+        specifier: workspace:*
+        version: link:../packages/kernel
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1

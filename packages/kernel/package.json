@@ -1,0 +1,24 @@
+{
+  "name": "@game-hub/kernel",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The Game Hub kernel: the tiny set of primitives every game and both hosts share — GameError, MoveRecord, Viewer, record(), makeSeating, the end-state union, and the GameModule/GameClient contracts. Consumed as TypeScript source by subpath (the engine convention). This package MAY have a `.` entry — it's the kernel, not a per-game platform, so there is no ambiguity about a default.",
+  "license": "BSD-3-Clause",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/contracts/client.ts"
+  },
+  "scripts": {
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

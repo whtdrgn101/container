@@ -1,8 +1,7 @@
-import { cantStopModule } from './cantstop';
-import { containerModule } from './container';
-import { GameRegistry } from './registry';
-import { stoneAgeModule } from './stoneage';
-import { stPetersburgModule } from './stpetersburg';
+// The backend games barrel. The **registry wiring** — which modules are registered, in what order — is
+// generated from the root `games.config.ts` into `./index.generated` (run `pnpm generate`). This file
+// stays hand-written for the stable surface everything else imports: the contract types, the registry
+// class, and each game's named module singleton (which the tests reference directly).
 
 export type {
   BotDriver,
@@ -17,25 +16,14 @@ export type {
 } from './module';
 export type { AnyGameModule, GameInfo } from './registry';
 export { GameRegistry } from './registry';
+
+// Named module singletons — kept for the many callers that reference a specific module (tests, and
+// `parseAction`/error-map wiring). The registry itself is built from the default exports in the
+// generated file below.
 export { containerModule } from './container';
 export { cantStopModule } from './cantstop';
 export { stoneAgeModule } from './stoneage';
 export { stPetersburgModule } from './stpetersburg';
 
-/**
- * The games this site hosts. Container came first; Can't Stop (roadmap C3) proved the seam is real, and
- * Stone Age and Saint Petersburg followed — four games running side by side on one server. Adding a game
- * is additive: implement `GameModule`, register it here, done.
- *
- * A factory rather than a shared singleton: the backend tests build many apps against their own
- * in-memory databases, and a registry that outlived one of them would be a cross-test leak.
- */
-export const createDefaultRegistry = (): GameRegistry =>
-  new GameRegistry()
-    .register(containerModule)
-    .register(cantStopModule)
-    .register(stoneAgeModule)
-    .register(stPetersburgModule);
-
-/** The id every existing row is backfilled to when C1 adds `game_type`. */
-export const DEFAULT_GAME_ID = containerModule.id;
+// The generated registry (from `games.config.ts`): `createDefaultRegistry` + `DEFAULT_GAME_ID`.
+export { createDefaultRegistry, DEFAULT_GAME_ID } from './index.generated';

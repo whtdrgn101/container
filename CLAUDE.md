@@ -63,14 +63,23 @@ A fuller mechanic-by-mechanic breakdown lives in the rulebook; capture edge case
 
 ```
 container/
+├── games.config.ts                — Track D: the ordered list of hosted games (id + module/client
+│                                    import specifiers). Single source of truth → `pnpm generate`.
+├── packages/
+│   └── kernel/  @game-hub/kernel — the tiny shared kernel (Track D / D0), consumed as TS source by
+│       └── src/                    subpath: `.` = primitives (GameError, MoveRecord, Viewer, record,
+│                                    makeSeating, GameEndState) + the `GameModule` contract;
+│                                    `./client` = the React `GameClient`/`BoardProps` contract.
 ├── engine/     @game-hub/engine  — pure, deterministic rules cores (NO I/O, NO randomness)
 │   └── src/                        — a per-game platform, mirroring the backend/UI:
-│       ├── kernel/                 — the tiny shared kernel: GameError, MoveRecord, Viewer
+│       ├── kernel/                 — a compat SHIM: re-exports `@game-hub/kernel` (so `../../kernel`
+│       │                             and `@game-hub/engine/kernel` keep resolving)
 │       └── games/                  — one folder per game (container/, cantstop/, stoneage/, stpetersburg/), each its
 │                                     own subpath export `@game-hub/engine/<game>`
 ├── bot/        @game-hub/bot     — AI players; pure policies over a redacted GameView (all four games)
 ├── backend/    @game-hub/backend — Fastify REST API; persists to SQLite; runs the AI (BotRunner)
-│   └── src/games/                 — the GameModule seam: module.ts (contract), registry.ts,
+│   └── src/games/                 — the GameModule seam: module.ts (binds the kernel contract to the
+│                                    host), registry.ts, index.generated.ts (built from games.config.ts),
 │                                    container/ + cantstop/ + stoneage/ + stpetersburg/ (each a registered game)
 ├── ui/         @game-hub/ui      — React + Tailwind + shadcn; talks to the API
 │   └── src/
@@ -78,8 +87,10 @@ container/
 │       ├── shell/                 — Header, Landing, WaitingRoom (generic)
 │       ├── hooks/                 — useGameTransport (one socket), useHomeLists
 │       ├── lib/api.ts             — the platform API client (generic)
-│       └── games/                 — the GameClient seam: types.ts, registry.ts,
+│       └── games/                 — the GameClient seam: types.ts (binds the kernel contract),
+│                                    registry.ts, registry.generated.ts (built from games.config.ts),
 │                                    container/ + cantstop/ + stoneage/ + stpetersburg/ (board + its own api.ts)
+├── scripts/generate-registries.ts — codegen: games.config.ts → the two *.generated.ts registries
 └── reference_materials/           — the rulebook PDFs (Container, Can't Stop, Stone Age, Saint Petersburg)
 ```
 
@@ -233,10 +244,46 @@ the module from the row, never a default". Both consumers transpile the TS sourc
 `engine` also has a real `build` (`tsc -p tsconfig.build.json` → `dist/`) used for typecheck/
 distribution; consumers may switch to `dist` later if we ever publish.
 
-**The kernel is tiny on purpose** (`engine/src/kernel/`): only the primitives every game *and* the
-backend `GameModule` contract share — `GameError` (generic in its code union), `MoveRecord`, `Viewer`,
-the `record()` version/log mechanism, the `makeSeating` seat helpers, and the end-state discriminated
-union (`GameEndState<R>` / `WinnersEndState`). Each game still keeps its **own** state types, constants
+**The kernel is its own package now — `@game-hub/kernel` (`packages/kernel/`, Track D / D0)** — extracted
+so a game can one day live in its own package: the engine, the backend `GameModule` contract, and the UI
+`GameClient` contract all build against this one neutral dependency instead of reaching into each other.
+It is consumed **as TS source by subpath**, the engine convention — but it **MAY have a `.` entry** (it's
+the kernel, not a per-game platform, so there's no default-game ambiguity):
+
+- `@game-hub/kernel` (`.`) — the framework-free surface: the engine primitives (`GameError`,
+  `MoveRecord`, `Viewer`, `record`, `makeSeating`, `GameEndState`/`WinnersEndState`) **plus** the backend
+  `GameModule`/`ModuleContext`/`BotDriver`/… contract (its host bindings — `DB`, `GameHub`,
+  `BotRepository`, `FastifyInstance` — are **generic parameters**, so the contract imports no backend).
+- `@game-hub/kernel/client` — the React `GameClient`/`BoardProps` contract, behind its own subpath
+  because it's the one entry that needs React (its transport DTOs are generic params too, so it imports
+  nothing but React). A backend/engine consumer never pulls React in.
+
+**Compat shims keep every old import path working** (this was a pure move): `engine/src/kernel/index.ts`
+re-exports `@game-hub/kernel` (so `../../kernel` and `@game-hub/engine/kernel` still resolve);
+`backend/src/games/module.ts` re-exports the kernel contract, pinning its generic host params to the
+backend's concrete types (`GameModule<S,A>`/`ModuleContext` read identically to before); `ui/src/games/types.ts`
+re-exports `GameClient`/`BoardProps`, pinning the transport params to `GamePayload<S>`/`GameMessage`. The
+old trick where `module.ts` *restated* `MoveRecord`/`Viewer` structurally (to avoid importing the engine)
+**retires** — contract and engine now share the kernel types directly. Consumption paths: the backend/ui
+add `@game-hub/kernel` as a workspace dep + a Vitest `server.deps.inline` entry (and the UI a Vite alias
+per subpath); the kernel package has **its own Vitest + 100% coverage gate** (its runtime primitives —
+`record`/`makeSeating`/`GameError` — left the engine's gate when they left `engine/src/`, and this keeps
+that discipline honest). **esbuild inlines `@game-hub/kernel` into the backend bundle** like the engine/bot.
+
+**Adding a game is one entry in `games.config.ts` + `pnpm generate`.** That root file is the ordered list
+of hosted games (`{ id, module, client }` — the module/client being import specifiers that default-export
+the `GameModule`/`GameClient`; in-repo games use `./container`-style relative paths, a future package uses
+`@game-hub/game-foo/module`). `scripts/generate-registries.ts` (run via `pnpm generate`) turns it into two
+**checked-in** files — `backend/src/games/index.generated.ts` (builds `createDefaultRegistry`) and
+`ui/src/games/registry.generated.ts` (builds `CLIENTS` with the one erasure cast). The hand-written
+`index.ts`/`registry.ts` are thin re-exports of those. Generated files are committed and Prettier-clean; a
+**CI freshness check** (`pnpm generate` then `git diff --exit-code` on the two files) fails if they drift
+from the config. The registration invariants live in the hand-written registry the generated file feeds
+(duplicate-id boot crash, `minPlayers ≤ maxPlayers`, registration = config order). `e2e/architecture.spec.ts`
+reads `games.config.ts` (not the filesystem), so a package-shaped game is covered and an in-repo `games/`
+folder missing from the config is caught.
+
+Each game still keeps its **own** state types, constants
 and `viewFor` — we did **not** extract a shared state or `viewFor`, the same discipline as not building
 a sealed-bid framework off one.
 
