@@ -13,6 +13,28 @@ Original goal statement: four games have tested the engine and the seams; the lo
 making games easier to add, and eventually addable from *outside* this repo. Pilot: Russian
 Railroads (a heavyweight is the right stress test).
 
+## D1 findings from RR1 (2026-07-24 — the pilot's first contact)
+
+**What held:** registration really is one `games.config.ts` entry + `pnpm generate`; the four-subpath
+package shape worked first try; the kernel contracts (generic hosts, React-free core) needed no
+changes; five games coexist with the package-shaped one indistinguishable at runtime.
+
+**What §2 predicted and TS-source shipping still costs** (all logged verbatim in the RR ROADMAP):
+the workspace glob, two host `package.json` deps, the backend vitest inline regex, **per-subpath Vite
+aliases** (the touchpoint-#2 duplication a real `dist` would kill), and a `ui/tsconfig.json` include
+— the package client cannot typecheck standalone.
+
+**Two contract gaps not in the original doc** (must close before D2):
+1. **The client transport layer isn't in the kernel.** `GamePayload`/`GameMessage` and the shared
+   chrome (`TurnBanner`/`ActivityFeed`/`GameOver`) live in `ui/src`, reached via the shell's `@`
+   alias — so a package client still couples to this repo's UI. Fix candidates: move the transport
+   DTOs into `@game-hub/kernel/client` and publish the shared chrome as `@game-hub/ui-kit` (or
+   accept shell-coupling as in-workspace-only and document it).
+2. **The bound `ModuleContext` lives in the backend shim.** A package's `createBotDriver` (RR10)
+   can't name the concrete context without importing `backend/src` — either the kernel's generic
+   context must be sufficient for drivers (preferred: drivers code against the generic surface), or
+   the backend must export a public binding package.
+
 This doc answers the four questions the roadmap poses: what a game package must export, how
 registration/discovery works, what the version-compat contract with the kernel is, and what the seams
 still assume about living in one workspace.
