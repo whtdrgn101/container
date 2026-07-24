@@ -86,7 +86,10 @@ function parseAction(raw: unknown): ParseResult<Action> {
       if (typeof action.slot !== 'number' || !Number.isInteger(action.slot)) {
         return { ok: false, message: 'REPLACE_FACTORY.slot must be an integer' };
       }
-      return { ok: true, action: { type: 'REPLACE_FACTORY', slot: action.slot, ...(from !== undefined ? { from } : {}) } };
+      return {
+        ok: true,
+        action: { type: 'REPLACE_FACTORY', slot: action.slot, ...(from !== undefined ? { from } : {}) },
+      };
     }
     return { ok: true, action: { type: 'PLACE_FACTORY', ...(from !== undefined ? { from } : {}) } };
   }

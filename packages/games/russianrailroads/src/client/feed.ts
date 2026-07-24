@@ -43,7 +43,8 @@ export function describeMove(entry: RussianRailroadsView['log'][number], nameOf?
       const coins = p.coinsGained ? ` (+${p.coinsGained} coins from a factory)` : '';
       return `placed a worker — advanced the wrench ${p.advanced}${coins}`;
     }
-    if ((p as { claim?: string }).claim) return `placed a worker — claimed ${(p as { claim?: string }).claim} place (next round)`;
+    if ((p as { claim?: string }).claim)
+      return `placed a worker — claimed ${(p as { claim?: string }).claim} place (next round)`;
     if (p.moves === 0) return `placed a worker — ${p.label} (no move possible)`;
     return `placed a worker — ${p.label}`;
   }
@@ -99,8 +100,7 @@ export function describeMove(entry: RussianRailroadsView['log'][number], nameOf?
   }
   if (entry.type === 'PASS') {
     const p = entry.payload as
-      | { gameEnded?: boolean; nextRound?: number; scores?: readonly RoundScore[]; passScore?: number }
-      | undefined;
+      { gameEnded?: boolean; nextRound?: number; scores?: readonly RoundScore[]; passScore?: number } | undefined;
     const passBit = p?.passScore ? ` (+${p.passScore} from the turn-order card)` : '';
     const tally = p?.scores?.length
       ? '; scored ' +

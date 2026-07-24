@@ -37,7 +37,10 @@ describe('reuse mini-phase — resolve a 1-worker space (pg. 17)', () => {
     expect(after.players[0]!.doublers).toBe(1);
     expect(after.supplies.doublers).toBe(s.supplies.doublers - 1);
     const empty = { ...s, supplies: { ...s.supplies, doublers: 0 } };
-    expectError(() => applyAction(empty, me(empty).id, { type: 'RESOLVE_REUSE', space: 'doubler' }), 'ILLEGAL_REUSE_SPACE');
+    expectError(
+      () => applyAction(empty, me(empty).id, { type: 'RESOLVE_REUSE', space: 'doubler' }),
+      'ILLEGAL_REUSE_SPACE',
+    );
   });
 
   it('industrialize-1: advances the wrench, and pools a factory it lands on', () => {
@@ -100,7 +103,8 @@ describe('reuse mini-phase — resolve a 1-worker space (pg. 17)', () => {
 
   it('refuses illegal reuse targets', () => {
     const s = reusing([0]);
-    const bad = (space: string) => expectError(() => applyAction(s, me(s).id, { type: 'RESOLVE_REUSE', space }), 'ILLEGAL_REUSE_SPACE');
+    const bad = (space: string) =>
+      expectError(() => applyAction(s, me(s).id, { type: 'RESOLVE_REUSE', space }), 'ILLEGAL_REUSE_SPACE');
     bad('track-wood-2'); // 2 workers
     bad('track-coin'); // mandatory coin
     bad('loco-1'); // loco kind (not reusable)
@@ -108,6 +112,9 @@ describe('reuse mini-phase — resolve a 1-worker space (pg. 17)', () => {
     bad('nope'); // unknown space
     // An occupied non-bottom space is refused.
     const occupied = { ...s, actionSpaces: { coins: [{ ownerId: 'p1', workers: 1, coins: 0 }] } };
-    expectError(() => applyAction(occupied, me(occupied).id, { type: 'RESOLVE_REUSE', space: 'coins' }), 'ILLEGAL_REUSE_SPACE');
+    expectError(
+      () => applyAction(occupied, me(occupied).id, { type: 'RESOLVE_REUSE', space: 'coins' }),
+      'ILLEGAL_REUSE_SPACE',
+    );
   });
 });

@@ -26,7 +26,13 @@ function reusableSpace(state: RussianRailroadsState, space: ActionSpaceDef): boo
   if (space.workers !== 1 || space.coinCost) return false;
   if (!space.neverOccupies && (state.actionSpaces[space.id]?.length ?? 0) > 0) return false;
   const player = state.players[state.activePlayerIndex]!;
-  if (space.track) return legalSteps(player.routes, space.track.colors.filter((c) => accessibleColors(player).includes(c))).length > 0;
+  if (space.track)
+    return (
+      legalSteps(
+        player.routes,
+        space.track.colors.filter((c) => accessibleColors(player).includes(c)),
+      ).length > 0
+    );
   if (space.industry) return advanceWrench(player.industry, space.industry.advance).wrench > player.industry.wrench;
   if (space.kind === 'doubler') return state.supplies.doublers > 0 && player.doublers < DOUBLER_SPACES;
   return space.kind === 'coins' || space.kind === 'temp-workers';
@@ -116,7 +122,12 @@ export function legalActions(state: RussianRailroadsState, playerId?: string): A
     const access = accessibleColors(player);
     const out: Action[] = [];
     for (const entry of player.actionPool) {
-      if (legalSteps(player.routes, entry.colors.filter((c) => access.includes(c))).length > 0) {
+      if (
+        legalSteps(
+          player.routes,
+          entry.colors.filter((c) => access.includes(c)),
+        ).length > 0
+      ) {
         out.push({ type: 'RESOLVE_POOL', id: entry.id });
       }
     }
@@ -152,7 +163,8 @@ export function legalActions(state: RussianRailroadsState, playerId?: string): A
         continue;
       }
       if (player.workersAvailable >= space.workers) actions.push({ type: 'PLACE', space: space.id, ...extra });
-      if (player.coins >= space.workers) actions.push({ type: 'PLACE', space: space.id, coins: space.workers, ...extra });
+      if (player.coins >= space.workers)
+        actions.push({ type: 'PLACE', space: space.id, coins: space.workers, ...extra });
     }
   };
 

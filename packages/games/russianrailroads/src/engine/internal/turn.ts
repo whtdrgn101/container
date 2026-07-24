@@ -82,5 +82,11 @@ export function afterBuild(state: RussianRailroadsState, seat: number): Partial<
       pendingThen: null,
     };
   }
-  return { supplies: state.supplies, pendingLoco: null, pendingFactory: null, pendingThen: null, ...continueTurn(state, seat) };
+  return {
+    supplies: state.supplies,
+    pendingLoco: null,
+    pendingFactory: null,
+    pendingThen: null,
+    ...continueTurn(state, seat),
+  };
 }

@@ -66,7 +66,14 @@ export const SPECIALS: readonly RouteSpecial[] = [
   // St. Petersburg
   { id: 'stpetersburg-idea-4', route: 'stpetersburg', space: 4, type: 'idea-token', requiresLoco: true },
   { id: 'stpetersburg-idea-6', route: 'stpetersburg', space: 6, type: 'idea-token', requiresLoco: true },
-  { id: 'stpetersburg-double-7', route: 'stpetersburg', space: 7, type: 'route-doubling', requiresLoco: true, color: 'green' },
+  {
+    id: 'stpetersburg-double-7',
+    route: 'stpetersburg',
+    space: 7,
+    type: 'route-doubling',
+    requiresLoco: true,
+    color: 'green',
+  },
   { id: 'stpetersburg-key-9', route: 'stpetersburg', space: 9, type: 'key', requiresLoco: false },
   // Kyiv — the cumulative bonus stars (pg. 19 example) + a new worker + the end key
   { id: 'kyiv-star-1', route: 'kyiv', space: 1, type: 'bonus-star', requiresLoco: true, points: 1 },

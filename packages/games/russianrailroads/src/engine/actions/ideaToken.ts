@@ -28,11 +28,23 @@ export function resolveIdeaToken(
 
   if (token === 'twenty-points') {
     const next = { ...state, players: withPlayer(state, seat, { ...used, medal20: true }), pendingIdeaToken: null };
-    return record(state, 'RESOLVE_IDEA_TOKEN', playerId, { pendingIdeaToken: null, ...continueTurn(next, seat) }, { token });
+    return record(
+      state,
+      'RESOLVE_IDEA_TOKEN',
+      playerId,
+      { pendingIdeaToken: null, ...continueTurn(next, seat) },
+      { token },
+    );
   }
   if (token === 'revaluation') {
     const next = { ...state, players: withPlayer(state, seat, { ...used, revalued: true }), pendingIdeaToken: null };
-    return record(state, 'RESOLVE_IDEA_TOKEN', playerId, { pendingIdeaToken: null, ...continueTurn(next, seat) }, { token });
+    return record(
+      state,
+      'RESOLVE_IDEA_TOKEN',
+      playerId,
+      { pendingIdeaToken: null, ...continueTurn(next, seat) },
+      { token },
+    );
   }
   if (token === 'second-wrench') {
     // Place the second wrench on START, then advance it 2 steps (pg. 47). The first 2 steps never reach a
@@ -56,7 +68,11 @@ export function resolveIdeaToken(
       state,
       'RESOLVE_IDEA_TOKEN',
       playerId,
-      { players: withPlayer(state, seat, withKeys), pendingIdeaToken: null, pendingKey: { remaining: KEYS_FROM_TOKEN } },
+      {
+        players: withPlayer(state, seat, withKeys),
+        pendingIdeaToken: null,
+        pendingKey: { remaining: KEYS_FROM_TOKEN },
+      },
       { token, keys: KEYS_FROM_TOKEN },
     );
   }
@@ -68,7 +84,12 @@ export function resolveIdeaToken(
     state,
     'RESOLVE_IDEA_TOKEN',
     playerId,
-    { players: withPlayer(state, seat, drawn), endBonusPile: restPile, pendingIdeaToken: null, pendingIdeaCard: { owed: true } },
+    {
+      players: withPlayer(state, seat, drawn),
+      endBonusPile: restPile,
+      pendingIdeaToken: null,
+      pendingIdeaCard: { owed: true },
+    },
     { token, drewEndBonus: top != null },
   );
 }

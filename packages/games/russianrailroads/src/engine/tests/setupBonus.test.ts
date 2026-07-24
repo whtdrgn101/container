@@ -48,6 +48,9 @@ describe('starting-bonus setup mini-phase (pg. 6)', () => {
   it('refuses RESOLVE_SETUP_BONUS once setup is done, and other actions during setup', () => {
     let s = newGameRaw(2);
     s = applyAction(s, me(s).id, { type: 'RESOLVE_SETUP_BONUS', card: 'start-coins-2' }); // setup done
-    expectError(() => applyAction(s, me(s).id, { type: 'RESOLVE_SETUP_BONUS', card: 'start-coins-2' }), 'NO_PENDING_SETUP_BONUS');
+    expectError(
+      () => applyAction(s, me(s).id, { type: 'RESOLVE_SETUP_BONUS', card: 'start-coins-2' }),
+      'NO_PENDING_SETUP_BONUS',
+    );
   });
 });

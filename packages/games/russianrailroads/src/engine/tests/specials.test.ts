@@ -34,7 +34,13 @@ describe('player-board specials — reached model (pp. 18–19)', () => {
 describe('new-worker specials (pp. 18–19)', () => {
   it('a wood-only new-worker space grants a permanent worker (Kyiv space 7)', () => {
     // Kyiv wood at space 7 (index 6), consuming nothing else; no loco needed.
-    const state = patch(newGame(2), { routes: [route('transsiberian', { 0: 'wood' }), route('stpetersburg', { 0: 'wood' }), route('kyiv', { 6: 'wood' })] });
+    const state = patch(newGame(2), {
+      routes: [
+        route('transsiberian', { 0: 'wood' }),
+        route('stpetersburg', { 0: 'wood' }),
+        route('kyiv', { 6: 'wood' }),
+      ],
+    });
     const seat = state.activePlayerIndex;
     const settled = settleSpecials(state, seat);
     expect(settled.held).toBe(false);
@@ -46,7 +52,14 @@ describe('new-worker specials (pp. 18–19)', () => {
 
   it('a loco-required new-worker space needs the loco reach too (Trans-Sib space 3)', () => {
     const locos: Locomotive[] = [{ number: 3, route: 'transsiberian' }];
-    const reached = patch(newGame(2), { routes: [route('transsiberian', { 2: 'wood' }), route('stpetersburg', { 0: 'wood' }), route('kyiv', { 0: 'wood' })], locomotives: locos });
+    const reached = patch(newGame(2), {
+      routes: [
+        route('transsiberian', { 2: 'wood' }),
+        route('stpetersburg', { 0: 'wood' }),
+        route('kyiv', { 0: 'wood' }),
+      ],
+      locomotives: locos,
+    });
     const seat = reached.activePlayerIndex;
     expect(settleSpecials(reached, seat).players[seat]!.consumedSpecials).toContain('transsiberian-worker-3');
     // Without the loco (reach 1 < 3) it does not fire.
@@ -59,7 +72,11 @@ describe('keys — end-station benefit (pg. 19)', () => {
   it('reaching a route end owes a key choice and counts the key', () => {
     // Kyiv wood at space 9 (the end); pre-consume the worker so only the key fires.
     const state = patch(newGame(2), {
-      routes: [route('transsiberian', { 0: 'wood' }), route('stpetersburg', { 0: 'wood' }), route('kyiv', { 8: 'wood' })],
+      routes: [
+        route('transsiberian', { 0: 'wood' }),
+        route('stpetersburg', { 0: 'wood' }),
+        route('kyiv', { 8: 'wood' }),
+      ],
       consumedSpecials: ['kyiv-worker-7'],
     });
     const seat = state.activePlayerIndex;
@@ -96,17 +113,29 @@ describe('keys — end-station benefit (pg. 19)', () => {
 
 describe('bonus stars + route doubling — scoring (pg. 19)', () => {
   it('pg. 19 example (verbatim): Kyiv track on space 3 with a #3 loco scores 1+2+3 = 6', () => {
-    const player: RussianRailroadsPlayer = { ...newGame(2).players[0]!, routes: [route('transsiberian', {}), route('stpetersburg', {}), route('kyiv', { 2: 'wood' })], locomotives: [{ number: 3, route: 'kyiv' }] };
+    const player: RussianRailroadsPlayer = {
+      ...newGame(2).players[0]!,
+      routes: [route('transsiberian', {}), route('stpetersburg', {}), route('kyiv', { 2: 'wood' })],
+      locomotives: [{ number: 3, route: 'kyiv' }],
+    };
     expect(bonusStarScore(player)).toBe(6);
   });
 
   it('bonus stars need the locomotive reach (no loco → no stars)', () => {
-    const player: RussianRailroadsPlayer = { ...newGame(2).players[0]!, routes: [route('transsiberian', {}), route('stpetersburg', {}), route('kyiv', { 2: 'wood' })], locomotives: [] };
+    const player: RussianRailroadsPlayer = {
+      ...newGame(2).players[0]!,
+      routes: [route('transsiberian', {}), route('stpetersburg', {}), route('kyiv', { 2: 'wood' })],
+      locomotives: [],
+    };
     expect(bonusStarScore(player)).toBe(0);
   });
 
   it('pg. 19: a green track + loco on St. Petersburg space 7 doubles that route', () => {
-    const player: RussianRailroadsPlayer = { ...newGame(2).players[0]!, routes: [route('transsiberian', {}), route('stpetersburg', { 6: 'green' }), route('kyiv', {})], locomotives: [{ number: 7, route: 'stpetersburg' }] };
+    const player: RussianRailroadsPlayer = {
+      ...newGame(2).players[0]!,
+      routes: [route('transsiberian', {}), route('stpetersburg', { 6: 'green' }), route('kyiv', {})],
+      locomotives: [{ number: 7, route: 'stpetersburg' }],
+    };
     expect(routeDoubled(player, 'stpetersburg')).toBe(true);
     expect(routeDoubled(player, 'kyiv')).toBe(false);
     // Score reflects the doubling: 7 green spaces × 1 = 7, doubled = 14.
@@ -116,7 +145,11 @@ describe('bonus stars + route doubling — scoring (pg. 19)', () => {
 
   it('the revalued tile scores tracks higher (pg. 46)', () => {
     const green = route('transsiberian', { 0: 'green' });
-    const base: RussianRailroadsPlayer = { ...newGame(2).players[0]!, routes: [green, route('stpetersburg', {}), route('kyiv', {})], locomotives: [{ number: 1, route: 'transsiberian' }] };
+    const base: RussianRailroadsPlayer = {
+      ...newGame(2).players[0]!,
+      routes: [green, route('stpetersburg', {}), route('kyiv', {})],
+      locomotives: [{ number: 1, route: 'transsiberian' }],
+    };
     expect(scorePlayer(base).routes).toBe(1); // green = 1 on the base tile
     expect(scorePlayer({ ...base, revalued: true }).routes).toBe(2); // green = 2 revalued
   });
@@ -129,7 +162,10 @@ describe('bonus stars + route doubling — scoring (pg. 19)', () => {
 
   it('the second wrench adds a second industry score (pg. 47)', () => {
     const base = newGame(2).players[0]!;
-    const two: RussianRailroadsPlayer = { ...base, industry: { wrench: 4, factories: [null, null, null, null, null], secondWrench: 2 } };
+    const two: RussianRailroadsPlayer = {
+      ...base,
+      industry: { wrench: 4, factories: [null, null, null, null, null], secondWrench: 2 },
+    };
     // wrench on the 5-space (4→5 pts... wrench index 4 = 5 pts) + second wrench on space 2 (2 pts) = 7.
     expect(scorePlayer(two).industry).toBe(7);
   });
@@ -138,7 +174,11 @@ describe('bonus stars + route doubling — scoring (pg. 19)', () => {
 describe('idea-token spaces (pp. 18–19)', () => {
   it('reaching an idea-token space owes an idea-token choice (St. Petersburg space 4)', () => {
     const state = patch(newGame(2), {
-      routes: [route('transsiberian', { 0: 'wood' }), route('stpetersburg', { 3: 'wood' }), route('kyiv', { 0: 'wood' })],
+      routes: [
+        route('transsiberian', { 0: 'wood' }),
+        route('stpetersburg', { 3: 'wood' }),
+        route('kyiv', { 0: 'wood' }),
+      ],
       locomotives: [{ number: 4, route: 'stpetersburg' }],
     });
     const seat = state.activePlayerIndex;

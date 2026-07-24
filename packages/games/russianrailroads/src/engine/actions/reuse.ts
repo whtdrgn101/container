@@ -1,6 +1,15 @@
 import { actionSpace, COINS_PER_ACTION, DOUBLER_SPACES, GameError, TEMP_WORKERS } from '../core';
 import type { PoolEntry, RussianRailroadsState, SpacePlacement } from '../core';
-import { accessibleColors, advanceWrench, continueTurn, legalSteps, record, seatOf, triggerEffect, withPlayer } from '../internal';
+import {
+  accessibleColors,
+  advanceWrench,
+  continueTurn,
+  legalSteps,
+  record,
+  seatOf,
+  triggerEffect,
+  withPlayer,
+} from '../internal';
 
 /**
  * `RESOLVE_REUSE` — the between-round worker-reuse mini-phase (pg. 17, RR6). The head seat of `pendingReuse`
@@ -45,7 +54,13 @@ export function resolveReuse(state: RussianRailroadsState, playerId: string, spa
       );
     }
     const next = { ...state, actionSpaces };
-    return record(state, 'RESOLVE_REUSE', playerId, { actionSpaces, ...continueTurn(next, seat) }, { ...payload, moves: 0 });
+    return record(
+      state,
+      'RESOLVE_REUSE',
+      playerId,
+      { actionSpaces, ...continueTurn(next, seat) },
+      { ...payload, moves: 0 },
+    );
   }
 
   // Industrialize-1: advance the wrench, auto-resolving coin factories and pooling track-move factories.
@@ -58,7 +73,12 @@ export function resolveReuse(state: RussianRailroadsState, playerId: string, spa
       coinsGained += eff.coins;
       if (eff.move) pool.push({ id: `factory:${n}#${i}`, count: eff.move.count, colors: eff.move.colors });
     });
-    const updated = { ...player, industry: { ...player.industry, wrench }, coins: player.coins + coinsGained, actionPool: pool };
+    const updated = {
+      ...player,
+      industry: { ...player.industry, wrench },
+      coins: player.coins + coinsGained,
+      actionPool: pool,
+    };
     const next = { ...state, players: withPlayer(state, seat, updated), actionSpaces };
     return record(
       state,
@@ -85,7 +105,11 @@ export function resolveReuse(state: RussianRailroadsState, playerId: string, spa
   if (def.kind === 'coins') {
     updated = { ...player, coins: player.coins + COINS_PER_ACTION };
   } else if (def.kind === 'temp-workers') {
-    updated = { ...player, tempWorkers: player.tempWorkers + TEMP_WORKERS, workersAvailable: player.workersAvailable + TEMP_WORKERS };
+    updated = {
+      ...player,
+      tempWorkers: player.tempWorkers + TEMP_WORKERS,
+      workersAvailable: player.workersAvailable + TEMP_WORKERS,
+    };
   } else {
     throw new GameError('ILLEGAL_REUSE_SPACE', `Space "${space}" (kind ${def.kind}) is not reusable (pg. 17)`);
   }

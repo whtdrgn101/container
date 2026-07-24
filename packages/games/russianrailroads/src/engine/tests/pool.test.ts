@@ -44,7 +44,9 @@ describe('industrialization spaces (pg. 14)', () => {
   it('legalActions omits a blocked industry space, but keeps the bottom one if its wood bonus can build', () => {
     const base = newGame(2);
     // Wrench on the 5-space with the first gap unfilled → the wrench cannot advance from any industry space.
-    const blocked = patchActive(base, { industry: { wrench: 4, factories: [null, null, null, null, null], secondWrench: null } });
+    const blocked = patchActive(base, {
+      industry: { wrench: 4, factories: [null, null, null, null, null], secondWrench: null },
+    });
     const me = activeId(blocked);
     const spaces = legalActions(blocked, me)
       .filter((a): a is { type: 'PLACE'; space: string } => a.type === 'PLACE')

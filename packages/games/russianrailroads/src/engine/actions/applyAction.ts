@@ -70,9 +70,11 @@ export function applyAction(state: RussianRailroadsState, playerId: string, acti
   } else if (state.pendingFactory) {
     if (!isFactoryResolution(action.type)) throw new GameError('FACTORY_PENDING', 'Finish building your factory first');
   } else if (state.players[state.activePlayerIndex]!.actionPool.length > 0) {
-    if (!isPoolResolution(action.type)) throw new GameError('POOL_PENDING', 'Resolve or skip your factory actions first');
+    if (!isPoolResolution(action.type))
+      throw new GameError('POOL_PENDING', 'Resolve or skip your factory actions first');
   } else if (state.pendingSetupBonus) {
-    if (action.type !== 'RESOLVE_SETUP_BONUS') throw new GameError('SETUP_BONUS_PENDING', 'Take your starting bonus card first');
+    if (action.type !== 'RESOLVE_SETUP_BONUS')
+      throw new GameError('SETUP_BONUS_PENDING', 'Take your starting bonus card first');
   } else if (state.pendingReuse) {
     if (action.type !== 'RESOLVE_REUSE') throw new GameError('REUSE_PENDING', 'Resolve your reuse worker first');
   } else {
@@ -83,7 +85,8 @@ export function applyAction(state: RussianRailroadsState, playerId: string, acti
     if (action.type === 'RESOLVE_KEY') throw new GameError('NO_PENDING_KEY', 'No key is pending');
     if (action.type === 'RESOLVE_IDEA_TOKEN') throw new GameError('NO_PENDING_IDEA_TOKEN', 'No idea token is pending');
     if (action.type === 'RESOLVE_IDEA_CARD') throw new GameError('NO_PENDING_IDEA_CARD', 'No idea card is pending');
-    if (action.type === 'RESOLVE_SETUP_BONUS') throw new GameError('NO_PENDING_SETUP_BONUS', 'No starting bonus is pending');
+    if (action.type === 'RESOLVE_SETUP_BONUS')
+      throw new GameError('NO_PENDING_SETUP_BONUS', 'No starting bonus is pending');
     if (action.type === 'RESOLVE_REUSE') throw new GameError('NO_PENDING_REUSE', 'No reuse mini-phase is active');
   }
 

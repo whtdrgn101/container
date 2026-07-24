@@ -127,14 +127,7 @@ export const routeColors = (routeId: RouteId): readonly TrackColor[] =>
   ROUTES.find((r) => r.id === routeId)?.colors ?? [];
 
 /** Which section of the board an action space belongs to (pg. 7). */
-export type ActionSpaceKind =
-  | 'coins'
-  | 'track'
-  | 'doubler'
-  | 'temp-workers'
-  | 'locomotive'
-  | 'industry'
-  | 'turn-order';
+export type ActionSpaceKind = 'coins' | 'track' | 'doubler' | 'temp-workers' | 'locomotive' | 'industry' | 'turn-order';
 
 /**
  * Locomotive supply (pg. 4, 10, 12). Locomotives are numbered **#2–#10** in the supply (the #1 every
@@ -311,15 +304,57 @@ export const ACTION_SPACES: readonly ActionSpaceDef[] = [
   // "locomotive **and** factory" (`loco: 'and'`, pg. 12 — "you may not choose 2 locos or 2 factories … you
   // may choose whether to add the loco or the factory first"). RR4 shipped the first two as loco-only; the
   // factory option and the 3-worker space land here now that the industry track (pg. 13) exists.
-  { id: 'loco-1', label: 'Build locomotive or factory', kind: 'locomotive', workers: 1, loco: 'or', neverOccupies: false },
-  { id: 'loco-2', label: 'Build locomotive or factory', kind: 'locomotive', workers: 2, loco: 'or', neverOccupies: false },
-  { id: 'loco-3', label: 'Build locomotive and factory', kind: 'locomotive', workers: 3, loco: 'and', neverOccupies: false },
+  {
+    id: 'loco-1',
+    label: 'Build locomotive or factory',
+    kind: 'locomotive',
+    workers: 1,
+    loco: 'or',
+    neverOccupies: false,
+  },
+  {
+    id: 'loco-2',
+    label: 'Build locomotive or factory',
+    kind: 'locomotive',
+    workers: 2,
+    loco: 'or',
+    neverOccupies: false,
+  },
+  {
+    id: 'loco-3',
+    label: 'Build locomotive and factory',
+    kind: 'locomotive',
+    workers: 3,
+    loco: 'and',
+    neverOccupies: false,
+  },
   // The three industrialization action spaces (pg. 14): move the wrench forward on the industry track. The
   // upper is 1 worker → advance 1; the middle 2 workers → advance 2; the bottom 2 workers → advance 1 and
   // move 1 wood track (a wood pool credit). Advance is capped by unfilled gaps (pg. 13).
-  { id: 'industry-1', label: 'Industrialize — advance 1', kind: 'industry', workers: 1, industry: { advance: 1 }, neverOccupies: false },
-  { id: 'industry-2', label: 'Industrialize — advance 2', kind: 'industry', workers: 2, industry: { advance: 2 }, neverOccupies: false },
-  { id: 'industry-3', label: 'Industrialize — advance 1 + wood track', kind: 'industry', workers: 2, industry: { advance: 1, woodMove: 1 }, neverOccupies: false },
+  {
+    id: 'industry-1',
+    label: 'Industrialize — advance 1',
+    kind: 'industry',
+    workers: 1,
+    industry: { advance: 1 },
+    neverOccupies: false,
+  },
+  {
+    id: 'industry-2',
+    label: 'Industrialize — advance 2',
+    kind: 'industry',
+    workers: 2,
+    industry: { advance: 2 },
+    neverOccupies: false,
+  },
+  {
+    id: 'industry-3',
+    label: 'Industrialize — advance 1 + wood track',
+    kind: 'industry',
+    workers: 2,
+    industry: { advance: 1, woodMove: 1 },
+    neverOccupies: false,
+  },
   // The two turn-order claim spaces (pg. 16): a 1-worker space under first / second place on the turn-order
   // track. Claiming buys that seat for next round; you may not claim below your own pawn, nor claim both.
   // Placing here has **no immediate effect** — the rearrangement happens at round end (`rearrangeTurnOrder`).

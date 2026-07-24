@@ -51,7 +51,10 @@ export function triggerEffect(factoryNumber: number): {
  * Each **factory** (filled gap) it moves onto is returned in `triggered`, in the order landed (pg. 13:
  * "when you move your wrench onto a factory, you immediately receive the indirect action").
  */
-export function advanceWrench(industry: Industry, n: number): { readonly wrench: number; readonly triggered: number[] } {
+export function advanceWrench(
+  industry: Industry,
+  n: number,
+): { readonly wrench: number; readonly triggered: number[] } {
   let wrench = industry.wrench;
   const triggered: number[] = [];
   for (let step = 0; step < n; step += 1) {

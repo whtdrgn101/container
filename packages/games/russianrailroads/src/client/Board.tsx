@@ -1,4 +1,12 @@
-import { ACTION_SPACES, GAP_LANE_INDICES, INDUSTRY_LANE, legalActions, legalSteps, locoResolutions, locosOnRoute } from '../engine';
+import {
+  ACTION_SPACES,
+  GAP_LANE_INDICES,
+  INDUSTRY_LANE,
+  legalActions,
+  legalSteps,
+  locoResolutions,
+  locosOnRoute,
+} from '../engine';
 import type { Action, PlayerView, RouteId, RussianRailroadsState, RussianRailroadsView, TrackColor } from '../engine';
 import { Button } from '@/components/ui/button';
 import { ActivityFeed } from '@/components/ActivityFeed';
@@ -58,14 +66,24 @@ export default function RussianRailroadsBoard({
   const resolvingFactory = acting && !!pendingFactory; // owing a factory placement (pg. 12)
   const resolvingPool = acting && !pending && !pendingLoco && !pendingFactory && pool.length > 0; // pool credits
   // A lock/choice of any kind blocks placement and the mini-phases.
-  const anyLock = !!pending || !!pendingKey || !!pendingIdeaToken || !!pendingIdeaCard || !!pendingLoco || !!pendingFactory || pool.length > 0;
+  const anyLock =
+    !!pending ||
+    !!pendingKey ||
+    !!pendingIdeaToken ||
+    !!pendingIdeaCard ||
+    !!pendingLoco ||
+    !!pendingFactory ||
+    pool.length > 0;
   const resolvingSetup = acting && !anyLock && inSetup; // game-start starting-bonus mini-phase (pg. 6)
   const resolvingReuse = acting && !anyLock && !inSetup && inReuse; // between-round reuse mini-phase (pg. 17)
   // Free to place a worker or pass only when nothing is owed and no mini-phase is active.
   const placing = acting && !anyLock && !inSetup && !inReuse;
 
   const run = (work: () => Promise<rrApi.RussianRailroadsPayload>) => guard(async () => onPayload(await work()));
-  const doPlace = (space: string, opts?: { coins?: number; build?: 'loco' | 'factory'; first?: 'loco' | 'factory' }) => {
+  const doPlace = (
+    space: string,
+    opts?: { coins?: number; build?: 'loco' | 'factory'; first?: 'loco' | 'factory' },
+  ) => {
     if (!placing || !active) return;
     void run(() => rrApi.act(gameId, active.id, { type: 'PLACE', space, ...opts }, viewer, game.version));
   };
@@ -250,7 +268,11 @@ export default function RussianRailroadsBoard({
                   key={`replace-${opt.slot}-${opt.from ?? 'low'}`}
                   variant="outline"
                   size="sm"
-                  data-testid={opt.from === undefined ? `rr-factory-replace-${opt.slot}` : `rr-factory-replace-${opt.slot}-${opt.from}`}
+                  data-testid={
+                    opt.from === undefined
+                      ? `rr-factory-replace-${opt.slot}`
+                      : `rr-factory-replace-${opt.slot}-${opt.from}`
+                  }
                   disabled={busy}
                   onClick={() => doFactory(opt)}
                 >
@@ -307,7 +329,14 @@ export default function RussianRailroadsBoard({
           <div className="mt-2 flex flex-wrap gap-2 font-normal">
             {choiceOptions.map((opt) =>
               opt.type === 'RESOLVE_SETUP_BONUS' ? (
-                <Button key={opt.card} variant="outline" size="sm" data-testid={`rr-setup-${opt.card}`} disabled={busy} onClick={() => doAction(opt)}>
+                <Button
+                  key={opt.card}
+                  variant="outline"
+                  size="sm"
+                  data-testid={`rr-setup-${opt.card}`}
+                  disabled={busy}
+                  onClick={() => doAction(opt)}
+                >
                   {opt.card}
                 </Button>
               ) : null,
@@ -323,7 +352,14 @@ export default function RussianRailroadsBoard({
           <div className="mt-2 flex flex-wrap gap-2 font-normal">
             {choiceOptions.map((opt) =>
               opt.type === 'RESOLVE_REUSE' ? (
-                <Button key={opt.space} variant="outline" size="sm" data-testid={`rr-reuse-${opt.space}`} disabled={busy} onClick={() => doAction(opt)}>
+                <Button
+                  key={opt.space}
+                  variant="outline"
+                  size="sm"
+                  data-testid={`rr-reuse-${opt.space}`}
+                  disabled={busy}
+                  onClick={() => doAction(opt)}
+                >
                   {opt.space}
                 </Button>
               ) : null,
@@ -339,7 +375,14 @@ export default function RussianRailroadsBoard({
           <div className="mt-2 flex flex-wrap gap-2 font-normal">
             {choiceOptions.map((opt) =>
               opt.type === 'RESOLVE_KEY' ? (
-                <Button key={opt.option} variant="outline" size="sm" data-testid={`rr-key-${opt.option}`} disabled={busy} onClick={() => doAction(opt)}>
+                <Button
+                  key={opt.option}
+                  variant="outline"
+                  size="sm"
+                  data-testid={`rr-key-${opt.option}`}
+                  disabled={busy}
+                  onClick={() => doAction(opt)}
+                >
                   {opt.option === 'moves' ? 'Advance a wood + any track' : 'Score 10 points'}
                 </Button>
               ) : null,
@@ -350,12 +393,22 @@ export default function RussianRailroadsBoard({
 
       {/* A pending idea-token choice (pp. 18–19, 46): spend one unused idea token. */}
       {resolvingIdeaToken ? (
-        <div data-testid="rr-idea-token" className="rounded-lg border border-primary bg-primary/5 p-3 text-sm font-medium">
+        <div
+          data-testid="rr-idea-token"
+          className="rounded-lg border border-primary bg-primary/5 p-3 text-sm font-medium"
+        >
           <div>Choose an idea token (pg. 46):</div>
           <div className="mt-2 flex flex-wrap gap-2 font-normal">
             {choiceOptions.map((opt) =>
               opt.type === 'RESOLVE_IDEA_TOKEN' ? (
-                <Button key={opt.token} variant="outline" size="sm" data-testid={`rr-idea-token-${opt.token}`} disabled={busy} onClick={() => doAction(opt)}>
+                <Button
+                  key={opt.token}
+                  variant="outline"
+                  size="sm"
+                  data-testid={`rr-idea-token-${opt.token}`}
+                  disabled={busy}
+                  onClick={() => doAction(opt)}
+                >
                   {opt.token}
                 </Button>
               ) : null,
@@ -366,12 +419,22 @@ export default function RussianRailroadsBoard({
 
       {/* A pending idea-card choice (pg. 46–47), granted by the end-bonus idea token. */}
       {resolvingIdeaCard ? (
-        <div data-testid="rr-idea-card" className="rounded-lg border border-primary bg-primary/5 p-3 text-sm font-medium">
+        <div
+          data-testid="rr-idea-card"
+          className="rounded-lg border border-primary bg-primary/5 p-3 text-sm font-medium"
+        >
           <div>Choose an idea card (pg. 47):</div>
           <div className="mt-2 flex flex-wrap gap-2 font-normal">
             {choiceOptions.map((opt) =>
               opt.type === 'RESOLVE_IDEA_CARD' ? (
-                <Button key={opt.card} variant="outline" size="sm" data-testid={`rr-idea-card-${opt.card}`} disabled={busy} onClick={() => doAction(opt)}>
+                <Button
+                  key={opt.card}
+                  variant="outline"
+                  size="sm"
+                  data-testid={`rr-idea-card-${opt.card}`}
+                  disabled={busy}
+                  onClick={() => doAction(opt)}
+                >
                   {opt.card}
                 </Button>
               ) : null,

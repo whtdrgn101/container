@@ -46,13 +46,24 @@ export function resolveIdeaCard(
         { card },
       );
     }
-    return record(state, 'RESOLVE_IDEA_CARD', playerId, { pendingIdeaCard: null, ...continueTurn(state, seat) }, { card });
+    return record(
+      state,
+      'RESOLVE_IDEA_CARD',
+      playerId,
+      { pendingIdeaCard: null, ...continueTurn(state, seat) },
+      { card },
+    );
   }
 
   // The resource cards resolve immediately, then hand off.
   let updated = player;
   if (card === 'wood-worker') {
-    updated = { ...player, woodWorker: true, workersTotal: player.workersTotal + 1, workersAvailable: player.workersAvailable + 1 };
+    updated = {
+      ...player,
+      woodWorker: true,
+      workersTotal: player.workersTotal + 1,
+      workersAvailable: player.workersAvailable + 1,
+    };
   } else {
     updated = { ...player, coins: player.coins + IDEA_CARD_COINS[card]! };
   }

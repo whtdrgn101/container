@@ -24,7 +24,10 @@ describe('idea tokens (pg. 46–47)', () => {
     expect(after.pendingIdeaToken).toBeNull();
     // Re-using a spent token is refused (same seat still owes a fresh idea-token choice).
     const again = { ...after, pendingIdeaToken: { spaceId: 'x' }, activePlayerIndex: seat(s) };
-    expectError(() => applyAction(again, me(again).id, { type: 'RESOLVE_IDEA_TOKEN', token: 'twenty-points' }), 'IDEA_TOKEN_UNAVAILABLE');
+    expectError(
+      () => applyAction(again, me(again).id, { type: 'RESOLVE_IDEA_TOKEN', token: 'twenty-points' }),
+      'IDEA_TOKEN_UNAVAILABLE',
+    );
   });
 
   it('revaluation flips the valuation tile', () => {
@@ -82,8 +85,12 @@ describe('idea cards (pg. 47)', () => {
   it('engineer-coin grants a coin; extra-coins grants two', () => {
     const s = owingIdeaCard();
     const c0 = s.players[seat(s)]!.coins;
-    expect(applyAction(s, me(s).id, { type: 'RESOLVE_IDEA_CARD', card: 'engineer-coin' }).players[seat(s)]!.coins).toBe(c0 + 1);
-    expect(applyAction(s, me(s).id, { type: 'RESOLVE_IDEA_CARD', card: 'extra-coins' }).players[seat(s)]!.coins).toBe(c0 + 2);
+    expect(applyAction(s, me(s).id, { type: 'RESOLVE_IDEA_CARD', card: 'engineer-coin' }).players[seat(s)]!.coins).toBe(
+      c0 + 1,
+    );
+    expect(applyAction(s, me(s).id, { type: 'RESOLVE_IDEA_CARD', card: 'extra-coins' }).players[seat(s)]!.coins).toBe(
+      c0 + 2,
+    );
   });
 
   it('wood-move opens a wood moves lock (or forfeits if blocked)', () => {
@@ -93,7 +100,15 @@ describe('idea cards (pg. 47)', () => {
     // Blocked (every route full of wood): no lock, just hands off.
     const full = {
       ...s,
-      players: s.players.map((p, i) => (i === seat(s) ? { ...p, routes: p.routes.map((r) => ({ ...r, spaces: r.spaces.map(() => 'wood' as const) })), consumedSpecials: ['transsiberian-key-15', 'stpetersburg-key-9', 'kyiv-key-9', 'kyiv-worker-7'] } : p)),
+      players: s.players.map((p, i) =>
+        i === seat(s)
+          ? {
+              ...p,
+              routes: p.routes.map((r) => ({ ...r, spaces: r.spaces.map(() => 'wood' as const) })),
+              consumedSpecials: ['transsiberian-key-15', 'stpetersburg-key-9', 'kyiv-key-9', 'kyiv-worker-7'],
+            }
+          : p,
+      ),
     };
     const forfeit = applyAction(full, me(full).id, { type: 'RESOLVE_IDEA_CARD', card: 'wood-move' });
     expect(forfeit.pendingMoves).toBeNull();
@@ -117,8 +132,14 @@ describe('idea gating (applyAction)', () => {
     // With nothing pending, the resolutions are refused.
     const plain = newGame(2);
     expectError(() => applyAction(plain, me(plain).id, { type: 'RESOLVE_KEY', option: 'points' }), 'NO_PENDING_KEY');
-    expectError(() => applyAction(plain, me(plain).id, { type: 'RESOLVE_IDEA_TOKEN', token: 'keys' }), 'NO_PENDING_IDEA_TOKEN');
-    expectError(() => applyAction(plain, me(plain).id, { type: 'RESOLVE_IDEA_CARD', card: 'loco-9' }), 'NO_PENDING_IDEA_CARD');
+    expectError(
+      () => applyAction(plain, me(plain).id, { type: 'RESOLVE_IDEA_TOKEN', token: 'keys' }),
+      'NO_PENDING_IDEA_TOKEN',
+    );
+    expectError(
+      () => applyAction(plain, me(plain).id, { type: 'RESOLVE_IDEA_CARD', card: 'loco-9' }),
+      'NO_PENDING_IDEA_CARD',
+    );
     expectError(() => applyAction(plain, me(plain).id, { type: 'RESOLVE_REUSE', space: 'coins' }), 'NO_PENDING_REUSE');
   });
 
@@ -137,7 +158,10 @@ describe('idea gating (applyAction)', () => {
       'keys',
       'second-wrench',
     ]);
-    const itUsed = { ...it0, players: it0.players.map((p, i) => (i === seat(it0) ? { ...p, usedIdeaTokens: ['keys' as const] } : p)) };
+    const itUsed = {
+      ...it0,
+      players: it0.players.map((p, i) => (i === seat(it0) ? { ...p, usedIdeaTokens: ['keys' as const] } : p)),
+    };
     expect(legalActions(itUsed).some((a) => a.type === 'RESOLVE_IDEA_TOKEN' && a.token === 'keys')).toBe(false);
     // Idea cards.
     const ic0 = owingIdeaCard();

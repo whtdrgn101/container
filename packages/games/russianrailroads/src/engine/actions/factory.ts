@@ -54,7 +54,11 @@ export function placeFactory(state: RussianRailroadsState, playerId: string, fro
   const industry = placeFactoryInGap(player.industry, number);
   const updated = { ...player, industry };
 
-  const next = { ...state, players: withPlayer(state, seat, updated), supplies: { ...state.supplies, locomotives: supply } };
+  const next = {
+    ...state,
+    players: withPlayer(state, seat, updated),
+    supplies: { ...state.supplies, locomotives: supply },
+  };
   return record(state, 'PLACE_FACTORY', playerId, afterBuild(next, seat), { number, slot });
 }
 
@@ -84,6 +88,10 @@ export function replaceFactory(
   const supply = returnFactory(drawn.supply, replaced);
   const updated = { ...player, industry };
 
-  const next = { ...state, players: withPlayer(state, seat, updated), supplies: { ...state.supplies, locomotives: supply } };
+  const next = {
+    ...state,
+    players: withPlayer(state, seat, updated),
+    supplies: { ...state.supplies, locomotives: supply },
+  };
   return record(state, 'REPLACE_FACTORY', playerId, afterBuild(next, seat), { number: drawn.number, slot, replaced });
 }

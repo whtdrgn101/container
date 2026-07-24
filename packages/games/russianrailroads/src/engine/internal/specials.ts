@@ -99,7 +99,11 @@ export function settleSpecials(
       const withKey = { ...consumed, keysReceived: consumed.keysReceived + 1 };
       return { players: withPlayer(state, seat, withKey), changes: { pendingKey: { remaining: 1 } }, held: true };
     }
-    return { players: withPlayer(state, seat, consumed), changes: { pendingIdeaToken: { spaceId: next.id } }, held: true };
+    return {
+      players: withPlayer(state, seat, consumed),
+      changes: { pendingIdeaToken: { spaceId: next.id } },
+      held: true,
+    };
   }
   // No route special is due: the industry-track idea space (pg. 19) may still owe an idea-token choice.
   if (industryIdeaDue(player)) {
@@ -130,5 +134,8 @@ export function routeDoubled(player: RussianRailroadsPlayer, routeId: RouteId): 
  */
 export function bonusStarScore(player: RussianRailroadsPlayer): number {
   // Every `bonus-star` special carries `points` (see SPECIALS), so the sum reads it directly.
-  return SPECIALS.filter((s) => s.type === 'bonus-star' && specialMet(player, s)).reduce((sum, s) => sum + s.points!, 0);
+  return SPECIALS.filter((s) => s.type === 'bonus-star' && specialMet(player, s)).reduce(
+    (sum, s) => sum + s.points!,
+    0,
+  );
 }

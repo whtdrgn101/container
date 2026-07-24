@@ -46,7 +46,10 @@ describe('Russian Railroads (Track D package)', () => {
       await app.inject({
         method: 'POST',
         url: `/games/${id}/actions`,
-        payload: { playerId: g.players[g.activePlayerIndex]!.id, action: { type: 'RESOLVE_SETUP_BONUS', card: 'start-coins-2' } },
+        payload: {
+          playerId: g.players[g.activePlayerIndex]!.id,
+          action: { type: 'RESOLVE_SETUP_BONUS', card: 'start-coins-2' },
+        },
       });
     }
   };
@@ -311,7 +314,9 @@ describe('Russian Railroads (Track D package)', () => {
     };
     const xView = afterOnto.players.find((p) => p.id === X)!;
     expect(xView.industry.wrench).toBe(5); // moved onto the factory
-    expect(xView.actionPool).toEqual([{ id: 'factory:2#0', count: 1, colors: ['wood', 'green', 'bronze', 'silver', 'gold'] }]);
+    expect(xView.actionPool).toEqual([
+      { id: 'factory:2#0', count: 1, colors: ['wood', 'green', 'bronze', 'silver', 'gold'] },
+    ]);
     expect(afterOnto.players[afterOnto.activePlayerIndex]!.id).toBe(X); // turn kept to resolve the pool
 
     // A non-pool move is refused; resolving the credit opens the track lock, and a MOVE_TRACK spends it.
@@ -319,7 +324,10 @@ describe('Russian Railroads (Track D package)', () => {
     expect(refused.statusCode).toBe(409);
     expect(refused.json().error.code).toBe('POOL_PENDING');
     const resolving = await post(X, { type: 'RESOLVE_POOL', id: 'factory:2#0' });
-    expect((resolving.json().game as { pendingMoves: unknown }).pendingMoves).toEqual({ remaining: 1, colors: ['wood'] });
+    expect((resolving.json().game as { pendingMoves: unknown }).pendingMoves).toEqual({
+      remaining: 1,
+      colors: ['wood'],
+    });
     const spent = await post(X, { type: 'MOVE_TRACK', route: 'transsiberian' });
     expect((spent.json().game as { pendingMoves: unknown }).pendingMoves).toBeNull();
   });
@@ -338,7 +346,9 @@ describe('Russian Railroads (Track D package)', () => {
       payload: { playerId: active.id, action: { type: 'PASS' } },
     });
     const expected = ({ 1: 0, 2: 2, 3: 4, 4: 6 } as Record<number, number>)[active.turnOrderCard];
-    expect((passed.json().game as { log: { type: string; payload?: { passScore?: number } }[] }).log.at(-1)).toMatchObject({
+    expect(
+      (passed.json().game as { log: { type: string; payload?: { passScore?: number } }[] }).log.at(-1),
+    ).toMatchObject({
       type: 'PASS',
       payload: { passScore: expected },
     });

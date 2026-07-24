@@ -21,7 +21,9 @@ const withSupply = (state: RussianRailroadsState, locomotives: LocomotiveSupply)
 /** Set the active player's industry gap fills. */
 const withGaps = (state: RussianRailroadsState, factories: (number | null)[]): RussianRailroadsState => ({
   ...state,
-  players: state.players.map((p, i) => (i === state.activePlayerIndex ? { ...p, industry: { ...p.industry, factories } } : p)),
+  players: state.players.map((p, i) =>
+    i === state.activePlayerIndex ? { ...p, industry: { ...p.industry, factories } } : p,
+  ),
 });
 
 /** The industry of a specific seat (the *placer* — the turn may have passed after a build). */
@@ -83,7 +85,10 @@ describe('building a factory from a "loco or factory" space (pg. 12)', () => {
   it('refuses to build a factory with nothing in the supply (pg. 12)', () => {
     const base = withSupply(newGame(2), EMPTY);
     const me = activeId(base);
-    expectError(() => applyAction(base, me, { type: 'PLACE', space: 'loco-1', build: 'factory' }), 'FACTORY_UNAVAILABLE');
+    expectError(
+      () => applyAction(base, me, { type: 'PLACE', space: 'loco-1', build: 'factory' }),
+      'FACTORY_UNAVAILABLE',
+    );
   });
 
   it('refuses a factory resolution with no factory owed', () => {
@@ -111,7 +116,10 @@ describe('replacing factories once all 5 gaps are filled (pg. 12)', () => {
     const replaced = applyAction(owed, me, { type: 'REPLACE_FACTORY', slot: 1 });
     expect(industryOf(replaced, seat).factories).toEqual([2, 2, 4, 5, 6]); // slot 1 now holds the lowest #2
     expect(replaced.supplies.locomotives.returnedFactories[3] ?? 0).toBe(1); // the replaced #3 returned
-    expect(replaced.log.at(-1)).toMatchObject({ type: 'REPLACE_FACTORY', payload: { number: 2, slot: 1, replaced: 3 } });
+    expect(replaced.log.at(-1)).toMatchObject({
+      type: 'REPLACE_FACTORY',
+      payload: { number: 2, slot: 1, replaced: 3 },
+    });
   });
 
   it('REPLACE_FACTORY is illegal before all gaps are filled, or for a bad slot', () => {
@@ -122,7 +130,10 @@ describe('replacing factories once all 5 gaps are filled (pg. 12)', () => {
 
     const full = withGaps(newGame(2), [2, 3, 4, 5, 6]);
     const owed2 = applyAction(full, activeId(full), { type: 'PLACE', space: 'loco-1', build: 'factory' });
-    expectError(() => applyAction(owed2, activeId(full), { type: 'REPLACE_FACTORY', slot: 9 }), 'ILLEGAL_FACTORY_PLACEMENT');
+    expectError(
+      () => applyAction(owed2, activeId(full), { type: 'REPLACE_FACTORY', slot: 9 }),
+      'ILLEGAL_FACTORY_PLACEMENT',
+    );
   });
 });
 
@@ -164,7 +175,10 @@ describe('the 3-worker "locomotive AND factory" space (pg. 12)', () => {
 
   it('refuses the space when the supply cannot satisfy both (pg. 12)', () => {
     const base = withSupply(newGame(2), { stacks: { 2: 1 }, tens: [0, 0], returnedFactories: {} });
-    expectError(() => applyAction(base, activeId(base), { type: 'PLACE', space: 'loco-3', first: 'loco' }), 'FACTORY_UNAVAILABLE');
+    expectError(
+      () => applyAction(base, activeId(base), { type: 'PLACE', space: 'loco-3', first: 'loco' }),
+      'FACTORY_UNAVAILABLE',
+    );
   });
 });
 
@@ -181,7 +195,10 @@ describe('legalActions under a pending-factory lock (pg. 12)', () => {
 
   it('offers a REPLACE_FACTORY per slot × source once all gaps are filled', () => {
     // A returned #7 plus the lowest #2 → two sources, five slots = ten replacements.
-    const full = withGaps(withSupply(newGame(2), { stacks: { 2: 1 }, tens: [0, 0], returnedFactories: { 7: 1 } }), [2, 3, 4, 5, 6]);
+    const full = withGaps(
+      withSupply(newGame(2), { stacks: { 2: 1 }, tens: [0, 0], returnedFactories: { 7: 1 } }),
+      [2, 3, 4, 5, 6],
+    );
     const me = activeId(full);
     const owed = applyAction(full, me, { type: 'PLACE', space: 'loco-1', build: 'factory' });
     const replaces = legalActions(owed, me);
@@ -204,10 +221,7 @@ describe('legalActions under a pending-factory lock (pg. 12)', () => {
   it('offers only the factory option when the supply has a returned factory but no locomotive', () => {
     // No locomotives left, but a returned #6 sits in the supply → only a factory can be built.
     const noCoins = { stacks: {}, tens: [0, 0] as const, returnedFactories: { 6: 1 } };
-    const base = withSupply(
-      { ...newGame(2), players: newGame(2).players.map((p) => ({ ...p, coins: 0 })) },
-      noCoins,
-    );
+    const base = withSupply({ ...newGame(2), players: newGame(2).players.map((p) => ({ ...p, coins: 0 })) }, noCoins);
     const actions = legalActions(base, activeId(base));
     const loco1 = actions.filter((a) => a.type === 'PLACE' && a.space === 'loco-1');
     expect(loco1).toEqual([{ type: 'PLACE', space: 'loco-1', build: 'factory' }]);

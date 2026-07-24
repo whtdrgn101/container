@@ -13,7 +13,11 @@ import { advanceWrench, continueTurn, record, seatOf, withPlayer } from '../inte
  * shared / consumed; the ADAPTED model does not track that — a negligible difference for four small
  * bonuses, reconciled in RR9). Never mutates; throws typed.
  */
-export function resolveSetupBonus(state: RussianRailroadsState, playerId: string, cardId: string): RussianRailroadsState {
+export function resolveSetupBonus(
+  state: RussianRailroadsState,
+  playerId: string,
+  cardId: string,
+): RussianRailroadsState {
   const seat = seatOf(state, playerId);
   const player = state.players[seat]!;
   const card = STARTING_BONUS_CARDS.find((c) => c.id === cardId);

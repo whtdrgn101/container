@@ -77,7 +77,10 @@ describe('factory actions (pg. 13, 48 — the art ruling)', () => {
 
   it('triggerEffect: coins are choiceless, track moves become credits, inert yields nothing', () => {
     expect(triggerEffect(6)).toEqual({ coins: 1, move: null });
-    expect(triggerEffect(2)).toEqual({ coins: 0, move: { count: 1, colors: ['wood', 'green', 'bronze', 'silver', 'gold'] } });
+    expect(triggerEffect(2)).toEqual({
+      coins: 0,
+      move: { count: 1, colors: ['wood', 'green', 'bronze', 'silver', 'gold'] },
+    });
     expect(triggerEffect(4)).toEqual({ coins: 0, move: null });
   });
 });
