@@ -17,7 +17,7 @@
 // Per the scope brief, RR6 implements **draw-top from the pile** and leaves this ruling note; RR8 lands the
 // final call. The card is placed face-down in the player's `endBonus` slot (its scoring is still an RR8 stub).
 
-import type { EndBonusCard, TrackColor } from './constants';
+import type { TrackColor } from './constants';
 
 /** The five idea-token benefit types (pg. 46–47 — see the component ruling above). */
 export type IdeaTokenType =

@@ -75,7 +75,6 @@ describe('turn-order — claim spaces (pg. 16)', () => {
 
   it('refuses claiming the space below your own pawn (pg. 16)', () => {
     const base = newGame(4);
-    const seat = base.activePlayerIndex; // position 0
     expectError(() => place(base, activeId(base), 'turnorder-1'), 'TURN_ORDER_OWN_PAWN');
   });
 

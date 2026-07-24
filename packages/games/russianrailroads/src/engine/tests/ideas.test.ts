@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyAction, legalActions } from '../actions';
 import type { RussianRailroadsState } from '../core';
-import { activeId, expectError, newGame } from './helpers';
+import { expectError, newGame } from './helpers';
 
 const seat = (s: RussianRailroadsState) => s.activePlayerIndex;
 const me = (s: RussianRailroadsState) => s.players[s.activePlayerIndex]!;

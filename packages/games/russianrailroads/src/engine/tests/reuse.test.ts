@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyAction, legalActions } from '../actions';
 import type { RussianRailroadsPlayer, RussianRailroadsState } from '../core';
-import { activeId, expectError, newGame } from './helpers';
+import { expectError, newGame } from './helpers';
 
 /** A game in the reuse mini-phase with `queue` seats owing a reuse move. */
 function reusing(queue: number[], patch: Partial<RussianRailroadsPlayer> = {}): RussianRailroadsState {
