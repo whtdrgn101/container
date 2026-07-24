@@ -28,6 +28,14 @@ const games: readonly GameEntry[] = [
   { id: 'cantstop', module: './cantstop', client: './cantstop' },
   { id: 'stoneage', module: './stoneage', client: './stoneage' },
   { id: 'stpetersburg', module: './stpetersburg', client: './stpetersburg' },
+  // Russian Railroads — the Track D pilot: the first game hosted from its own in-workspace package
+  // (`@game-hub/game-russianrailroads`) rather than sibling folders in the backend/UI. Same GameEntry
+  // shape, package specifiers instead of relative paths.
+  {
+    id: 'russianrailroads',
+    module: '@game-hub/game-russianrailroads/module',
+    client: '@game-hub/game-russianrailroads/client',
+  },
 ];
 
 export default games;

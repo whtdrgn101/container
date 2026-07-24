@@ -74,7 +74,26 @@ contracts, compat re-exports everywhere); `games.config.ts` + checked-in registr
 freshness check; Tailwind `@source` for `packages/games/**`; `architecture.spec` driven by the
 config. Pure refactor — all four existing games untouched, every suite green.
 
-### RR1 — Package bootstrap + the worker-placement spine
+### RR1 — Package bootstrap + the worker-placement spine ✅ *(shipped)*
+Shipped as `@game-hub/game-russianrailroads` — the first `games.config.ts`-registered **package** (four
+subpath exports over TS source: `./engine`, `./module`, `./client`, `./bot`), added with one config
+entry + `pnpm generate`. The **engine** (100% coverage, 44 tests) is the pg. 4–6 setup + the
+`PLACE`/`PASS` turn loop: `createGame({rng})` deals the turn-order cards, the engineer A/B strip (7 slots
+at 4p, 6 at 2–3p, left-most empty at 3p), the end-bonus pile (2 removed unseen), a wood track on space 1
+of each route, the #1 loco, and per-count workers/coins/rounds; `place` occupies a space (worker OR coin,
+pg. 14) with the bottom track space as the never-occupied stub (pg. 9, move deferred to RR2); `pass` is
+round-terminal and, once all pass, closes the round (workers return, occupancy clears, engineer strip
+slides right, round++ or the stub shared-result end at the round count). `viewFor` redacts from day one
+(opponent end-bonus → held-count; pile → count), proven by a JSON wire test. The **module** (seat bounds
+2–4, palette, `PLACE`/`PASS` `parseAction`, error map; no routes/pendingStep/bots, schemaVersion v1) and a
+**read-only-ish client** (lazy board over the shared TurnBanner/ActivityFeed/GameOver, `canDrive`-gated)
+round it out. Tests: backend coexistence extended to **five real games + the counter stub** in one app
+(`module-seam`), a dedicated `russianrailroads.test.ts` (REST play + wire redaction), and
+`e2e/russianrailroads.spec.ts` (pick → place → pass → feed). The **bot** subpath exists but is empty
+(RR10). **Track D findings** logged below. *(Simple dealt turn order this slice; the full track is RR6.)*
+
+<details><summary>RR1 planned scope (retained)</summary>
+
 The first `games.config.ts`-registered **package**: state shape (players: workers/coins/routes/
 locos/industry/engineers/action-pool/end-bonus slot; shared: action-space occupancy, engineer strip,
 supplies, turn order, round), `createGame({rng})` with the pg. 4–6 setup (turn-order deal, engineer
@@ -85,6 +104,63 @@ coins-as-workers (pg. 14), pass → round end skeleton (workers/coins return, st
 7/6 rounds by count (pg. 22–23). Two placeholder actions (take-2-coins, the reusable bottom
 track space as a stub). Read-only board; engine 100%; coexistence + wire-redaction tests. *(Simple
 dealt turn order this slice; the full track is RR6.)*
+
+</details>
+
+## Track D findings log — RR1
+
+The design doc claims "adding a game = one entry in `games.config.ts` + `pnpm generate`." That's true for
+**registration** (one `GameEntry` with package specifiers, then codegen). But shipping the first game *as a
+package* over **TypeScript source** (not a built `dist`) still needed the hand-edits below. The recurring
+theme: the doc's §2 ("externalization forces a real `dist`") is **not** done here — we consume the package
+as source, like the engine — so every workspace assumption the doc says a `dist` would dissolve is *still
+present*, just relocated from `engine/` to the new package. Feed this back into the doc before any D2
+decision.
+
+**Config/registration (the intended path — zero friction):**
+- `games.config.ts` — one entry `{ id, module: '@game-hub/game-russianrailroads/module', client:
+  '.../client' }`; `pnpm generate` wrote both registries correctly and idempotently. ✔
+
+**Hand-edits still required (each a finding):**
+1. **`pnpm-workspace.yaml`** — added `packages/games/*`. The existing `packages/*` glob does not reach a
+   nested `packages/games/<game>/`, so pnpm never linked the package until this was added.
+2. **`backend/package.json`** — added `"@game-hub/game-russianrailroads": "workspace:*"`. The generated
+   backend registry `import`s `.../module`; without the dependency, tsx/node can't resolve it.
+3. **`ui/package.json`** — same dependency, for the same reason (the generated UI registry imports
+   `.../client`).
+4. **`backend/vitest.config.ts`** — widened `server.deps.inline` from `/@game-hub\/(engine|bot|kernel)/`
+   to include `game-`, so Vitest **transpiles** the TS-source game package instead of treating it as an
+   external dep. A `dist`-shipping package would not need this — this is a direct consequence of shipping
+   source.
+5. **`ui/vite.config.ts`** — added **one alias per subpath** the UI consumes
+   (`@game-hub/game-russianrailroads/client` → the source file), exactly the **touchpoint #2 duplication**
+   the doc predicted a `dist` would kill. It persists for TS-source packages. (Only `/client` is needed —
+   the client imports its own `./engine` via a relative path, so no `/engine` alias was required.)
+6. **`ui/tsconfig.json`** — added the package's `src/client` dir to `include`. A game package **cannot
+   fully typecheck its own client**: the client needs the shell's `@/*` path alias (for `@/lib/api`,
+   `@/components/*`) plus React/DOM libs, which live in the UI's tsconfig, not the package's. So the
+   package's own `tsconfig` covers only `engine`/`module`/`bot` (kernel-only deps), and the **UI host
+   typechecks the client**. This is the sharpest finding: the client subpath is not self-contained.
+7. **Package → UI coupling (no file edited, but a real dependency).** The client reaches into `ui/src`
+   through the `@` alias — `@/lib/api` (the transport DTOs `GamePayload`/`GameMessage`) and the shared
+   board chrome (`TurnBanner`/`ActivityFeed`/`GameOver`/`seatIdentity`). The kernel's `GameClient`/
+   `BoardProps` **contract** is neutral (good — the package binds it in `client/types.ts`), but the
+   **concrete transport types and shared components are UI-internal**. Until the shell exports them as a
+   package a game can depend on, a game client is not truly decoupled from this repo's UI.
+8. **Coexistence tests hard-code the game list.** Adding a game touched `backend/src/tests/module-seam.test.ts`
+   (catalog + "all games at once") and the exact-catalog assertions in `stoneage.test.ts` /
+   `stpetersburg.test.ts`. Expected (these are the *point* of a coexistence test), but worth noting the
+   list isn't derived.
+
+**Kernel-contract awkwardness (Track D signal for later slices):**
+- The module is typed `GameModule<State, Action>` from `@game-hub/kernel` with the host generics left at
+  their `unknown` defaults, and the generated `.register()` accepts it via **method bivariance** against
+  the backend's bound `GameModule<unknown, unknown, ModuleContext, FastifyInstance>`. Works cleanly *for a
+  module with no host hooks*. But **RR10's `createBotDriver(ctx: ModuleContext)` will want the backend's
+  concrete `ModuleContext`** — which lives in `backend/src/games/module.ts`, not the kernel. A bot-having
+  game package will need that bound context type exposed somewhere neutral, or it re-couples to the
+  backend. The kernel exposes `ModuleContext<Db, Hub, BotSeats>` generically, so the package can't name
+  the *concrete* one without the host. Flag for RR10 / any external pilot.
 
 ### RR2 — Track extension (wood) + per-round scoring
 The game's "produce" (digest §5): the track-extension action spaces (incl. the coin+worker space and

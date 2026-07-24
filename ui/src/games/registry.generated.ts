@@ -6,6 +6,7 @@ import containerClient from './container';
 import cantstopClient from './cantstop';
 import stoneageClient from './stoneage';
 import stpetersburgClient from './stpetersburg';
+import russianrailroadsClient from '@game-hub/game-russianrailroads/client';
 
 /**
  * A registered client with its state type erased. Only a game's own board may pair itself with its own
@@ -22,4 +23,5 @@ export const CLIENTS: readonly AnyGameClient[] = [
   cantstopClient as unknown as AnyGameClient,
   stoneageClient as unknown as AnyGameClient,
   stpetersburgClient as unknown as AnyGameClient,
+  russianrailroadsClient as unknown as AnyGameClient,
 ];

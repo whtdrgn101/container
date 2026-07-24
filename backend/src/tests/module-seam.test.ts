@@ -231,13 +231,14 @@ describe('hosting two games at once', () => {
 
   it('lists every hosted game in the catalog', async () => {
     const response = await app.inject({ method: 'GET', url: '/games/catalog' });
-    // The default registry ships the real games (Container, Can't Stop, Stone Age, Saint Petersburg);
-    // this test adds the counter stub on top, so all of them appear side by side.
+    // The default registry ships the real games (Container, Can't Stop, Stone Age, Saint Petersburg, and
+    // the Track D pilot Russian Railroads); this test adds the counter stub on top, so all appear side by side.
     expect((response.json().games as { id: string }[]).map((g) => g.id)).toEqual([
       'container',
       'cantstop',
       'stoneage',
       'stpetersburg',
+      'russianrailroads',
       'counter',
     ]);
   });
@@ -365,15 +366,16 @@ describe('hosting two games at once', () => {
     expect(response.json()).toEqual({ auction: null }); // nobody is at the island yet
   });
 
-  // The honest four-games check (SP7): all FOUR real games *and* the counter stub, live in one app
-  // instance at once — create one of each, drive a real move into each game's own engine, and list them
-  // all side by side. If the core had any per-game assumption left, a fourth game hosted beside three
-  // others is where it would surface.
-  it('hosts all four real games plus the counter stub at once — create, act, list', async () => {
+  // The honest all-games check (SP7, extended for RR1): all FIVE real games *and* the counter stub live
+  // in one app instance at once — create one of each, drive a real move into each game's own engine, and
+  // list them all side by side. Russian Railroads is the Track D pilot (hosted from its own package), so
+  // its presence here proves a package-shaped module routes exactly like the in-repo ones.
+  it('hosts all five real games plus the counter stub at once — create, act, list', async () => {
     const container = await createOf('container', threeNames);
     const cantstop = await createOf('cantstop', [{ name: 'Ann' }, { name: 'Bo' }]);
     const stoneage = await createOf('stoneage', [{ name: 'Ann' }, { name: 'Bo' }]);
     const stpetersburg = await createOf('stpetersburg', [{ name: 'Ann' }, { name: 'Bo' }]);
+    const russianrailroads = await createOf('russianrailroads', [{ name: 'Ann' }, { name: 'Bo' }]);
     const counter = await createOf('counter', [{ name: 'Ann' }, { name: 'Bo' }]);
 
     // The active seat of a freshly-dealt game, from the module's own summary (no field read off state).
@@ -399,6 +401,11 @@ describe('hosting two games at once', () => {
       (await act(stoneage.id, await activeOf(stoneage.id), { type: 'PLACE', place: 'forest', count: 1 })).statusCode,
     ).toBe(200);
     expect((await act(stpetersburg.id, await activeOf(stpetersburg.id), { type: 'PASS' })).statusCode).toBe(200);
+    // Russian Railroads: place a worker on the take-2-coins action space (RR1's PLACE).
+    expect(
+      (await act(russianrailroads.id, await activeOf(russianrailroads.id), { type: 'PLACE', space: 'coins' }))
+        .statusCode,
+    ).toBe(200);
     expect((await act(counter.id, 'p1', { type: 'BUMP', by: 1 })).statusCode).toBe(200);
 
     // All five are in the in-progress list, each tagged with its own type.
@@ -411,6 +418,7 @@ describe('hosting two games at once', () => {
     expect(byId.get(cantstop.id)).toBe('cantstop');
     expect(byId.get(stoneage.id)).toBe('stoneage');
     expect(byId.get(stpetersburg.id)).toBe('stpetersburg');
+    expect(byId.get(russianrailroads.id)).toBe('russianrailroads');
     expect(byId.get(counter.id)).toBe('counter');
   });
 

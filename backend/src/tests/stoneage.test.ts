@@ -29,7 +29,7 @@ describe('Stone Age bootstrap', () => {
 
   it('is listed in the catalog alongside the other games', async () => {
     const catalog = (await app.inject({ method: 'GET', url: '/games/catalog' })).json().games as { id: string }[];
-    expect(catalog.map((g) => g.id)).toEqual(['container', 'cantstop', 'stoneage', 'stpetersburg']);
+    expect(catalog.map((g) => g.id)).toEqual(['container', 'cantstop', 'stoneage', 'stpetersburg', 'russianrailroads']);
   });
 
   it('deals a fresh game with the Stone Age starting setup', async () => {

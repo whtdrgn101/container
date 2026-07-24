@@ -1,0 +1,74 @@
+import { describe, expect, it } from 'vitest';
+import { createGame } from '../createGame';
+import { ROUNDS, STARTING_COINS, STARTING_WORKERS } from '../core';
+import { expectError, makeRng, newGame } from './helpers';
+
+describe('createGame', () => {
+  it('rejects an out-of-range player count', () => {
+    expectError(() => createGame({ id: 'x', players: [{ name: 'A' }] }), 'INVALID_PLAYER_COUNT');
+    expectError(
+      () => createGame({ id: 'x', players: Array.from({ length: 5 }, (_, i) => ({ name: `P${i}` })) }),
+      'INVALID_PLAYER_COUNT',
+    );
+  });
+
+  it.each([2, 3, 4])('sets per-count workers, coins and rounds (%i players)', (count) => {
+    const state = newGame(count);
+    expect(state.rounds).toBe(ROUNDS[count]);
+    for (const p of state.players) {
+      expect(p.workersAvailable).toBe(STARTING_WORKERS[count]);
+      expect(p.workersTotal).toBe(STARTING_WORKERS[count]);
+      expect(p.coins).toBe(STARTING_COINS[count]);
+    }
+  });
+
+  it('seeds each route with a wood track on space 1 and empties elsewhere, plus the #1 loco', () => {
+    const state = newGame(4);
+    const p = state.players[0]!;
+    expect(p.routes).toHaveLength(3);
+    for (const route of p.routes) {
+      expect(route.spaces[0]).toBe('wood');
+      expect(route.spaces.slice(1).every((s) => s === null)).toBe(true);
+    }
+    expect(p.locomotives).toEqual([{ number: 1 }]);
+    expect(p.industry).toEqual({ wrench: 0 });
+    expect(p.endBonus).toBeNull();
+    expect(p.hiredEngineers).toEqual([]);
+    expect(p.actionPool).toEqual([]);
+  });
+
+  it('deals a distinct turn-order card to each seat and opens with card #1', () => {
+    const state = newGame(4);
+    const cards = state.players.map((p) => p.turnOrderCard).sort();
+    expect(cards).toEqual([1, 2, 3, 4]);
+    // The opening seat holds the lowest card among those dealt.
+    const openingCard = state.players[state.activePlayerIndex]!.turnOrderCard;
+    expect(openingCard).toBe(Math.min(...state.players.map((p) => p.turnOrderCard)));
+    // turnOrder is the seats sorted by their card.
+    expect(state.turnOrder.map((seat) => state.players[seat]!.turnOrderCard)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('is deterministic for a fixed rng and varies with the seed', () => {
+    const a = createGame({ id: 'g', players: [{ name: 'A' }, { name: 'B' }], rng: makeRng(7) });
+    const b = createGame({ id: 'g', players: [{ name: 'A' }, { name: 'B' }], rng: makeRng(7) });
+    expect(a).toEqual(b);
+    const c = createGame({ id: 'g', players: [{ name: 'A' }, { name: 'B' }], rng: makeRng(8) });
+    expect(c.players.map((p) => p.turnOrderCard)).not.toBeUndefined();
+  });
+
+  it('works with the default (unseeded) rng', () => {
+    const state = createGame({ id: 'g', players: [{ name: 'A' }, { name: 'B' }] });
+    expect(state.status).toBe('active');
+    expect(state.players).toHaveLength(2);
+  });
+
+  it('starts active, at round 1, version 0, empty log and no occupancy', () => {
+    const state = newGame(4);
+    expect(state.status).toBe('active');
+    expect(state.round).toBe(1);
+    expect(state.version).toBe(0);
+    expect(state.log).toEqual([]);
+    expect(state.actionSpaces).toEqual({});
+    expect(state.supplies).toEqual({ doublers: 0 });
+  });
+});

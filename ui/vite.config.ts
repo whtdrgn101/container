@@ -22,6 +22,13 @@ export default defineConfig({
       '@game-hub/engine/stpetersburg': fileURLToPath(
         new URL('../engine/src/games/stpetersburg/index.ts', import.meta.url),
       ),
+      // Track D pilot: Russian Railroads ships as an in-workspace package over TS source, so — exactly
+      // like the engine subpaths above — its client entry is aliased to source rather than resolved as a
+      // prebundled node_modules dep. Only `/client` is needed here (the client imports its own engine via
+      // a relative path within the package). This alias is a Track D finding — see the package ROADMAP.
+      '@game-hub/game-russianrailroads/client': fileURLToPath(
+        new URL('../packages/games/russianrailroads/src/client/index.ts', import.meta.url),
+      ),
     },
   },
   server: {
