@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { isGatherPlace, isUsePlace, legalActions, PLACE_CAPACITY, PLACES } from '@game-hub/engine/stoneage';
-import type { FixedPlaceId, StoneAgeView } from '@game-hub/engine/stoneage';
+import type { FixedPlaceId, StoneAgeState, StoneAgeView } from '@game-hub/engine/stoneage';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Meeple, PLACE_ICON } from './art';
@@ -62,7 +62,8 @@ export function BoardMap({ game, canDrive, busy, onPlace, onGather, onUse, seatC
   // Legal placements for the active player, collapsed to {min,max} per place.
   const options = new Map<FixedPlaceId, { min: number; max: number }>();
   if (canDrive && placing) {
-    for (const a of legalActions(game)) {
+    // legalActions enumerates moves off public state and never reads the redacted deck (§4.6) — safe cast.
+    for (const a of legalActions(game as unknown as StoneAgeState)) {
       if (a.type !== 'PLACE' || !(a.place in PLACE_LABEL)) continue;
       const place = a.place as FixedPlaceId;
       const cur = options.get(place);

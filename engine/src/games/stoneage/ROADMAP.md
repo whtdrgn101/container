@@ -333,6 +333,17 @@ hint (with a title/aria explanation) in place of the `n/m` line. **Bot**: no str
 symmetrically; the bar was re-committed to 25/32 per the calibrate-then-commit rule. 100% engine
 coverage held; a new e2e (`stoneage.spec.ts`) demonstrates the lock.
 
+### ✅ SA15 — Redact the undrawn card deck from the view (shipped 2026-07, REVIEW.md §4.6)
+
+`viewFor` no longer ships the face-down civilization-card draw pile. `StoneAgeView` drops `cardDeck` and
+carries `cardDeckCount: number` instead (computed in `viewFor`), so the shuffled draw order never leaves
+the engine boundary onto a REST reply or WS push — mirroring Saint Petersburg's day-one draw-stacks-as-
+counts convention (always present, **no reveal at `ended`**: the undrawn deck is dead info, not a player
+secret). The persisted state is unchanged (no `schemaVersion` bump). The view is now a strict projection,
+so board/bot cast it to `StoneAgeState` at the pure engine read-helpers (which never read the deck); a
+backend wire test proves no undrawn card id reaches a client while the count stays correct. *(The building
+stacks' unrevealed tiles are the same class of leak, left for a follow-up — see §4.6.)*
+
 ## Notes / scope
 
 - **Two randomness sources:** the card/building shuffle at `createGame` (via the injected rng, like

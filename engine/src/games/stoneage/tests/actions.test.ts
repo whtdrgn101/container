@@ -91,9 +91,27 @@ describe('legalActions', () => {
 });
 
 describe('viewFor', () => {
-  it('passes the whole state through with a viewer note (near-identity)', () => {
+  it('passes the public state through, redacting the undrawn deck to a count (§4.6)', () => {
     const state = makeState();
-    expect(viewFor(state, 'p1')).toEqual({ ...state, viewerId: 'p1' });
+    const { cardDeck, ...publicState } = state;
+    // Everything public survives verbatim; the deck is replaced by its count, contents gone.
+    expect(viewFor(state, 'p1')).toEqual({ ...publicState, cardDeckCount: cardDeck.length, viewerId: 'p1' });
     expect(viewFor(state, null).viewerId).toBeNull();
+    expect('cardDeck' in viewFor(state, 'p1')).toBe(false);
+  });
+
+  it('never puts an undrawn card id on the wire, even at game end (dead info, no reveal)', () => {
+    const dealt = makeState();
+    expect(dealt.cardDeck.length).toBeGreaterThan(0); // there is a real face-down deck to hide
+    const secretId = dealt.cardDeck[0]!.id;
+
+    const active = viewFor(dealt, null);
+    expect(active.cardDeckCount).toBe(dealt.cardDeck.length);
+    expect(JSON.stringify(active)).not.toContain(secretId);
+
+    // Unlike a scoring card, the undrawn deck is NOT revealed once the game has ended.
+    const ended = viewFor(makeState({ ...dealt, status: 'ended', results: [], winnerIds: ['p1'] }), null);
+    expect(ended.cardDeckCount).toBe(dealt.cardDeck.length);
+    expect(JSON.stringify(ended)).not.toContain(secretId);
   });
 });

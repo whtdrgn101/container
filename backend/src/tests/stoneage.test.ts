@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
+import { createGame } from '@game-hub/engine/stoneage';
 import { buildApp } from '../app';
 import { createDatabase } from '../db';
 import type { DB } from '../db';
+
+type WsClient = Awaited<ReturnType<FastifyInstance['injectWS']>>;
 
 /**
  * Stone Age bootstrap (roadmap SA0) over REST — the platform proof that a third game registers and
@@ -486,5 +489,92 @@ describe('Stone Age bots (SA12)', () => {
       (byPlayer) => (byPlayer as Record<string, number>)['p2'] !== undefined,
     );
     expect(p2Placed).toBe(true);
+  });
+});
+
+/** Pull-based reader over an injected WebSocket: `next()` resolves with the next JSON message. */
+function wsReader(socket: WsClient): () => Promise<{ type: string; game: { cardDeckCount: number } }> {
+  type Msg = { type: string; game: { cardDeckCount: number } };
+  const queue: Msg[] = [];
+  const pending: Array<(m: Msg) => void> = [];
+  socket.on('message', (raw: unknown) => {
+    const msg = JSON.parse(String(raw)) as Msg;
+    const resolve = pending.shift();
+    if (resolve) resolve(msg);
+    else queue.push(msg);
+  });
+  return () => (queue.length ? Promise.resolve(queue.shift()!) : new Promise<Msg>((r) => pending.push(r)));
+}
+
+/**
+ * §4.6 — the undrawn civilization-card deck is a secret (its order is the next cards to be dealt), so it
+ * must never leave the engine boundary: `viewFor` ships only a `cardDeckCount`. This is the honest proof,
+ * the SP wire-test pattern (`stpetersburg.test.ts`) mirrored — a serialized REST reply *and* WS push for a
+ * mid-game state carry no undrawn card id, while the count is present and correct.
+ */
+describe('Stone Age deck redaction (§4.6)', () => {
+  let db: DB;
+  let app: FastifyInstance;
+
+  beforeEach(async () => {
+    db = createDatabase();
+    // A constant rng near 1 keeps the civ deck in deck order (no shuffle), so the reference game built
+    // below deals an identical deck — giving us the exact undrawn card ids to prove stay off the wire.
+    app = buildApp({ db, rng: () => 0.9999 });
+    await app.ready();
+  });
+
+  afterEach(async () => {
+    await app.close();
+    db.close();
+  });
+
+  it('never puts an undrawn card id on the wire over REST or the WS, but sends the count', async () => {
+    // The engine reference: the same deterministic deck the app deals, so we know its undrawn ids.
+    const reference = createGame({ id: 'ref', players: [{ name: 'Ann' }, { name: 'Bob' }], rng: () => 0.9999 });
+    const undrawnIds = reference.cardDeck.map((c) => c.id);
+    const shownId = reference.cardDisplay.find((c) => c !== null)!.id; // a face-up card that MUST be on the wire
+    expect(undrawnIds.length).toBe(32); // 36-card deck − 4 dealt to the display
+    expect(undrawnIds).not.toContain(shownId);
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/games',
+      payload: { gameType: 'stoneage', players: [{ name: 'Ann' }, { name: 'Bob' }] },
+    });
+    const id = created.json().game.id as string;
+
+    // Advance to a genuine mid-game position (round 1, actions phase) without buying a card, so the deck
+    // is unchanged from setup and its undrawn ids still match the reference.
+    await app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId: 'p1', action: { type: 'PLACE', place: 'forest', count: 5 } },
+    });
+    await app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId: 'p2', action: { type: 'PLACE', place: 'clayPit', count: 5 } },
+    });
+
+    // REST: the count is present and correct; the raw serialized game carries no undrawn card id, and
+    // there is no `cardDeck` array at all — but the face-up display card is there.
+    const rest = await app.inject({ method: 'GET', url: `/games/${id}` });
+    expect(rest.json().game.phase).toBe('actions'); // mid-game
+    expect(rest.json().game.cardDeckCount).toBe(32);
+    expect(rest.json().game.cardDeck).toBeUndefined();
+    const restWire = JSON.stringify(rest.json().game);
+    for (const cardId of undrawnIds) expect(restWire).not.toContain(cardId);
+    expect(restWire).toContain(shownId); // the public display is not redacted
+
+    // WS push: the same redaction holds on the real-time channel.
+    const socket = await app.injectWS(`/games/${id}/stream`);
+    const next = wsReader(socket);
+    const initial = await next();
+    expect(initial.type).toBe('state');
+    expect(initial.game.cardDeckCount).toBe(32);
+    const wsWire = JSON.stringify(initial.game);
+    for (const cardId of undrawnIds) expect(wsWire).not.toContain(cardId);
+    socket.close();
   });
 });

@@ -1,5 +1,5 @@
 import { CARD_SYMBOLS, CIV_CARD_DECK, placedBy, RESOURCES } from '@game-hub/engine/stoneage';
-import type { StoneAgePlayer, StoneAgeView } from '@game-hub/engine/stoneage';
+import type { StoneAgePlayer, StoneAgeState, StoneAgeView } from '@game-hub/engine/stoneage';
 import { cn } from '@/lib/utils';
 import { CardIcon, FieldIcon, FoodIcon, Hut, Meeple, ResourceIcon, SYMBOL_ICON, ToolIcon } from './art';
 
@@ -55,6 +55,8 @@ function MultChip({ icon, count, stat, label }: { icon: React.ReactNode; count: 
  * "Food track: n" wording the e2e asserts.
  */
 export function PlayerPanel({ game, player, seat, detailed, seatColor }: PlayerPanelProps) {
+  // placedBy reads only public placements, never the redacted deck (§4.6) — safe cast to the engine state.
+  const engineState = game as unknown as StoneAgeState;
   const engines = cardEngines(player);
   const toolValue = player.tools.reduce((sum, v) => sum + v, 0);
   const greenPts = engines.symbols.size * engines.symbols.size;
@@ -82,7 +84,7 @@ export function PlayerPanel({ game, player, seat, detailed, seatColor }: PlayerP
         <span className="flex items-center gap-1" title="People placed / total">
           <Meeple className="h-3 w-3 opacity-60" />
           <span className="tabular-nums">
-            {placedBy(game, player.id)}/{player.people}
+            {placedBy(engineState, player.id)}/{player.people}
           </span>
         </span>
         <span className="flex items-center gap-1" title={`Food track: ${player.foodTrack}`}>
@@ -153,7 +155,7 @@ export function PlayerPanel({ game, player, seat, detailed, seatColor }: PlayerP
           <Meeple className={cn('h-3.5 w-3.5', seatColor.text)} />
           People:{' '}
           <span className="font-medium tabular-nums">
-            {placedBy(game, player.id)}/{player.people}
+            {placedBy(engineState, player.id)}/{player.people}
           </span>{' '}
           placed
         </span>

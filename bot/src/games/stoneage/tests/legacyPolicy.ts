@@ -30,6 +30,7 @@ import type {
   PlaceId,
   Resource,
   StoneAgePlayer,
+  StoneAgeState,
   StoneAgeView,
 } from '@game-hub/engine/stoneage';
 import type { Payment } from '@game-hub/engine/stoneage';
@@ -62,7 +63,8 @@ function desiredCount(player: StoneAgePlayer, place: PlaceId, max: number): numb
 function pickPlacement(view: StoneAgeView, playerId: string): { place: PlaceId; count: number } {
   const player = view.players[view.activePlayerIndex]!;
   const options = new Map<PlaceId, { min: number; max: number }>();
-  for (const action of legalActions(view, playerId)) {
+  // §4.6: the view redacts the undrawn deck, which legalActions never reads — safe cast for enumeration.
+  for (const action of legalActions(view as unknown as StoneAgeState, playerId)) {
     if (action.type !== 'PLACE') continue;
     const cur = options.get(action.place);
     options.set(action.place, {

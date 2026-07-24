@@ -44,9 +44,10 @@ That's a high floor. Two things qualify it:
   - [x] 3.4 hoist the bot drive-loop (+ the two safe bot-package extractions)
   - [x] 3.3 UI shell fields + shared board components
   - [x] 3.1 end-state discriminated union
-- [~] **Tier 4 — ops hardening** — 4.1 (state-schema migration), 4.2 (optimistic concurrency),
-  4.3 (lobby poll bounds + retention), 4.4 (graceful shutdown, DB-checking health, WAL-safe backups)
-  and 4.7 (rate limit, WS origin/cap/maxPayload, input bounds) done; 4.5/4.6 open
+- [x] **Tier 4 — ops hardening** — 4.1 (state-schema migration), 4.2 (optimistic concurrency),
+  4.3 (lobby poll bounds + retention), 4.4 (graceful shutdown, DB-checking health, WAL-safe backups),
+  4.7 (rate limit, WS origin/cap/maxPayload, input bounds), 4.6 (Stone Age card-deck redaction), and
+  4.5 (slim, non-root Docker image with esbuild-bundled backend) all done
 - [ ] **Tier 5 — worth knowing**
 
 ---
@@ -455,7 +456,24 @@ but the DB runs in **WAL mode** — copying it alone while the server runs omits
 `-wal` sidecar, giving a silently stale or torn backup. Use `VACUUM INTO` (atomic, WAL-correct, works
 on a live DB).
 
-### 4.5 The image ships the dev toolchain, as root
+### 4.5 The image ships the dev toolchain, as root ✅
+
+> **Done.** The backend now has a `build` script — `esbuild src/server.ts --bundle --platform=node
+> --format=esm --target=node22 --external:better-sqlite3` → one `backend/dist/server.js` that **inlines**
+> the workspace TS deps (`@game-hub/engine`, `@game-hub/bot`), leaving only native `better-sqlite3`
+> external. That's the crux the original note called out: those packages export **`.ts` source** (no
+> `.` entry), so neither a plain `node`-run nor a `tsc`-only backend build could resolve them — esbuild
+> transpiling+inlining the source is the seam that fits. The **runtime stage** (`node:22-bookworm-slim`)
+> now copies just the bundle, `ui/dist`, and a production-only `node_modules` from
+> `pnpm deploy --legacy --prod` (carrying the *compiled* SQLite binding — no recompile) — **no
+> tsx/vitest/vite/tailwind/typescript**. It runs as the unprivileged **`node`** user (with `/data`
+> chowned to it) and has an **in-image `HEALTHCHECK`** (Node `fetch` to `/health`, since slim has no
+> curl/wget), so `docker run` users get health status too. The bundle is **boot-proven in the build
+> stage** by `backend/scripts/smoke.mjs` (spawns `node dist/server.js`, curls `/health`, creates a game
+> over REST) so a broken bundle fails `docker build`, not prod. `docker-compose.yml` gained
+> `mem_limit: 512m` + json-file log rotation. **Image size: 673 MB → 375 MB** (measured
+> before/after via `docker build`); root `pnpm build` now includes the backend. *(Original finding
+> follows.)*
 
 `COPY --from=build /app /app` brings the whole build stage, including ~205 MB of `node_modules`
 carrying vitest, typescript, tailwind, vite and Playwright. No `USER` directive, no `HEALTHCHECK` in
@@ -478,6 +496,27 @@ are drafted from a public display; face-down stacking in the physical game is a 
 info). **Decision 2026-07-21: deferred** — redacting means splitting server state from the client view
 shape for a game whose view is otherwise the whole state, a larger refactor than the leak warrants for
 trusted-LAN play. If it's ever done, redact in `viewFor` (deck → count), never in the UI.
+
+> **Done (SA15, 2026-07-24) — the card deck.** `engine/src/games/stoneage/view.ts` no longer passes the
+> undrawn `cardDeck` through: `StoneAgeView` drops the array and carries `cardDeckCount: number`, computed
+> in `viewFor`, so the full draw order never crosses the engine boundary onto any REST reply or WS push.
+> The persisted **state** is unchanged (views aren't persisted — no `schemaVersion` bump). Mirrors Saint
+> Petersburg's day-one convention (`stpetersburg/view.ts` ships draw stacks as counts): the count is
+> **always** present, with **no reveal at `ended`** — the undrawn deck is dead information, not a player
+> secret to unmask like a scoring card. Consumers updated: the bot's `remainingRounds` reads
+> `cardDeckCount` (it only ever read `.length`, so **no cheating** — it never saw deck contents); the view
+> is now a strict projection, not a superset of the state, so the board / bot cast it to `StoneAgeState`
+> at the pure engine read-helpers (`legalActions` / `availableToPlace` / `placedBy`, none of which read
+> the deck) — the same safe cast Container's board already uses. The honest proof is a wire test in
+> `backend/src/tests/stoneage.test.ts` (SP0 pattern): a serialized mid-game REST reply **and** WS push
+> carry no undrawn card id while `cardDeckCount` is present and correct. Engine 100% gate, bot 90% gate,
+> backend coverage, typecheck, lint and the Stone Age e2e all green.
+>
+> **Still open — the building stacks.** The other half of the original note (each building stack's
+> unrevealed tiles beneath its face-up top ride the wire) is the same class of future-info leak but was
+> **out of this fix's scope** and remains: redacting it reshapes how the board renders the stacks and how
+> the bot reads them (a bigger, separate change), and it's harmless on trusted LAN. Do it the same way
+> when it matters — in `viewFor`, top tile + count, never in the UI.
 
 ### 4.7 Security footguns (the no-auth choice is fine; these are orthogonal) ✅
 

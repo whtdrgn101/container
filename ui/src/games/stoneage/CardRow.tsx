@@ -14,6 +14,7 @@ import type {
   PlaceId,
   Resource,
   StoneAgePlayer,
+  StoneAgeState,
   StoneAgeView,
 } from '@game-hub/engine/stoneage';
 import { Button } from '@/components/ui/button';
@@ -150,7 +151,8 @@ export function CardRow({
             !!card &&
             occupants.length === 0 &&
             !!active &&
-            availableToPlace(game, active.id) >= 1;
+            // Placement room is public state; availableToPlace never reads the redacted deck (§4.6) — safe cast.
+            availableToPlace(game as unknown as StoneAgeState, active.id) >= 1;
           const draft = pay[slot] ?? {};
           const canAcquire =
             acting && canDrive && mineHere && !!card && !!active && cardPaymentError(slot, draft, active) === null;

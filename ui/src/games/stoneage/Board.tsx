@@ -18,6 +18,7 @@ import type {
   FixedPlaceId,
   PlaceId,
   Resource,
+  StoneAgeState,
   StoneAgeView,
 } from '@game-hub/engine/stoneage';
 import { Button } from '@/components/ui/button';
@@ -93,6 +94,9 @@ export default function StoneAgeBoard({
   // Tools selected to add to the pending dice roll (by index into the player's tools).
   const [selectedTools, setSelectedTools] = useState<number[]>([]);
 
+  // The redacted view (§4.6: no undrawn `cardDeck`) fed to engine read helpers, which enumerate moves /
+  // placement room off public state alone and never inspect the deck. Safe cast, same as Container's board.
+  const engineState = game as unknown as StoneAgeState;
   const active = game.players[game.activePlayerIndex];
   // Seat binding is a platform rule (shared `seatIdentity`, §3.3) — Stone Age no longer hand-rolls it,
   // which is why it now has the "You are X" line the copy-paste version silently dropped.
@@ -171,7 +175,7 @@ export default function StoneAgeBoard({
       })()
     : { produced: 0, shortfall: 0, canPay: true };
 
-  const remaining = active ? availableToPlace(game, active.id) : 0;
+  const remaining = active ? availableToPlace(engineState, active.id) : 0;
   const waitingFor = active?.name ?? 'the next player';
   const banner =
     game.status === 'ended'
@@ -428,7 +432,7 @@ export default function StoneAgeBoard({
                 !!top &&
                 occupants.length === 0 &&
                 !!active &&
-                availableToPlace(game, active.id) >= 1;
+                availableToPlace(engineState, active.id) >= 1;
               const draft = pay[i] ?? {};
               const draftCount = RESOURCES.reduce((sum, r) => sum + (draft[r] ?? 0), 0);
               const canBuild =

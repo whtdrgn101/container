@@ -21,6 +21,7 @@ import type {
   PlaceId,
   Resource,
   StoneAgePlayer,
+  StoneAgeState,
   StoneAgeView,
 } from '@game-hub/engine/stoneage';
 import type { Payment } from '@game-hub/engine/stoneage';
@@ -108,7 +109,7 @@ export function heldScoring(player: StoneAgePlayer): {
 export function remainingRounds(view: StoneAgeView): number {
   const byBuildings = Math.min(...view.buildings.map((stack) => stack.length));
   const buysPerRound = Math.min(view.players.length, 2.5);
-  const byCards = Math.ceil(view.cardDeck.length / buysPerRound);
+  const byCards = Math.ceil(view.cardDeckCount / buysPerRound);
   return Math.max(1, Math.min(byBuildings, byCards, 12));
 }
 
@@ -340,7 +341,9 @@ export function pickPlacement(view: StoneAgeView, playerId: string): { place: Pl
 
   let best: { place: PlaceId; count: number } | null = null;
   let bestScore = -Infinity;
-  for (const action of legalActions(view, playerId)) {
+  // legalActions enumerates moves off public state and never reads the redacted deck (§4.6) — safe cast,
+  // the same shape SP's bot uses to drive engine enumeration off a redacted view.
+  for (const action of legalActions(view as unknown as StoneAgeState, playerId)) {
     if (action.type !== 'PLACE') continue;
     const score =
       placementValue(view, player, action.place, action.count, roundsLeft, residual) -
