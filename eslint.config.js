@@ -50,6 +50,14 @@ export default tseslint.config(
     },
   },
 
+  // Node scripts (e.g. the Docker build's bundle smoke-proof) run under Node with its globals.
+  {
+    files: ['**/scripts/**/*.{mjs,js}'],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+  },
+
   // React + hooks — scoped to the UI package only (nothing else renders JSX).
   {
     ...react.configs.flat.recommended,

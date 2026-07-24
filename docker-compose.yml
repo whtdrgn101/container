@@ -17,6 +17,15 @@ services:
       com.centurylinklabs.watchtower.enable: 'true'
     ports:
       - '8080:3001'
+    # A single Node process serving a SQLite-backed board-game hub is light; cap it so a runaway
+    # (a leak, a busy loop) can't starve the NAS. Bump if you host many concurrent games.
+    mem_limit: 512m
+    # Rotate the JSON logs so an old container's request log can't quietly fill the disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
     environment:
       HOST: 0.0.0.0
       PORT: '3001'

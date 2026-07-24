@@ -5,5 +5,7 @@
     "noEmit": false
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts"]
+  // bench.ts is the console-printing bench driver (run via tsx, env-gated) — a dev tool, not part of
+  // the distributable surface, and the pure bot package deliberately has no Node types to compile it.
+  "exclude": ["src/**/*.test.ts", "src/bench.ts"]
 }

@@ -223,8 +223,9 @@ there is deliberately **no `.` entry**. Consumers import a specific game's surfa
 shared `@game-hub/engine/kernel`. No game is a privileged default, mirroring the backend rule "resolve
 the module from the row, never a default". Both consumers transpile the TS source directly:
 
-- **backend** — `tsx` (dev/prod-start) and Vitest (`server.deps.inline: [/@game-hub\/engine/]`)
-  transform the TS source across the workspace boundary; the subpath `exports` map resolves each game.
+- **backend** — `tsx` (dev), Vitest (`server.deps.inline: [/@game-hub\/engine/]`), and — for the
+  production image — **esbuild**, which *inlines* the engine/bot TS source into one bundle. All three
+  transform the TS across the workspace boundary; the subpath `exports` map resolves each game.
 - **ui** — `vite.config.ts` has **one alias per subpath** (`/container`, `/cantstop`, `/stoneage`,
   `/stpetersburg`, `/kernel`) → the matching `engine/src/…` file, so Vite bundles it as project source. This also gives
   the **frontend shared types** (`CantStopState`, `StoneAgeState`, `Color`, …) for free.
@@ -474,14 +475,30 @@ docker run -d -p 8080:3001 -v game-hub-game-data:/data game-hub:latest  # → ht
 ## Deployment (home server / Portainer)
 
 A single Docker image serves the built UI **and** the API on one port (`Dockerfile`, multi-stage:
-build UI + native SQLite, then a slim Node runtime). The backend serves `ui/dist` as static files when
-`UI_DIST` is set and falls back to `index.html` for non-API GETs (SPA); in a production build the UI's
-API base is same-origin (`import.meta.env.PROD ? '' : '/api'`), so there's no CORS/proxy. Games persist
-to `DATABASE_PATH` (default `/data/game-hub.sqlite`) — mount `/data` to a volume so they survive
-restarts/updates. `docker-compose.yml` maps host `8080` → container `3001`; **[`DEPLOY.md`](./DEPLOY.md)**
-has Portainer stack instructions. No auth (trusted-LAN use). When adding a top-level API route, update
-the `setNotFoundHandler` allowlist regex in `app.ts` (`/^\/(games|lobbies|health)\b/`) so it isn't
+build UI + native SQLite + **bundle the backend**, then a genuinely slim Node runtime). The backend
+serves `ui/dist` as static files when `UI_DIST` is set and falls back to `index.html` for non-API GETs
+(SPA); in a production build the UI's API base is same-origin (`import.meta.env.PROD ? '' : '/api'`), so
+there's no CORS/proxy. Games persist to `DATABASE_PATH` (default `/data/game-hub.sqlite`) — mount
+`/data` to a volume so they survive restarts/updates. `docker-compose.yml` maps host `8080` →
+container `3001` (and caps memory + rotates logs); **[`DEPLOY.md`](./DEPLOY.md)** has Portainer stack
+instructions. No auth (trusted-LAN use). When adding a top-level API route, update the
+`setNotFoundHandler` allowlist regex in `app.ts` (`/^\/(games|lobbies|health)\b/`) so it isn't
 swallowed by the SPA fallback.
+
+**The runtime image is bundled, not the whole build tree (§4.5).** The backend has a `build` script —
+`esbuild src/server.ts --bundle --platform=node --format=esm --external:better-sqlite3` → one
+`backend/dist/server.js` that **inlines** the workspace TS deps (`@game-hub/engine`, `@game-hub/bot`).
+This is what makes a slim image possible: those packages export **`.ts` source** (no `.` entry), so a
+plain `node`-run of the backend can't resolve them and a `tsc`-only build of the backend can't either —
+esbuild transpiling+inlining the source is the seam that fits (see "How the shared engine is consumed").
+The **only** external is native `better-sqlite3`; the runtime ships just Node + the bundle + a
+production-only `node_modules` (from `pnpm deploy --prod`, carrying the *compiled* SQLite binding) + the
+static UI. **No tsx/vitest/vite/tailwind/typescript in the image, and it runs as the unprivileged `node`
+user with an in-image `HEALTHCHECK`.** *(This retires the old trap: the CMD used to be `tsx src/server.ts`
+with `tsx` a devDependency, so the image had to keep the whole dev toolchain — a naive `--prod` install
+broke startup. The bundle removes tsx from the runtime entirely.)* The bundle is boot-proven in the build
+stage by `backend/scripts/smoke.mjs` (spawns `node dist/server.js`, hits `/health`, creates a game over
+REST), so a broken bundle fails `docker build` instead of crash-looping in prod.
 
 ## Testing strategy
 

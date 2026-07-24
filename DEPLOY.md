@@ -13,6 +13,12 @@ LAN and share the URL with family/friends.
 - Games persist to `DATABASE_PATH` (default `/data/game-hub.sqlite`). Mount `/data` to a volume so
   they survive restarts and image updates.
 
+The image is **slim**: the backend is bundled (esbuild) into a single `backend/dist/server.js`, so the
+runtime ships only Node, that bundle, the native SQLite module and the static UI — no dev toolchain
+(no vite/tailwind/vitest/typescript/tsx), no package manager. It runs as the unprivileged **`node`**
+user and carries its **own `HEALTHCHECK`** (`GET /health`), so even a bare
+`docker run` — with no compose file — gets container health status and auto-restart-on-unhealthy.
+
 ### Environment variables
 
 | Var             | Default                   | Notes                                        |
@@ -126,7 +132,9 @@ stale `game-hub.sqlite-wal` / `-shm` alongside it), and starting again.
 - **WebSockets** work through the single port; if you put a reverse proxy in front, allow WS upgrades
   on `/games/:id/stream`.
 - **Health check.** `GET /health` runs a real `SELECT 1` against the database and returns `503` if it
-  can't reach it, so the compose healthcheck + `restart: unless-stopped` actually fire on a locked or
-  unmounted volume — not just when the process dies. It's what the compose `healthcheck` polls.
+  can't reach it, so the healthcheck + `restart: unless-stopped` actually fire on a locked or
+  unmounted volume — not just when the process dies. The **image itself** has a `HEALTHCHECK` (probing
+  with Node's `fetch`, since the slim image has no curl/wget), so `docker run` users get it too; the
+  compose file also declares one (identical command) for `depends_on` ordering and clarity.
 - **Graceful shutdown.** The server handles `SIGTERM`/`SIGINT` (what `docker stop` and Ctrl-C send):
   it drains in-flight requests and closes the database cleanly before exiting.
