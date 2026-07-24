@@ -210,10 +210,55 @@ on the board but wait for **RR3**'s colour access (`accessibleColors` is a stub 
 one seam RR3 fills). Adding those eight spaces now would be spaces nobody could place on. St. Petersburg's
 ×2 and Kyiv's star spaces (route-special scoring) are RR6; doublers are RR3; industry scoring is RR5.
 
-### RR3 — The color ladder + doublers
-Unlock thresholds (Trans-Siberian 2/6/10/15 → green/bronze/silver/gold, pg. 8–9), strict build
-order, per-route color availability (5/4/3), valuation-tile values for silver/gold (art ruling #1),
-**doubler tiles** (left-to-right above the route, supply-limited, pg. 14), temp workers (pg. 15).
+### RR3 — The color ladder + doublers + temp workers ✅ *(shipped)*
+The colour ladder made real. Shipped: the **unlock thresholds** (the wood track reaching Trans-Siberian
+space 2/6/10/15 grants green/bronze/silver/gold access — computed, not stored); **per-route colour
+availability** (Trans-Sib 5, St. Pete 4, Kyiv 3); the eight **dedicated colour action spaces** (green
+1w→2/2w→3, bronze/silver/gold 1w→1/2w→2, read off the board); `MOVE_TRACK`'s **colour choice** de-stubbed
+(the lock's `colors` constraint is real, a new colour **enters at space 1** then relocates forward, no
+leapfrog); **doubler tiles** (1 worker → the leftmost Trans-Siberian doubler space, shared supply of 30,
+doubles that space's points every round — the pg. 20 example); **temporary workers** (1 worker → the 2
+turquoise workers, usable this round, returned at round end). Engine 100% (**85 tests**, +20 across new
+`colorLadder`/`doubler`/`tempWorkers` files); a backend REST test drives a doubler + a colour unlock over
+the wire; the client gained a colour picker (`rr-build-<route>-<colour>` on a multi-colour lock), doubler
+badges, a temp-worker readout, and legal-move-gated action buttons; `e2e/russianrailroads.spec.ts` extended
+with a green build after unlock. Rulings landed below. **Track D findings: none new** (self-contained
+inside the package, like RR2 — no host file touched, registries unchanged).
+
+**RR3 rulings (with evidence):**
+- **Unlock trigger — LANDED (pg. 8–9).** "As soon as you reach or pass space N on your Trans-Siberian
+  route [with your **wood** track] … take the X tracks." Thresholds green 2 / bronze 6 / silver 10 / gold
+  15, gated on the **wood** frontier of the **Trans-Siberian** route (`UNLOCK_SPACE`). Access is **global**
+  (buildable on any route that supports the colour) and **monotonic** (wood only advances). The unlock
+  grants **access only** — the tracks go to supply; **no immediate free move** (verified pp. 8–9 grant no
+  moves; the "new track" grant icons are access markers, not move spaces).
+- **Colour-entry rule — LANDED (pg. 9 example + pg. 20).** A new colour **enters at space 1** as its first
+  move, then relocates forward. Tracks are **not** in a fixed colour order along a route — pg. 9 shows green
+  behind bronze, pg. 20 shows bronze behind green; the only positional rule is onto-empty-only / no-leapfrog
+  (already in `canAdvance`). "Strict build order wood→green→bronze→silver→gold" (pg. 9) is the **access-tier**
+  order, enforced automatically by the ascending thresholds — **not** a per-route positional constraint.
+- **Per-route colours + supply reconciliation — LANDED (pg. 9 / board colour strips at 300 DPI).**
+  Trans-Sib wood/green/bronze/silver/gold, St. Pete wood/green/bronze/silver, Kyiv wood/green/bronze. This
+  **reconciles** the pg. 3 contents "12 tracks: 3×,3×,3×,2×,1×": each colour appears on exactly as many
+  routes as it has tracks (wood/green/bronze ×3, silver ×2, gold ×1), so the per-player supply is **emergent**
+  from route availability + the one-tile-per-colour-per-route model — **no separate supply count is stored**.
+- **Trans-Siberian length = 15 — LANDED (pg. 6 board art).** Spaces 1–9 across the top, corner space 10,
+  11–15 down the right edge — the length the gold threshold (space 15) needs. St. Pete/Kyiv kept at the RR2
+  placeholders (7/8); the board reads 9/9, but exact non-Trans-Siberian lengths are RR6 and don't affect the
+  ladder (which is gated on the Trans-Siberian). *(A latent bug avoided: at length 10 gold could never
+  unlock.)*
+- **Doubler spaces = 8 — LANDED (pg. 6, 14).** Eight doubler spaces above Trans-Siberian spaces 1–8, filled
+  left-to-right, ≤1 per space, shared supply 30. A doubler over space _i_ doubles that space's scored points
+  each round; the count persists across rounds (tiles stay on the board). Modelled as a per-player prefix
+  count 0–8.
+- **Temp workers — LANDED (pg. 15).** The 2 turquoise workers fold into `workersAvailable` for the round and
+  a `tempWorkers` count; the round-end reset (`workersAvailable = workersTotal`, `tempWorkers = 0`) returns
+  them. "Not the turn taken" is automatic — taking them is a normal `PLACE` that passes the turn. Only one
+  holder at a time (the single action space is occupied once used).
+
+**Scope deferred (as designed):** St. Petersburg's ×2 / Kyiv's star route-specials, the wood-prerequisite /
+key / new-worker / bonus-star spaces along the routes, and exact St. Pete/Kyiv lengths are RR6; locomotives
+RR4; industry (the doubler's cousin on the industry track) RR5.
 
 ### RR4 — Locomotives
 Lowest-available acquisition, route capacity (2/1/1), reach-gates-scoring (pg. 10), **upgrade

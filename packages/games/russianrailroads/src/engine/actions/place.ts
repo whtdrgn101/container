@@ -1,4 +1,4 @@
-import { actionSpace, COINS_PER_ACTION, GameError } from '../core';
+import { actionSpace, COINS_PER_ACTION, DOUBLER_SPACES, GameError, TEMP_WORKERS } from '../core';
 import type { RussianRailroadsState, SpacePlacement } from '../core';
 import { accessibleColors, legalSteps, nextActiveSeat, record, seatOf, withPlayer } from '../internal';
 
@@ -30,6 +30,14 @@ export function place(state: RussianRailroadsState, playerId: string, space: str
     throw new GameError('SPACE_OCCUPIED', `Action space "${space}" is already occupied this round`);
   }
 
+  // The doubler space can't be chosen when the supply is empty or all doubler spaces are filled (pg. 14).
+  if (def.kind === 'doubler') {
+    const activeSeat = seatOf(state, playerId);
+    if (state.supplies.doublers <= 0 || state.players[activeSeat]!.doublers >= DOUBLER_SPACES) {
+      throw new GameError('DOUBLER_UNAVAILABLE', 'No doubler tile can be taken (supply empty or spaces full)');
+    }
+  }
+
   const coinCost = def.coinCost ?? 0;
   if (coinCost > 0 && coins !== 0) {
     throw new GameError(
@@ -58,18 +66,20 @@ export function place(state: RussianRailroadsState, playerId: string, space: str
   const placement: SpacePlacement = { ownerId: playerId, workers: workersNeeded, coins: totalCoins };
   const actionSpaces = { ...state.actionSpaces, [space]: [...existing, placement] };
 
-  // A track-extension space (pg. 8–9): spend the payment, then set the pending lock.
+  // Every space first spends the worker/coin payment; the effect then differs by kind.
+  const paid = {
+    ...player,
+    workersAvailable: player.workersAvailable - workersNeeded,
+    coins: player.coins - totalCoins,
+  };
+
+  // A track-extension space (pg. 8–9): set the pending lock, constrained to the space's *accessible*
+  // colours, and keep the turn — unless nothing can advance, in which case the moves are forfeit and the
+  // turn advances now (pg. 9 "as many as you are able to").
   if (def.track) {
-    const spent = {
-      ...player,
-      workersAvailable: player.workersAvailable - workersNeeded,
-      coins: player.coins - totalCoins,
-    };
-    const players = withPlayer(state, seat, spent);
-    const colors = def.track.colors.filter((c) => accessibleColors(spent).includes(c));
-    // The lock is playable only if some accessible-colour track can actually advance; otherwise the moves
-    // are forfeit and the turn advances now (pg. 9 "as many as you are able to").
-    if (legalSteps(spent.routes, colors).length > 0) {
+    const players = withPlayer(state, seat, paid);
+    const colors = def.track.colors.filter((c) => accessibleColors(paid).includes(c));
+    if (legalSteps(paid.routes, colors).length > 0) {
       return record(
         state,
         'PLACE',
@@ -87,13 +97,44 @@ export function place(state: RussianRailroadsState, playerId: string, space: str
     );
   }
 
-  // The only non-track space in RR2 is the take-2-coins space (pg. 14): gain coins and pass the turn.
+  // The doubler space (pg. 14): take one tile from the shared supply onto the next Trans-Siberian doubler
+  // space (the count fills left to right), then pass the turn.
+  if (def.kind === 'doubler') {
+    const updated = { ...paid, doublers: paid.doublers + 1 };
+    return record(
+      state,
+      'PLACE',
+      playerId,
+      {
+        players: withPlayer(state, seat, updated),
+        actionSpaces,
+        supplies: { ...state.supplies, doublers: state.supplies.doublers - 1 },
+        activePlayerIndex: nextActiveSeat(state)!,
+      },
+      { space, label: def.label, doubler: updated.doublers },
+    );
+  }
+
+  // The temporary-workers space (pg. 15): take the 2 turquoise workers into the supply for this round
+  // (also counted in `workersAvailable`), then pass the turn. They are returned at round end.
+  if (def.kind === 'temp-workers') {
+    const updated = {
+      ...paid,
+      tempWorkers: paid.tempWorkers + TEMP_WORKERS,
+      workersAvailable: paid.workersAvailable + TEMP_WORKERS,
+    };
+    return record(
+      state,
+      'PLACE',
+      playerId,
+      { players: withPlayer(state, seat, updated), actionSpaces, activePlayerIndex: nextActiveSeat(state)! },
+      { space, label: def.label, tempWorkers: TEMP_WORKERS },
+    );
+  }
+
+  // The take-2-coins space (pg. 14): gain coins and pass the turn.
   const gainedCoins = COINS_PER_ACTION;
-  const updated = {
-    ...player,
-    workersAvailable: player.workersAvailable - workersNeeded,
-    coins: player.coins - totalCoins + gainedCoins,
-  };
+  const updated = { ...paid, coins: paid.coins + gainedCoins };
   return record(
     state,
     'PLACE',

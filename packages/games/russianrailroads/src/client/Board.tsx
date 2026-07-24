@@ -1,5 +1,5 @@
-import { ACTION_SPACES, legalSteps } from '../engine';
-import type { PlayerView, RouteId, RussianRailroadsView } from '../engine';
+import { ACTION_SPACES, legalActions, legalSteps } from '../engine';
+import type { PlayerView, RouteId, RussianRailroadsState, RussianRailroadsView, TrackColor } from '../engine';
 import { Button } from '@/components/ui/button';
 import { ActivityFeed } from '@/components/ActivityFeed';
 import { GameOver } from '@/components/GameOver';
@@ -51,9 +51,11 @@ export default function RussianRailroadsBoard({
       rrApi.act(gameId, active.id, { type: 'PLACE', space, ...(coins ? { coins } : {}) }, viewer, game.version),
     );
   };
-  const doMoveTrack = (route: RouteId) => {
+  const doMoveTrack = (route: RouteId, color?: TrackColor) => {
     if (!resolving || !active) return;
-    void run(() => rrApi.act(gameId, active.id, { type: 'MOVE_TRACK', route }, viewer, game.version));
+    void run(() =>
+      rrApi.act(gameId, active.id, { type: 'MOVE_TRACK', route, ...(color ? { color } : {}) }, viewer, game.version),
+    );
   };
   const doPass = () => {
     if (!placing || !active) return;
@@ -63,10 +65,29 @@ export default function RussianRailroadsBoard({
   const nameOf = (id: string) => game.players.find((p) => p.id === id)?.name ?? id;
   const winnerNames = game.status === 'ended' ? game.winnerIds.map(nameOf) : [];
 
-  // Which of the active player's routes a lock step may advance right now (drives the clickable rows).
-  const advanceable = new Set<RouteId>(
-    resolving && active && pending ? legalSteps(active.routes, pending.colors).map((s) => s.route) : [],
-  );
+  // Which of the active player's routes+colours a lock step may advance right now (drives the clickable
+  // rows). A single-colour lock keeps the simple `rr-build-<route>` button; a multi-colour lock (the
+  // worker+coin space once colours are unlocked) offers a `rr-build-<route>-<colour>` button per choice.
+  const multiColor = resolving && !!pending && pending.colors.length > 1;
+  const legalByRoute = new Map<RouteId, TrackColor[]>();
+  if (resolving && active && pending) {
+    for (const step of legalSteps(active.routes, pending.colors)) {
+      const colors = legalByRoute.get(step.route) ?? [];
+      colors.push(step.color);
+      legalByRoute.set(step.route, colors);
+    }
+  }
+
+  // Which placements the active seat may actually make right now — the engine's own enumeration, so the
+  // board never offers a placement that would be refused or wasted (a colour space with no access, a
+  // doubler with none left, an occupied/unpayable space). The View carries every field `legalActions`
+  // reads (all public), so the cast is sound — move enumeration never touches a redacted secret.
+  const legal = placing && active ? legalActions(game as unknown as RussianRailroadsState, active.id) : [];
+  // Space ids placeable with workers (a bare PLACE) vs. with a coin substitute (a PLACE carrying `coins`).
+  const spaceIds = (withCoins: boolean) =>
+    new Set(legal.flatMap((a) => (a.type === 'PLACE' && (a.coins !== undefined) === withCoins ? [a.space] : [])));
+  const workerSpaces = spaceIds(false);
+  const coinSpaces = spaceIds(true);
 
   return (
     <div data-testid="board" className="space-y-4">
@@ -110,10 +131,10 @@ export default function RussianRailroadsBoard({
             const placements = game.actionSpaces[space.id] ?? [];
             const occupied = !space.neverOccupies && placements.length > 0;
             const coinCost = space.coinCost ?? 0;
-            const canWorkers =
-              placing && !occupied && !!active && active.workersAvailable >= space.workers && active.coins >= coinCost;
+            // Gate on the engine's legal-move set (accessibility, doubler supply, occupancy, affordability).
+            const canWorkers = workerSpaces.has(space.id);
             // The coin *substitution* variant (pg. 14) — not offered on the mandatory worker+coin space.
-            const canCoins = placing && !occupied && !!active && coinCost === 0 && active.coins >= space.workers;
+            const canCoins = coinSpaces.has(space.id);
             return (
               <div
                 key={space.id}
@@ -189,7 +210,8 @@ export default function RussianRailroadsBoard({
               player={player}
               isActive={player.id === active?.id}
               isBot={bots.includes(player.id)}
-              advanceable={player.id === active?.id ? advanceable : undefined}
+              legalByRoute={player.id === active?.id ? legalByRoute : undefined}
+              multiColor={multiColor}
               onMoveTrack={player.id === active?.id ? doMoveTrack : undefined}
               busy={busy}
             />
@@ -208,20 +230,36 @@ export default function RussianRailroadsBoard({
   );
 }
 
-/** One player's tableau card (RR2): turn-order card, workers, coins, score, and the three routes' tracks. */
+/** Tailwind fill for each track colour (pg. 8–9) — plus a dashed neutral for empty spaces. */
+const TRACK_FILL: Record<TrackColor, string> = {
+  wood: 'bg-amber-700',
+  green: 'bg-green-600',
+  bronze: 'bg-orange-700',
+  silver: 'bg-slate-400',
+  gold: 'bg-yellow-500',
+};
+
+/**
+ * One player's tableau card (RR3): turn-order card, workers (incl. temporary), coins, doublers, score, and
+ * the three routes' tracks. During a lock, the active player's advanceable routes become clickable — a
+ * single-colour lock keeps the `rr-build-<route>` button; a multi-colour lock renders a colour picker
+ * (`rr-build-<route>-<colour>`).
+ */
 function PlayerCard({
   player,
   isActive,
   isBot,
-  advanceable,
+  legalByRoute,
+  multiColor,
   onMoveTrack,
   busy,
 }: {
   player: PlayerView;
   isActive: boolean;
   isBot: boolean;
-  advanceable?: Set<RouteId>;
-  onMoveTrack?: (route: RouteId) => void;
+  legalByRoute?: Map<RouteId, TrackColor[]>;
+  multiColor: boolean;
+  onMoveTrack?: (route: RouteId, color?: TrackColor) => void;
   busy?: boolean;
 }) {
   return (
@@ -241,50 +279,86 @@ function PlayerCard({
           </span>
         ) : null}
       </div>
-      <div className="mt-1 flex gap-4 text-xs">
+      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
         <span data-testid={`rr-workers-${player.id}`}>
           Workers: {player.workersAvailable}/{player.workersTotal}
+          {player.tempWorkers > 0 ? (
+            <span data-testid={`rr-temp-${player.id}`}> (+{player.tempWorkers} temp)</span>
+          ) : null}
         </span>
         <span data-testid={`rr-coins-${player.id}`}>Coins: {player.coins}</span>
+        <span data-testid={`rr-doublers-${player.id}`}>Doublers: {player.doublers}</span>
         <span data-testid={`rr-score-${player.id}`} className="font-medium">
           Score: {player.score}
         </span>
       </div>
       <ul className="mt-2 space-y-1 text-xs">
         {player.routes.map((route) => {
-          const canBuild = !!onMoveTrack && !!advanceable?.has(route.id);
-          const row = (
-            <>
-              <span className="w-28 shrink-0 capitalize text-muted-foreground">{route.id}</span>
-              <span className="flex gap-0.5">
-                {route.spaces.map((track, i) => (
-                  <span
-                    key={i}
-                    className={cn(
-                      'inline-block h-3 w-3 rounded-sm border',
-                      track === 'wood' ? 'bg-amber-700' : 'bg-transparent',
-                    )}
-                    title={track ?? 'empty'}
-                  />
-                ))}
-              </span>
-            </>
+          const legalColors = onMoveTrack ? (legalByRoute?.get(route.id) ?? []) : [];
+          const chips = (
+            <span className="flex gap-0.5">
+              {route.spaces.map((track, i) => (
+                <span
+                  key={i}
+                  className={cn(
+                    'inline-block h-3 w-3 border',
+                    // A doubler tile sits above the first N Trans-Siberian spaces (pg. 14).
+                    route.id === 'transsiberian' && i < player.doublers
+                      ? 'rounded-full ring-1 ring-primary'
+                      : 'rounded-sm',
+                    track ? TRACK_FILL[track] : 'bg-transparent',
+                  )}
+                  title={`${track ?? 'empty'}${route.id === 'transsiberian' && i < player.doublers ? ' ×2' : ''}`}
+                />
+              ))}
+            </span>
           );
-          return canBuild ? (
-            <li key={route.id}>
-              <button
-                type="button"
-                data-testid={`rr-build-${route.id}`}
-                disabled={busy}
-                onClick={() => onMoveTrack(route.id)}
-                className="flex w-full items-center gap-1 rounded-sm border border-primary bg-primary/10 px-1 py-0.5 text-left hover:bg-primary/20 disabled:opacity-50"
-              >
-                {row}
-              </button>
-            </li>
-          ) : (
+          const label = <span className="w-28 shrink-0 capitalize text-muted-foreground">{route.id}</span>;
+
+          // Single-colour lock: the whole row is one build button (keeps the `rr-build-<route>` testid).
+          if (legalColors.length > 0 && !multiColor) {
+            return (
+              <li key={route.id}>
+                <button
+                  type="button"
+                  data-testid={`rr-build-${route.id}`}
+                  disabled={busy}
+                  onClick={() => onMoveTrack!(route.id)}
+                  className="flex w-full items-center gap-1 rounded-sm border border-primary bg-primary/10 px-1 py-0.5 text-left hover:bg-primary/20 disabled:opacity-50"
+                >
+                  {label}
+                  {chips}
+                </button>
+              </li>
+            );
+          }
+          // Multi-colour lock: a colour picker per advanceable route (`rr-build-<route>-<colour>`).
+          if (legalColors.length > 0) {
+            return (
+              <li key={route.id} className="flex items-center gap-1 px-1 py-0.5">
+                {label}
+                {chips}
+                <span className="ml-1 flex gap-1">
+                  {legalColors.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      data-testid={`rr-build-${route.id}-${color}`}
+                      disabled={busy}
+                      onClick={() => onMoveTrack!(route.id, color)}
+                      className="rounded-sm border border-primary bg-primary/10 px-1 capitalize hover:bg-primary/20 disabled:opacity-50"
+                    >
+                      {color}
+                    </button>
+                  ))}
+                </span>
+              </li>
+            );
+          }
+          return (
             <li key={route.id} className="flex items-center gap-1 px-1 py-0.5">
-              {row}
+              {label}
+              {chips}
             </li>
           );
         })}

@@ -28,7 +28,10 @@ export type RussianRailroadsErrorCode =
   | 'INVALID_TRACK_COLOR'
   // A MOVE_TRACK that can't be made: no such colour track on the route, the space ahead is occupied
   // (no leapfrog), or the track is at the route's end (pg. 9).
-  | 'ILLEGAL_TRACK_MOVE';
+  | 'ILLEGAL_TRACK_MOVE'
+  // A PLACE on the doubler space when no doubler tile can be taken — the shared supply is empty or every
+  // Trans-Siberian doubler space is filled (pg. 14).
+  | 'DOUBLER_UNAVAILABLE';
 
 /**
  * Thrown when a Russian Railroads action is illegal. Subclasses the shared kernel `GameError` and pins

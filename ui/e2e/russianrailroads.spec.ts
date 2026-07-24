@@ -42,6 +42,23 @@ test('pick Russian Railroads and play track extension: place, lock, two clicks, 
   // The lock is spent; the pending prompt is gone and the turn moves on.
   await expect(page.getByTestId('rr-pending')).toBeHidden();
 
+  // Advancing the Trans-Siberian to space 2 unlocked **green** for that seat (pg. 8–9). Cycle turns until
+  // that seat is on the clock with the green action space enabled, then build a green track (a new colour
+  // enters at space 1). Count-agnostic: other seats have no green access, so they pass.
+  await expect(async () => {
+    if (await page.getByTestId('rr-place-track-green-1').isEnabled()) return;
+    await page.getByTestId('rr-pass').click();
+    throw new Error('not the green-capable seat yet');
+  }).toPass({ timeout: 15000 });
+  await page.getByTestId('rr-place-track-green-1').click();
+  await expect(page.getByTestId('rr-pending')).toContainText('track move');
+  // The green space grants 2 moves: green enters the Trans-Siberian on space 1 (it can't advance past this
+  // seat's wood on space 2), so spend the second move entering green on another route. Both spent → lock clears.
+  await page.getByTestId('rr-build-transsiberian').click();
+  await expect(page.getByTestId('rr-log')).toContainText('built green track on transsiberian');
+  await page.getByTestId('rr-build-kyiv').click();
+  await expect(page.getByTestId('rr-pending')).toBeHidden();
+
   // Pass everyone out to close round 1 → the scoring phase runs and the feed narrates it. Count-agnostic:
   // keep passing the active seat until the round rolls over (the hotseat default seat count can vary).
   await expect(async () => {

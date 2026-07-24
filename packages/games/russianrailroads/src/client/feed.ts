@@ -14,9 +14,12 @@ interface RoundScore {
  */
 export function describeMove(entry: RussianRailroadsView['log'][number], nameOf?: (id: string) => string): string {
   if (entry.type === 'PLACE') {
-    const p = entry.payload as { label?: string; gainedCoins?: number; moves?: number } | undefined;
+    const p = entry.payload as
+      { label?: string; gainedCoins?: number; moves?: number; doubler?: number; tempWorkers?: number } | undefined;
     if (!p?.label) return 'placed a worker';
     if (p.gainedCoins) return `placed a worker — ${p.label} (+${p.gainedCoins} coins)`;
+    if (p.doubler) return `placed a worker — took a doubler (×2 on space ${p.doubler})`;
+    if (p.tempWorkers) return `placed a worker — took ${p.tempWorkers} temporary workers`;
     if (p.moves === 0) return `placed a worker — ${p.label} (no move possible)`;
     return `placed a worker — ${p.label}`;
   }

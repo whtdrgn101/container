@@ -36,6 +36,14 @@ describe('createGame', () => {
     expect(p.hiredEngineers).toEqual([]);
     expect(p.actionPool).toEqual([]);
     expect(p.score).toBe(0);
+    // No temporary workers and no doubler tiles at setup (pg. 6, 14, 15).
+    expect(p.tempWorkers).toBe(0);
+    expect(p.doublers).toBe(0);
+  });
+
+  it('gives the Trans-Siberian route 15 spaces (the gold threshold), the others the base counts', () => {
+    const p = newGame(4).players[0]!;
+    expect(p.routes.find((r) => r.id === 'transsiberian')!.spaces).toHaveLength(15);
   });
 
   it('deals a distinct turn-order card to each seat and opens with card #1', () => {
@@ -70,7 +78,7 @@ describe('createGame', () => {
     expect(state.version).toBe(0);
     expect(state.log).toEqual([]);
     expect(state.actionSpaces).toEqual({});
-    expect(state.supplies).toEqual({ doublers: 0 });
+    expect(state.supplies).toEqual({ doublers: 30 }); // the shared doubler supply (pg. 14)
     expect(state.pendingMoves).toBeNull();
   });
 });

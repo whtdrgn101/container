@@ -1,4 +1,5 @@
 import {
+  DOUBLER_SUPPLY,
   GameError,
   MAX_PLAYERS,
   MIN_PLAYERS,
@@ -72,6 +73,8 @@ export function createGame(options: CreateGameOptions): RussianRailroadsState {
     workersAvailable: workers,
     workersTotal: workers,
     coins: STARTING_COINS[count]!,
+    tempWorkers: 0,
+    doublers: 0,
     routes: startingRoutes(),
     // The #1 loco starts on the Trans-Siberian (pg. 6, step 3) — so only that route reaches space 1 for
     // scoring until more locos are bought (RR4).
@@ -99,7 +102,7 @@ export function createGame(options: CreateGameOptions): RussianRailroadsState {
     pendingMoves: null,
     round: 1,
     rounds: ROUNDS[count]!,
-    supplies: { doublers: 0 },
+    supplies: { doublers: DOUBLER_SUPPLY },
     // Active arm of the kernel end-state union: no results/winnerIds until the game ends.
     status: 'active',
     version: 0,

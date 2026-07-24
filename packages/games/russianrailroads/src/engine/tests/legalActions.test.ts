@@ -12,8 +12,10 @@ describe('legalActions', () => {
     const state = newGame(4); // 5 workers, 1 coin
     const actions = legalActions(state);
     expect(actions.some((a) => a.type === 'PASS')).toBe(true);
+    // At setup only wood is accessible, so the higher-colour spaces are omitted; the doubler and
+    // temporary-worker auxiliary spaces are open.
     expect(placedSpaces(actions)).toEqual(
-      new Set(['coins', 'track-wood-1', 'track-wood-2', 'track-coin', 'track-bottom']),
+      new Set(['coins', 'track-wood-1', 'track-wood-2', 'track-coin', 'track-bottom', 'doubler', 'temp-workers']),
     );
     // The coins space offers a worker and a coin variant.
     const coinsPlacements = actions.filter((a) => a.type === 'PLACE' && a.space === 'coins');
@@ -35,24 +37,19 @@ describe('legalActions', () => {
     ]);
   });
 
-  it('omits a track space when no track could advance from it', () => {
-    // Every wood track parked at the end of its route → no legal step, so the track spaces drop out.
+  it('omits every track space when nothing could advance from it', () => {
+    // Fill every space of every route with a wood tile: nothing can advance and no colour can enter (space 1
+    // is occupied everywhere), so all track spaces drop out — only the non-track spaces remain.
     const base = newGame(4);
     const maxed: RussianRailroadsState = {
       ...base,
       players: base.players.map((p, i) =>
         i === base.activePlayerIndex
-          ? {
-              ...p,
-              routes: p.routes.map((r) => ({
-                ...r,
-                spaces: r.spaces.map((_, idx) => (idx === r.spaces.length - 1 ? ('wood' as const) : null)),
-              })),
-            }
+          ? { ...p, routes: p.routes.map((r) => ({ ...r, spaces: r.spaces.map(() => 'wood' as const) })) }
           : p,
       ),
     };
-    expect(placedSpaces(legalActions(maxed))).toEqual(new Set(['coins']));
+    expect(placedSpaces(legalActions(maxed))).toEqual(new Set(['coins', 'doubler', 'temp-workers']));
   });
 
   it('drops an occupied space but keeps the never-occupied bottom space', () => {

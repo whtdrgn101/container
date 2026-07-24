@@ -105,13 +105,14 @@ describe('moveTrack', () => {
       { remaining: 1, colors: ['wood'] },
     );
     expectError(() => moveTrack(atEnd, me, 'kyiv'), 'ILLEGAL_TRACK_MOVE');
-    // No wood track at all on the route → nothing to move.
-    const empty = locked(
+    // A colour not yet on the route enters at space 1 (pg. 9) — but only if space 1 is empty. Here a green
+    // tile already sits on space 1, so wood cannot enter.
+    const occupiedStart = locked(
       start,
-      { stpetersburg: [null, null, null, null, null, null, null] },
+      { stpetersburg: ['green', null, null, null, null, null, null] },
       { remaining: 1, colors: ['wood'] },
     );
-    expectError(() => moveTrack(empty, me, 'stpetersburg'), 'ILLEGAL_TRACK_MOVE');
+    expectError(() => moveTrack(occupiedStart, me, 'stpetersburg'), 'ILLEGAL_TRACK_MOVE');
   });
 
   it('is reachable through applyAction, which gates the lock both ways', () => {

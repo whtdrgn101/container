@@ -1,4 +1,4 @@
-import { ACTION_SPACES } from '../core';
+import { ACTION_SPACES, DOUBLER_SPACES } from '../core';
 import type { RussianRailroadsState } from '../core';
 import { accessibleColors, legalSteps, seatOf } from '../internal';
 import type { Action } from './action';
@@ -44,6 +44,8 @@ export function legalActions(state: RussianRailroadsState, playerId?: string): A
       const colors = space.track.colors.filter((c) => access.includes(c));
       if (legalSteps(player.routes, colors).length === 0) continue;
     }
+    // The doubler space needs a tile in the supply and an empty doubler space (pg. 14).
+    if (space.kind === 'doubler' && (state.supplies.doublers <= 0 || player.doublers >= DOUBLER_SPACES)) continue;
 
     const coinCost = space.coinCost ?? 0;
     if (coinCost > 0) {

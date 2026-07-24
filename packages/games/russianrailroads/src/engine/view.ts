@@ -26,6 +26,10 @@ export interface PlayerView {
   readonly workersAvailable: number;
   readonly workersTotal: number;
   readonly coins: number;
+  /** Temporary (turquoise) workers held this round (pg. 15) — public. */
+  readonly tempWorkers: number;
+  /** Doubler tiles placed on the Trans-Siberian doubler spaces (pg. 14) — public. */
+  readonly doublers: number;
   readonly routes: readonly Route[];
   readonly locomotives: readonly Locomotive[];
   readonly industry: Industry;
@@ -91,6 +95,8 @@ export function viewFor(state: RussianRailroadsState, viewer: Viewer): RussianRa
       workersAvailable: player.workersAvailable,
       workersTotal: player.workersTotal,
       coins: player.coins,
+      tempWorkers: player.tempWorkers,
+      doublers: player.doublers,
       routes: player.routes,
       locomotives: player.locomotives,
       industry: player.industry,

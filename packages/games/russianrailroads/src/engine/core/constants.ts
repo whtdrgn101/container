@@ -7,8 +7,9 @@ export const MAX_PLAYERS = 4;
 
 /**
  * Starting workers by player count (pg. 6, "Place 5 workers"; the 2–3-player note, pg. 23: "start with
- * 6 workers instead of 5"). These are the *usable* workers; the 2 temporary workers and the returned
- * one (pg. 6) are RR3 / out of scope.
+ * 6 workers instead of 5"). These are the *usable* workers a player owns. The 2 **temporary** turquoise
+ * workers are not part of this count — they are taken via the temp-workers action for a single round
+ * (RR3, `TEMP_WORKERS`); the one returned worker (pg. 6) is out of scope.
  */
 export const STARTING_WORKERS: Readonly<Record<number, number>> = { 2: 6, 3: 6, 4: 5 };
 
@@ -41,11 +42,29 @@ export const ENGINEER_DEAL: Readonly<Record<number, { readonly a: number; readon
   4: { a: 3, b: 4 },
 };
 
-/** The five ascending track colours (pg. 8–9). RR2 only ever *builds* `wood` (colour access is RR3). */
+/** The five ascending track colours (pg. 8–9). */
 export type TrackColor = 'wood' | 'green' | 'bronze' | 'silver' | 'gold';
 
 /** The five track colours in strict build order (pg. 9: wood → green → bronze → silver → gold). */
 export const TRACK_COLORS: readonly TrackColor[] = ['wood', 'green', 'bronze', 'silver', 'gold'];
+
+/**
+ * The colour-access unlock thresholds (pg. 8–9): the 1-based space a player's **wood** track must
+ * **reach or pass on the Trans-Siberian route** to gain access to that colour. RR3 ruling (pg. 8–9,
+ * verified against the board art at 300 DPI): green at space 2, bronze at 6, silver at 10, gold at 15 —
+ * exactly the grant icons drawn beside those Trans-Siberian spaces, matching the prose ("As soon as you
+ * reach or pass space 2 … take the 3 green tracks"; "space 6 … 3 bronze"; "space 10 … 2 silver"; "space
+ * 15 … 1 gold"). Access is **global** (once unlocked, the colour is buildable on any route that supports
+ * it) and **monotonic** (the wood track only ever advances). The unlock grants **access only** — the
+ * tracks go to the player's supply; there is **no** immediate free move on the board (pp. 8–9 grant no
+ * moves). Wood needs no threshold (available from setup), so it is absent here.
+ */
+export const UNLOCK_SPACE: Readonly<Record<Exclude<TrackColor, 'wood'>, number>> = {
+  green: 2,
+  bronze: 6,
+  silver: 10,
+  gold: 15,
+};
 
 /**
  * The valuation tile (pg. 20) — how many points each colour of track scores per space. **Art ruling #1,
@@ -66,26 +85,58 @@ export const VALUATION: Readonly<Record<TrackColor, number>> = {
 /** The three private routes on the Russian player board (pg. 6, 8). */
 export type RouteId = 'transsiberian' | 'stpetersburg' | 'kyiv';
 
-/** One route definition: its id and how many track spaces it has (pg. 8). */
+/** One route definition: its id, how many track spaces it has, and which colours it accepts (pg. 8–9). */
 export interface RouteDef {
   readonly id: RouteId;
   /** Number of ordered track spaces (pg. 8). The Trans-Siberian is the longest. */
   readonly length: number;
+  /**
+   * The track colours this route accepts (pg. 9: "Not all routes use all track colors. Your player board
+   * shows which colors go with which routes."). **RR3 ruling** (board colour-strip art at 300 DPI):
+   * Trans-Siberian all 5, St. Petersburg 4 (no gold), Kyiv 3 (no silver/gold). This reconciles the pg. 3
+   * contents count "12 tracks: 3×,3×,3×,2×,1×": each colour appears on exactly as many routes as it has
+   * tracks (wood/green/bronze on all 3, silver on 2 = Trans-Sib+St.Pete, gold on 1 = Trans-Sib), so the
+   * per-player supply is **emergent** from route availability + the one-tile-per-colour-per-route model —
+   * no separate supply count is tracked.
+   */
+  readonly colors: readonly TrackColor[];
 }
 
 /**
  * The three routes, in board order (pg. 8): Trans-Siberian (Moscow→Vladivostok, the long one),
- * St. Petersburg, and Kyiv. RR1 seeds space 1 of each with a wood track (pg. 6) and never advances them;
- * the full ladder, thresholds and exact lengths are RR3/RR6 (the lengths here are the base-board counts).
+ * St. Petersburg, and Kyiv. Setup seeds space 1 of each with a wood track (pg. 6).
+ *
+ * **Trans-Siberian length = 15** (RR3): the board shows spaces 1–9 across the top, the corner space 10,
+ * then 11–15 down the right edge — long enough to reach the pg. 9 gold threshold at space 15 (verified on
+ * the pg. 6 player board at 300 DPI). St. Petersburg / Kyiv lengths (7 / 8) remain the RR2 base-board
+ * placeholders — the board art reads 9 / 9, but exact non-Trans-Siberian lengths land with the turn-order
+ * / player-board slice (RR6); RR3 only needs the Trans-Siberian thresholds, and the shorter placeholders
+ * cost nothing (the colour ladder is gated on the Trans-Siberian wood track).
  */
 export const ROUTES: readonly RouteDef[] = [
-  { id: 'transsiberian', length: 10 },
-  { id: 'stpetersburg', length: 7 },
-  { id: 'kyiv', length: 8 },
+  { id: 'transsiberian', length: 15, colors: ['wood', 'green', 'bronze', 'silver', 'gold'] },
+  { id: 'stpetersburg', length: 7, colors: ['wood', 'green', 'bronze', 'silver'] },
+  { id: 'kyiv', length: 8, colors: ['wood', 'green', 'bronze'] },
 ];
 
-/** Which section of the board an action space belongs to (pg. 7). RR2 uses two. */
-export type ActionSpaceKind = 'coins' | 'track';
+/** The colours a given route accepts (pg. 9), or `[]` for an unknown id. */
+export const routeColors = (routeId: RouteId): readonly TrackColor[] =>
+  ROUTES.find((r) => r.id === routeId)?.colors ?? [];
+
+/** Which section of the board an action space belongs to (pg. 7). */
+export type ActionSpaceKind = 'coins' | 'track' | 'doubler' | 'temp-workers';
+
+/**
+ * Doubler tiles (pg. 14). The shared supply is **30** tiles; a base-game player board has doubler spaces
+ * above the **Trans-Siberian** route only. The board art (pg. 6, 300 DPI) shows **8** doubler spaces,
+ * aligned above Trans-Siberian spaces 1–8; you fill them **left to right**, ≤ 1 tile per space, and a
+ * doubler over space _i_ doubles the points that space scores each round (pg. 14, 20).
+ */
+export const DOUBLER_SUPPLY = 30;
+export const DOUBLER_SPACES = 8;
+
+/** The 2 turquoise **temporary** workers a player takes with the temp-workers action (pg. 15). */
+export const TEMP_WORKERS = 2;
 
 /**
  * The track-extension payload of an action space (pg. 8–9): placing on it grants `moves` single track
@@ -127,42 +178,60 @@ export interface ActionSpaceDef {
 }
 
 /**
- * The action spaces RR2 models (pg. 7–9). Move counts and worker costs are read directly off the main
- * board art (pp. 4–5, at 300 DPI) and cross-checked against the pg. 8 example ("2 workers → move a wood
- * track 3 spaces"):
+ * How many track moves each colour's dedicated single-/double-worker action space grants (pg. 8–9). Read
+ * directly off the main board art (pp. 4–5, at 300 DPI) — the number of track tiles drawn in each space:
+ * wood/green give **2 / 3** for one / two workers; bronze/silver/gold give **1 / 2**. (Wood is the pg. 8
+ * example: 2 workers → 3 moves.)
+ */
+export const COLOR_MOVES: Readonly<Record<TrackColor, { readonly one: number; readonly two: number }>> = {
+  wood: { one: 2, two: 3 },
+  green: { one: 2, two: 3 },
+  bronze: { one: 1, two: 2 },
+  silver: { one: 1, two: 2 },
+  gold: { one: 1, two: 2 },
+};
+
+/** A dedicated single-colour track-extension space (pg. 8–9): `n` workers → `moves` moves of `color`. */
+function colorSpace(color: TrackColor, workers: 1 | 2, moves: number): ActionSpaceDef {
+  return {
+    id: `track-${color}-${workers}`,
+    label: `Build ${color} — ${moves} move${moves > 1 ? 's' : ''}`,
+    kind: 'track',
+    workers,
+    track: { colors: [color], moves },
+    neverOccupies: false,
+  };
+}
+
+/**
+ * The action spaces the track/auxiliary sections of the board expose (pg. 7–9, 14–15). Move counts and
+ * worker costs are read directly off the main board art (pp. 4–5, at 300 DPI) and cross-checked against
+ * the pg. 8 example:
  *
  *  - `coins` — take 2 coins for 1 worker (pg. 14).
- *  - `track-wood-1` — 1 worker → **2** wood moves (left column, top row of the track-extension block).
- *  - `track-wood-2` — 2 workers → **3** wood moves (right column, top row — the pg. 8 example space).
- *  - `track-coin` — 1 worker **+ 1 coin** → **2** moves of any accessible colour (pg. 9, "two lower track
- *    extension actions"). Wood-only in RR2 by colour access.
+ *  - `track-<colour>-1` / `track-<colour>-2` — the dedicated per-colour spaces (rows 1–5): wood/green
+ *    1w→2 · 2w→3, bronze/silver/gold 1w→1 · 2w→2 (see `COLOR_MOVES`). A space is only *usable* once its
+ *    colour is unlocked (the `accessibleColors` gate) — the higher-colour spaces sit idle until the wood
+ *    track passes the pg. 8–9 threshold, exactly as the physical board's colours become buildable.
+ *  - `track-coin` — 1 worker **+ 1 coin** → **2** moves of any *accessible* colour (pg. 9, "two lower
+ *    track extension actions").
  *  - `track-bottom` — the never-occupied bottom space: 1 worker → **1** move of wood **or** green (pg. 9).
- *    RR1 stubbed this (no-occupy only); RR2 makes its move real (wood-only until green access in RR3).
- *
- * The dedicated green/bronze/silver/gold single- and double-worker spaces (board rows 2–5: 1 worker →
- * 2/1/1/1 moves, 2 workers → 3/2/2/2 moves) exist on the real board but are **deferred to RR3**, where
- * colour access (the unlock thresholds) makes them usable — adding them now would be eight spaces nobody
- * can place on. The rest of the board (locomotives, industrialization, doublers, engineers, the
- * turn-order track) arrives one slice at a time.
+ *  - `doubler` — 1 worker → take a doubler tile onto the leftmost empty Trans-Siberian doubler space
+ *    (pg. 14).
+ *  - `temp-workers` — 1 worker → take the 2 turquoise temporary workers for the round (pg. 15).
  */
 export const ACTION_SPACES: readonly ActionSpaceDef[] = [
   { id: 'coins', label: 'Take 2 coins', kind: 'coins', workers: 1, neverOccupies: false },
-  {
-    id: 'track-wood-1',
-    label: 'Build wood — 2 moves',
-    kind: 'track',
-    workers: 1,
-    track: { colors: ['wood'], moves: 2 },
-    neverOccupies: false,
-  },
-  {
-    id: 'track-wood-2',
-    label: 'Build wood — 3 moves',
-    kind: 'track',
-    workers: 2,
-    track: { colors: ['wood'], moves: 3 },
-    neverOccupies: false,
-  },
+  colorSpace('wood', 1, COLOR_MOVES.wood.one),
+  colorSpace('wood', 2, COLOR_MOVES.wood.two),
+  colorSpace('green', 1, COLOR_MOVES.green.one),
+  colorSpace('green', 2, COLOR_MOVES.green.two),
+  colorSpace('bronze', 1, COLOR_MOVES.bronze.one),
+  colorSpace('bronze', 2, COLOR_MOVES.bronze.two),
+  colorSpace('silver', 1, COLOR_MOVES.silver.one),
+  colorSpace('silver', 2, COLOR_MOVES.silver.two),
+  colorSpace('gold', 1, COLOR_MOVES.gold.one),
+  colorSpace('gold', 2, COLOR_MOVES.gold.two),
   {
     id: 'track-coin',
     label: 'Build track — 2 moves (worker + coin)',
@@ -180,6 +249,8 @@ export const ACTION_SPACES: readonly ActionSpaceDef[] = [
     track: { colors: ['wood', 'green'], moves: 1 },
     neverOccupies: true,
   },
+  { id: 'doubler', label: 'Take a doubler', kind: 'doubler', workers: 1, neverOccupies: false },
+  { id: 'temp-workers', label: 'Take 2 temporary workers', kind: 'temp-workers', workers: 1, neverOccupies: false },
 ];
 
 /** Look up an action-space definition by id, or `undefined` if none. */

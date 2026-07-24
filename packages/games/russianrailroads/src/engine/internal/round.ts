@@ -35,13 +35,16 @@ export function slideEngineerStrip(strip: readonly (Engineer | null)[]): (Engine
 }
 
 /**
- * The "after the scoring phase" cleanup shared by every round end (pg. 21): return all workers from
- * action spaces to their personal supplies (RR1 has no temporary workers, so every worker returns — the
- * supply goes back to full) and clear each seat's pass flag. Coins on spaces went to the general supply
- * when placed, and held coins carry over (pg. 14), so `coins` is untouched. Returns the reset roster.
+ * The "after the scoring phase" cleanup shared by every round end (pg. 21): return all workers to their
+ * personal supplies (`workersAvailable` back to full) and clear each seat's pass flag. The 2 **temporary**
+ * workers are returned to their action space (pg. 15) — so `tempWorkers` clears to 0 and, because the reset
+ * sets `workersAvailable = workersTotal` (which excludes temp workers), any unspent temp worker vanishes
+ * with it. Coins went to the general supply when placed and held coins carry over (pg. 14), and doubler
+ * tiles stay on the board across rounds (pg. 14), so `coins`/`doublers` are untouched. Returns the reset
+ * roster.
  */
 function resetPlayers(players: readonly RussianRailroadsPlayer[]): RussianRailroadsPlayer[] {
-  return players.map((p) => ({ ...p, workersAvailable: p.workersTotal, passed: false }));
+  return players.map((p) => ({ ...p, workersAvailable: p.workersTotal, tempWorkers: 0, passed: false }));
 }
 
 /** What `closeRound` hands back: the state changes to fold into one `record()`, plus the scoring breakdown. */

@@ -153,6 +153,55 @@ describe('Russian Railroads (Track D package)', () => {
     expect(close?.payload?.scores).toHaveLength(2);
   });
 
+  it('takes a doubler over the wire, drawing down the shared supply (pg. 14)', async () => {
+    const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    const first = await activeOf(game.id);
+    const placed = await app.inject({
+      method: 'POST',
+      url: `/games/${game.id}/actions`,
+      payload: { playerId: first, action: { type: 'PLACE', space: 'doubler' } },
+    });
+    expect(placed.statusCode).toBe(200);
+    const view = placed.json().game as {
+      supplies: { doublers: number };
+      players: { id: string; doublers: number }[];
+    };
+    expect(view.supplies.doublers).toBe(29); // one tile left the shared supply of 30
+    expect(view.players.find((p) => p.id === first)!.doublers).toBe(1);
+  });
+
+  it('unlocks green over the wire once the wood track reaches space 2, then builds it (pg. 8–9)', async () => {
+    const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    const first = await activeOf(game.id);
+    const post = (playerId: string, action: unknown) =>
+      app.inject({ method: 'POST', url: `/games/${game.id}/actions`, payload: { playerId, action } });
+
+    // Advance the wood track on the Trans-Siberian to space 3 (≥ the pg. 8 space-2 green threshold): the
+    // 1-worker wood space grants 2 moves, spent on that route.
+    await post(first, { type: 'PLACE', space: 'track-wood-1' });
+    await post(first, { type: 'MOVE_TRACK', route: 'transsiberian' });
+    await post(first, { type: 'MOVE_TRACK', route: 'transsiberian' }); // lock clears, turn passes to Bob
+    const second = await activeOf(game.id);
+    expect(second).not.toBe(first);
+    await post(second, { type: 'PASS' }); // hand the turn back to Ann
+
+    // Green is now accessible: the dedicated green space is playable, and MOVE_TRACK builds green track.
+    const greenPlace = await post(first, { type: 'PLACE', space: 'track-green-1' });
+    expect(greenPlace.statusCode).toBe(200);
+    expect((greenPlace.json().game as { pendingMoves: unknown }).pendingMoves).toEqual({
+      remaining: 2,
+      colors: ['green'],
+    });
+    const built = await post(first, { type: 'MOVE_TRACK', route: 'transsiberian', color: 'green' });
+    expect(built.statusCode).toBe(200);
+    const ts = (
+      built.json().game as { players: { id: string; routes: { id: string; spaces: (string | null)[] }[] }[] }
+    ).players
+      .find((p) => p.id === first)!
+      .routes.find((r) => r.id === 'transsiberian')!;
+    expect(ts.spaces[0]).toBe('green'); // a new colour enters at space 1 (pg. 9)
+  });
+
   it("maps a wrong-turn move to 409, and reports the module's error code", async () => {
     const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
     const active = await activeOf(game.id);

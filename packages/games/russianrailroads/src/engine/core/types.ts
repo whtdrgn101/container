@@ -53,6 +53,21 @@ export interface RussianRailroadsPlayer {
   readonly workersTotal: number;
   /** Coins held in the personal supply — kept across rounds (pg. 14). */
   readonly coins: number;
+  /**
+   * The 2 turquoise **temporary** workers this player currently holds (pg. 15): 0 normally, `TEMP_WORKERS`
+   * (2) after taking the temp-workers action, usable this round as extra workers (they are also folded into
+   * `workersAvailable`). Returned at round end — `resetPlayers` clears this to 0 and `workersAvailable`
+   * resets to `workersTotal`, so a temp worker never survives the round (pg. 15). Only one player can hold
+   * them at a time (the single action space is occupied once used).
+   */
+  readonly tempWorkers: number;
+  /**
+   * Doubler tiles this player has placed on the Trans-Siberian doubler spaces (pg. 14): a count 0…
+   * `DOUBLER_SPACES` (8). They fill **left to right**, so a count of _n_ means spaces 1…_n_ are doubled —
+   * the scoring phase doubles those Trans-Siberian spaces' points every round. Persists across rounds
+   * (tiles stay on the board). Drawn from the shared `supplies.doublers` pool.
+   */
+  readonly doublers: number;
   /** The three routes, in board order (pg. 6, 8). */
   readonly routes: readonly Route[];
   /** Locomotives owned (pg. 6, 10). RR1: just the starting `#1`. */
@@ -119,7 +134,10 @@ export interface SpacePlacement {
  * for the shape (RR3 sets the real starting count when doublers land — RR1 never reads it).
  */
 export interface RussianRailroadsSupplies {
-  /** Doubler tiles remaining (pg. 7, 14). Consumed from RR3; RR1 leaves it at 0 and never reads it. */
+  /**
+   * Doubler tiles remaining in the shared supply (pg. 7, 14): starts at `DOUBLER_SUPPLY` (30) and is drawn
+   * down by the `doubler` action. When it hits 0 the doubler space can no longer be chosen (pg. 14).
+   */
   readonly doublers: number;
 }
 
