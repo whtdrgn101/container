@@ -1,8 +1,17 @@
 # Track D — Externalize games (design doc)
 
-**Status: design only — no code.** Per the platform roadmap: four games have tested the engine and
-the seams; the long-term goal is making games easier to add, and eventually addable from *outside*
-this repo. Pilot candidate: Russian Railroads (a heavyweight is the right stress test).
+**Status: D0 in progress — the compressed path (owner decision, 2026-07-24).** Game 5 (Russian
+Railroads, from the Ultimate Railroads rulebook) arrives *as* the Track D pilot: **RR0 = D0** (the
+in-repo restructure below), then Russian Railroads is built as the first **in-workspace game
+package** (`packages/games/russianrailroads`, the §3 four-subpath shape) — taking over D1's role
+from Can't Stop, since a heavyweight built against the contract from day one is a more honest test
+than retrofitting the smallest game. Out-of-repo graduation (D2) stays a later option. The §8
+questions resolve provisionally by staying in-workspace: bot inside the package; PDFs stay in
+`reference_materials/`; e2e stays in the platform harness; naming stays workspace-scoped.
+
+Original goal statement: four games have tested the engine and the seams; the long-term goal is
+making games easier to add, and eventually addable from *outside* this repo. Pilot: Russian
+Railroads (a heavyweight is the right stress test).
 
 This doc answers the four questions the roadmap poses: what a game package must export, how
 registration/discovery works, what the version-compat contract with the kernel is, and what the seams
