@@ -2,6 +2,7 @@ import type { GameEndState, Viewer } from '@game-hub/kernel';
 import type {
   EndBonusCard,
   Engineer,
+  IdeaTokenType,
   Industry,
   Locomotive,
   PendingFactory,
@@ -45,6 +46,18 @@ export interface PlayerView {
   readonly endBonusHeld: number;
   readonly turnOrderCard: number;
   readonly passed: boolean;
+  /** Player-board specials consumed (pp. 18–19) — public. */
+  readonly consumedSpecials: readonly string[];
+  /** Keys received over the game (pp. 18–19, 46) — public. */
+  readonly keysReceived: number;
+  /** The 20-point medal is placed (pg. 46) — public. */
+  readonly medal20: boolean;
+  /** The valuation tile is flipped to its better side (pg. 46) — public. */
+  readonly revalued: boolean;
+  /** The wood-worker idea card is held (pg. 47) — public. */
+  readonly woodWorker: boolean;
+  /** Idea-token benefit types already used (pg. 46) — public. */
+  readonly usedIdeaTokens: readonly IdeaTokenType[];
   /** Cumulative score on the scoring track (pg. 20–21) — public. */
   readonly score: number;
 }
@@ -63,6 +76,8 @@ export type RussianRailroadsView = {
   /** The number of cards left in the face-down end-bonus pile (its order is secret). */
   readonly endBonusPileCount: number;
   readonly turnOrder: readonly number[];
+  /** This round's turn-order claims (pg. 16) — public. */
+  readonly turnClaims: RussianRailroadsState['turnClaims'];
   readonly activePlayerIndex: number;
   /** The active player's pending track-extension lock (pg. 8–9), or `null` — public information. */
   readonly pendingMoves: PendingMoves | null;
@@ -72,6 +87,13 @@ export type RussianRailroadsView = {
   readonly pendingFactory: PendingFactory | null;
   /** What the active player owes after the current loco/factory build (pg. 12), or `null` — public. */
   readonly pendingThen: 'loco' | 'factory' | null;
+  /** The active player's pending key / idea-token / idea-card choice (pp. 18–19, 46), or `null` — public. */
+  readonly pendingKey: RussianRailroadsState['pendingKey'];
+  readonly pendingIdeaToken: RussianRailroadsState['pendingIdeaToken'];
+  readonly pendingIdeaCard: RussianRailroadsState['pendingIdeaCard'];
+  /** The between-round reuse / game-start setup mini-phase queues (pp. 6, 17), or `null` — public. */
+  readonly pendingReuse: RussianRailroadsState['pendingReuse'];
+  readonly pendingSetupBonus: RussianRailroadsState['pendingSetupBonus'];
   readonly round: number;
   readonly rounds: number;
   readonly supplies: RussianRailroadsSupplies;
@@ -116,6 +138,12 @@ export function viewFor(state: RussianRailroadsState, viewer: Viewer): RussianRa
       endBonusHeld: player.endBonus ? 1 : 0,
       turnOrderCard: player.turnOrderCard,
       passed: player.passed,
+      consumedSpecials: player.consumedSpecials,
+      keysReceived: player.keysReceived,
+      medal20: player.medal20,
+      revalued: player.revalued,
+      woodWorker: player.woodWorker,
+      usedIdeaTokens: player.usedIdeaTokens,
       score: player.score,
     };
   });

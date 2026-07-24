@@ -1,6 +1,7 @@
 import type { Engineer, RussianRailroadsPlayer, RussianRailroadsResult, RussianRailroadsState } from '../core';
 import { scorePlayer } from './scoring';
 import type { RoundScore } from './scoring';
+import { rearrangeTurnOrder, reuseQueue } from './turnorder';
 
 /**
  * The next seat to act after the current one (pg. 7): the next seat in `turnOrder` (wrapping) whose
@@ -76,40 +77,44 @@ export function closeRound(state: RussianRailroadsState): RoundClose {
   const scored = state.players.map((p, i) => ({ ...p, score: p.score + scores[i]!.gained }));
   const players = resetPlayers(scored);
   const engineerStrip = slideEngineerStrip(state.engineerStrip);
+  // Every lock is clear at round close (all seats have passed, so nothing was mid-resolution).
+  const clearedLocks = {
+    pendingMoves: null,
+    pendingLoco: null,
+    pendingFactory: null,
+    pendingThen: null,
+    pendingKey: null,
+    pendingIdeaToken: null,
+    pendingIdeaCard: null,
+  } as const;
 
   if (state.round >= state.rounds) {
     const results: RussianRailroadsResult[] = players.map((p) => ({ playerId: p.id, total: p.score }));
     const top = Math.max(...players.map((p) => p.score));
     const winnerIds = players.filter((p) => p.score === top).map((p) => p.id);
     return {
-      changes: {
-        players,
-        actionSpaces: {},
-        engineerStrip,
-        pendingMoves: null,
-        pendingLoco: null,
-        pendingFactory: null,
-        pendingThen: null,
-        status: 'ended',
-        results,
-        winnerIds,
-      },
+      changes: { players, actionSpaces: {}, engineerStrip, ...clearedLocks, status: 'ended', results, winnerIds },
       scores,
     };
   }
 
-  return {
-    changes: {
-      players,
-      actionSpaces: {},
-      engineerStrip,
-      pendingMoves: null,
-      pendingLoco: null,
-      pendingFactory: null,
-      pendingThen: null,
-      round: state.round + 1,
-      activePlayerIndex: state.turnOrder[0]!,
-    },
-    scores,
+  // Rearrange the turn-order track for next round (pg. 16–17), then reset the claims.
+  const turnOrder = rearrangeTurnOrder(state.turnOrder, state.turnClaims);
+  const reuse = reuseQueue(state.turnClaims);
+  const common = {
+    players,
+    actionSpaces: {},
+    engineerStrip,
+    ...clearedLocks,
+    turnOrder,
+    turnClaims: { first: null, second: null },
+    round: state.round + 1,
   };
+
+  // The between-round worker-reuse mini-phase (pg. 17): if anyone claimed a turn-order space, open it with
+  // the 2nd-place claimant on the clock. Placement for the new round opens only once the queue empties.
+  if (reuse.length > 0) {
+    return { changes: { ...common, pendingReuse: reuse, activePlayerIndex: reuse[0]! }, scores };
+  }
+  return { changes: { ...common, pendingReuse: null, activePlayerIndex: turnOrder[0]! }, scores };
 }

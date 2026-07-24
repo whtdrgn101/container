@@ -108,15 +108,18 @@ export interface RouteDef {
  *
  * **Trans-Siberian length = 15** (RR3): the board shows spaces 1–9 across the top, the corner space 10,
  * then 11–15 down the right edge — long enough to reach the pg. 9 gold threshold at space 15 (verified on
- * the pg. 6 player board at 300 DPI). St. Petersburg / Kyiv lengths (7 / 8) remain the RR2 base-board
- * placeholders — the board art reads 9 / 9, but exact non-Trans-Siberian lengths land with the turn-order
- * / player-board slice (RR6); RR3 only needs the Trans-Siberian thresholds, and the shorter placeholders
- * cost nothing (the colour ladder is gated on the Trans-Siberian wood track).
+ * the pg. 6 player board at 300 DPI).
+ *
+ * **St. Petersburg / Kyiv length = 9 — LANDED (RR6, pg. 6 board art @ 400 DPI).** Both middle and bottom
+ * routes run spaces 1–9 (the RR6 player-board read fixes the RR2/RR3 placeholders of 7 / 8). The pg. 19
+ * worked examples confirm the tail: St. Petersburg's idea-token space is space 4 and its route-doubling
+ * space is space 7 (so the route must run at least to 9, its end-station key); Kyiv's cumulative bonus
+ * stars sit on spaces 1–4 and its end-station key on space 9. See `SPECIALS` in specials.ts.
  */
 export const ROUTES: readonly RouteDef[] = [
   { id: 'transsiberian', length: 15, colors: ['wood', 'green', 'bronze', 'silver', 'gold'] },
-  { id: 'stpetersburg', length: 7, colors: ['wood', 'green', 'bronze', 'silver'] },
-  { id: 'kyiv', length: 8, colors: ['wood', 'green', 'bronze'] },
+  { id: 'stpetersburg', length: 9, colors: ['wood', 'green', 'bronze', 'silver'] },
+  { id: 'kyiv', length: 9, colors: ['wood', 'green', 'bronze'] },
 ];
 
 /** The colours a given route accepts (pg. 9), or `[]` for an unknown id. */
@@ -124,7 +127,14 @@ export const routeColors = (routeId: RouteId): readonly TrackColor[] =>
   ROUTES.find((r) => r.id === routeId)?.colors ?? [];
 
 /** Which section of the board an action space belongs to (pg. 7). */
-export type ActionSpaceKind = 'coins' | 'track' | 'doubler' | 'temp-workers' | 'locomotive' | 'industry';
+export type ActionSpaceKind =
+  | 'coins'
+  | 'track'
+  | 'doubler'
+  | 'temp-workers'
+  | 'locomotive'
+  | 'industry'
+  | 'turn-order';
 
 /**
  * Locomotive supply (pg. 4, 10, 12). Locomotives are numbered **#2–#10** in the supply (the #1 every
@@ -310,6 +320,11 @@ export const ACTION_SPACES: readonly ActionSpaceDef[] = [
   { id: 'industry-1', label: 'Industrialize — advance 1', kind: 'industry', workers: 1, industry: { advance: 1 }, neverOccupies: false },
   { id: 'industry-2', label: 'Industrialize — advance 2', kind: 'industry', workers: 2, industry: { advance: 2 }, neverOccupies: false },
   { id: 'industry-3', label: 'Industrialize — advance 1 + wood track', kind: 'industry', workers: 2, industry: { advance: 1, woodMove: 1 }, neverOccupies: false },
+  // The two turn-order claim spaces (pg. 16): a 1-worker space under first / second place on the turn-order
+  // track. Claiming buys that seat for next round; you may not claim below your own pawn, nor claim both.
+  // Placing here has **no immediate effect** — the rearrangement happens at round end (`rearrangeTurnOrder`).
+  { id: 'turnorder-1', label: 'Claim first place (next round)', kind: 'turn-order', workers: 1, neverOccupies: false },
+  { id: 'turnorder-2', label: 'Claim second place (next round)', kind: 'turn-order', workers: 1, neverOccupies: false },
 ];
 
 /** Look up an action-space definition by id, or `undefined` if none. */

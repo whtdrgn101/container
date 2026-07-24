@@ -1,4 +1,4 @@
-import type { RouteId, TrackColor } from '../core';
+import type { IdeaCardId, IdeaTokenType, RouteId, TrackColor } from '../core';
 
 /**
  * Everything a player can do in Russian Railroads (RR2: the worker-placement spine + track extension).
@@ -104,6 +104,46 @@ export type Action =
   | {
       /** Forfeit all remaining action-pool credits and end the resolution (pg. 13: unused credits are lost). */
       readonly type: 'SKIP_POOL';
+    }
+  | {
+      /**
+       * Resolve a pending **key** (pg. 19, RR6): `'moves'` = advance a wood track 1 + any track 1 (two pool
+       * credits), or `'points'` = score 10. Only legal under a `pendingKey` lock.
+       */
+      readonly type: 'RESOLVE_KEY';
+      readonly option: 'moves' | 'points';
+    }
+  | {
+      /**
+       * Resolve a pending **idea-token** choice (pp. 18–19, 46, RR6): spend one of your unused idea tokens.
+       * Only legal under a `pendingIdeaToken` lock.
+       */
+      readonly type: 'RESOLVE_IDEA_TOKEN';
+      readonly token: IdeaTokenType;
+    }
+  | {
+      /**
+       * Resolve a pending **idea-card** choice (pg. 46–47, RR6): pick one idea card (granted by the end-bonus
+       * idea token). Only legal under a `pendingIdeaCard` lock.
+       */
+      readonly type: 'RESOLVE_IDEA_CARD';
+      readonly card: IdeaCardId;
+    }
+  | {
+      /**
+       * Resolve one **reuse** move (pg. 17, RR6): move your turn-order worker onto an empty 1-worker action
+       * space and resolve it. Only legal during the between-round reuse mini-phase (`pendingReuse`).
+       */
+      readonly type: 'RESOLVE_REUSE';
+      readonly space: string;
+    }
+  | {
+      /**
+       * Resolve one **starting-bonus** card (pg. 6, RR6): pick and resolve a starting bonus card. Only legal
+       * during the game-start setup mini-phase (`pendingSetupBonus`).
+       */
+      readonly type: 'RESOLVE_SETUP_BONUS';
+      readonly card: string;
     }
   | { readonly type: 'PASS' };
 

@@ -6,5 +6,7 @@ export * from './round';
 export * from './track';
 export * from './locomotives';
 export * from './industry';
+export * from './specials';
+export * from './turnorder';
 export * from './turn';
 export * from './scoring';

@@ -1,18 +1,21 @@
+import { passPoints } from '../core';
 import type { RussianRailroadsState } from '../core';
 import { allPassed, closeRound, nextActiveSeat, record, seatOf, withPlayer } from '../internal';
 
 /**
- * Pass (pg. 7): end your participation for the round. A pass is **terminal for the round** — you take no
- * more turns until it ends. When the pass makes *every* seat passed, the round closes (`closeRound`): the
- * per-round scoring stub runs, workers/coins return and pass flags clear, the engineer strip slides right,
- * and the game either opens the next round or (after the last round) ends into the stub result (pg. 21–22).
- *
- * The pass-scoring detail — a pass scores the reverse of your turn-order card and reorders the track — is
- * RR6; RR1 keeps the dealt turn order for the whole game. Never mutates the input.
+ * Pass (pg. 7, 16): end your participation for the round. A pass is **terminal for the round** — you take no
+ * more turns until it ends. Passing immediately **flips your turn-order card and scores its reverse** (pg.
+ * 16, `passPoints`), added to your cumulative score. When the pass makes *every* seat passed, the round
+ * closes (`closeRound`): the scoring phase runs, workers return and pass flags clear, the engineer strip
+ * slides right, the **turn-order track is rearranged** (pg. 16–17), and the game opens the next round (or,
+ * after the last round, ends). Never mutates the input.
  */
 export function pass(state: RussianRailroadsState, playerId: string): RussianRailroadsState {
   const seat = seatOf(state, playerId);
-  const passedRoster = withPlayer(state, seat, { ...state.players[seat]!, passed: true });
+  const player = state.players[seat]!;
+  // Flip the turn-order card and score its reverse (pg. 16) — a fixed per-round bonus for later seats.
+  const gainedPass = passPoints(player.turnOrderCard);
+  const passedRoster = withPlayer(state, seat, { ...player, passed: true, score: player.score + gainedPass });
   const passedState: RussianRailroadsState = { ...state, players: passedRoster };
 
   if (allPassed(passedState)) {
@@ -20,14 +23,18 @@ export function pass(state: RussianRailroadsState, playerId: string): RussianRai
     const ended = changes.status === 'ended';
     return record(state, 'PASS', playerId, changes, {
       closedRound: state.round,
+      passScore: gainedPass,
       // The round's scoring is public (pg. 20–21 is open information) — the feed narrates it from here.
       scores,
       ...(ended ? { gameEnded: true } : { nextRound: state.round + 1 }),
     });
   }
 
-  return record(state, 'PASS', playerId, {
-    players: passedRoster,
-    activePlayerIndex: nextActiveSeat(passedState)!,
-  });
+  return record(
+    state,
+    'PASS',
+    playerId,
+    { players: passedRoster, activePlayerIndex: nextActiveSeat(passedState)! },
+    { passScore: gainedPass },
+  );
 }

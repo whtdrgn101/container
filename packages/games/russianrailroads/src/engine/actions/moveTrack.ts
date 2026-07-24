@@ -1,6 +1,6 @@
 import { GameError, ROUTES } from '../core';
 import type { RouteId, RussianRailroadsState, TrackColor } from '../core';
-import { advanceTrack, canAdvance, legalSteps, nextSeatOrHold, record, seatOf, withPlayer } from '../internal';
+import { advanceTrack, canAdvance, continueTurn, legalSteps, record, seatOf, withPlayer } from '../internal';
 
 /**
  * Resolve one single step of a track-extension lock (pg. 9) — the `MOVE_TRACK` action. Consumes one of the
@@ -56,13 +56,15 @@ export function moveTrack(
       { route: routeId, color: chosen, remaining },
     );
   }
-  // The lock is spent. If this was a **pool credit** and the placer still has more credits, control returns
-  // to the pool (the turn stays with them); otherwise the turn passes (`nextSeatOrHold`).
+  // The lock is spent. `continueTurn` settles any newly-reached specials (a track step can reach a key /
+  // idea-token / new-worker space, pp. 18–19), holds for remaining pool credits, or advances the context
+  // (reuse / setup mini-phase, or the next seat).
+  const next = { ...state, players };
   return record(
     state,
     'MOVE_TRACK',
     playerId,
-    { players, pendingMoves: null, activePlayerIndex: nextSeatOrHold(state, seat) },
+    { pendingMoves: null, ...continueTurn(next, seat) },
     { route: routeId, color: chosen, remaining: 0, done: true },
   );
 }

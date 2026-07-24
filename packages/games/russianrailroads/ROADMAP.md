@@ -355,12 +355,73 @@ action over the wire; `e2e/russianrailroads.spec.ts` gained a build-a-factory + 
   a factory to the supply, and then place the just-returned factory" — works: an earlier flip's factory is
   available to the later factory step.
 
-### RR6 — Player-board specials + turn order
-(a) Route special spaces (pg. 18–19): wood-track prerequisites (persist across upgrades), keys, new
-workers, route doubling, cumulative bonus stars, idea-token spaces + the 9 tokens / 5 idea cards
-(pg. 46–47, incl. second wrench + revaluation flip). (b) The **turn-order track** (pg. 16–17): pass
-scores the card's reverse, the two claim spaces + rearrangement, the **between-round worker-reuse
-mini-phase** (2nd then 1st, 1-worker spaces only), starting-bonus setup cards (pg. 6).
+### RR6 — Player-board specials + turn order ✅ *(shipped)*
+The biggest remaining slice, landed in full. **(a) Route special spaces (pp. 18–19)** — encoded as data
+(`SPECIALS`, from the pg. 6 board art) with the **reached-flag** model (`player.consumedSpecials` +
+recomputed scoring specials): **new workers** (wood-only / loco-required, choiceless +1 permanent worker),
+**end-station keys** (`pendingKey` → advance a wood + any track via the pool, **or** score 10, pg. 19),
+**route doubling** (green+loco → that route ×2, recomputed), **cumulative bonus stars** (recomputed —
+pg. 19 example verbatim), **idea-token spaces** + the **industry-track idea space** (`pendingIdeaToken`),
+the **five idea tokens** (end-bonus draw-top + idea card, 20-point medal, revaluation flip, 2 keys, second
+wrench — both wrenches score, pg. 47) and the **five idea cards** (`pendingIdeaCard`; wood worker / #9 loco /
+engineer-coin real + two ADAPTED). New-track unlocks stay the RR3 computed thresholds (the board confirms
+they're printed spaces). **(b) Turn order (pp. 16–17)** — the real **track** replaces RR1's dealt order:
+`pass` flips the card and **scores its reverse**, the **two claim spaces** (not below your own pawn, not
+both), the round-end **rearrangement** (claimants to the front — the pg. 17 special no-change case falls out
+of the one formula), the **between-round worker-reuse mini-phase** (modelled as an engine phase/lock
+`pendingReuse`: 2nd then 1st move a turn-order worker to an empty 1-worker space), and the **starting-bonus
+setup mini-phase** (`pendingSetupBonus`: 4th → 3rd → 2nd at game start). Every multi-step choice is an
+**engine lock** (the binding RR design decision), funnelled through one `continueTurn` (settle specials →
+hold for a choice/pool → advance the reuse/setup phase or the next seat). Engine **100% (208 tests**, +59
+across new `turnorder`/`specials`/`ideas`/`reuse`/`setupBonus` files); backend REST tests drive a key choice,
+a pass-score and the reuse phase over the wire (**14** RR REST tests); `e2e/russianrailroads.spec.ts` gained
+a turn-order-claim + reuse test and pass-score narration (**8** specs, desktop + mobile). UI: setup/reuse/key/
+idea-token/idea-card panels, a turn-order-track readout, and a specials readout (keys/medal/tile). Rulings
+below. **Track D findings: none new** — the whole slice landed inside the package (engine, module
+`parseAction`, client), touching **zero** host files (no `games.config.ts`, no registry regen, no
+vite/tsconfig/vitest edits), the RR2–5 pattern holding.
+
+**RR6 rulings (with evidence):**
+- **Route special-space layout — LANDED (pg. 6 board art @ 400 DPI, cross-checked pp. 18–19 + the two
+  worked examples).** The prose gives the special *types*, not their positions — a component read (see
+  `core/specials.ts` for the per-space table). Trans-Siberian: new-worker (loco) space 3, idea-token (loco)
+  space 13, end key + gold-unlock space 15. St. Petersburg: idea-token (loco) spaces 4 & 6, route-doubling
+  space 7, end key space 9. Kyiv: cumulative bonus stars 1/2/3/4 on spaces 1–4 (loco), new-worker
+  (wood-only) space 7, end key space 9. The pg. 19 examples are asserted verbatim: **Kyiv space 3 + #3
+  loco → 1+2+3 = 6**; the St. Petersburg idea-token example sits on space 4.
+- **St. Petersburg / Kyiv length = 9 — LANDED (pg. 6 art).** Fixes the RR2/RR3 placeholders (7/8); both
+  routes run spaces 1–9, the length the end-station keys + St. Petersburg's space-7 doubler need.
+- **The wood-track prerequisite is a monotonic reached-index — LANDED (pg. 18).** "Nothing happens until
+  track is built on the space" and "the prerequisite remains fulfilled even when you upgrade the space" fall
+  out for free: a frontier only advances, so a met prereq stays met; one-time specials record consumption in
+  `consumedSpecials`, scoring specials recompute from the board each phase.
+- **Turn-order card reverse values — ART RULING (documented ADAPTED).** The reverse (pass-score) values are
+  **not legibly readable** in the v2 PDF (pg. 5 shows only the numbered fronts; no page tabulates the backs).
+  Adopted an increasing set rewarding later seats: `{1:0, 2:2, 3:4, 4:6}` (`TURN_ORDER_PASS_POINTS`).
+  Reconcile against physical cards in RR9.
+- **Revaluation tile values — ART RULING (documented ADAPTED).** The flipped valuation tile's values aren't
+  legible at this DPI; adopted a strictly-≥-base set (`VALUATION_REVALUED` = 0/2/3/5/8, wood staying 0).
+  Reconcile in RR9.
+- **Idea-token set — COMPONENT RULING.** pp. 46–47 describe **five** distinct benefits; the pg. 6 art shows
+  ≈6 physical tokens and the scope brief cited "9". The **rules text is authoritative over the ambiguous
+  count**, so RR6 models the five described benefit *types*, one of each per player, each single-use (an
+  idea-token space spends one). Exact multiset reconciled in RR9.
+- **"Choose an end bonus card" (AMBIGUITY #3) — deferred, as planned.** RR6 implements **draw-top** from the
+  pile (the scope brief's instruction) and leaves the draw-vs-pick ruling to **RR8** (it interacts with pile
+  redaction + end-bonus scoring).
+- **Idea cards — RULING (pg. 47 legibility).** pg. 47 legibly describes three (wood worker / #9 loco /
+  engineer+coin); the game ships five. Encoded the three read benefits as real and two ADAPTED simple ones
+  (`extra-coins`, `wood-move`), the END_BONUS_CARDS convention. The engineer half of `engineer-coin` is
+  deferred to RR7 (engineers); the coin is granted now.
+- **Starting bonus cards — ART RULING (documented ADAPTED).** The pg. 6 art shows four "simple action" cards,
+  only partly legible; adopted four ADAPTED simple one-time actions (coins / a wood move / a wrench advance).
+  **Simplification:** each seat may pick any of the four (the physical cards are shared/consumed; the ADAPTED
+  model does not track that — negligible for four small bonuses). Reconcile in RR9.
+
+**Scope notes / documented simplifications (reconcile later):** the reuse mini-phase targets the direct-action
+1-worker spaces (coins / doubler / temp workers / industrialize-1 / track spaces) — loco-acquisition and
+turn-order re-claim *via reuse* are deferred; the second wrench's 2 industry steps advance the new wrench
+(no split-across-wrenches choice); the wood-worker card's passive +1 applies on wood-specific track spaces.
 
 ### RR7 — Engineers
 Hire-for-a-coin (one per round), the two public variable-action spaces, the sliding strip +

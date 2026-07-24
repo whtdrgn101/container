@@ -24,7 +24,7 @@ import { newGame } from './helpers';
 
 /** An industry track with a given wrench index and gap fills (short-hand: `-` = unfilled). */
 function industry(wrench: number, factories: (number | null)[] = [null, null, null, null, null]): Industry {
-  return { wrench, factories };
+  return { wrench, factories, secondWrench: null };
 }
 
 describe('industry track layout (pg. 6 art, pg. 13)', () => {

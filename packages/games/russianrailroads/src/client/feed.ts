@@ -43,8 +43,29 @@ export function describeMove(entry: RussianRailroadsView['log'][number], nameOf?
       const coins = p.coinsGained ? ` (+${p.coinsGained} coins from a factory)` : '';
       return `placed a worker — advanced the wrench ${p.advanced}${coins}`;
     }
+    if ((p as { claim?: string }).claim) return `placed a worker — claimed ${(p as { claim?: string }).claim} place (next round)`;
     if (p.moves === 0) return `placed a worker — ${p.label} (no move possible)`;
     return `placed a worker — ${p.label}`;
+  }
+  if (entry.type === 'RESOLVE_KEY') {
+    const p = entry.payload as { option?: string } | undefined;
+    return p?.option === 'points' ? 'used a key — scored 10 points' : 'used a key — advanced tracks';
+  }
+  if (entry.type === 'RESOLVE_IDEA_TOKEN') {
+    const p = entry.payload as { token?: string } | undefined;
+    return `resolved the ${p?.token ?? '?'} idea token`;
+  }
+  if (entry.type === 'RESOLVE_IDEA_CARD') {
+    const p = entry.payload as { card?: string } | undefined;
+    return `took the ${p?.card ?? '?'} idea card`;
+  }
+  if (entry.type === 'RESOLVE_REUSE') {
+    const p = entry.payload as { space?: string } | undefined;
+    return `reused a worker on ${p?.space ?? 'a space'}`;
+  }
+  if (entry.type === 'RESOLVE_SETUP_BONUS') {
+    const p = entry.payload as { card?: string } | undefined;
+    return `took the starting bonus ${p?.card ?? ''}`.trim();
   }
   if (entry.type === 'PLACE_FACTORY') {
     const p = entry.payload as { number?: number } | undefined;
@@ -77,16 +98,19 @@ export function describeMove(entry: RussianRailroadsView['log'][number], nameOf?
     return `flipped the #${p?.number ?? '?'} to a factory`;
   }
   if (entry.type === 'PASS') {
-    const p = entry.payload as { gameEnded?: boolean; nextRound?: number; scores?: readonly RoundScore[] } | undefined;
+    const p = entry.payload as
+      | { gameEnded?: boolean; nextRound?: number; scores?: readonly RoundScore[]; passScore?: number }
+      | undefined;
+    const passBit = p?.passScore ? ` (+${p.passScore} from the turn-order card)` : '';
     const tally = p?.scores?.length
       ? '; scored ' +
         p.scores
           .map((s) => `${nameOf?.(s.playerId) ?? s.playerId} ${s.gained} (routes ${s.routes}, industry ${s.industry})`)
           .join(', ')
       : '';
-    if (p?.gameEnded) return `passed — final round scored${tally}`;
-    if (p?.nextRound) return `passed — round over, on to round ${p.nextRound}${tally}`;
-    return 'passed';
+    if (p?.gameEnded) return `passed${passBit} — final round scored${tally}`;
+    if (p?.nextRound) return `passed${passBit} — round over, on to round ${p.nextRound}${tally}`;
+    return `passed${passBit}`;
   }
   return entry.type.toLowerCase();
 }

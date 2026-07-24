@@ -43,13 +43,26 @@ export default function RussianRailroadsBoard({
   const pending = game.pendingMoves;
   const pendingLoco = game.pendingLoco;
   const pendingFactory = game.pendingFactory;
+  const pendingKey = game.pendingKey;
+  const pendingIdeaToken = game.pendingIdeaToken;
+  const pendingIdeaCard = game.pendingIdeaCard;
+  const inReuse = !!game.pendingReuse;
+  const inSetup = !!game.pendingSetupBonus;
   const pool = active?.actionPool ?? [];
   const resolving = acting && !!pending; // holding a track-extension lock: resolve it before anything else
+  // The RR6 choice locks (pp. 18–19, 46): key / idea-token / idea-card, in applyAction precedence.
+  const resolvingKey = acting && !pending && !!pendingKey;
+  const resolvingIdeaToken = acting && !pending && !pendingKey && !!pendingIdeaToken;
+  const resolvingIdeaCard = acting && !pending && !pendingKey && !pendingIdeaToken && !!pendingIdeaCard;
   const resolvingLoco = acting && !!pendingLoco; // holding a locomotive: place / upgrade / flip it
   const resolvingFactory = acting && !!pendingFactory; // owing a factory placement (pg. 12)
   const resolvingPool = acting && !pending && !pendingLoco && !pendingFactory && pool.length > 0; // pool credits
-  // Free to place a worker or pass only when nothing is owed.
-  const placing = acting && !pending && !pendingLoco && !pendingFactory && pool.length === 0;
+  // A lock/choice of any kind blocks placement and the mini-phases.
+  const anyLock = !!pending || !!pendingKey || !!pendingIdeaToken || !!pendingIdeaCard || !!pendingLoco || !!pendingFactory || pool.length > 0;
+  const resolvingSetup = acting && !anyLock && inSetup; // game-start starting-bonus mini-phase (pg. 6)
+  const resolvingReuse = acting && !anyLock && !inSetup && inReuse; // between-round reuse mini-phase (pg. 17)
+  // Free to place a worker or pass only when nothing is owed and no mini-phase is active.
+  const placing = acting && !anyLock && !inSetup && !inReuse;
 
   const run = (work: () => Promise<rrApi.RussianRailroadsPayload>) => guard(async () => onPayload(await work()));
   const doPlace = (space: string, opts?: { coins?: number; build?: 'loco' | 'factory'; first?: 'loco' | 'factory' }) => {
@@ -78,6 +91,11 @@ export default function RussianRailroadsBoard({
     if (!placing || !active) return;
     void run(() => rrApi.act(gameId, active.id, { type: 'PASS' }, viewer, game.version));
   };
+  // RR6 choice / phase resolutions — each guarded on the matching flag, then sent as an opaque action.
+  const doAction = (action: Action) => {
+    if (!active) return;
+    void run(() => rrApi.act(gameId, active.id, action, viewer, game.version));
+  };
 
   // The legal place / upgrade / flip resolutions for the held locomotive (pg. 10–11), driving the panel.
   const locoOptions = resolvingLoco && active && pendingLoco ? locoResolutions(active, pendingLoco.number) : [];
@@ -85,6 +103,11 @@ export default function RussianRailroadsBoard({
   const factoryOptions =
     resolvingFactory && active ? legalActions(game as unknown as RussianRailroadsState, active.id) : [];
   const poolOptions = resolvingPool && active ? legalActions(game as unknown as RussianRailroadsState, active.id) : [];
+  // The RR6 choice / phase options — the engine's own enumeration drives each panel.
+  const choiceOptions =
+    (resolvingKey || resolvingIdeaToken || resolvingIdeaCard || resolvingSetup || resolvingReuse) && active
+      ? legalActions(game as unknown as RussianRailroadsState, active.id)
+      : [];
 
   const nameOf = (id: string) => game.players.find((p) => p.id === id)?.name ?? id;
   const winnerNames = game.status === 'ended' ? game.winnerIds.map(nameOf) : [];
@@ -276,6 +299,97 @@ export default function RussianRailroadsBoard({
           </div>
         </div>
       ) : null}
+
+      {/* The starting-bonus setup mini-phase (pg. 6): 4th → 3rd → 2nd pick a card at game start. */}
+      {resolvingSetup ? (
+        <div data-testid="rr-setup" className="rounded-lg border border-primary bg-primary/5 p-3 text-sm font-medium">
+          <div>Starting bonus — pick a card (pg. 6):</div>
+          <div className="mt-2 flex flex-wrap gap-2 font-normal">
+            {choiceOptions.map((opt) =>
+              opt.type === 'RESOLVE_SETUP_BONUS' ? (
+                <Button key={opt.card} variant="outline" size="sm" data-testid={`rr-setup-${opt.card}`} disabled={busy} onClick={() => doAction(opt)}>
+                  {opt.card}
+                </Button>
+              ) : null,
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {/* The between-round worker-reuse mini-phase (pg. 17): move the turn-order worker to a 1-worker space. */}
+      {resolvingReuse ? (
+        <div data-testid="rr-reuse" className="rounded-lg border border-primary bg-primary/5 p-3 text-sm font-medium">
+          <div>Reuse your turn-order worker — resolve one 1-worker space (pg. 17):</div>
+          <div className="mt-2 flex flex-wrap gap-2 font-normal">
+            {choiceOptions.map((opt) =>
+              opt.type === 'RESOLVE_REUSE' ? (
+                <Button key={opt.space} variant="outline" size="sm" data-testid={`rr-reuse-${opt.space}`} disabled={busy} onClick={() => doAction(opt)}>
+                  {opt.space}
+                </Button>
+              ) : null,
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {/* A pending key (pg. 19): advance a wood + any track, or score 10. */}
+      {resolvingKey ? (
+        <div data-testid="rr-key" className="rounded-lg border border-primary bg-primary/5 p-3 text-sm font-medium">
+          <div>You received a key (pg. 19) — choose:</div>
+          <div className="mt-2 flex flex-wrap gap-2 font-normal">
+            {choiceOptions.map((opt) =>
+              opt.type === 'RESOLVE_KEY' ? (
+                <Button key={opt.option} variant="outline" size="sm" data-testid={`rr-key-${opt.option}`} disabled={busy} onClick={() => doAction(opt)}>
+                  {opt.option === 'moves' ? 'Advance a wood + any track' : 'Score 10 points'}
+                </Button>
+              ) : null,
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {/* A pending idea-token choice (pp. 18–19, 46): spend one unused idea token. */}
+      {resolvingIdeaToken ? (
+        <div data-testid="rr-idea-token" className="rounded-lg border border-primary bg-primary/5 p-3 text-sm font-medium">
+          <div>Choose an idea token (pg. 46):</div>
+          <div className="mt-2 flex flex-wrap gap-2 font-normal">
+            {choiceOptions.map((opt) =>
+              opt.type === 'RESOLVE_IDEA_TOKEN' ? (
+                <Button key={opt.token} variant="outline" size="sm" data-testid={`rr-idea-token-${opt.token}`} disabled={busy} onClick={() => doAction(opt)}>
+                  {opt.token}
+                </Button>
+              ) : null,
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {/* A pending idea-card choice (pg. 46–47), granted by the end-bonus idea token. */}
+      {resolvingIdeaCard ? (
+        <div data-testid="rr-idea-card" className="rounded-lg border border-primary bg-primary/5 p-3 text-sm font-medium">
+          <div>Choose an idea card (pg. 47):</div>
+          <div className="mt-2 flex flex-wrap gap-2 font-normal">
+            {choiceOptions.map((opt) =>
+              opt.type === 'RESOLVE_IDEA_CARD' ? (
+                <Button key={opt.card} variant="outline" size="sm" data-testid={`rr-idea-card-${opt.card}`} disabled={busy} onClick={() => doAction(opt)}>
+                  {opt.card}
+                </Button>
+              ) : null,
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {/* The turn-order track (pg. 16): the pawn order for this round, left → first. */}
+      <section aria-label="Turn order" data-testid="rr-turnorder" className="text-xs text-muted-foreground">
+        Turn order:{' '}
+        {game.turnOrder.map((seat, i) => (
+          <span key={seat} className={cn(i === 0 && 'font-semibold text-foreground')}>
+            {i > 0 ? ' → ' : ''}
+            {game.players[seat]?.name ?? seat}
+          </span>
+        ))}
+      </section>
 
       {/* Shared action spaces (pg. 7–9). Each shows its occupancy; the active driving seat may place on an
           unoccupied one (the bottom track space is never occupied — pg. 9). Locked out while resolving. */}
@@ -492,6 +606,9 @@ function PlayerCard({
         </span>
         <span data-testid={`rr-coins-${player.id}`}>Coins: {player.coins}</span>
         <span data-testid={`rr-doublers-${player.id}`}>Doublers: {player.doublers}</span>
+        {player.keysReceived > 0 ? <span data-testid={`rr-keys-${player.id}`}>🔑 {player.keysReceived}</span> : null}
+        {player.medal20 ? <span data-testid={`rr-medal-${player.id}`}>🏅 +20</span> : null}
+        {player.revalued ? <span data-testid={`rr-revalued-${player.id}`}>tile↑</span> : null}
         <span data-testid={`rr-score-${player.id}`} className="font-medium">
           Score: {player.score}
         </span>

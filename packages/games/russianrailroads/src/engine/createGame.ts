@@ -86,17 +86,27 @@ export function createGame(options: CreateGameOptions): RussianRailroadsState {
     // The #1 loco starts on the Trans-Siberian (pg. 6, step 3) — so only that route reaches space 1 for
     // scoring until more locos are bought (RR4).
     locomotives: [{ number: STARTING_LOCOMOTIVE, route: 'transsiberian' }],
-    // The wrench starts on the START space (pg. 6, step 6); no gaps filled yet (pg. 12–13).
-    industry: { wrench: 0, factories: Array.from({ length: INDUSTRY_GAPS }, () => null) },
+    // The wrench starts on the START space (pg. 6, step 6); no gaps filled yet (pg. 12–13); no 2nd wrench.
+    industry: { wrench: 0, factories: Array.from({ length: INDUSTRY_GAPS }, () => null), secondWrench: null },
     hiredEngineers: [],
     actionPool: [],
     endBonus: null,
     turnOrderCard: turnOrderCards[seat]!,
     passed: false,
+    consumedSpecials: [],
+    keysReceived: 0,
+    medal20: false,
+    revalued: false,
+    woodWorker: false,
+    usedIdeaTokens: [],
     score: 0,
   }));
 
   const turnOrder = turnOrderFromCards(turnOrderCards);
+  // The starting-bonus setup mini-phase (pg. 6): 4th → 3rd → 2nd take + resolve one card; the start player
+  // (turn-order position 0) takes none. The game opens *in* this phase, with the last-position seat first.
+  // With 2–4 players there is always ≥1 non-start seat, so this queue is never empty.
+  const setupBonusQueue = turnOrder.slice(1).reverse();
 
   return {
     id,
@@ -105,12 +115,19 @@ export function createGame(options: CreateGameOptions): RussianRailroadsState {
     engineerStrip: dealEngineerStrip(count, rng),
     endBonusPile: dealEndBonusPile(rng),
     turnOrder,
-    // The round opens with the turn-order starting seat (the player holding card "1", pg. 5).
-    activePlayerIndex: turnOrder[0]!,
+    turnClaims: { first: null, second: null },
+    // Setup opens with the starting-bonus mini-phase (pg. 6); once it empties, placement opens with the
+    // turn-order starting seat (the player holding card "1", pg. 5).
+    activePlayerIndex: setupBonusQueue[0]!,
     pendingMoves: null,
     pendingLoco: null,
     pendingFactory: null,
     pendingThen: null,
+    pendingKey: null,
+    pendingIdeaToken: null,
+    pendingIdeaCard: null,
+    pendingReuse: null,
+    pendingSetupBonus: setupBonusQueue,
     round: 1,
     rounds: ROUNDS[count]!,
     // The shared doubler supply (pg. 14) + the locomotive/factory supply (pg. 4, 10–12: `count` per stack).

@@ -1,6 +1,6 @@
 import type { ErrorResponse, GameModule, GameSummary, ParseResult, Viewer } from '@game-hub/kernel';
 import { applyAction, createGame, GameError, legalActions, MAX_PLAYERS, MIN_PLAYERS, viewFor } from '../engine';
-import type { Action, RouteId, RussianRailroadsState, TrackColor } from '../engine';
+import type { Action, IdeaCardId, IdeaTokenType, RouteId, RussianRailroadsState, TrackColor } from '../engine';
 
 /**
  * Validate opaque JSON into a typed Russian Railroads `Action` (RR4: `PLACE` / `MOVE_TRACK` / the loco
@@ -25,10 +25,42 @@ function parseAction(raw: unknown): ParseResult<Action> {
     from?: unknown;
     slot?: unknown;
     id?: unknown;
+    option?: unknown;
+    token?: unknown;
+    card?: unknown;
   };
 
   if (action.type === 'PASS') {
     return { ok: true, action: { type: 'PASS' } };
+  }
+
+  // RR6 choice / phase resolutions. The engine does the domain validation (a used token, an unknown card,
+  // an illegal reuse space, no lock set); parseAction only shapes the JSON.
+  if (action.type === 'RESOLVE_KEY') {
+    if (action.option !== 'moves' && action.option !== 'points') {
+      return { ok: false, message: "RESOLVE_KEY.option must be 'moves' or 'points'" };
+    }
+    return { ok: true, action: { type: 'RESOLVE_KEY', option: action.option } };
+  }
+
+  if (action.type === 'RESOLVE_IDEA_TOKEN') {
+    if (typeof action.token !== 'string') return { ok: false, message: 'RESOLVE_IDEA_TOKEN.token must be a string' };
+    return { ok: true, action: { type: 'RESOLVE_IDEA_TOKEN', token: action.token as IdeaTokenType } };
+  }
+
+  if (action.type === 'RESOLVE_IDEA_CARD') {
+    if (typeof action.card !== 'string') return { ok: false, message: 'RESOLVE_IDEA_CARD.card must be a string' };
+    return { ok: true, action: { type: 'RESOLVE_IDEA_CARD', card: action.card as IdeaCardId } };
+  }
+
+  if (action.type === 'RESOLVE_REUSE') {
+    if (typeof action.space !== 'string') return { ok: false, message: 'RESOLVE_REUSE.space must be a string' };
+    return { ok: true, action: { type: 'RESOLVE_REUSE', space: action.space } };
+  }
+
+  if (action.type === 'RESOLVE_SETUP_BONUS') {
+    if (typeof action.card !== 'string') return { ok: false, message: 'RESOLVE_SETUP_BONUS.card must be a string' };
+    return { ok: true, action: { type: 'RESOLVE_SETUP_BONUS', card: action.card } };
   }
 
   if (action.type === 'FLIP_LOCO') {

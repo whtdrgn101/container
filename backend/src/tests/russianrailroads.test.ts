@@ -31,6 +31,26 @@ describe('Russian Railroads (Track D package)', () => {
   const activeOf = async (id: string) =>
     (await app.inject({ method: 'GET', url: `/games/${id}` })).json().activePlayerId as string;
 
+  /**
+   * Resolve the RR6 starting-bonus setup mini-phase (pg. 6) so a test reaches round-1 placement. Each owing
+   * seat takes the coins-only card (no lingering lock). Idempotent — a no-op once setup is done.
+   */
+  const clearSetup = async (id: string) => {
+    for (let guard = 0; guard < 6; guard += 1) {
+      const g = (await app.inject({ method: 'GET', url: `/games/${id}` })).json().game as {
+        pendingSetupBonus: number[] | null;
+        activePlayerIndex: number;
+        players: { id: string }[];
+      };
+      if (!g.pendingSetupBonus) return;
+      await app.inject({
+        method: 'POST',
+        url: `/games/${id}/actions`,
+        payload: { playerId: g.players[g.activePlayerIndex]!.id, action: { type: 'RESOLVE_SETUP_BONUS', card: 'start-coins-2' } },
+      });
+    }
+  };
+
   it('appears in the catalog with its palette and seat bounds', async () => {
     const catalog = (await app.inject({ method: 'GET', url: '/games/catalog' })).json().games as {
       id: string;
@@ -53,6 +73,7 @@ describe('Russian Railroads (Track D package)', () => {
 
   it('plays a worker placement and a pass through /actions', async () => {
     const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    await clearSetup(game.id);
     const first = await activeOf(game.id);
     const placed = await app.inject({
       method: 'POST',
@@ -75,6 +96,7 @@ describe('Russian Railroads (Track D package)', () => {
 
   it('never sends the end-bonus pile order to a client (redaction on the wire)', async () => {
     const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    await clearSetup(game.id);
     const view = (await app.inject({ method: 'GET', url: `/games/${game.id}?viewer=p1` })).json().game as Record<
       string,
       unknown
@@ -88,6 +110,7 @@ describe('Russian Railroads (Track D package)', () => {
 
   it('resolves a track-extension lock one MOVE_TRACK at a time over /actions', async () => {
     const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    await clearSetup(game.id);
     const first = await activeOf(game.id);
     // Place on the 2-worker wood space → a 3-move lock; the placer keeps the turn.
     const placed = await app.inject({
@@ -133,6 +156,7 @@ describe('Russian Railroads (Track D package)', () => {
 
   it('runs the scoring phase at round close and carries the per-player total on the wire', async () => {
     const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    await clearSetup(game.id);
     // Both players pass to close round 1; wood-only, so everyone scores 0, but the phase runs.
     for (let i = 0; i < 2; i += 1) {
       const who = await activeOf(game.id);
@@ -148,13 +172,15 @@ describe('Russian Railroads (Track D package)', () => {
       log: { type: string; payload?: { closedRound?: number; scores?: unknown[] } }[];
     };
     expect(view.round).toBe(2);
-    expect(view.players.every((p) => p.score === 0)).toBe(true);
     const close = view.log.find((e) => e.type === 'PASS' && e.payload?.closedRound === 1);
     expect(close?.payload?.scores).toHaveLength(2);
+    // Route+industry scoring is 0 this round (wood only); pass-card reverses are the only points (pg. 16).
+    expect((close?.payload?.scores as { gained: number }[]).every((s) => s.gained === 0)).toBe(true);
   });
 
   it('takes a doubler over the wire, drawing down the shared supply (pg. 14)', async () => {
     const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    await clearSetup(game.id);
     const first = await activeOf(game.id);
     const placed = await app.inject({
       method: 'POST',
@@ -172,6 +198,7 @@ describe('Russian Railroads (Track D package)', () => {
 
   it('unlocks green over the wire once the wood track reaches space 2, then builds it (pg. 8–9)', async () => {
     const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    await clearSetup(game.id);
     const first = await activeOf(game.id);
     const post = (playerId: string, action: unknown) =>
       app.inject({ method: 'POST', url: `/games/${game.id}/actions`, payload: { playerId, action } });
@@ -204,6 +231,7 @@ describe('Russian Railroads (Track D package)', () => {
 
   it('acquires a locomotive and drives an upgrade chain over the wire (pg. 10–11)', async () => {
     const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    await clearSetup(game.id);
     const first = await activeOf(game.id);
     const post = (playerId: string, action: unknown) =>
       app.inject({ method: 'POST', url: `/games/${game.id}/actions`, payload: { playerId, action } });
@@ -245,6 +273,7 @@ describe('Russian Railroads (Track D package)', () => {
 
   it('builds a factory, then moves the wrench onto it for a pool action (pg. 12–13)', async () => {
     const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    await clearSetup(game.id);
     const post = (playerId: string, action: unknown) =>
       app.inject({ method: 'POST', url: `/games/${game.id}/actions`, payload: { playerId, action } });
     const industryOf = async (playerId: string) => {
@@ -295,8 +324,94 @@ describe('Russian Railroads (Track D package)', () => {
     expect((spent.json().game as { pendingMoves: unknown }).pendingMoves).toBeNull();
   });
 
+  it('scores the turn-order card reverse when a player passes (pg. 16)', async () => {
+    const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    await clearSetup(game.id);
+    const g0 = (await app.inject({ method: 'GET', url: `/games/${game.id}?viewer=p1` })).json().game as {
+      activePlayerIndex: number;
+      players: { id: string; turnOrderCard: number }[];
+    };
+    const active = g0.players[g0.activePlayerIndex]!;
+    const passed = await app.inject({
+      method: 'POST',
+      url: `/games/${game.id}/actions`,
+      payload: { playerId: active.id, action: { type: 'PASS' } },
+    });
+    const expected = ({ 1: 0, 2: 2, 3: 4, 4: 6 } as Record<number, number>)[active.turnOrderCard];
+    expect((passed.json().game as { log: { type: string; payload?: { passScore?: number } }[] }).log.at(-1)).toMatchObject({
+      type: 'PASS',
+      payload: { passScore: expected },
+    });
+  });
+
+  it('reaches a route end for a key and resolves the choice over the wire (pg. 18–19)', async () => {
+    const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    await clearSetup(game.id);
+    const post = (playerId: string, action: unknown) =>
+      app.inject({ method: 'POST', url: `/games/${game.id}/actions`, payload: { playerId, action } });
+    const A = await activeOf(game.id);
+    const B = A === 'p1' ? 'p2' : 'p1';
+
+    // Drive A's Kyiv wood track from space 1 to its end (space 9) — 8 moves across four track spaces — so the
+    // wood-only new-worker (space 7) then the end-station key (space 9) fire.
+    const buildKyiv = async (space: string, coins: number, moves: number) => {
+      await post(A, coins ? { type: 'PLACE', space } : { type: 'PLACE', space });
+      for (let i = 0; i < moves; i += 1) await post(A, { type: 'MOVE_TRACK', route: 'kyiv', color: 'wood' });
+    };
+    await buildKyiv('track-wood-2', 0, 3); // → space 4; turn passes to B
+    await post(B, { type: 'PASS' }); // B done → A keeps the clock alone
+    await buildKyiv('track-wood-1', 0, 2); // → space 6
+    await buildKyiv('track-coin', 1, 2); // (worker + coin) → space 8; the new-worker at space 7 fires
+    // The bottom space's last move reaches space 9 (the end) → a key is owed.
+    await post(A, { type: 'PLACE', space: 'track-bottom' });
+    const owed = await post(A, { type: 'MOVE_TRACK', route: 'kyiv', color: 'wood' });
+    const owedView = owed.json().game as {
+      pendingKey: { remaining: number } | null;
+      players: { id: string; workersTotal: number; keysReceived: number }[];
+    };
+    expect(owedView.pendingKey).toEqual({ remaining: 1 });
+    expect(owedView.players.find((p) => p.id === A)!.workersTotal).toBeGreaterThan(5); // the new worker was gained
+    expect(owedView.players.find((p) => p.id === A)!.keysReceived).toBe(1);
+
+    // Everything but RESOLVE_KEY is refused; scoring 10 points resolves it.
+    const refused = await post(A, { type: 'PASS' });
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json().error.code).toBe('KEY_PENDING');
+    const scored = await post(A, { type: 'RESOLVE_KEY', option: 'points' });
+    const done = scored.json().game as { pendingKey: unknown; players: { id: string; score: number }[] };
+    expect(done.pendingKey).toBeNull();
+    expect(done.players.find((p) => p.id === A)!.score).toBe(10);
+  });
+
+  it('runs the between-round reuse mini-phase over the wire (pg. 17)', async () => {
+    const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    await clearSetup(game.id);
+    const post = (playerId: string, action: unknown) =>
+      app.inject({ method: 'POST', url: `/games/${game.id}/actions`, payload: { playerId, action } });
+    const A = await activeOf(game.id);
+    const B = A === 'p1' ? 'p2' : 'p1';
+
+    // The first player claims second place, then both pass → the round closes into the reuse mini-phase.
+    await post(A, { type: 'PLACE', space: 'turnorder-2' });
+    await post(B, { type: 'PASS' });
+    await post(A, { type: 'PASS' });
+    const inReuse = (await app.inject({ method: 'GET', url: `/games/${game.id}?viewer=p1` })).json().game as {
+      pendingReuse: number[] | null;
+      round: number;
+    };
+    expect(inReuse.pendingReuse).not.toBeNull();
+    expect(inReuse.round).toBe(2);
+
+    // The claimant reuses its worker on the coins space; the gain is available for the new round.
+    const reuseSeat = await activeOf(game.id);
+    const resolved = await post(reuseSeat, { type: 'RESOLVE_REUSE', space: 'coins' });
+    const after = resolved.json().game as { pendingReuse: number[] | null };
+    expect(after.pendingReuse).toBeNull();
+  });
+
   it("maps a wrong-turn move to 409, and reports the module's error code", async () => {
     const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    await clearSetup(game.id);
     const active = await activeOf(game.id);
     const other = active === 'p1' ? 'p2' : 'p1';
     const res = await app.inject({

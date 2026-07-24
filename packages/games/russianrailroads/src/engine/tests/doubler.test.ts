@@ -3,6 +3,7 @@ import { applyAction, legalActions, place } from '../actions';
 import { DOUBLER_SPACES, DOUBLER_SUPPLY } from '../core';
 import type { Locomotive, Route, RouteId, RussianRailroadsState, TrackColor } from '../core';
 import { scorePlayer, scoreRoute } from '../internal';
+import { VALUATION } from '../core';
 import { activeId, expectError, newGame } from './helpers';
 
 /** The active seat with fields overridden. */
@@ -75,9 +76,9 @@ describe('doubler scoring — pg. 20 worked example (verbatim)', () => {
     // doubler over space 1. Bronze = 2 pts each, but space 1 scores 4 → 4+2+2 = 8. Green = 1 each → 4.
     // Space 8 = wood = 0. Total = 12.
     const trans = route('transsiberian', 15, { 2: 'bronze', 6: 'green', 8: 'wood' });
-    expect(scoreRoute(trans, 8, 1)).toBe(12);
+    expect(scoreRoute(trans, 8, 1, VALUATION, false)).toBe(12);
     // Without the doubler, the same route scores 10 (bronze 6 + green 4 + wood 0).
-    expect(scoreRoute(trans, 8, 0)).toBe(10);
+    expect(scoreRoute(trans, 8, 0, VALUATION, false)).toBe(10);
   });
 
   it('scores a whole player with a doubler only on the Trans-Siberian', () => {
@@ -99,6 +100,6 @@ describe('doubler scoring — pg. 20 worked example (verbatim)', () => {
       ],
     };
     // The doubler count is Trans-Siberian's alone — it must not leak onto the other routes (they score 0).
-    expect(scorePlayer(player)).toEqual({ playerId: player.id, routes: 20, industry: 0, gained: 20 });
+    expect(scorePlayer(player)).toEqual({ playerId: player.id, routes: 20, industry: 0, bonus: 0, gained: 20 });
   });
 });

@@ -43,14 +43,10 @@ export function placeLoco(state: RussianRailroadsState, playerId: string, routeI
 
   const placed: Locomotive = { number: pending.number, route: routeId };
   const updated = { ...player, locomotives: [...player.locomotives, placed] };
-  return record(
-    state,
-    'PLACE_LOCO',
-    playerId,
-    // Placing a locomotive draws nothing, so `afterBuild` settles from the unchanged supply.
-    { players: withPlayer(state, seat, updated), ...afterBuild(state, seat, state.supplies.locomotives) },
-    { route: routeId, number: pending.number },
-  );
+  // Placing a locomotive draws nothing (supply unchanged); `afterBuild` settles from the updated board — a
+  // higher loco reach can newly satisfy a loco-required special (pp. 18–19).
+  const next = { ...state, players: withPlayer(state, seat, updated) };
+  return record(state, 'PLACE_LOCO', playerId, afterBuild(next, seat), { route: routeId, number: pending.number });
 }
 
 /**
@@ -121,5 +117,6 @@ export function flipLoco(state: RussianRailroadsState, playerId: string): Russia
 
   // The flipped locomotive returns to the supply as a factory of its own number (pg. 11, 13).
   const supply = returnFactory(state.supplies.locomotives, pending.number);
-  return record(state, 'FLIP_LOCO', playerId, afterBuild(state, seat, supply), { number: pending.number });
+  const next = { ...state, supplies: { ...state.supplies, locomotives: supply } };
+  return record(state, 'FLIP_LOCO', playerId, afterBuild(next, seat), { number: pending.number });
 }

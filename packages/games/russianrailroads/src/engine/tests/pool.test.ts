@@ -29,7 +29,7 @@ describe('industrialization spaces (pg. 14)', () => {
 
   it('a coin factory auto-resolves (choiceless) and does not enter the pool (pg. 13)', () => {
     // Wrench on the 5-space (lane 4); a #6 (coin) factory fills the first gap.
-    const industry: Industry = { wrench: 4, factories: [6, null, null, null, null] };
+    const industry: Industry = { wrench: 4, factories: [6, null, null, null, null], secondWrench: null };
     const base = patchActive(newGame(2), { industry });
     const placer = base.activePlayerIndex;
     const before = base.players[placer]!.coins;
@@ -44,7 +44,7 @@ describe('industrialization spaces (pg. 14)', () => {
   it('legalActions omits a blocked industry space, but keeps the bottom one if its wood bonus can build', () => {
     const base = newGame(2);
     // Wrench on the 5-space with the first gap unfilled → the wrench cannot advance from any industry space.
-    const blocked = patchActive(base, { industry: { wrench: 4, factories: [null, null, null, null, null] } });
+    const blocked = patchActive(base, { industry: { wrench: 4, factories: [null, null, null, null, null], secondWrench: null } });
     const me = activeId(blocked);
     const spaces = legalActions(blocked, me)
       .filter((a): a is { type: 'PLACE'; space: string } => a.type === 'PLACE')
@@ -63,7 +63,7 @@ describe('industrialization spaces (pg. 14)', () => {
   });
 
   it('an inert factory yields nothing (lost, pg. 13)', () => {
-    const industry: Industry = { wrench: 4, factories: [4, null, null, null, null] }; // #4 is inert
+    const industry: Industry = { wrench: 4, factories: [4, null, null, null, null], secondWrench: null }; // #4 is inert
     const base = patchActive(newGame(2), { industry });
     const placer = base.activePlayerIndex;
     const s1 = applyAction(base, activeId(base), { type: 'PLACE', space: 'industry-1' });
@@ -76,7 +76,7 @@ describe('industrialization spaces (pg. 14)', () => {
 describe('the action pool — track-move credits (pg. 13)', () => {
   it('a track-move factory becomes a pool credit; RESOLVE_POOL opens the lock and MOVE_TRACK spends it', () => {
     // #2 (move a track) factory in the first gap; wrench on the 5-space → moving onto it triggers it.
-    const industry: Industry = { wrench: 4, factories: [2, null, null, null, null] };
+    const industry: Industry = { wrench: 4, factories: [2, null, null, null, null], secondWrench: null };
     const base = patchActive(newGame(2), { industry });
     const me = activeId(base);
     const pooled = applyAction(base, me, { type: 'PLACE', space: 'industry-1' });
@@ -109,7 +109,7 @@ describe('the action pool — track-move credits (pg. 13)', () => {
 
   it('holds the turn across multiple credits, passing only once the pool empties', () => {
     // industry-3 from the 5-space onto a #2 factory: the factory move-credit AND the wood bonus → two credits.
-    const industry: Industry = { wrench: 4, factories: [2, null, null, null, null] };
+    const industry: Industry = { wrench: 4, factories: [2, null, null, null, null], secondWrench: null };
     const base = patchActive(newGame(2), { industry });
     const me = activeId(base);
     const pooled = applyAction(base, me, { type: 'PLACE', space: 'industry-3' });
@@ -129,7 +129,7 @@ describe('the action pool — track-move credits (pg. 13)', () => {
   });
 
   it('SKIP_POOL forfeits remaining credits and passes the turn (pg. 13)', () => {
-    const industry: Industry = { wrench: 4, factories: [2, null, null, null, null] };
+    const industry: Industry = { wrench: 4, factories: [2, null, null, null, null], secondWrench: null };
     const base = patchActive(newGame(2), { industry });
     const me = activeId(base);
     const pooled = applyAction(base, me, { type: 'PLACE', space: 'industry-1' });
@@ -146,7 +146,7 @@ describe('the action pool — track-move credits (pg. 13)', () => {
     expectError(() => applyAction(base, me, { type: 'RESOLVE_POOL', id: 'x' }), 'NO_PENDING_POOL');
 
     const pooled = applyAction(
-      patchActive(base, { industry: { wrench: 4, factories: [2, null, null, null, null] } }),
+      patchActive(base, { industry: { wrench: 4, factories: [2, null, null, null, null], secondWrench: null } }),
       me,
       { type: 'PLACE', space: 'industry-1' },
     );
@@ -156,7 +156,13 @@ describe('the action pool — track-move credits (pg. 13)', () => {
   it('an unresolvable credit (no accessible track can advance) can only be skipped', () => {
     // All routes full of wood → nothing can advance and only wood is accessible; the credit is stuck.
     const base = newGame(2);
-    const stuck = patchActive(base, { routes: allWood(base), industry: { wrench: 4, factories: [2, null, null, null, null] } });
+    // Pre-consume the end-station specials the full routes would otherwise trigger, so the pool credit — not
+    // a key choice — is what's on the clock.
+    const stuck = patchActive(base, {
+      routes: allWood(base),
+      industry: { wrench: 4, factories: [2, null, null, null, null], secondWrench: null },
+      consumedSpecials: ['transsiberian-key-15', 'stpetersburg-key-9', 'kyiv-key-9', 'kyiv-worker-7'],
+    });
     const me = activeId(stuck);
     const pooled = applyAction(stuck, me, { type: 'PLACE', space: 'industry-1' });
     expect(legalActions(pooled, me)).toEqual([{ type: 'SKIP_POOL' }]); // no RESOLVE_POOL offered

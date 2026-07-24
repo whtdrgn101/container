@@ -30,6 +30,7 @@ describe('legalActions', () => {
         'industry-1',
         'industry-2',
         'industry-3',
+        'turnorder-2',
       ]),
     );
     // The coins space offers a worker and a coin variant.
@@ -67,7 +68,7 @@ describe('legalActions', () => {
     // Track spaces all drop out; the coin, doubler, temp-worker, locomotive/factory and industrialization
     // spaces remain (the wrench can still advance regardless of the routes being full).
     expect(placedSpaces(legalActions(maxed))).toEqual(
-      new Set(['coins', 'doubler', 'temp-workers', 'loco-1', 'loco-2', 'loco-3', 'industry-1', 'industry-2', 'industry-3']),
+      new Set(['coins', 'doubler', 'temp-workers', 'loco-1', 'loco-2', 'loco-3', 'industry-1', 'industry-2', 'industry-3', 'turnorder-2']),
     );
   });
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { locoReach, scoreIndustry, scorePlayer, scoreRoute } from '../internal';
+import { VALUATION } from '../core';
 import type { Locomotive, Route, RussianRailroadsPlayer, TrackColor } from '../core';
 import { newGame } from './helpers';
 
@@ -26,9 +27,9 @@ describe('scoring', () => {
     // last wood tile itself (space 9) is out of reach, but space 8 behind it is treated as wood (0).
     const r = route('transsiberian', 10, { 2: 'bronze', 6: 'green', 8: 'wood' });
     // spaces 1-3 bronze (2 each), 4-7 green (1 each), 8 wood (0) → 6 + 4 + 0 = 10.
-    expect(scoreRoute(r, 8)).toBe(10);
+    expect(scoreRoute(r, 8, 0, VALUATION, false)).toBe(10);
     // Wood only ever scores 0, whatever the reach.
-    expect(scoreRoute(route('kyiv', 8, { 0: 'wood' }), 8)).toBe(0);
+    expect(scoreRoute(route('kyiv', 8, { 0: 'wood' }), 8, 0, VALUATION, false)).toBe(0);
   });
 
   it('scores nothing for spaces beyond the furthest track, and nothing at reach 0', () => {
@@ -36,8 +37,8 @@ describe('scoring', () => {
     // silver tile at index 2 so there is a non-zero, and leave index 3 (space 4) with nothing ahead.
     const r = route('transsiberian', 6, { 0: 'wood', 2: 'silver' });
     // space1: nearest ahead = wood@0 → 0; space2: silver@2 → 4; space3: silver@2 → 4; space4: nothing ahead → 0.
-    expect(scoreRoute(r, 4)).toBe(8);
-    expect(scoreRoute(r, 0)).toBe(0); // reach 0 scores nothing at all
+    expect(scoreRoute(r, 4, 0, VALUATION, false)).toBe(8);
+    expect(scoreRoute(r, 0, 0, VALUATION, false)).toBe(0); // reach 0 scores nothing at all
   });
 
   it('industry is a stub of 0 (RR5)', () => {
@@ -56,6 +57,6 @@ describe('scoring', () => {
         route('kyiv', 8, { 0: 'wood' }), // no loco → 0
       ],
     };
-    expect(scorePlayer(player)).toEqual({ playerId: player.id, routes: 5, industry: 0, gained: 5 });
+    expect(scorePlayer(player)).toEqual({ playerId: player.id, routes: 5, industry: 0, bonus: 0, gained: 5 });
   });
 });

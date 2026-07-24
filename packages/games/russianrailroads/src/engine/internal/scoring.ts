@@ -1,6 +1,6 @@
-import { VALUATION } from '../core';
-import type { Locomotive, Route, RouteId, RussianRailroadsPlayer } from '../core';
-import { industryScore } from './industry';
+import { industryPointsAt, TWENTY_POINTS } from '../core';
+import type { Locomotive, Route, RouteId, RussianRailroadsPlayer, TrackColor } from '../core';
+import { bonusStarScore, routeDoubled, valuationOf } from './specials';
 
 /**
  * The scoring phase (pg. 20–21), run at the close of every round. Pure functions over a player's board —
@@ -29,7 +29,13 @@ export function locoReach(locomotives: readonly Locomotive[], routeId: RouteId):
  * that space's points, exactly the pg. 20 example ("a doubler over space 1, so that track scores 4 instead
  * of 2").
  */
-export function scoreRoute(route: Route, reach: number, doublers = 0): number {
+export function scoreRoute(
+  route: Route,
+  reach: number,
+  doublers: number,
+  valuation: Readonly<Record<TrackColor, number>>,
+  routeDouble: boolean,
+): number {
   const limit = Math.min(reach, route.spaces.length);
   let score = 0;
   for (let s = 0; s < limit; s += 1) {
@@ -42,29 +48,39 @@ export function scoreRoute(route: Route, reach: number, doublers = 0): number {
         break;
       }
     }
-    if (color != null) score += VALUATION[color] * (s < doublers ? 2 : 1);
+    if (color != null) score += valuation[color] * (s < doublers ? 2 : 1);
   }
-  return score;
+  // Route doubling (pg. 19): the whole route scores twice once its green+loco doubling space is reached.
+  return routeDouble ? score * 2 : score;
 }
 
 /**
- * Industry-track score (pg. 21): the points shown on the space the wrench is on, or the previous numbered
- * space if it's on a factory / numberless space. RR5 replaces the RR2 stub with the real track (the wrench
- * starts on the 0-point START space, so a player who never industrialized still scores 0).
+ * Industry-track score (pg. 21): the points shown on the space the wrench is on (or the previous numbered
+ * space, on a factory / numberless space). With the **second wrench** (pg. 47, RR6) both wrenches score, so
+ * their two space-scores are summed. RR5's single-wrench case is `secondWrench === null` (adds nothing).
  */
 export function scoreIndustry(player: RussianRailroadsPlayer): number {
-  return industryScore(player.industry);
+  const { wrench, secondWrench } = player.industry;
+  return industryPointsAt(wrench) + (secondWrench !== null ? industryPointsAt(secondWrench) : 0);
 }
 
 /**
  * The route points a player scores this phase — the sum over their three routes (pg. 20). The player's
- * doubler tiles sit above the **Trans-Siberian** route (pg. 14), so its doubler count is passed only there.
+ * doubler tiles sit above the **Trans-Siberian** route (pg. 14), so its doubler count is passed only there;
+ * the valuation tile (base or revalued, pg. 46) and per-route doubling (pg. 19) apply throughout.
  */
 export function scoreRoutes(player: RussianRailroadsPlayer): number {
+  const valuation = valuationOf(player);
   return player.routes.reduce(
     (sum, route) =>
       sum +
-      scoreRoute(route, locoReach(player.locomotives, route.id), route.id === 'transsiberian' ? player.doublers : 0),
+      scoreRoute(
+        route,
+        locoReach(player.locomotives, route.id),
+        route.id === 'transsiberian' ? player.doublers : 0,
+        valuation,
+        routeDoubled(player, route.id),
+      ),
     0,
   );
 }
@@ -74,13 +90,16 @@ export interface RoundScore {
   readonly playerId: string;
   readonly routes: number;
   readonly industry: number;
-  /** Points gained this round (routes + industry) — added to the player's cumulative `score`. */
+  /** Bonus-star + 20-point-medal points (pp. 19, 46, RR6). */
+  readonly bonus: number;
+  /** Points gained this round (routes + industry + bonus) — added to the player's cumulative `score`. */
   readonly gained: number;
 }
 
-/** Score one player for the round (pg. 20–21): routes + industry. */
+/** Score one player for the round (pg. 20–21, plus pp. 19/46 specials): routes + industry + bonus. */
 export function scorePlayer(player: RussianRailroadsPlayer): RoundScore {
   const routes = scoreRoutes(player);
   const industry = scoreIndustry(player);
-  return { playerId: player.id, routes, industry, gained: routes + industry };
+  const bonus = bonusStarScore(player) + (player.medal20 ? TWENTY_POINTS : 0);
+  return { playerId: player.id, routes, industry, bonus, gained: routes + industry + bonus };
 }

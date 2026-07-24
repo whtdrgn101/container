@@ -1,4 +1,11 @@
-import { ACTION_SPACES, DOUBLER_SPACES } from '../core';
+import {
+  ACTION_SPACES,
+  DOUBLER_SPACES,
+  IDEA_CARDS,
+  IDEA_TOKEN_TYPES,
+  STARTING_BONUS_CARDS,
+  turnOrderOrdinal,
+} from '../core';
 import type { ActionSpaceDef, RussianRailroadsState } from '../core';
 import {
   accessibleColors,
@@ -13,6 +20,17 @@ import {
   seatOf,
 } from '../internal';
 import type { Action } from './action';
+
+/** Is `space` a legal reuse target for the seat right now (pg. 17) — the resolveReuse-accepting subset? */
+function reusableSpace(state: RussianRailroadsState, space: ActionSpaceDef): boolean {
+  if (space.workers !== 1 || space.coinCost) return false;
+  if (!space.neverOccupies && (state.actionSpaces[space.id]?.length ?? 0) > 0) return false;
+  const player = state.players[state.activePlayerIndex]!;
+  if (space.track) return legalSteps(player.routes, space.track.colors.filter((c) => accessibleColors(player).includes(c))).length > 0;
+  if (space.industry) return advanceWrench(player.industry, space.industry.advance).wrench > player.industry.wrench;
+  if (space.kind === 'doubler') return state.supplies.doublers > 0 && player.doublers < DOUBLER_SPACES;
+  return space.kind === 'coins' || space.kind === 'temp-workers';
+}
 
 /**
  * The actions a seat may legally take right now (RR5). Reads only the active seat's own public board, so it
@@ -42,6 +60,27 @@ export function legalActions(state: RussianRailroadsState, playerId?: string): A
       route: step.route,
       color: step.color,
     }));
+  }
+
+  // A pending key (pg. 19): advance a wood + any track, or score 10 points.
+  if (state.pendingKey) {
+    return [
+      { type: 'RESOLVE_KEY', option: 'moves' },
+      { type: 'RESOLVE_KEY', option: 'points' },
+    ];
+  }
+
+  // A pending idea-token choice (pp. 18–19): each unused idea-token type.
+  if (state.pendingIdeaToken) {
+    return IDEA_TOKEN_TYPES.filter((t) => !player.usedIdeaTokens.includes(t)).map((token) => ({
+      type: 'RESOLVE_IDEA_TOKEN',
+      token,
+    }));
+  }
+
+  // A pending idea-card choice (pg. 46–47): each idea card.
+  if (state.pendingIdeaCard) {
+    return IDEA_CARDS.map((card) => ({ type: 'RESOLVE_IDEA_CARD', card }));
   }
 
   // Holding a locomotive (pg. 10–11): only the legal place / upgrade / flip resolutions.
@@ -83,6 +122,16 @@ export function legalActions(state: RussianRailroadsState, playerId?: string): A
     }
     out.push({ type: 'SKIP_POOL' });
     return out;
+  }
+
+  // The game-start setup mini-phase (pg. 6): pick any starting bonus card.
+  if (state.pendingSetupBonus) {
+    return STARTING_BONUS_CARDS.map((c) => ({ type: 'RESOLVE_SETUP_BONUS', card: c.id }));
+  }
+
+  // The between-round reuse mini-phase (pg. 17): move the turn-order worker to a legal 1-worker space.
+  if (state.pendingReuse) {
+    return ACTION_SPACES.filter((s) => reusableSpace(state, s)).map((s) => ({ type: 'RESOLVE_REUSE', space: s.id }));
   }
 
   const actions: Action[] = [{ type: 'PASS' }];
@@ -143,6 +192,14 @@ export function legalActions(state: RussianRailroadsState, playerId?: string): A
       const moved = advanceWrench(player.industry, space.industry.advance).wrench > player.industry.wrench;
       const woodOk = !!space.industry.woodMove && legalSteps(player.routes, ['wood']).length > 0;
       if (!moved && !woodOk) continue;
+      emitPlace(space, [{}]);
+      continue;
+    }
+    // A turn-order claim space (pg. 16): only if you're not already at that position and haven't claimed one.
+    if (space.kind === 'turn-order') {
+      const ordinal = turnOrderOrdinal(space.id);
+      if (state.turnOrder.indexOf(seat) === ordinal) continue;
+      if (state.turnClaims.first === seat || state.turnClaims.second === seat) continue;
       emitPlace(space, [{}]);
       continue;
     }

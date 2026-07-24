@@ -15,10 +15,20 @@ export function makeRng(seed: number): () => number {
   };
 }
 
-/** Build a fresh game with `count` seats (default 4), seeded deterministically. */
-export function newGame(count = 4, seed = 1): RussianRailroadsState {
+/** Build a fresh game with `count` seats (default 4), seeded deterministically — in its game-start state. */
+export function newGameRaw(count = 4, seed = 1): RussianRailroadsState {
   const players = Array.from({ length: count }, (_, i) => ({ name: `P${i + 1}` }));
   return createGame({ id: `g-${count}-${seed}`, players, rng: makeRng(seed) });
+}
+
+/**
+ * A fresh game **past the starting-bonus setup mini-phase** (pg. 6) — the round-1 placement state most tests
+ * exercise. A test fixture that clears the setup phase without applying any card, so player state stays
+ * pristine; the setup phase itself is tested via `newGameRaw`.
+ */
+export function newGame(count = 4, seed = 1): RussianRailroadsState {
+  const raw = newGameRaw(count, seed);
+  return { ...raw, pendingSetupBonus: null, activePlayerIndex: raw.turnOrder[0]! };
 }
 
 /** The id of the seat currently on the clock. */

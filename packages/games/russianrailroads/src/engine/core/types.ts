@@ -1,5 +1,6 @@
 import type { GameEndState, MoveRecord } from '@game-hub/kernel';
 import type { EndBonusCard, RouteId, TrackColor } from './constants';
+import type { IdeaTokenType } from './ideas';
 import type { Engineer } from './engineers';
 
 // The append-only move-log entry is a kernel primitive; re-exported so the modules import it alongside
@@ -44,6 +45,12 @@ export interface Industry {
    * move onto (triggering that factory's action) or past. RR5 setup: all `null`.
    */
   readonly factories: readonly (number | null)[];
+  /**
+   * The **second wrench**'s lane index (pg. 47, RR6), placed by the second-wrench idea token, or `null`
+   * when the player has only one wrench (the default). Both wrenches score each phase and either can be
+   * moved by industrialization; moving the second onto a factory re-triggers its action (pg. 47).
+   */
+  readonly secondWrench: number | null;
 }
 
 /**
@@ -115,6 +122,29 @@ export interface RussianRailroadsPlayer {
   readonly turnOrderCard: number;
   /** Whether this player has passed this round (pg. 7). A pass is terminal for the round. */
   readonly passed: boolean;
+  /**
+   * Player-board **special spaces** already fired (pp. 18–19, RR6): the ids of one-time specials
+   * (`new-worker` / `key` / `idea-token`) this player has consumed, so they never re-fire. The scoring
+   * specials (`route-doubling` / `bonus-star`) are recomputed from the board each phase, not stored here.
+   */
+  readonly consumedSpecials: readonly string[];
+  /**
+   * Total **keys** received over the game (pp. 18–19, 46, RR6) — from route end-stations, the 2-keys idea
+   * token, and (later) the industry track. Each key's benefit is resolved immediately (a `pendingKey`
+   * choice); this running count is what an end-bonus card scores (pg. 47).
+   */
+  readonly keysReceived: number;
+  /** The 20-point medal is placed (pg. 46 idea token): +20 each scoring phase from now on. */
+  readonly medal20: boolean;
+  /** The valuation tile is flipped to its better side (pg. 46 idea token): tracks score by `VALUATION_REVALUED`. */
+  readonly revalued: boolean;
+  /**
+   * The **wood-worker** idea card is held (pg. 47): an extra permanent worker (folded into `workersTotal`),
+   * plus a passive +1 wood move when placing on a wood-specific track space.
+   */
+  readonly woodWorker: boolean;
+  /** The idea-token benefit types this player has already used (pg. 46, RR6): each type is single-use. */
+  readonly usedIdeaTokens: readonly IdeaTokenType[];
   /**
    * Cumulative points on the scoring track (pg. 20–21), summed across every round's scoring phase. Starts
    * at 0. **Art ruling #2 (RR2):** the physical track is a 1–100 loop with 100/300/500 **point tiles**
@@ -248,11 +278,18 @@ export type RussianRailroadsState = {
    */
   readonly endBonusPile: readonly EndBonusCard[];
   /**
-   * Turn order for the current round (pg. 5): seat indices into `players`, in play order. RR1 fixes this
-   * from the dealt turn-order cards for the whole game; the full turn-order track (pass scores the card's
-   * reverse; the claim spaces reorder it) is RR6.
+   * The turn-order **track** (pg. 16, RR6): seat indices in play order, leftmost (index 0) acts first. This
+   * *is* the pawn track — round 1 is the dealt cards ascending, and every later round is what the previous
+   * round's rearrangement (`rearrangeTurnOrder`) left. The claim spaces buy a front position for next round;
+   * a pass scores the reverse of the passer's dealt card (`turnOrderCard`).
    */
   readonly turnOrder: readonly number[];
+  /**
+   * The turn-order **claims** made this round (pg. 16, RR6): which seat placed a worker under first / second
+   * place, or `null`. Coordination read by the round-end rearrangement (claimants move to the front) and the
+   * between-round worker-reuse mini-phase (2nd then 1st). Reset to `{ first: null, second: null }` each round.
+   */
+  readonly turnClaims: { readonly first: number | null; readonly second: number | null };
   /** Whose turn it is — a seat index into `players` (always a member of `turnOrder`). */
   readonly activePlayerIndex: number;
   /**
@@ -279,6 +316,37 @@ export type RussianRailroadsState = {
    * the *other* lock (keeping the turn) or pass. The pg. 12 ordering choice lives entirely here.
    */
   readonly pendingThen: 'loco' | 'factory' | null;
+  /**
+   * The active player's pending **key** choice(s) (pg. 19, RR6), or `null`. Set when a key is received (a
+   * route end-station, the 2-keys idea token); `remaining` counts keys still to resolve. While set,
+   * `applyAction` refuses everything but `RESOLVE_KEY` (advance a wood + any track, or score 10 points).
+   */
+  readonly pendingKey: { readonly remaining: number } | null;
+  /**
+   * The active player's pending **idea-token** choice (pp. 18–19, RR6), or `null`. Set when an idea-token
+   * space is reached (or the industry idea space); `spaceId` is the special that owes it (so it is consumed
+   * once). While set, only `RESOLVE_IDEA_TOKEN` is allowed.
+   */
+  readonly pendingIdeaToken: { readonly spaceId: string } | null;
+  /**
+   * The active player owes an **idea-card** choice (pg. 46–47, RR6), or `null`. Set when the end-bonus idea
+   * token is resolved (draw-top end bonus + choose one idea card). While set, only `RESOLVE_IDEA_CARD`.
+   */
+  readonly pendingIdeaCard: { readonly owed: true } | null;
+  /**
+   * The between-round worker-**reuse** mini-phase queue (pg. 17, RR6), or `null` when not in it. After the
+   * round-end rearrangement, the seats who claimed a turn-order space move their worker to an empty 1-worker
+   * space and resolve it — **2nd-place claimant first, then 1st** (the queue order). While set, only
+   * `RESOLVE_REUSE` (and any lock it opens) is allowed; when it empties, the next round's placement opens.
+   */
+  readonly pendingReuse: readonly number[] | null;
+  /**
+   * The game-start **starting-bonus** setup mini-phase queue (pg. 6, RR6), or `null` once setup is done. The
+   * players in 4th / 3rd / 2nd position each take and resolve one starting bonus card (the start player none)
+   * — the queue order. While set, only `RESOLVE_SETUP_BONUS` (and any lock it opens) is allowed; when it
+   * empties, round 1's placement opens.
+   */
+  readonly pendingSetupBonus: readonly number[] | null;
   /** The current round (1-based). */
   readonly round: number;
   /** Total rounds this game (pg. 7, 22–23): 7 at 4 players, 6 at 2–3. */

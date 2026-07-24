@@ -1,10 +1,19 @@
-import { actionSpace, COINS_PER_ACTION, DOUBLER_SPACES, GameError, TEMP_WORKERS } from '../core';
+import {
+  actionSpace,
+  COINS_PER_ACTION,
+  DOUBLER_SPACES,
+  GameError,
+  TEMP_WORKERS,
+  TRACK_COLORS,
+  turnOrderOrdinal,
+} from '../core';
 import type { PoolEntry, RussianRailroadsState, SpacePlacement } from '../core';
 import {
   accessibleColors,
   advanceWrench,
   canBuildFactory,
   canBuildLocoAndFactory,
+  continueTurn,
   legalSteps,
   nextActiveSeat,
   record,
@@ -13,6 +22,15 @@ import {
   triggerEffect,
   withPlayer,
 } from '../internal';
+
+/**
+ * The extra move the **wood-worker** idea card grants (pg. 47): +1 when placing on a space that
+ * *specifically* shows wood track — the dedicated wood spaces (`['wood']`) and the bottom wood/green space,
+ * but **not** an "any track" space (all five colours, e.g. the worker+coin space). 0 without the card.
+ */
+function woodWorkerBonus(player: RussianRailroadsState['players'][number], colors: readonly string[]): number {
+  return player.woodWorker && colors.includes('wood') && colors.length < TRACK_COLORS.length ? 1 : 0;
+}
 
 /**
  * Place workers (and/or coins) on an action space and resolve it (pg. 7, 9, 14). The turn/turn-order and
@@ -98,13 +116,15 @@ export function place(
   if (def.track) {
     const players = withPlayer(state, seat, paid);
     const colors = def.track.colors.filter((c) => accessibleColors(paid).includes(c));
+    // The wood-worker idea card adds a move on a wood-specific space (pg. 47).
+    const moves = def.track.moves + woodWorkerBonus(paid, def.track.colors);
     if (legalSteps(paid.routes, colors).length > 0) {
       return record(
         state,
         'PLACE',
         playerId,
-        { players, actionSpaces, pendingMoves: { remaining: def.track.moves, colors } },
-        { space, label: def.label, moves: def.track.moves },
+        { players, actionSpaces, pendingMoves: { remaining: moves, colors } },
+        { space, label: def.label, moves },
       );
     }
     return record(
@@ -214,18 +234,35 @@ export function place(
       coins: paid.coins + coinsGained,
       actionPool: pool,
     };
-    const players = withPlayer(state, seat, updated);
+    const next = { ...state, players: withPlayer(state, seat, updated), actionSpaces };
     const payload = { space, label: def.label, advanced: wrench - paid.industry.wrench, wrench, coinsGained };
-    // Pool credits keep the turn (the placer resolves them); otherwise the turn passes now.
-    if (pool.length > 0) {
-      return record(state, 'PLACE', playerId, { players, actionSpaces }, { ...payload, pooled: pool.length });
-    }
+    // `continueTurn` keeps the turn for pool credits or the industry idea space (pg. 19), else passes it.
     return record(
       state,
       'PLACE',
       playerId,
-      { players, actionSpaces, activePlayerIndex: nextActiveSeat(state)! },
-      payload,
+      { actionSpaces, ...continueTurn(next, seat) },
+      pool.length > 0 ? { ...payload, pooled: pool.length } : payload,
+    );
+  }
+
+  // A turn-order claim space (pg. 16): buy first / second place for next round. No immediate effect — the
+  // rearrangement happens at round end. Refuse claiming below your own pawn or claiming both spaces.
+  if (def.kind === 'turn-order') {
+    const ordinal = turnOrderOrdinal(space); // 0 = first place, 1 = second place
+    if (state.turnOrder.indexOf(seat) === ordinal) {
+      throw new GameError('TURN_ORDER_OWN_PAWN', 'You cannot claim the space below your own pawn (pg. 16)');
+    }
+    if (state.turnClaims.first === seat || state.turnClaims.second === seat) {
+      throw new GameError('TURN_ORDER_ALREADY_CLAIMED', 'You cannot claim both turn-order spaces (pg. 16)');
+    }
+    const turnClaims = ordinal === 0 ? { ...state.turnClaims, first: seat } : { ...state.turnClaims, second: seat };
+    return record(
+      state,
+      'PLACE',
+      playerId,
+      { players: withPlayer(state, seat, paid), actionSpaces, turnClaims, activePlayerIndex: nextActiveSeat(state)! },
+      { space, label: def.label, claim: ordinal === 0 ? 'first' : 'second' },
     );
   }
 

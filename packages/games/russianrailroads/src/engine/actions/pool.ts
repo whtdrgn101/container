@@ -1,6 +1,6 @@
 import { GameError } from '../core';
 import type { RussianRailroadsState } from '../core';
-import { accessibleColors, legalSteps, nextActiveSeat, record, seatOf, withPlayer } from '../internal';
+import { accessibleColors, continueTurn, legalSteps, record, seatOf, withPlayer } from '../internal';
 
 /**
  * Resolve the per-turn **action pool** (pg. 7, 13) — the track-move credits a player earned this turn from
@@ -48,11 +48,7 @@ export function skipPool(state: RussianRailroadsState, playerId: string): Russia
   const player = state.players[seat]!;
   const forfeited = player.actionPool.length;
   const updated = { ...player, actionPool: [] };
-  return record(
-    state,
-    'SKIP_POOL',
-    playerId,
-    { players: withPlayer(state, seat, updated), activePlayerIndex: nextActiveSeat(state)! },
-    { forfeited },
-  );
+  // With the pool emptied, `continueTurn` hands off (respecting the reuse / setup mini-phase context).
+  const next = { ...state, players: withPlayer(state, seat, updated) };
+  return record(state, 'SKIP_POOL', playerId, continueTurn(next, seat), { forfeited });
 }

@@ -10,6 +10,14 @@ function passRound(state: RussianRailroadsState): RussianRailroadsState {
   return s;
 }
 
+/**
+ * Force every seat's turn-order card to #1 (pass-reverse = 0 points), so these scoring-phase tests isolate
+ * route/industry scoring from the RR6 pass-scoring (which has its own tests). Turn order is unaffected.
+ */
+function noPassPoints(state: RussianRailroadsState): RussianRailroadsState {
+  return { ...state, players: state.players.map((p) => ({ ...p, turnOrderCard: 1 })) };
+}
+
 describe('pass', () => {
   it('marks the seat passed and advances the turn (round not yet over)', () => {
     const state = newGame(4);
@@ -57,7 +65,7 @@ describe('pass', () => {
   });
 
   it('runs the scoring phase at round close and logs the per-player breakdown', () => {
-    const state = newGame(2);
+    const state = noPassPoints(newGame(2));
     const closed = passRound(state);
     // Wood-only, so everyone scores 0 this round — but the phase ran and the breakdown is on the wire.
     expect(closed.players.every((p) => p.score === 0)).toBe(true);
@@ -76,7 +84,7 @@ describe('pass', () => {
 
   it('accumulates real scores across rounds and picks the highest scorer as winner', () => {
     // Plant a scoring board on p1: a green track reached by a #5 loco (5 points/round), so p1 pulls ahead.
-    let state = newGame(2); // 6 rounds
+    let state = noPassPoints(newGame(2)); // 6 rounds
     state = {
       ...state,
       players: state.players.map((p) =>
@@ -107,7 +115,7 @@ describe('pass', () => {
   });
 
   it('ends in a shared result when scores are level (all wood → all 0)', () => {
-    let state = newGame(2);
+    let state = noPassPoints(newGame(2));
     for (let r = 0; r < state.rounds; r += 1) state = passRound(state);
     expect(state.status).toBe('ended');
     if (state.status !== 'ended') throw new Error('unreachable');

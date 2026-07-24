@@ -64,7 +64,34 @@ export type RussianRailroadsErrorCode =
   | 'UNKNOWN_POOL_ENTRY'
   // A RESOLVE_POOL of a credit that can't be spent — no accessible-colour track can advance (pg. 13). Use
   // SKIP_POOL to forfeit it instead.
-  | 'POOL_UNRESOLVABLE';
+  | 'POOL_UNRESOLVABLE'
+  // A claim on the turn-order space directly below your own pawn (pg. 16: "you cannot occupy the action
+  // space below your own pawn").
+  | 'TURN_ORDER_OWN_PAWN'
+  // A second turn-order claim by a seat that already claimed one this round (pg. 16: "you cannot occupy
+  // both action spaces").
+  | 'TURN_ORDER_ALREADY_CLAIMED'
+  // A RESOLVE_KEY with no key owed, or an unknown option (pg. 19).
+  | 'NO_PENDING_KEY'
+  | 'KEY_PENDING'
+  // A RESOLVE_IDEA_TOKEN with no idea-token choice owed, or naming a token already used / not a real type
+  // (pg. 18–19, 46).
+  | 'NO_PENDING_IDEA_TOKEN'
+  | 'IDEA_TOKEN_PENDING'
+  | 'IDEA_TOKEN_UNAVAILABLE'
+  // A RESOLVE_IDEA_CARD with no idea-card choice owed, or naming an unknown card (pg. 46–47).
+  | 'NO_PENDING_IDEA_CARD'
+  | 'IDEA_CARD_PENDING'
+  | 'UNKNOWN_IDEA_CARD'
+  // A RESOLVE_REUSE with no reuse mini-phase active, or targeting an illegal space (pg. 17: an empty
+  // 1-worker space only).
+  | 'NO_PENDING_REUSE'
+  | 'REUSE_PENDING'
+  | 'ILLEGAL_REUSE_SPACE'
+  // A RESOLVE_SETUP_BONUS with no setup mini-phase active, or naming an unknown starting bonus card (pg. 6).
+  | 'NO_PENDING_SETUP_BONUS'
+  | 'SETUP_BONUS_PENDING'
+  | 'UNKNOWN_SETUP_BONUS';
 
 /**
  * Thrown when a Russian Railroads action is illegal. Subclasses the shared kernel `GameError` and pins

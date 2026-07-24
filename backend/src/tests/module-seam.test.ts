@@ -401,10 +401,14 @@ describe('hosting two games at once', () => {
       (await act(stoneage.id, await activeOf(stoneage.id), { type: 'PLACE', place: 'forest', count: 1 })).statusCode,
     ).toBe(200);
     expect((await act(stpetersburg.id, await activeOf(stpetersburg.id), { type: 'PASS' })).statusCode).toBe(200);
-    // Russian Railroads: place a worker on the take-2-coins action space (RR1's PLACE).
+    // Russian Railroads opens in the RR6 starting-bonus setup mini-phase (pg. 6): resolve one bonus card.
     expect(
-      (await act(russianrailroads.id, await activeOf(russianrailroads.id), { type: 'PLACE', space: 'coins' }))
-        .statusCode,
+      (
+        await act(russianrailroads.id, await activeOf(russianrailroads.id), {
+          type: 'RESOLVE_SETUP_BONUS',
+          card: 'start-coins-2',
+        })
+      ).statusCode,
     ).toBe(200);
     expect((await act(counter.id, 'p1', { type: 'BUMP', by: 1 })).statusCode).toBe(200);
 
