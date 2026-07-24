@@ -473,14 +473,15 @@ parameterized. Real gaps:
   changes with no cancellation, and three paths write the same setter, so responses can land out of
   order. `App.tsx` already does this correctly with a `live` flag for rematch. It matters mainly
   because it's the template game 4 will copy for its own side-channel.
-- **`e2e/architecture.spec.ts` hardcodes the game list** in a regex alternation. Adding game 4 means
-  editing the test meant to catch game-4 mistakes — and forgetting makes it silently weaker rather
-  than failing. Derive it from `readdirSync`.
-- **`app.ts` is the file that grew back** — 718 lines holding games, abandon, rematch, lobbies, WS and
-  static serving in one closure. Same monolith shape C2 fixed in `App.tsx` (1895 → 364).
-- **`backend/src/tests/app.test.ts` is 1196 lines** and violates the repo's own "well under 1000"
-  rule. A second header block sits mid-file, so a second suite is already living inside it. The
-  backend never adopted the engine's `tests/helpers.ts` convention; `mulberry32` is duplicated
+- ~~**`e2e/architecture.spec.ts` hardcodes the game list**~~ ✅ **Fixed in passing** (verified
+  2026-07-24): the spec now derives the game list from `readdirSync(GAME_DIR)`, so game 5 is covered
+  automatically.
+- **`app.ts` is the file that grew back** — now **926 lines** (was 718 at review time; the colours
+  feature et al. landed in the closure) holding games, abandon, rematch, lobbies, WS and static
+  serving. Same monolith shape C2 fixed in `App.tsx` (1895 → 364). Getting worse, not better.
+- **`backend/src/tests/app.test.ts` is now 1237 lines** (was 1196) and violates the repo's own "well
+  under 1000" rule. A second header block sits mid-file, so a second suite is already living inside
+  it. The backend never adopted the engine's `tests/helpers.ts` convention; `mulberry32` is duplicated
   verbatim across three test files.
 - **Bot strength is entirely unmeasured.** Every self-play test asserts only legality and termination.
   Container's is the exception and the model — it asserts the whole trade chain runs and ≥3
@@ -496,15 +497,14 @@ parameterized. Real gaps:
   game a fourth game is most likely to be copied from.
 - **Stone Age ships the undrawn `cardDeck` to every client** — its own `view.ts` comment admits it.
   Any client can read the next four civilization cards. Small stakes, but real.
-- **Stone Age's 2–3 player rules are deferred** while `MIN_PLAYERS = 2` and the roadmap calls the game
-  complete. A 2p game offers 4p capacities everywhere — materially not Stone Age at 2p, and the first
-  thing a playtester will hit.
-- **Immutability is asserted only in Container.** CLAUDE.md states the invariant as tested; neither
-  newer game has such a test. Both are in fact clean, but Stone Age is the most exposed (it does the
-  most nested-record rebuilding).
+- ~~**Stone Age's 2–3 player rules are deferred**~~ ✅ **Fixed** (SA14, 2026-07): the pg. 8 village
+  lock + resource-place player caps now apply through `countRange`.
+- **Immutability is asserted only in Container.** CLAUDE.md states the invariant as tested; none of
+  the **three** newer games has such a test (Saint Petersburg inherited the gap). All are in fact
+  clean, but Stone Age and Saint Petersburg do the most nested-record rebuilding.
 - **Test helper typing regressed in the newer games** — Container's `expectError` is compile-checked
-  against its error union; Can't Stop's and Stone Age's both take a bare `string`, so a test asserting
-  a code that no longer exists stays green.
+  against its error union; Can't Stop's, Stone Age's and Saint Petersburg's all take a bare `string`
+  (verified 2026-07-24), so a test asserting a code that no longer exists stays green.
 - **`MoveRecord.type` is stringly-typed**, discarding each game's precise `ActionType` union. The UI's
   log filters on string literals with no compile-time link to the engine.
 - **Dependencies are clean but stale** — `pnpm audit` finds nothing, but vite is 2 majors behind,
