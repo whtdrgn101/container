@@ -5,6 +5,26 @@ interface GameRow {
   id: string;
   state: string;
   game_type: string;
+  schema_version: number;
+}
+
+/**
+ * A stored state was saved at a schema version *newer* than the module that now wants to read it — the
+ * server is older than the row (REVIEW §4.1). We cannot safely migrate backwards, so the read is
+ * refused. Same family as an unregistered `game_type`: the game exists, we just can't play it here.
+ * The core maps this to `409 GAME_SCHEMA_UNSUPPORTED`; `listActive` skips such rows.
+ */
+export class SchemaUnsupportedError extends Error {
+  constructor(
+    readonly gameId: string,
+    readonly rowVersion: number,
+    readonly moduleVersion: number,
+  ) {
+    super(
+      `Game "${gameId}" was saved at schema v${rowVersion}, newer than this server's v${moduleVersion}`,
+    );
+    this.name = 'SchemaUnsupportedError';
+  }
 }
 
 /**
@@ -36,14 +56,27 @@ interface MoveRow {
 export class GameRepository {
   constructor(private readonly db: DB) {}
 
+  /** The schema version a module reads its state at — absent ⇒ 1 (the shape everything shipped with). */
+  private schemaVersionOf(module: AnyGameModule): number {
+    return module.schemaVersion ?? 1;
+  }
+
   /** Insert a brand-new game (and any moves already in its log), stamped with the module that owns it. */
   create(module: AnyGameModule, state: unknown): void {
     const insertGame = this.db.prepare(
-      `INSERT INTO games (id, state, version, created_at, updated_at, game_type) VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO games (id, state, version, created_at, updated_at, game_type, schema_version) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     );
     const now = new Date().toISOString();
     const tx = this.db.transaction((s: unknown) => {
-      insertGame.run(module.summarize(s).id, JSON.stringify(s), module.versionOf(s), now, now, module.id);
+      insertGame.run(
+        module.summarize(s).id,
+        JSON.stringify(s),
+        module.versionOf(s),
+        now,
+        now,
+        module.id,
+        this.schemaVersionOf(module),
+      );
       this.persistMoves(module, s, now);
     });
     tx(state);
@@ -66,13 +99,58 @@ export class GameRepository {
   /**
    * Load a game's current state, or undefined if it does not exist. Opaque — only its module can read it.
    *
-   * Abandoned games still load: the row is soft-deleted, not gone, so an old link or a client that
-   * was mid-game still resolves rather than 404ing. Whether an abandoned game may be *played* is a
-   * separate question, and `isAbandoned` answers it.
+   * **Migrates on read where module and row meet (REVIEW §4.1).** A row stamped at an older
+   * `schema_version` than the module now declares is handed to `module.migrate` and re-stamped
+   * *before* it is returned, so callers only ever see the current shape. A row stamped *newer* than
+   * the module throws `SchemaUnsupportedError` (the server is behind the data). The repository stays
+   * shape-agnostic throughout: it reads no field off the state, only calls the module's hooks.
+   *
+   * Takes the module (like `create`/`update`) because only the module knows its current shape and how
+   * to reach it. Abandoned games still load: the row is soft-deleted, not gone, so an old link or a
+   * client that was mid-game still resolves rather than 404ing. Whether an abandoned game may be
+   * *played* is a separate question, and `isAbandoned` answers it.
    */
-  get(id: string): unknown {
-    const row = this.db.prepare(`SELECT state FROM games WHERE id = ?`).get(id) as GameRow | undefined;
-    return row ? JSON.parse(row.state) : undefined;
+  get(module: AnyGameModule, id: string): unknown {
+    const row = this.db.prepare(`SELECT state, schema_version FROM games WHERE id = ?`).get(id) as
+      | { state: string; schema_version: number }
+      | undefined;
+    return row ? this.upgraded(module, id, row.state, row.schema_version) : undefined;
+  }
+
+  /** True if a game row exists at all — the game-agnostic existence check (no module, no migration). */
+  exists(id: string): boolean {
+    return this.db.prepare(`SELECT 1 FROM games WHERE id = ?`).get(id) !== undefined;
+  }
+
+  /**
+   * Bring a persisted state up to the module's current schema, persisting the upgrade once (REVIEW §4.1).
+   *
+   * - equal ⇒ parse and return, untouched (the common path — no migration exists for a v1 game).
+   * - older ⇒ `module.migrate(state, from)`, then persist the result + new `schema_version` and return
+   *   it. The write is **not a move**: no `version` bump, no move-log append, no `updated_at` touch (a
+   *   migration must not reorder the resume list). Write-on-read, so a row pays the cost once.
+   * - newer ⇒ `SchemaUnsupportedError` (the server is older than the row).
+   *
+   * A higher declared `schemaVersion` with no `migrate` is a wiring bug, thrown loudly rather than
+   * guessed at — a shipped state shape changed and nobody wrote the upgrade.
+   */
+  private upgraded(module: AnyGameModule, id: string, rawState: string, rowVersion: number): unknown {
+    const state: unknown = JSON.parse(rawState);
+    const target = this.schemaVersionOf(module);
+    if (rowVersion === target) return state;
+    if (rowVersion > target) throw new SchemaUnsupportedError(id, rowVersion, target);
+    if (!module.migrate) {
+      throw new Error(
+        `Game "${id}" is stored at schema v${rowVersion} but its module declares v${target} with no migrate()`,
+      );
+    }
+    const migrated = module.migrate(state, rowVersion);
+    this.db.transaction(() => {
+      this.db
+        .prepare(`UPDATE games SET state = ?, schema_version = ? WHERE id = ?`)
+        .run(JSON.stringify(migrated), target, id);
+    })();
+    return migrated;
   }
 
   /**
@@ -113,7 +191,7 @@ export class GameRepository {
     // would eat the page and hide live ones from the resume list.
     const rows = this.db
       .prepare(
-        `SELECT id, state, game_type FROM games WHERE abandoned_at IS NULL ORDER BY updated_at DESC LIMIT ?`,
+        `SELECT id, state, game_type, schema_version FROM games WHERE abandoned_at IS NULL ORDER BY updated_at DESC LIMIT ?`,
       )
       .all(limit) as GameRow[];
     const botRows = this.db.prepare(`SELECT game_id, player_id FROM game_bots`).all() as {
@@ -128,7 +206,19 @@ export class GameRepository {
     return rows
       .map((row) => {
         const module = moduleOfType(row.game_type);
-        return module ? { ...module.summarize(JSON.parse(row.state)), gameType: row.game_type } : null;
+        if (!module) return null;
+        // Migrate a stale-schema row lazily, exactly like `get` — `summarize` reads the current shape,
+        // so an un-upgraded old row could crash it. Stamp it too, so the 3s poll pays the cost once. A
+        // row from a newer server (SchemaUnsupportedError) is skipped, like an unregistered type, rather
+        // than crashing the whole home screen.
+        let state: unknown;
+        try {
+          state = this.upgraded(module, row.id, row.state, row.schema_version);
+        } catch (error) {
+          if (error instanceof SchemaUnsupportedError) return null;
+          throw error;
+        }
+        return { ...module.summarize(state), gameType: row.game_type };
       })
       .filter((summary) => summary !== null)
       .filter((summary) => summary.status === 'active')
@@ -138,11 +228,13 @@ export class GameRepository {
   /** Overwrite a game's snapshot and append any newly-logged moves. */
   update(module: AnyGameModule, state: unknown): void {
     const updateGame = this.db.prepare(
-      `UPDATE games SET state = ?, version = ?, updated_at = ? WHERE id = ?`,
+      `UPDATE games SET state = ?, version = ?, updated_at = ?, schema_version = ? WHERE id = ?`,
     );
     const now = new Date().toISOString();
     const tx = this.db.transaction((s: unknown) => {
-      updateGame.run(JSON.stringify(s), module.versionOf(s), now, module.summarize(s).id);
+      // A live write is always at the module's current shape, so it re-stamps `schema_version` too —
+      // keeping the column truthful even if a migration and a move land in the same session.
+      updateGame.run(JSON.stringify(s), module.versionOf(s), now, this.schemaVersionOf(module), module.summarize(s).id);
       this.persistMoves(module, s, now);
     });
     tx(state);

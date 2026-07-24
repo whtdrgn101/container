@@ -22,7 +22,14 @@ CREATE TABLE IF NOT EXISTS games (
   -- the server cannot tell one game's rules from another's — this column is the whole reason a second
   -- game can exist. Defaults to 'container' so every row written before it existed backfills to the
   -- only game there was.
-  game_type    TEXT NOT NULL DEFAULT 'container'
+  game_type    TEXT NOT NULL DEFAULT 'container',
+  -- The schema version of the persisted state *shape* (REVIEW §4.1). The state blob is frozen on disk
+  -- the moment it's written; a shipped engine that later changes its shape leaves every in-flight game
+  -- deserializing into an engine that no longer matches. This column records the shape each row was
+  -- saved at, so GameRepository.get can hand an older row to the owning module's migrate() and stamp
+  -- it forward. It is NOT the game version column (that counts moves), and it never lives in GameState.
+  -- Defaults to 1 so every row written before it existed backfills to the only shape there was.
+  schema_version INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS moves (
@@ -136,6 +143,15 @@ const ADDED_COLUMNS: readonly { readonly table: string; readonly column: string;
     table: 'games',
     column: 'game_type',
     ddl: `ALTER TABLE games ADD COLUMN game_type TEXT NOT NULL DEFAULT 'container'`,
+  },
+  // Persisted-state schema version (REVIEW §4.1). The backfill *is* the DEFAULT: SQLite stamps every
+  // existing row with 1 as it adds the column, which is exactly right — before this column, every
+  // stored state was written at shape v1 by definition. Must live here as well as in the schema
+  // string, or an already-deployed database (the whole point of the `/data` volume) never grows it.
+  {
+    table: 'games',
+    column: 'schema_version',
+    ddl: `ALTER TABLE games ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1`,
   },
   // Promote `status` out of the JSON blob into a real, indexable column (REVIEW §4.3). The DEFAULT
   // stamps every existing row 'open' as the column is added; the second statement then backfills the

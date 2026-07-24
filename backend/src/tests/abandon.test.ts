@@ -203,11 +203,17 @@ describe('the abandoned_at migration', () => {
     // too, and without it `moduleOf` (which reads `game_type` on the very first request) throws on
     // every deployed database. Asserting only one column let a dropped `game_type` migration pass.
     expect(columns).toContain('game_type');
-    // The pre-existing game survives, un-abandoned, and is listable — and is backfilled to the game it
-    // could only have been before the column existed, so its rules resolve.
-    expect(db.prepare(`SELECT abandoned_at, game_type FROM games WHERE id = 'old'`).get()).toEqual({
+    // `schema_version` (REVIEW §4.1) migrates in on the same pass, the same way `game_type` does: the
+    // legacy DDL predates it, so a deployed database only grows it on open. Assert BOTH the column and
+    // its backfilled value — a pre-column row is v1 by definition (the only shape there ever was), and
+    // asserting only the column's presence would let a dropped DEFAULT slip through (the game_type lesson).
+    expect(columns).toContain('schema_version');
+    // The pre-existing game survives, un-abandoned, and is listable — backfilled to the game it could
+    // only have been, and stamped at the shape it could only have been saved at.
+    expect(db.prepare(`SELECT abandoned_at, game_type, schema_version FROM games WHERE id = 'old'`).get()).toEqual({
       abandoned_at: null,
       game_type: 'container',
+      schema_version: 1,
     });
     expect(new GameRepository(db).isAbandoned('old')).toBe(false);
     expect(new GameRepository(db).typeOf('old')).toBe('container');

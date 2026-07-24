@@ -25,8 +25,9 @@ The near-term order, decided while play-testing:
    as the Track D pilot: a heavyweight is the right stress test once adding games is smoother). Sliced
    SP0–SP9 in its roadmap; the first game exercising real `viewFor` redaction (hidden hands + hidden
    rubles) and continuous deck randomness.
-3. **Schema versioning for state transitions** (REVIEW §4.1) — `schemaVersion` on persisted state + a
-   `migrate` hook on `GameModule`, so iterating on shipped engines can't strand in-flight games.
+3. **Schema versioning for state transitions** ✅ (REVIEW §4.1) — `schemaVersion` + `migrate` on
+   `GameModule`, a `games.schema_version` column, and write-on-read upgrades in `GameRepository`, so
+   iterating on shipped engines can't strand in-flight games (downgrade rows 409, all four games are v1).
 4. **Track D (new, core) — externalize games.** Four games have tested the engine and the seams; the
    long-term goal is making games easier to add — and eventually addable from *outside* this repo.
    **Design doc written** (2026-07-24): **[`docs/track-d-externalize-games.md`](docs/track-d-externalize-games.md)**

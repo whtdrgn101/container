@@ -98,6 +98,26 @@ export interface GameModule<S, A> {
   mapError(error: unknown): ErrorResponse | null;
 
   /**
+   * The version of the *persisted state shape* this module currently reads (REVIEW §4.1). Absent ⇒ 1.
+   *
+   * Bump it whenever a shipped engine changes the shape of the state it serializes — every in-flight
+   * game on the `/data` volume is frozen at the shape it was written at, and without this the server
+   * would silently deserialize it into an engine that no longer matches. It is **not** the game
+   * `version` (which counts moves) and it does **not** live in `GameState`: it describes what the
+   * module expects on disk. The repository stamps every row with it and upgrades any older row on read.
+   */
+  readonly schemaVersion?: number;
+
+  /**
+   * Upgrade a state persisted at schema `from` to the module's current `schemaVersion`. Required once
+   * `schemaVersion > 1` — a higher declared version with no `migrate` is a wiring error the repository
+   * throws on. It owns its shape knowledge, per the seam rule, and may step through intermediate
+   * versions internally (that is the module's business), but must return a state the current engine can
+   * read. Pure and deterministic: the repository persists exactly what it returns, once, write-on-read.
+   */
+  migrate?(state: unknown, from: number): unknown;
+
+  /**
    * Is this action currently owned by a flow of the module's own (so `POST /actions` must refuse it)?
    * Container returns a 409 for `DELIVER` while an auction is pending: its sealed bids live
    * server-side, and letting a client post its own `DELIVER` would hand the deliverer every

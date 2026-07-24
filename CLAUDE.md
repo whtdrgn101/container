@@ -133,6 +133,14 @@ server, proven by `tests/module-seam.test.ts`.
   redaction stays an explicit decision made by code that knows the game.
 - **An unregistered `game_type`** (a module pulled while its rows remain) is `409 GAME_TYPE_UNAVAILABLE`,
   and such rows are skipped by `GET /games` rather than taking the home screen down.
+- **The module owns its persisted-state shape** (REVIEW §4.1): optional `schemaVersion?` (absent ⇒ 1) +
+  `migrate?(state, from)`. A game's state is an opaque blob frozen on disk, so when a shipped engine's
+  shape changes, bump `schemaVersion` and write `migrate`. `GameRepository.get(module, id)` upgrades a
+  stale row **write-on-read** (migrate → persist + re-stamp `schema_version`, **not** a move: no
+  `version` bump, no log append) and refuses a row from a *newer* server with `409
+  GAME_SCHEMA_UNSUPPORTED` (`listActive` skips it, like an unregistered type). A higher `schemaVersion`
+  with no `migrate` throws loudly — a shape changed and nobody wrote the upgrade. The repository stays
+  shape-agnostic: it only calls module hooks. All four games are shape-v1 (no `schemaVersion` declared).
 
 - **The core is game-agnostic; the module owns every rule-shaped decision.** `app.ts` and
   `repository.ts` contain no Container-specific code and read **no field off a game state** — id,
@@ -674,7 +682,14 @@ sessions). The Container summary below is retained for context; the per-game roa
     existing table — every earlier schema change was a whole new table, which is why this never came
     up. `db.ts`'s `ADDED_COLUMNS` + `addMissingColumns()` runs `ALTER TABLE` on open, guarded by
     `PRAGMA table_info`. **Put new columns there, not just in the schema string**, or an already-
-    deployed database (the point of the `/data` volume) never gets them.
+    deployed database (the point of the `/data` volume) never gets them. (`games.schema_version`,
+    REVIEW §4.1, is the newest example — schema string + `ADDED_COLUMNS`, `DEFAULT 1` backfilling every
+    deployed row to the only shape there was.)
+  - **⚠️ A column is the DB schema; the *state blob's* schema is the module's** (REVIEW §4.1). Changing a
+    shipped engine's serialized shape is **not** a column migration — the state is one opaque `TEXT`
+    column. Bump the module's `schemaVersion` and write `migrate` (see the `GameModule` seam bullet);
+    `GameRepository.get` upgrades old rows write-on-read. Don't reach for `ADDED_COLUMNS` for a state
+    reshape — that's the module's job, not the table's.
 - **Track C / C0 ✅ (`GameModule` interface + registry).** The site is now a games *room* with Container
   registered into it — see "The `GameModule` seam" above for the working rules. Pure refactor: the 90
   existing backend tests, 204 engine tests and 70 e2e specs all pass untouched. What moved:

@@ -15,7 +15,7 @@ import type { Lobby, LobbyMember } from './lobbies';
 import { RematchRepository } from './rematch';
 import type { Rematch } from './rematch';
 import { LobbyRepository, LOBBY_SWEEP_INTERVAL_MS, OPEN_LOBBY_TTL_MS } from './lobbies';
-import { GameRepository } from './repository';
+import { GameRepository, SchemaUnsupportedError } from './repository';
 
 export interface AppOptions {
   db: DB;
@@ -231,6 +231,19 @@ export function buildApp(options: AppOptions): FastifyInstance {
       },
     });
 
+  /**
+   * The row was saved at a schema version newer than the module that owns it — the server is behind the
+   * data (REVIEW §4.1). Same family as `GAME_TYPE_UNAVAILABLE`: the game exists, we just can't safely
+   * read it here, so 409 rather than 404. The fix is deploying a server new enough to know the shape.
+   */
+  const schemaUnsupported = (reply: FastifyReply, id: string) =>
+    reply.code(409).send({
+      error: {
+        code: 'GAME_SCHEMA_UNSUPPORTED',
+        message: `Game "${id}" was saved by a newer version of this server and cannot be loaded until it is updated`,
+      },
+    });
+
   /** You asked one game's endpoint about another game's row. 404 — that endpoint has no such game. */
   const wrongType = (reply: FastifyReply, id: string, moduleId: string) =>
     reply.code(404).send({
@@ -247,8 +260,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
    * game's state and its rules are never chosen independently.
    */
   const load = (reply: FastifyReply, id: string): { state: unknown; module: AnyGameModule } | null => {
-    const state = repo.get(id);
-    if (state === undefined) {
+    if (!repo.exists(id)) {
       void notFound(reply, id);
       return null;
     }
@@ -257,7 +269,22 @@ export function buildApp(options: AppOptions): FastifyInstance {
       void unknownType(reply, id);
       return null;
     }
-    return { state, module };
+    // Resolve the module *before* reading the state, so a stale-schema row is migrated by its own
+    // module (or refused if it's from a newer server) as it loads — every core read goes through here.
+    try {
+      const state = repo.get(module, id);
+      if (state === undefined) {
+        void notFound(reply, id);
+        return null;
+      }
+      return { state, module };
+    } catch (error) {
+      if (error instanceof SchemaUnsupportedError) {
+        void schemaUnsupported(reply, id);
+        return null;
+      }
+      throw error;
+    }
   };
 
   /**
@@ -328,7 +355,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
 
     // A bot in an early seat should already have played by the time anyone sees the board.
     tick(gameId);
-    return repo.get(gameId) ?? state;
+    return repo.get(module, gameId) ?? state;
   };
 
   /**
@@ -405,9 +432,22 @@ export function buildApp(options: AppOptions): FastifyInstance {
       '/games/:id/stream',
       { websocket: true },
       (socket, request) => {
-        const state = repo.get(request.params.id);
         const module = moduleOf(request.params.id);
-        if (state === undefined || !module) {
+        if (!module) {
+          socket.close(1008, `No game with id "${request.params.id}"`);
+          return;
+        }
+        let state: unknown;
+        try {
+          state = repo.get(module, request.params.id);
+        } catch (error) {
+          if (error instanceof SchemaUnsupportedError) {
+            socket.close(1011, 'Game was saved by a newer version of this server');
+            return;
+          }
+          throw error;
+        }
+        if (state === undefined) {
           socket.close(1008, `No game with id "${request.params.id}"`);
           return;
         }
@@ -496,7 +536,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
    * authenticated, like every other seat action here (trusted-LAN use).
    */
   app.post<{ Params: { id: string } }>('/games/:id/abandon', async (request, reply) => {
-    if (!repo.get(request.params.id)) return notFound(reply, request.params.id);
+    if (!repo.exists(request.params.id)) return notFound(reply, request.params.id);
     repo.abandon(request.params.id);
     // Tell anyone still watching, so a client sitting on the board finds out rather than discovering
     // it on its next rejected move.
@@ -577,7 +617,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
 
   /** The current rematch proposal for a game (for a client entering an already-finished game). */
   app.get<{ Params: { id: string } }>('/games/:id/rematch', async (request, reply) => {
-    if (!repo.get(request.params.id)) return notFound(reply, request.params.id);
+    if (!repo.exists(request.params.id)) return notFound(reply, request.params.id);
     const rematch = rematches.get(request.params.id) ?? {
       gameId: request.params.id,
       agreed: [],
@@ -595,9 +635,9 @@ export function buildApp(options: AppOptions): FastifyInstance {
     // because it isn't their turn. Ticking on read makes that self-healing; it's a no-op with no
     // bots, or when a human is on the clock.
     tick(request.params.id);
-    // Re-read: the bots may have moved it on since `load`.
-    const state = repo.get(request.params.id)!;
     const { module } = loaded;
+    // Re-read: the bots may have moved it on since `load` (which already migrated the row).
+    const state = repo.get(module, request.params.id)!;
     return reply.send({
       ...gamePayload(module, request.params.id, state, viewerFrom(request.query.viewer, module, state)),
       // Readable but not playable — say so, so a client that holds a link can show it rather than
@@ -650,7 +690,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
         // back the state as it stands once the bots have finished, not a snapshot mid-round.
         tick(request.params.id);
         // Read back rather than replying with `next`: the bots may have played several turns since.
-        const settled = repo.get(request.params.id) ?? next;
+        const settled = repo.get(module, request.params.id) ?? next;
         // Project the reply for the acting client's own seats (not the active player), so ending a
         // turn never leaks the next player's card. No `?viewer` ⇒ follow the active player (hotseat).
         return reply.send(
@@ -670,7 +710,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       db: options.db,
       // Bound to this module, so it can persist its own state without naming itself.
       games: {
-        get: (gameId) => repo.get(gameId),
+        get: (gameId) => repo.get(module, gameId),
         update: (state) => repo.update(module, state),
       },
       botSeats,
@@ -706,9 +746,16 @@ export function buildApp(options: AppOptions): FastifyInstance {
         scope.addHook('preHandler', async (request, reply) => {
           const gameId = (request.params as { id?: string }).id;
           if (gameId === undefined) return;
-          const state = repo.get(gameId);
-          if (state === undefined) return notFound(reply, gameId);
+          if (!repo.exists(gameId)) return notFound(reply, gameId);
           if (repo.typeOf(gameId) !== module.id) return wrongType(reply, gameId, module.id);
+          // Migrate on the module-route path too (only *after* the type guard, so a wrong-type row is
+          // never handed to this module), and refuse a row from a newer server rather than 500.
+          try {
+            repo.get(module, gameId);
+          } catch (error) {
+            if (error instanceof SchemaUnsupportedError) return schemaUnsupported(reply, gameId);
+            throw error;
+          }
         });
         module.routes?.(scope, ctx);
       },

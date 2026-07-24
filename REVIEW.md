@@ -44,8 +44,8 @@ That's a high floor. Two things qualify it:
   - [x] 3.4 hoist the bot drive-loop (+ the two safe bot-package extractions)
   - [x] 3.3 UI shell fields + shared board components
   - [x] 3.1 end-state discriminated union
-- [~] **Tier 4 — ops hardening** — 4.3 (lobby poll bounds + retention) and 4.4 (graceful shutdown,
-  DB-checking health, WAL-safe backups) done; 4.1/4.2/4.5/4.6/4.7 open
+- [~] **Tier 4 — ops hardening** — 4.1 (state-schema migration), 4.3 (lobby poll bounds + retention)
+  and 4.4 (graceful shutdown, DB-checking health, WAL-safe backups) done; 4.2/4.5/4.6/4.7 open
 - [ ] **Tier 5 — worth knowing**
 
 ---
@@ -352,7 +352,7 @@ complaining instead of 500).
 
 ## Tier 4 — Ops: what breaks the home server first
 
-### 4.1 There is no state-schema migration story
+### 4.1 There is no state-schema migration story ✅
 
 There's a solid *column* migration path (`ADDED_COLUMNS` + `addMissingColumns`), but game state is an
 opaque JSON blob persisted forever on the `/data` volume, with no `schemaVersion` and no `migrate`
@@ -360,6 +360,21 @@ hook on `GameModule`. The moment a shipped game's state shape changes, every in-
 deployed database deserializes into an engine that no longer matches it, and nothing detects it.
 
 This is the gap most likely to actually bite, because it bites on **iteration**, not on adding games.
+
+> **Done.** `GameModule` gained `schemaVersion?: number` (absent ⇒ 1) and `migrate?(state, from)` — the
+> module owns its persisted-shape knowledge, per the seam rule; `module.ts` still imports no game. The
+> `games` table gained `schema_version INTEGER NOT NULL DEFAULT 1` (schema string **and** `ADDED_COLUMNS`,
+> the `DEFAULT` backfilling every deployed row to v1). `GameRepository.get` now takes the module and
+> upgrades a stale row **write-on-read** — `migrate` → persist the result + re-stamp `schema_version` in a
+> transaction, with **no `version` bump and no move-log append** (a migration is not a move); `exists(id)`
+> serves the game-agnostic existence checks that used to call `get`. A row from a *newer* server is refused
+> `409 GAME_SCHEMA_UNSUPPORTED` on reads/writes and **skipped** by `listActive` (which migrates lazily too,
+> so `summarize` never sees a stale shape); a higher `schemaVersion` with no `migrate` throws loudly. The
+> engines are **untouched** — `schemaVersion` describes the on-disk expectation, not `GameState`. Proof
+> (`tests/schemaVersion.test.ts`): a counter stub bumped v1→v2 renaming a field migrates on GET, stamps
+> `schema_version` with `version` unchanged, doesn't re-migrate (call-count), and acts on the new shape;
+> a v3-stamped row 409s on GET + `/actions` and drops off `GET /games`; the legacy-DB test (`abandon.test.ts`)
+> grows `schema_version` and reads back 1; all four real games declare no `schemaVersion` and round-trip.
 
 ### 4.2 `version` is documented as optimistic concurrency and never used for it
 
