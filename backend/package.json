@@ -13,10 +13,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@game-hub/bot": "workspace:*",
-    "@game-hub/engine": "workspace:*",
+    "@fastify/rate-limit": "^11.1.0",
     "@fastify/static": "^10.1.0",
     "@fastify/websocket": "^11.3.0",
+    "@game-hub/bot": "workspace:*",
+    "@game-hub/engine": "workspace:*",
     "better-sqlite3": "^11.8.0",
     "fastify": "^5.2.0"
   },

@@ -28,6 +28,22 @@ export class SchemaUnsupportedError extends Error {
 }
 
 /**
+ * Optimistic-concurrency conflict (REVIEW §4.2): a guarded `update` found the row no longer at the
+ * version its state was loaded at, so someone else's write landed in between. Refusing rather than
+ * overwriting is what turns a double-click / double-submit into a no-op instead of a double-apply.
+ * The core maps this to `409 STALE_VERSION`; the client refetches rather than surfacing an error.
+ */
+export class StaleVersionError extends Error {
+  constructor(
+    readonly gameId: string,
+    readonly expectedVersion: number,
+  ) {
+    super(`Game "${gameId}" was modified concurrently (no longer at version ${expectedVersion})`);
+    this.name = 'StaleVersionError';
+  }
+}
+
+/**
  * A listable game: the module's secret-free summary plus the seats an AI holds (which is coordination
  * state, so it lives here rather than in any game's state).
  */
@@ -225,16 +241,40 @@ export class GameRepository {
       .map((summary) => ({ ...summary, bots: botsByGame.get(summary.id) ?? [] }));
   }
 
-  /** Overwrite a game's snapshot and append any newly-logged moves. */
-  update(module: AnyGameModule, state: unknown): void {
+  /**
+   * Overwrite a game's snapshot and append any newly-logged moves.
+   *
+   * **Optimistic concurrency (REVIEW §4.2).** When `expectedVersion` is given, the write is guarded
+   * `WHERE id = ? AND version = ?` on the version the state was loaded at; if the row has moved on
+   * (zero rows changed) it throws `StaleVersionError` and the transaction rolls back — no snapshot
+   * overwrite, no double-logged move. The core's `POST /actions` always threads the loaded version,
+   * so the guard is a backstop even though that handler is synchronous end-to-end today: it's the
+   * thing that would catch a lost-update race the moment an `await` ever creeps into that block.
+   *
+   * Omit `expectedVersion` for an **unconditional** overwrite. Module routes (`ModuleGames.update`)
+   * and the bot runner do exactly that — each re-reads and re-applies inside a single synchronous
+   * span, so there is no interleaving window to guard, and a version WHERE-clause would only add a
+   * false-conflict failure mode for no gain.
+   */
+  update(module: AnyGameModule, state: unknown, expectedVersion?: number): void {
     const updateGame = this.db.prepare(
-      `UPDATE games SET state = ?, version = ?, updated_at = ?, schema_version = ? WHERE id = ?`,
+      expectedVersion === undefined
+        ? `UPDATE games SET state = ?, version = ?, updated_at = ?, schema_version = ? WHERE id = ?`
+        : `UPDATE games SET state = ?, version = ?, updated_at = ?, schema_version = ? WHERE id = ? AND version = ?`,
     );
     const now = new Date().toISOString();
     const tx = this.db.transaction((s: unknown) => {
+      const id = module.summarize(s).id;
       // A live write is always at the module's current shape, so it re-stamps `schema_version` too —
       // keeping the column truthful even if a migration and a move land in the same session.
-      updateGame.run(JSON.stringify(s), module.versionOf(s), now, this.schemaVersionOf(module), module.summarize(s).id);
+      const args = [JSON.stringify(s), module.versionOf(s), now, this.schemaVersionOf(module), id];
+      const result =
+        expectedVersion === undefined
+          ? updateGame.run(...args)
+          : updateGame.run(...args, expectedVersion);
+      if (expectedVersion !== undefined && result.changes === 0) {
+        throw new StaleVersionError(id, expectedVersion);
+      }
       this.persistMoves(module, s, now);
     });
     tx(state);

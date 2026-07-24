@@ -31,7 +31,17 @@ export default defineConfig({
       command: 'pnpm --filter @game-hub/backend start',
       url: 'http://127.0.0.1:3001/health',
       reuseExistingServer: !isCI,
-      env: { DATABASE_PATH: ':memory:', PORT: '3001', HOST: '127.0.0.1' },
+      env: {
+        DATABASE_PATH: ':memory:',
+        PORT: '3001',
+        HOST: '127.0.0.1',
+        // The e2e backend runs the production bootstrap (server.ts), which enables the §4.7 hardening.
+        // Raise the rate limit far above what the suite generates from one IP, and allow the Vite dev
+        // origin so the proxied live-stream WebSocket (browser Origin 5173, backend Host 3001) is not
+        // refused as cross-origin. Both keep the hardening code paths exercised without crippling e2e.
+        RATE_LIMIT_MAX: '1000000',
+        ALLOWED_ORIGINS: BASE_URL,
+      },
     },
     {
       command: 'pnpm --filter @game-hub/ui dev',

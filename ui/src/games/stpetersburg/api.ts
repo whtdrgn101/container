@@ -16,9 +16,17 @@ export const GAME_TYPE = 'stpetersburg';
 /** A Saint Petersburg game payload, with its state pinned to the game's view. */
 export type StPetersburgPayload = GamePayload<StPetersburgView>;
 
-/** Apply a Saint Petersburg action, typed. Thin wrapper over the opaque-action route. */
-export const act = (gameId: string, playerId: string, action: Action, viewer?: string): Promise<StPetersburgPayload> =>
-  applyAction<StPetersburgView>(gameId, playerId, action, viewer);
+/**
+ * Apply a Saint Petersburg action, typed. Thin wrapper over the opaque-action route.
+ * `expectedVersion` threads optimistic concurrency (REVIEW §4.2).
+ */
+export const act = (
+  gameId: string,
+  playerId: string,
+  action: Action,
+  viewer?: string,
+  expectedVersion?: number,
+): Promise<StPetersburgPayload> => applyAction<StPetersburgView>(gameId, playerId, action, viewer, expectedVersion);
 
 /** Re-read a Saint Petersburg game, typed. */
 export const getGameAs = (gameId: string, viewer?: string): Promise<StPetersburgPayload> =>

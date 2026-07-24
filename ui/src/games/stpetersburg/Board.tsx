@@ -66,20 +66,20 @@ export default function StPetersburgBoard({
   const doBuy = (row: 'upper' | 'lower', index: number, displace?: string) => {
     if (!canDrive || !active) return;
     setPicker(null);
-    void run(() => spApi.act(gameId, active.id, { type: 'BUY', row, index, ...(displace ? { displace } : {}) }, viewer));
+    void run(() => spApi.act(gameId, active.id, { type: 'BUY', row, index, ...(displace ? { displace } : {}) }, viewer, game.version));
   };
   const doAdd = (row: 'upper' | 'lower', index: number) => {
     if (!canDrive || !active) return;
-    void run(() => spApi.act(gameId, active.id, { type: 'ADD_TO_HAND', row, index }, viewer));
+    void run(() => spApi.act(gameId, active.id, { type: 'ADD_TO_HAND', row, index }, viewer, game.version));
   };
   const doPlay = (index: number, displace?: string) => {
     if (!canDrive || !active) return;
     setPicker(null);
-    void run(() => spApi.act(gameId, active.id, { type: 'PLAY_FROM_HAND', index, ...(displace ? { displace } : {}) }, viewer));
+    void run(() => spApi.act(gameId, active.id, { type: 'PLAY_FROM_HAND', index, ...(displace ? { displace } : {}) }, viewer, game.version));
   };
   const doPass = () => {
     if (!canDrive || !active) return;
-    void run(() => spApi.act(gameId, active.id, { type: 'PASS' }, viewer));
+    void run(() => spApi.act(gameId, active.id, { type: 'PASS' }, viewer, game.version));
   };
 
   // ── SP5 special-card interludes (pg. 8) ──
@@ -91,16 +91,16 @@ export default function StPetersburgBoard({
 
   const doPubBuy = (points: number) => {
     if (!canDrive || !active) return;
-    void run(() => spApi.act(gameId, active.id, { type: 'PUB_BUY', points }, viewer));
+    void run(() => spApi.act(gameId, active.id, { type: 'PUB_BUY', points }, viewer, game.version));
   };
   const doObservatoryDraw = (stack: CardKind) => {
     if (!canDrive || !active) return;
-    void run(() => spApi.act(gameId, active.id, { type: 'OBSERVATORY_DRAW', stack }, viewer));
+    void run(() => spApi.act(gameId, active.id, { type: 'OBSERVATORY_DRAW', stack }, viewer, game.version));
   };
   const doResolve = (choice: 'buy' | 'hand' | 'discard', displace?: string) => {
     if (!canDrive || !active) return;
     setPicker(null);
-    void run(() => spApi.act(gameId, active.id, { type: 'OBSERVATORY_RESOLVE', choice, ...(displace ? { displace } : {}) }, viewer));
+    void run(() => spApi.act(gameId, active.id, { type: 'OBSERVATORY_RESOLVE', choice, ...(displace ? { displace } : {}) }, viewer, game.version));
   };
 
   // Buy/play a trading card by displacement (pg. 7): a single legal target acts at once, otherwise open the

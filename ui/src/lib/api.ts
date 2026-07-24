@@ -153,21 +153,33 @@ export async function createGame<S = unknown>(gameType: string, players: NewSeat
  * `action` is opaque: the server delegates all validation to the game's own module, so the shape is
  * the game's business. `viewer` (your seat ids) projects the response for your own seats so the reply
  * never reveals another player's card; omit for hotseat.
+ *
+ * `expectedVersion` is optimistic concurrency (REVIEW §4.2): pass the version of the state you acted
+ * against and the server refuses (`409 STALE_VERSION`) if the game has since moved on. Rather than
+ * surface that as an error, we **refetch and return the current state** — a double-click or a second
+ * device that lost the race should feel like the board catching up, not a failure. Omit it to apply
+ * unconditionally (the old behaviour).
  */
 export async function applyAction<S = unknown>(
   gameId: string,
   playerId: string,
   action: unknown,
   viewer?: string,
+  expectedVersion?: number,
 ): Promise<GamePayload<S>> {
   const query = viewer !== undefined ? `?viewer=${encodeURIComponent(viewer)}` : '';
-  return unwrap<S>(
-    await fetch(`${BASE_URL}/games/${gameId}/actions${query}`, {
-      method: 'POST',
-      headers: JSON_HEADERS,
-      body: JSON.stringify({ playerId, action }),
-    }),
-  );
+  const response = await fetch(`${BASE_URL}/games/${gameId}/actions${query}`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ playerId, action, ...(expectedVersion !== undefined ? { expectedVersion } : {}) }),
+  });
+  // Lost the optimistic-concurrency race (a double-click, a stale second device): don't error the
+  // user — catch the board up to the current server state, which is what the click would have shown.
+  if (response.status === 409) {
+    const body = (await response.clone().json().catch(() => ({}))) as ApiError;
+    if (body.error?.code === 'STALE_VERSION') return getGame<S>(gameId, viewer);
+  }
+  return unwrap<S>(response);
 }
 
 /**

@@ -90,7 +90,7 @@ export default function StoneAgeBoard({ gameId, game, bots, colors, controlledId
   const run = (work: () => Promise<stoneageApi.StoneAgePayload>) => guard(async () => onPayload(await work()));
   const doPlace = (place: PlaceId, count: number) => {
     if (!canDrive || !active) return;
-    void run(() => stoneageApi.act(gameId, active.id, { type: 'PLACE', place, count }, viewer));
+    void run(() => stoneageApi.act(gameId, active.id, { type: 'PLACE', place, count }, viewer, game.version));
   };
   const doGather = (place: PlaceId) => {
     if (!canDrive || !active) return;
@@ -102,23 +102,23 @@ export default function StoneAgeBoard({ gameId, game, bots, colors, controlledId
   const doTake = (toolIndices: number[]) => {
     if (!canDrive || !active) return;
     setSelectedTools([]);
-    void run(() => stoneageApi.act(gameId, active.id, { type: 'TAKE_GATHER', toolIndices }, viewer));
+    void run(() => stoneageApi.act(gameId, active.id, { type: 'TAKE_GATHER', toolIndices }, viewer, game.version));
   };
   const doUse = (place: PlaceId) => {
     if (!canDrive || !active) return;
-    void run(() => stoneageApi.act(gameId, active.id, { type: 'USE', place }, viewer));
+    void run(() => stoneageApi.act(gameId, active.id, { type: 'USE', place }, viewer, game.version));
   };
   const doFeed = (payWithResources: boolean) => {
     if (!canDrive || !active) return;
-    void run(() => stoneageApi.act(gameId, active.id, { type: 'FEED', payWithResources }, viewer));
+    void run(() => stoneageApi.act(gameId, active.id, { type: 'FEED', payWithResources }, viewer, game.version));
   };
   const doBuild = (stack: number, resources: Partial<Record<Resource, number>>) => {
     if (!canDrive || !active) return;
-    void run(() => stoneageApi.act(gameId, active.id, { type: 'BUILD', stack, resources }, viewer));
+    void run(() => stoneageApi.act(gameId, active.id, { type: 'BUILD', stack, resources }, viewer, game.version));
   };
   const doAcquire = (slot: number, resources: Partial<Record<Resource, number>>) => {
     if (!canDrive || !active) return;
-    void run(() => stoneageApi.act(gameId, active.id, { type: 'ACQUIRE_CARD', slot, resources }, viewer));
+    void run(() => stoneageApi.act(gameId, active.id, { type: 'ACQUIRE_CARD', slot, resources }, viewer, game.version));
   };
   const bumpPay = (stack: number, resource: Resource, by: number, owned: number) =>
     setPay((prev) => {

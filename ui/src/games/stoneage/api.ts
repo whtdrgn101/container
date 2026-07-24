@@ -14,9 +14,14 @@ export type StoneAgePayload = GamePayload<StoneAgeView>;
 export const getGameAs = (gameId: string, viewer?: string): Promise<StoneAgePayload> =>
   getGame<StoneAgeView>(gameId, viewer);
 
-/** Apply a Stone Age action, typed. */
-export const act = (gameId: string, playerId: string, action: Action, viewer?: string): Promise<StoneAgePayload> =>
-  applyAction<StoneAgeView>(gameId, playerId, action, viewer);
+/** Apply a Stone Age action, typed. `expectedVersion` threads optimistic concurrency (REVIEW §4.2). */
+export const act = (
+  gameId: string,
+  playerId: string,
+  action: Action,
+  viewer?: string,
+  expectedVersion?: number,
+): Promise<StoneAgePayload> => applyAction<StoneAgeView>(gameId, playerId, action, viewer, expectedVersion);
 
 /**
  * Gather resources from a place (SA2). The **server** rolls one die per worker there and returns the

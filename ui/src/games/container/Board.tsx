@@ -116,7 +116,7 @@ export default function ContainerBoard({
     if (!canDrive) return; // only the client controlling the active seat may submit moves
     setPick(null);
     setBuildColor(null);
-    void run(() => containerApi.act(gameId, playerId, action, viewer));
+    void run(() => containerApi.act(gameId, playerId, action, viewer, game.version));
   }
 
   /** Toggle a container into/out of the current buy selection. */
@@ -177,7 +177,7 @@ export default function ContainerBoard({
         ? { type: 'FACTORY_PURCHASE', sellerId: pick.sellerId, bought }
         : { type: 'HARBOR_PURCHASE', bought };
     setPick(null);
-    void run(() => containerApi.act(gameId, active.id, action, viewer));
+    void run(() => containerApi.act(gameId, active.id, action, viewer, game.version));
   }
 
   return (
@@ -206,7 +206,7 @@ export default function ContainerBoard({
         setTieChoice={setTieChoice}
         submitBid={submitBid}
         resolveDelivery={resolveDelivery}
-        requestLoan={(seat) => void run(() => containerApi.act(gameId, seat, { type: 'REQUEST_LOAN' }, viewer))}
+        requestLoan={(seat) => void run(() => containerApi.act(gameId, seat, { type: 'REQUEST_LOAN' }, viewer, game.version))}
       />
 
       <ResultsPanel game={game} resetToLanding={onLeave} />

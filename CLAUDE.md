@@ -415,7 +415,11 @@ this" rule. To add a game `foo`:
   → 409). Add new codes in the engine, not ad-hoc strings.
 - **Immutability + `readonly`** everywhere in engine types.
 - **Versioning:** `GameState.version` increments once per applied action; mirrored in the
-  `games` table for future optimistic-concurrency checks.
+  `games` table and used for **optimistic concurrency** (REVIEW §4.2). `POST /games/:id/actions`
+  takes an optional `expectedVersion`; a mismatch is `409 STALE_VERSION` (the UI refetches rather than
+  erroring). `GameRepository.update(module, state, expectedVersion?)` guards `WHERE version = ?` as the
+  backstop; module routes / the bot runner pass **no** `expectedVersion` (unconditional — they re-read
+  inside one synchronous span). Thread the acting view's `version` when adding a new board action.
 - **Testids:** UI exposes `data-testid` hooks (`start-game`, `board`, `player-card-<id>`,
   `money-<id>`, `store-count-<id>`, `produce-<id>`) — keep these stable; Playwright depends on them.
 - **shadcn components** are copied into `ui/src/components/ui` (not a dependency). Extend them
@@ -545,6 +549,12 @@ sessions). The Container summary below is retained for context; the per-game roa
   and offers join-by-code; Vite's `/api` proxy has `ws: true`. Tests: backend `app.injectWS` (initial
   snapshot + per-action push + fixed-seat viewer + unknown-game close) and `e2e/live-sync.spec.ts`
   (two browser contexts). The socket is push-only; any connected client can drive the active seat.
+  - **⚠️ WS is exempt from CORS, so `/games/:id/stream` enforces its own origin check** (REVIEW §4.7):
+    it refuses a cross-origin upgrade (`1008`) unless same-origin (Origin host = Host), no-Origin
+    (non-browser), or in `AppOptions.allowedOrigins` / `ALLOWED_ORIGINS`. A reverse/Vite proxy that
+    fronts the socket under a different Host than the browser's Origin (the e2e setup) must list that
+    origin. Also: per-IP connection cap (`1013` over it) + `maxPayload: 1024` — the socket is push-only,
+    so the UI sends **no** frames; don't add a client→server WS message (add a REST route instead).
 - **Track B / lobby ✅ (create → join & name → start).** Pre-game **lobbies** are coordination state
   *outside* the engine (`backend/src/lobbies.ts`: `lobbies` table + `LobbyRepository`; a `Lobby` is
   `{ id, seats, members: (name|null)[], status, gameId }`). Endpoints: `POST /lobbies {seats}` (3–5 empty

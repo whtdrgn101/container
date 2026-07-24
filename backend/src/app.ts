@@ -3,6 +3,7 @@ import Fastify from 'fastify';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import fastifyWebsocket from '@fastify/websocket';
+import fastifyRateLimit from '@fastify/rate-limit';
 import { BotRepository } from './bots';
 import { ColorRepository, assignColors, colorsForSeats } from './colors';
 import type { DB } from './db';
@@ -15,7 +16,16 @@ import type { Lobby, LobbyMember } from './lobbies';
 import { RematchRepository } from './rematch';
 import type { Rematch } from './rematch';
 import { LobbyRepository, LOBBY_SWEEP_INTERVAL_MS, OPEN_LOBBY_TTL_MS } from './lobbies';
-import { GameRepository, SchemaUnsupportedError } from './repository';
+import { GameRepository, SchemaUnsupportedError, StaleVersionError } from './repository';
+import {
+  BODY_LIMIT_BYTES,
+  isAllowedWsOrigin,
+  MAX_GAME_TYPE_LENGTH,
+  MAX_NAME_LENGTH,
+  MAX_SEATS,
+  WS_MAX_PAYLOAD,
+  WsConnectionLimiter,
+} from './security';
 
 export interface AppOptions {
   db: DB;
@@ -37,6 +47,18 @@ export interface AppOptions {
    * a test can seed it and get a deterministic game. Defaults to `Math.random`.
    */
   rng?: () => number;
+  /**
+   * Global per-IP rate limit (REVIEW §4.7). Omit to disable — the default, because the test suites
+   * make far more requests per app than any human would, and `@fastify/rate-limit` also throttles
+   * `app.inject`. Production opts in via `DEFAULT_RATE_LIMIT` (see `server.ts`).
+   */
+  rateLimit?: { max: number; timeWindow: number | string };
+  /**
+   * Extra origins the live-stream WebSocket accepts an upgrade from, beyond same-origin and
+   * no-Origin clients (REVIEW §4.7). Each entry is a full origin (`https://play.lan`) or a bare host.
+   * Populated from `ALLOWED_ORIGINS` in production; empty by default (same-origin only).
+   */
+  allowedOrigins?: readonly string[];
 }
 
 /**
@@ -58,6 +80,13 @@ interface CreateGameBody {
 interface ActionBody {
   playerId: string;
   action: unknown;
+  /**
+   * The version the client believes the game is at (REVIEW §4.2). When present and no longer current,
+   * the move is refused with `409 STALE_VERSION` — the optimistic-concurrency check that turns a
+   * double-click or a stale second device into a no-op instead of a double-apply. Omit for the old
+   * unconditional behaviour.
+   */
+  expectedVersion?: number;
 }
 
 /**
@@ -70,7 +99,29 @@ interface ActionBody {
  * lives, so C1 is a one-function change rather than a hunt.
  */
 export function buildApp(options: AppOptions): FastifyInstance {
-  const app = Fastify({ logger: options.logger ?? false });
+  // `bodyLimit` (§4.7): actions are tiny, so cap a hostile/oversized body well below Fastify's 1 MiB
+  // default. An over-limit body is rejected with 413 before any handler runs.
+  const app = Fastify({ logger: options.logger ?? false, bodyLimit: BODY_LIMIT_BYTES });
+  // Generous global per-IP rate limit (§4.7), opt-in so the test suites (which out-request any human,
+  // and would trip `inject`) stay green. Registered with `global: false` and driven by our own
+  // `onRequest` hook, added here **before any route** so Fastify applies it to all of them: the
+  // plugin's own global hook is added only when it finishes loading (at `ready()`), by which point the
+  // synchronously-registered routes below have already snapshotted their hooks and would miss it —
+  // and `buildApp` is synchronous, so we can't `await` the registration first. The limiter middleware
+  // (`app.rateLimit()`) is created lazily on the first request, once the plugin has decorated `app`.
+  if (options.rateLimit) {
+    void app.register(fastifyRateLimit, { ...options.rateLimit, global: false });
+    // Wrap the decorator call so `ReturnType` sees a plain function (not a `this`-bound method).
+    const makeLimiter = () => app.rateLimit();
+    let limiter: ReturnType<typeof makeLimiter> | undefined;
+    app.addHook('onRequest', async function (this: FastifyInstance, request, reply) {
+      // `.call(this, …)` because the plugin's middleware is a `this`-bound Fastify hook.
+      await (limiter ??= makeLimiter()).call(this, request, reply);
+    });
+  }
+  const allowedOrigins = options.allowedOrigins ?? [];
+  // Per-IP cap on concurrent live-stream sockets (§4.7); the hub's room map is otherwise unbounded.
+  const wsConnections = new WsConnectionLimiter();
   const registry = options.registry ?? createDefaultRegistry();
   const repo = new GameRepository(options.db);
   const lobbies = new LobbyRepository(options.db);
@@ -381,7 +432,9 @@ export function buildApp(options: AppOptions): FastifyInstance {
     };
   };
 
-  app.register(fastifyWebsocket);
+  // `maxPayload` (§4.7): the stream is push-only, so a client legitimately sends no data frames at all
+  // — a small inbound cap rejects anything a misbehaving or hostile peer tries to push up the socket.
+  app.register(fastifyWebsocket, { options: { maxPayload: WS_MAX_PAYLOAD } });
 
   /**
    * Refuse every mutating request against an abandoned game, whatever route it targets.
@@ -432,6 +485,20 @@ export function buildApp(options: AppOptions): FastifyInstance {
       '/games/:id/stream',
       { websocket: true },
       (socket, request) => {
+        // WS is exempt from CORS (§4.7): without an origin check any page a LAN user visits could open
+        // this socket and read their projected state. Refuse a cross-origin upgrade — same-origin and
+        // non-browser (no Origin) clients pass, plus any configured `allowedOrigins`.
+        if (!isAllowedWsOrigin(request.headers.origin, request.headers.host, allowedOrigins)) {
+          socket.close(1008, 'Cross-origin WebSocket connections are not allowed');
+          return;
+        }
+        // Per-IP concurrent-connection cap (§4.7): one tab opens one socket, so a flood is abuse.
+        const ip = request.ip;
+        if (!wsConnections.tryAcquire(ip)) {
+          socket.close(1013, 'Too many concurrent connections'); // 1013 = Try Again Later
+          return;
+        }
+        socket.on('close', () => wsConnections.release(ip));
         const module = moduleOf(request.params.id);
         if (!module) {
           socket.close(1008, `No game with id "${request.params.id}"`);
@@ -474,14 +541,18 @@ export function buildApp(options: AppOptions): FastifyInstance {
           properties: {
             // Which game to deal. Optional: a bare POST still starts the default (the hotseat
             // quick-start posts no type), while C2's picker names one explicitly.
-            gameType: { type: 'string', minLength: 1 },
+            gameType: { type: 'string', minLength: 1, maxLength: MAX_GAME_TYPE_LENGTH },
             players: {
               type: 'array',
+              // Bounded (§4.7): above any module's max seats (5 today), so no game is constrained, but
+              // a hostile list of thousands of seats can't be stored in the state JSON.
+              maxItems: MAX_SEATS,
               items: {
                 type: 'object',
                 required: ['name'],
                 properties: {
-                  name: { type: 'string', minLength: 1 },
+                  // Bounded (§4.7): an unbounded name is stored in state JSON and echoed on every poll.
+                  name: { type: 'string', minLength: 1, maxLength: MAX_NAME_LENGTH },
                   // A player-colour pick (a palette id). Honoured if valid/unique, else defaulted.
                   color: { type: 'string' },
                   bot: { type: 'boolean' },
@@ -658,6 +729,9 @@ export function buildApp(options: AppOptions): FastifyInstance {
             // Deliberately opaque: the route can't enumerate every game's action types, so validation
             // is `module.parseAction`'s job in full. Don't re-add a `type` enum here.
             action: { type: 'object' },
+            // Optimistic concurrency (§4.2): the client's known version. Optional — absent ⇒ today's
+            // unconditional apply, so the field is backward-compatible.
+            expectedVersion: { type: 'number' },
           },
         },
       },
@@ -667,6 +741,20 @@ export function buildApp(options: AppOptions): FastifyInstance {
       const loaded = load(reply, request.params.id);
       if (!loaded) return reply;
       const { state, module } = loaded;
+
+      // Optimistic concurrency (§4.2): if the client told us the version it acted against and the game
+      // has since moved on, refuse rather than apply to a state the client never saw. This is what
+      // makes a double-click / stale second device a no-op — the UI refetches on this code, not errors.
+      const loadedVersion = module.versionOf(state);
+      const expected = request.body.expectedVersion;
+      if (expected !== undefined && expected !== loadedVersion) {
+        return reply.code(409).send({
+          error: {
+            code: 'STALE_VERSION',
+            message: `Game is at version ${loadedVersion}, not ${expected}; reload before acting`,
+          },
+        });
+      }
 
       const parsed = module.parseAction(request.body.action);
       if (!parsed.ok) return badRequest(reply, parsed.message);
@@ -681,10 +769,11 @@ export function buildApp(options: AppOptions): FastifyInstance {
         // better-sqlite3 is synchronous and there is no `await` between `load` (above) and
         // `repo.update` (below), so two concurrent POSTs cannot interleave a read and a write. Do NOT
         // add an `await` into this block — a single one silently opens a lost-update / double-apply
-        // race (a double-click applying the same action twice). The real fix is optimistic
-        // concurrency on `version` (REVIEW §4.2); until that lands, keep this synchronous. (§4.4)
+        // race (a double-click applying the same action twice). The `WHERE version = ?` guard threaded
+        // below (§4.2) is the backstop that would catch such a race, refusing the second write with
+        // `StaleVersionError` rather than clobbering the first; keep this stretch synchronous anyway.
         const next = module.applyAction(state, request.body.playerId, parsed.action);
-        repo.update(module, next);
+        repo.update(module, next, loadedVersion);
         pushGame(request.params.id, next); // tell every connected client
         // Let the AI take any seats that are now on the clock, before we reply — so the caller gets
         // back the state as it stands once the bots have finished, not a snapshot mid-round.
@@ -697,6 +786,13 @@ export function buildApp(options: AppOptions): FastifyInstance {
           gamePayload(module, request.params.id, settled, viewerFrom(request.query.viewer, module, settled)),
         );
       } catch (error) {
+        // The `WHERE version` backstop fired: a concurrent write beat this one. Same client-facing
+        // contract as the pre-check above — 409 STALE_VERSION, so the UI refetches rather than erroring.
+        if (error instanceof StaleVersionError) {
+          return reply.code(409).send({
+            error: { code: 'STALE_VERSION', message: error.message },
+          });
+        }
         return sendGameError(reply, module, error);
       }
     },
@@ -711,6 +807,10 @@ export function buildApp(options: AppOptions): FastifyInstance {
       // Bound to this module, so it can persist its own state without naming itself.
       games: {
         get: (gameId) => repo.get(module, gameId),
+        // Unconditional overwrite (no `expectedVersion`): a module route re-reads and re-applies inside
+        // one synchronous span (Container's auction resolve, Can't Stop / Stone Age roll), so there is
+        // no interleaving window the version guard would protect — and adding it would only invent a
+        // false-conflict failure mode. The core's `/actions` handler is the one that threads the guard.
         update: (state) => repo.update(module, state),
       },
       botSeats,
@@ -801,7 +901,10 @@ export function buildApp(options: AppOptions): FastifyInstance {
       schema: {
         body: {
           type: 'object',
-          properties: { seats: { type: 'number' }, gameType: { type: 'string', minLength: 1 } },
+          properties: {
+            seats: { type: 'number' },
+            gameType: { type: 'string', minLength: 1, maxLength: MAX_GAME_TYPE_LENGTH },
+          },
         },
       },
     },
@@ -851,7 +954,8 @@ export function buildApp(options: AppOptions): FastifyInstance {
           type: 'object',
           required: ['name'],
           properties: {
-            name: { type: 'string', minLength: 1 },
+            // Bounded (§4.7): the claimed name is persisted and echoed to every waiting-room poll.
+            name: { type: 'string', minLength: 1, maxLength: MAX_NAME_LENGTH },
             bot: { type: 'boolean' },
             // Optional colour pick, validated against this game's palette + the other seats' picks.
             color: { type: 'string' },

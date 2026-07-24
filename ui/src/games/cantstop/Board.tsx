@@ -69,7 +69,7 @@ export default function CantStopBoard({
   };
   const doAct = (action: Action) => {
     if (!canDrive || !active) return;
-    void run(() => cantstopApi.act(gameId, active.id, action, viewer));
+    void run(() => cantstopApi.act(gameId, active.id, action, viewer, game.version));
   };
 
   // What the active seat may do right now. `legalActions` never lists ROLL (server-only), so rolling

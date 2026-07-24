@@ -44,8 +44,9 @@ That's a high floor. Two things qualify it:
   - [x] 3.4 hoist the bot drive-loop (+ the two safe bot-package extractions)
   - [x] 3.3 UI shell fields + shared board components
   - [x] 3.1 end-state discriminated union
-- [~] **Tier 4 — ops hardening** — 4.1 (state-schema migration), 4.3 (lobby poll bounds + retention)
-  and 4.4 (graceful shutdown, DB-checking health, WAL-safe backups) done; 4.2/4.5/4.6/4.7 open
+- [~] **Tier 4 — ops hardening** — 4.1 (state-schema migration), 4.2 (optimistic concurrency),
+  4.3 (lobby poll bounds + retention), 4.4 (graceful shutdown, DB-checking health, WAL-safe backups)
+  and 4.7 (rate limit, WS origin/cap/maxPayload, input bounds) done; 4.5/4.6 open
 - [ ] **Tier 5 — worth knowing**
 
 ---
@@ -376,7 +377,7 @@ This is the gap most likely to actually bite, because it bites on **iteration**,
 > a v3-stamped row 409s on GET + `/actions` and drops off `GET /games`; the legacy-DB test (`abandon.test.ts`)
 > grows `schema_version` and reads back 1; all four real games declare no `schemaVersion` and round-trip.
 
-### 4.2 `version` is documented as optimistic concurrency and never used for it
+### 4.2 `version` is documented as optimistic concurrency and never used for it ✅
 
 Both `types.ts` files say "Used for optimistic concurrency". `POST /games/:id/actions` takes no
 expected version, and the repository writes unconditionally. A double-click or a client retry applies
@@ -385,6 +386,22 @@ the action twice.
 Related, and worth a code comment: the handler is currently race-free only **accidentally** — there
 is no `await` between load and update, and better-sqlite3 is synchronous, so it runs atomically.
 Adding a single `await` to that block silently introduces a lost-update race.
+
+> **Done.** `POST /games/:id/actions` now accepts an optional `expectedVersion` (schema-validated);
+> when it is present and ≠ `module.versionOf(state)` at load time the move is refused `409 STALE_VERSION`
+> with the current version in the message — absent ⇒ the old unconditional behaviour, so it is
+> backward-compatible. `GameRepository.update` gained the backstop guard `WHERE id = ? AND version = ?`
+> on the loaded version, throwing `StaleVersionError` (also mapped to `409 STALE_VERSION`) on zero rows
+> changed; the `/actions` handler always threads the loaded version, so the guard would catch a
+> lost-update race the moment an `await` ever enters that block (the warning comment now says so).
+> Module routes and the bot runner call `update` **without** `expectedVersion` (an unconditional
+> overwrite) — each re-reads and re-applies inside one synchronous span, so there is no window to
+> guard, documented at both `ModuleGames.update` and on the repository method. **UI adoption:**
+> `lib/api.ts` `applyAction` sends the client's known `game.version` and, on `STALE_VERSION`,
+> **refetches instead of erroring** — a lost double-click feels like the board catching up, not a
+> toast; every game's `act` wrapper and board call site threads its current view's `version`. Tests:
+> `tests/hardening.test.ts` (STALE_VERSION pre-check, replay-after-apply, backward-compat omit, the
+> repository WHERE-guard throw, and the handler's catch mapped to 409).
 
 ### 4.3 `listOpen()` has no LIMIT, and lobbies are never deleted ✅
 
@@ -462,7 +479,7 @@ info). **Decision 2026-07-21: deferred** — redacting means splitting server st
 shape for a game whose view is otherwise the whole state, a larger refactor than the leak warrants for
 trusted-LAN play. If it's ever done, redact in `viewFor` (deck → count), never in the UI.
 
-### 4.7 Security footguns (the no-auth choice is fine; these are orthogonal)
+### 4.7 Security footguns (the no-auth choice is fine; these are orthogonal) ✅
 
 Validation is genuinely consistent — every body-taking route has a Fastify schema and all SQL is
 parameterized. Real gaps:
@@ -474,6 +491,22 @@ parameterized. Real gaps:
 | No WS connection cap or heartbeat; the hub's `rooms` map is unbounded | per-IP cap, `maxPayload`, ping/pong to reap half-open sockets |
 | Unbounded strings — no `maxLength` on names, no `maxItems` on `players`. A 1 MB name is stored in state JSON and echoed on every 3s poll | `maxLength: 64`, `maxItems` |
 | `bodyLimit` not set explicitly (default 1 MiB is fine) | pin it |
+
+> **Done.** New `backend/src/security.ts` holds the pure/stateful units (constants + `isAllowedWsOrigin`
+> + `WsConnectionLimiter`), unit-tested directly. **Rate limiting:** `@fastify/rate-limit` added, driven
+> by a global `onRequest` hook registered *before the routes* (buildApp is synchronous, so it can't
+> `await` the plugin's own late-loading global hook) and delegating to a lazily-created limiter;
+> opt-in via `AppOptions.rateLimit` (off in the in-process suites, which out-request any human and would
+> trip `inject`), enabled to the generous `DEFAULT_RATE_LIMIT` (300/min per IP) in `server.ts` — now
+> env-tunable via `RATE_LIMIT_MAX`. **WS origin:** `/games/:id/stream` refuses a cross-origin upgrade
+> (`1008`) — same-origin (Origin host = Host), no-Origin (non-browser), and `ALLOWED_ORIGINS`/`allowedOrigins`
+> pass. **WS hygiene:** per-IP concurrent-connection cap (`WsConnectionLimiter`, 32; `1013` over it) and
+> `maxPayload: 1024` on the plugin (the stream is push-only — the UI sends no frames). **Input bounds:**
+> `maxLength: 64` on every name + `gameType`, `maxItems: 8` on `players`, and an explicit `bodyLimit`
+> of 256 KiB (`413` over it). Tests in `tests/hardening.test.ts`; the e2e backend (which runs the
+> production `server.ts`) raises `RATE_LIMIT_MAX` and sets `ALLOWED_ORIGINS` to the Vite dev origin so
+> the proxied live-stream socket still connects. *(Heartbeat/ping-pong for half-open sockets deferred —
+> the per-IP cap + close-on-unsubscribe bound the `rooms` map; add a ping sweep if idle sockets pile up.)*
 
 ---
 
@@ -498,7 +531,11 @@ parameterized. Real gaps:
   under 1000" rule. A second header block sits mid-file, so a second suite is already living inside
   it. The backend never adopted the engine's `tests/helpers.ts` convention; `mulberry32` is duplicated
   verbatim across three test files.
-- **Bot strength is entirely unmeasured.** Every self-play test asserts only legality and termination.
+- ~~**Bot strength is entirely unmeasured.**~~ ✅ **Fixed** (2026-07-24): `bot/src/kernel/benchmark.ts`
+  — seat-rotated candidate-vs-baseline with the same board replayed per seat, Wilson 95% CI, per-seat
+  policy support in every game's self-play (Container's sealed bids per-seat too), and a `pnpm bench`
+  driver. Convention: freeze a baseline, tune, commit when the CI lower bound clears 50%. *(Original
+  finding follows.)* Every self-play test asserts only legality and termination.
   Container's is the exception and the model — it asserts the whole trade chain runs and ≥3
   deliveries happen, precisely because the ships-never-sail bug taught that lesson. Neither other game
   has an equivalent.

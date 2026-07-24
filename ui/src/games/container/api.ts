@@ -57,9 +57,19 @@ export interface AuctionPush {
 /** Narrow a side-channel push from the shell's socket to Container's auction frame. */
 export const isAuctionPush = (message: { type: string }): message is AuctionPush => message.type === 'auction';
 
-/** Apply a Container action, typed. Thin wrapper over the platform's opaque-action route. */
-export const act = (gameId: string, playerId: string, action: Action, viewer?: string): Promise<ContainerPayload> =>
-  applyAction<GameView>(gameId, playerId, action, viewer);
+/**
+ * Apply a Container action, typed. Thin wrapper over the platform's opaque-action route.
+ *
+ * `expectedVersion` is the acting view's version, threaded to the optimistic-concurrency guard
+ * (REVIEW §4.2) so a double-click resolves to "the board caught up" rather than a double-apply.
+ */
+export const act = (
+  gameId: string,
+  playerId: string,
+  action: Action,
+  viewer?: string,
+  expectedVersion?: number,
+): Promise<ContainerPayload> => applyAction<GameView>(gameId, playerId, action, viewer, expectedVersion);
 
 /** Re-read a Container game, typed. */
 export const getGameAs = (gameId: string, viewer?: string): Promise<ContainerPayload> =>

@@ -23,9 +23,17 @@ export type CantStopPayload = GamePayload<CantStopView>;
 
 const route = (gameId: string, path: string) => `${BASE_URL}/games/${gameId}/${GAME_TYPE}${path}`;
 
-/** Apply a Can't Stop action (SELECT / STOP), typed. Thin wrapper over the opaque-action route. */
-export const act = (gameId: string, playerId: string, action: Action, viewer?: string): Promise<CantStopPayload> =>
-  applyAction<CantStopView>(gameId, playerId, action, viewer);
+/**
+ * Apply a Can't Stop action (SELECT / STOP), typed. Thin wrapper over the opaque-action route.
+ * `expectedVersion` threads optimistic concurrency (REVIEW §4.2).
+ */
+export const act = (
+  gameId: string,
+  playerId: string,
+  action: Action,
+  viewer?: string,
+  expectedVersion?: number,
+): Promise<CantStopPayload> => applyAction<CantStopView>(gameId, playerId, action, viewer, expectedVersion);
 
 /** Re-read a Can't Stop game, typed. */
 export const getGameAs = (gameId: string, viewer?: string): Promise<CantStopPayload> =>
