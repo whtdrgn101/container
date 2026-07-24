@@ -4,6 +4,7 @@ import type {
   Engineer,
   Industry,
   Locomotive,
+  PendingMoves,
   Route,
   RussianRailroadsResult,
   RussianRailroadsState,
@@ -36,6 +37,8 @@ export interface PlayerView {
   readonly endBonusHeld: number;
   readonly turnOrderCard: number;
   readonly passed: boolean;
+  /** Cumulative score on the scoring track (pg. 20–21) — public. */
+  readonly score: number;
 }
 
 /**
@@ -53,6 +56,8 @@ export type RussianRailroadsView = {
   readonly endBonusPileCount: number;
   readonly turnOrder: readonly number[];
   readonly activePlayerIndex: number;
+  /** The active player's pending track-extension lock (pg. 8–9), or `null` — public information. */
+  readonly pendingMoves: PendingMoves | null;
   readonly round: number;
   readonly rounds: number;
   readonly supplies: RussianRailroadsSupplies;
@@ -95,6 +100,7 @@ export function viewFor(state: RussianRailroadsState, viewer: Viewer): RussianRa
       endBonusHeld: player.endBonus ? 1 : 0,
       turnOrderCard: player.turnOrderCard,
       passed: player.passed,
+      score: player.score,
     };
   });
 

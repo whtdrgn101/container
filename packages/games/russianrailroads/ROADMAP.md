@@ -61,9 +61,11 @@ including empty spaces behind a track — plus industry, pg. 20–21); final sco
   in any order, partially, never saved across turns. A first-class state field from RR1, since three
   later slices hang off it.
 - **Rulebook gaps resolve by reading component art** (the SP0 600-DPI precedent), each ruling
-  documented here: (1) silver/gold valuation-tile values (pg. 20 shows green=1, bronze=2, wood=0);
-  (2) scoring-track overflow via point tiles (pg. 4/6, art only); (3) "choose an end bonus card"
-  (pg. 46) — **AMBIGUOUS** draw-top vs pick; interacts with redaction; ruling due in RR8.
+  documented here: (1) silver/gold valuation-tile values — **LANDED in RR2**: the pg. 20 tile art reads
+  wood 0 / green 1 / bronze 2 / **silver 4 / gold 7**; (2) scoring-track overflow via point tiles —
+  **LANDED in RR2**: track is a 1–100 loop, 100/300/500 point tiles (pg. 4), modelled as an unbounded
+  integer score; (3) "choose an end bonus card" (pg. 46) — **AMBIGUOUS** draw-top vs pick; interacts with
+  redaction; ruling due in RR8.
 - **Solo "Emil" (pg. 44–45) is out of scope** — the platform's own bots are the solo story.
 
 ## The build plan — vertical slices
@@ -162,12 +164,51 @@ decision.
   backend. The kernel exposes `ModuleContext<Db, Hub, BotSeats>` generically, so the package can't name
   the *concrete* one without the host. Flag for RR10 / any external pilot.
 
-### RR2 — Track extension (wood) + per-round scoring
-The game's "produce" (digest §5): the track-extension action spaces (incl. the coin+worker space and
-the never-occupied bottom space, pg. 9), single-step moves under the **pending-moves lock**, empty-
-space/no-leapfrog/route-end rules (pg. 9), then the **scoring phase** (pg. 20–21): per-route
-valuation (wood=0 baseline; "empty spaces behind" rule), industry stub, scoring marker + point-tile
-overflow (art ruling #2). A full multi-round wood-only game loops and scores.
+## Track D findings log — RR2
+
+**No new hand-touchpoints.** RR2 added a whole mechanic (a new `MOVE_TRACK` action, the pending lock, the
+scoring phase) entirely **inside** the package — engine, module `parseAction`, client — plus the package's
+own backend REST test and its `e2e/` spec. It needed **zero** edits to any host file: no
+`games.config.ts`, no registry regeneration (the codegen reported both registries unchanged), no
+`vite.config.ts` / `tsconfig` / `package.json` / `vitest` changes. This is the encouraging half of the
+Track D story: once a game package is *wired* (the RR1 findings), growing it is self-contained — the
+per-slice cost lives where it should. (The standing RR1 findings — TS-source consumption, the client
+typechecking via the UI host — are unchanged; nothing in RR2 touched them.)
+
+### RR2 — Track extension (wood) + per-round scoring ✅ *(shipped)*
+The game's "produce" (digest §5). Shipped: the track-extension action spaces (the 1-worker wood → **2**
+moves and 2-worker wood → **3** moves spaces, the worker+coin → **2** moves space, and the never-occupied
+bottom → **1** move wood/green space — move counts read off the pp. 4–5 board art and cross-checked
+against the pg. 8 example); single-step `MOVE_TRACK` under the **pending-moves lock** (`state.pendingMoves
+= { remaining, colors }`, the binding ruling); the empty-space/no-leapfrog/route-end rules (pg. 9); and the
+**scoring phase** (pg. 20–21) at round close — per-route valuation (loco-reach-gated, "empty spaces behind"
+rule, the full valuation tile), an industry stub (0, RR5), and cumulative per-player scores that drive the
+end-game winner. Engine 100% (65 tests); a backend REST test drives the lock + scoring on the wire;
+`e2e/russianrailroads.spec.ts` plays place → lock → clicks → pass-out → score. Rulings landed below.
+
+**RR2 rulings (with evidence):**
+- **Ruling #1 (valuation tile) — LANDED.** Read off the pg. 20 tile art at 400 DPI (confirmed on the pg. 6
+  player board): **wood 0 / green 1 / bronze 2 / silver 4 / gold 7**. The rulebook prose only gives wood/
+  green/bronze; silver = 4 and gold = 7 are the component read. Encoded in full now (`VALUATION`), so RR3's
+  colour ladder needs no further art work here.
+- **Ruling #2 (scoring-track overflow) — LANDED.** The physical track is a 1–100 loop with **100/300/500
+  point tiles** beside space 100 (pg. 4 art). The engine models a player's score as **one unbounded
+  integer**; the wrap is pure display (track position = `score % 100`, point tiles = `⌊score/100⌋`), so
+  there is no wrapping logic to get wrong.
+- **Lock-exhaustion ruling.** pg. 8–9 doesn't state what happens to unspent moves when no track can advance
+  (all at the route end / blocked). Adopting the **Container Produce precedent** ("as many as you are able
+  to"): the lock **auto-releases and forfeits** the remaining moves, and the turn passes. This covers both a
+  placement that can't move at all (no lock is ever set) and a lock that runs dry mid-resolution.
+- **Track-model ruling (relocate).** Each route holds **≤ 1 track tile per colour** at its frontier; a step
+  **relocates** the tile one space forward, leaving the space behind empty (scored as that colour, pg. 20).
+  This matches RR1's sparse `spaces` representation and the pg. 20 scoring example (sparse tiles + empty-
+  behind). Loco **reach** = the **sum** of a route's loco numbers (pg. 20: #6 + #2 reach space 8); RR2's #1
+  loco sits on the Trans-Siberian, so only that route reaches space 1.
+
+**Scope deferred (as designed):** the dedicated green/bronze/silver/gold single-/double-worker spaces exist
+on the board but wait for **RR3**'s colour access (`accessibleColors` is a stub returning `['wood']` — the
+one seam RR3 fills). Adding those eight spaces now would be spaces nobody could place on. St. Petersburg's
+×2 and Kyiv's star spaces (route-special scoring) are RR6; doublers are RR3; industry scoring is RR5.
 
 ### RR3 — The color ladder + doublers
 Unlock thresholds (Trans-Siberian 2/6/10/15 → green/bronze/silver/gold, pg. 8–9), strict build

@@ -30,11 +30,12 @@ describe('createGame', () => {
       expect(route.spaces[0]).toBe('wood');
       expect(route.spaces.slice(1).every((s) => s === null)).toBe(true);
     }
-    expect(p.locomotives).toEqual([{ number: 1 }]);
+    expect(p.locomotives).toEqual([{ number: 1, route: 'transsiberian' }]);
     expect(p.industry).toEqual({ wrench: 0 });
     expect(p.endBonus).toBeNull();
     expect(p.hiredEngineers).toEqual([]);
     expect(p.actionPool).toEqual([]);
+    expect(p.score).toBe(0);
   });
 
   it('deals a distinct turn-order card to each seat and opens with card #1', () => {
@@ -70,5 +71,6 @@ describe('createGame', () => {
     expect(state.log).toEqual([]);
     expect(state.actionSpaces).toEqual({});
     expect(state.supplies).toEqual({ doublers: 0 });
+    expect(state.pendingMoves).toBeNull();
   });
 });

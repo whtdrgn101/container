@@ -73,13 +73,16 @@ export function createGame(options: CreateGameOptions): RussianRailroadsState {
     workersTotal: workers,
     coins: STARTING_COINS[count]!,
     routes: startingRoutes(),
-    locomotives: [{ number: STARTING_LOCOMOTIVE }],
+    // The #1 loco starts on the Trans-Siberian (pg. 6, step 3) — so only that route reaches space 1 for
+    // scoring until more locos are bought (RR4).
+    locomotives: [{ number: STARTING_LOCOMOTIVE, route: 'transsiberian' }],
     industry: { wrench: 0 },
     hiredEngineers: [],
     actionPool: [],
     endBonus: null,
     turnOrderCard: turnOrderCards[seat]!,
     passed: false,
+    score: 0,
   }));
 
   const turnOrder = turnOrderFromCards(turnOrderCards);
@@ -93,6 +96,7 @@ export function createGame(options: CreateGameOptions): RussianRailroadsState {
     turnOrder,
     // The round opens with the turn-order starting seat (the player holding card "1", pg. 5).
     activePlayerIndex: turnOrder[0]!,
+    pendingMoves: null,
     round: 1,
     rounds: ROUNDS[count]!,
     supplies: { doublers: 0 },

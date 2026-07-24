@@ -18,12 +18,16 @@ export interface Route {
 }
 
 /**
- * A locomotive a player owns (pg. 6, 10). RR1 has only the starting `#1`; the route it sits on and the
- * factory-flip mechanic are RR4/RR5, so the shape is intentionally minimal here.
+ * A locomotive a player owns (pg. 6, 10). RR1 had only the starting `#1`; RR2 adds the `route` it sits on
+ * because **loco reach gates route scoring** (pg. 20: "only spaces reached by locomotives are scored", and
+ * a route's reach is the sum of its locos' numbers — #6 + #2 reach space 8). The lowest-available
+ * acquisition + upgrade chains + factory flip are RR4/RR5, so the shape stays otherwise minimal.
  */
 export interface Locomotive {
-  /** Printed number (2–10; the starting one is 1 — pg. 6, 10). */
+  /** Printed number (2–10; the starting one is 1 — pg. 6, 10). Contributes this much to its route's reach. */
   readonly number: number;
+  /** Which route this locomotive sits on (pg. 6, 10). The starting #1 is on the Trans-Siberian (pg. 6). */
+  readonly route: RouteId;
 }
 
 /**
@@ -72,6 +76,32 @@ export interface RussianRailroadsPlayer {
   readonly turnOrderCard: number;
   /** Whether this player has passed this round (pg. 7). A pass is terminal for the round. */
   readonly passed: boolean;
+  /**
+   * Cumulative points on the scoring track (pg. 20–21), summed across every round's scoring phase. Starts
+   * at 0. **Art ruling #2 (RR2):** the physical track is a 1–100 loop with 100/300/500 **point tiles**
+   * beside space 100 (pg. 4 art) for scores past a lap; the engine models the score as one **unbounded
+   * integer** and treats the wrap as pure display (track position = `score % 100`, point tiles =
+   * `⌊score / 100⌋`), so there is no wrapping logic to get wrong. RR8's final scoring adds to it.
+   */
+  readonly score: number;
+}
+
+/**
+ * The pending track-extension lock (pg. 8–9; the binding design decision — the Stone Age `pendingGather` /
+ * SP `pendingDraw` pattern). A track-extension `PLACE` sets this on the state; single-step `MOVE_TRACK`
+ * actions consume it one space at a time, and **every other action is refused while it is set** (a
+ * 409-family error). It always belongs to the active player (only they can hold a lock). `null` when no
+ * lock is active.
+ */
+export interface PendingMoves {
+  /** How many single track-steps are still to be resolved (pg. 8–9). Cleared to `null` when it hits 0. */
+  readonly remaining: number;
+  /**
+   * The colours a step may build — the **constraint**. RR2 is always `['wood']` (the only accessible
+   * colour); the field is a *set* so RR3's colour access (the coin/bottom spaces offer a choice) drops in
+   * without a reshape. A `MOVE_TRACK`'s colour must be one of these.
+   */
+  readonly colors: readonly TrackColor[];
 }
 
 /** One placement on a shared action space (pg. 7, 14): whose it is, and how many workers/coins it used. */
@@ -130,6 +160,11 @@ export type RussianRailroadsState = {
   readonly turnOrder: readonly number[];
   /** Whose turn it is — a seat index into `players` (always a member of `turnOrder`). */
   readonly activePlayerIndex: number;
+  /**
+   * The active player's pending track-extension lock (pg. 8–9), or `null`. While set, `applyAction`
+   * refuses everything but `MOVE_TRACK` — the single-step resolution of a track-extension action.
+   */
+  readonly pendingMoves: PendingMoves | null;
   /** The current round (1-based). */
   readonly round: number;
   /** Total rounds this game (pg. 7, 22–23): 7 at 4 players, 6 at 2–3. */
@@ -140,12 +175,13 @@ export type RussianRailroadsState = {
 } & GameEndState<RussianRailroadsResult>;
 
 /**
- * One player's end-of-game result. RR1 ships a **stub**: the game ends at the round count with every
- * player scored 0 (a shared victory), because real per-round scoring (RR2) and final scoring (RR8) don't
- * exist yet. The shape carries `total` so RR2/RR8 fill it in without a state migration.
+ * One player's end-of-game result. RR2 fills `total` with the player's **cumulative per-round score**
+ * (pg. 20–21) — the real route + industry points summed over every round, so the winner is genuine (highest
+ * total; ties share). **Final** scoring (the end-bonus card + engineer majority, pg. 22) is added in RR8,
+ * which extends this same field without a state migration.
  */
 export interface RussianRailroadsResult {
   readonly playerId: string;
-  /** Final score. RR1 stub: 0 for everyone. */
+  /** Final score — the cumulative per-round total (RR2); RR8 adds the end-of-game bonuses. */
   readonly total: number;
 }

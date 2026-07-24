@@ -3,3 +3,5 @@ export * from './players';
 export * from './record';
 export * from './setup';
 export * from './round';
+export * from './track';
+export * from './scoring';

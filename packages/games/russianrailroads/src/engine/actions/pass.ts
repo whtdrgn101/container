@@ -16,10 +16,12 @@ export function pass(state: RussianRailroadsState, playerId: string): RussianRai
   const passedState: RussianRailroadsState = { ...state, players: passedRoster };
 
   if (allPassed(passedState)) {
-    const changes = closeRound(passedState);
+    const { changes, scores } = closeRound(passedState);
     const ended = changes.status === 'ended';
     return record(state, 'PASS', playerId, changes, {
       closedRound: state.round,
+      // The round's scoring is public (pg. 20–21 is open information) — the feed narrates it from here.
+      scores,
       ...(ended ? { gameEnded: true } : { nextRound: state.round + 1 }),
     });
   }

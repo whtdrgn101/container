@@ -1,18 +1,19 @@
 import type { ErrorResponse, GameModule, GameSummary, ParseResult, Viewer } from '@game-hub/kernel';
 import { applyAction, createGame, GameError, legalActions, MAX_PLAYERS, MIN_PLAYERS, viewFor } from '../engine';
-import type { Action, RussianRailroadsState } from '../engine';
+import type { Action, RouteId, RussianRailroadsState, TrackColor } from '../engine';
 
 /**
- * Validate opaque JSON into a typed Russian Railroads `Action` (RR1: `PLACE` / `PASS`). The core route
- * accepts arbitrary JSON and delegates *all* action validation here. There are **no server-only actions**
- * in RR1 (no dice, no shuffles mid-game — base-game randomness is setup-only), so every action a client
- * may send is validated here.
+ * Validate opaque JSON into a typed Russian Railroads `Action` (RR2: `PLACE` / `MOVE_TRACK` / `PASS`). The
+ * core route accepts arbitrary JSON and delegates *all* action validation here. There are **no server-only
+ * actions** in RR2 (no dice, no shuffles mid-game — base-game randomness is setup-only), so every action a
+ * client may send is validated here. The engine does the domain validation (route/colour legality, the
+ * pending lock); this only shapes the JSON.
  */
 function parseAction(raw: unknown): ParseResult<Action> {
   if (typeof raw !== 'object' || raw === null) {
     return { ok: false, message: 'action must be an object' };
   }
-  const action = raw as { type?: unknown; space?: unknown; coins?: unknown };
+  const action = raw as { type?: unknown; space?: unknown; coins?: unknown; route?: unknown; color?: unknown };
 
   if (action.type === 'PASS') {
     return { ok: true, action: { type: 'PASS' } };
@@ -31,6 +32,26 @@ function parseAction(raw: unknown): ParseResult<Action> {
     return {
       ok: true,
       action: { type: 'PLACE', space: action.space, ...(action.coins !== undefined ? { coins: action.coins } : {}) },
+    };
+  }
+
+  if (action.type === 'MOVE_TRACK') {
+    if (typeof action.route !== 'string') {
+      return { ok: false, message: 'MOVE_TRACK.route must be a string' };
+    }
+    if (action.color !== undefined && typeof action.color !== 'string') {
+      return { ok: false, message: 'MOVE_TRACK.color must be a string when present' };
+    }
+    // Cast at the JSON boundary: the engine (`moveTrack`) validates the route id and colour against the
+    // player's board and the current lock, so an unknown value becomes a typed `UNKNOWN_ROUTE` /
+    // `INVALID_TRACK_COLOR` rather than a parse failure.
+    return {
+      ok: true,
+      action: {
+        type: 'MOVE_TRACK',
+        route: action.route as RouteId,
+        ...(action.color !== undefined ? { color: action.color as TrackColor } : {}),
+      },
     };
   }
 
@@ -57,10 +78,12 @@ function mapError(error: unknown): ErrorResponse | null {
  * the first game hosted from its own in-workspace **package** (`@game-hub/game-russianrailroads`) rather
  * than a folder in the backend. It coexists with Container, Can't Stop, Stone Age and Saint Petersburg.
  *
- * RR1 is the worker-placement spine (`PLACE`/`PASS` over `/actions`). **No `routes`, `pendingStep`,
- * side-channels, per-turn rng or bots** — base-game randomness is setup-only, every rule is an engine
- * rule, and the AI seats land RR10. `schemaVersion` is undeclared (v1). The host-parameter hooks
- * (`routes`/`onStateChanged`/`createBotDriver`) are simply omitted — proof, again, that they are optional.
+ * RR2 adds track extension: `PLACE`/`MOVE_TRACK`/`PASS` over `/actions`, plus per-round scoring. **No
+ * `routes`, `pendingStep`, side-channels, per-turn rng or bots** — the track-extension lock is an *engine*
+ * lock (`state.pendingMoves`), resolved by ordinary `MOVE_TRACK` actions the engine gates, **not** a
+ * backend `pendingStep` (that hook is for a *flow the module owns*, like Container's auction). Base-game
+ * randomness is setup-only and the AI seats land RR10. `schemaVersion` is undeclared (v1). The
+ * host-parameter hooks are simply omitted — proof, again, that they are optional.
  */
 const russianRailroadsModule: GameModule<RussianRailroadsState, Action> = {
   id: 'russianrailroads',

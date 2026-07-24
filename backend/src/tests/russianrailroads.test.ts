@@ -86,6 +86,73 @@ describe('Russian Railroads (Track D package)', () => {
     expect(players.every((p) => p.endBonus === null)).toBe(true);
   });
 
+  it('resolves a track-extension lock one MOVE_TRACK at a time over /actions', async () => {
+    const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    const first = await activeOf(game.id);
+    // Place on the 2-worker wood space → a 3-move lock; the placer keeps the turn.
+    const placed = await app.inject({
+      method: 'POST',
+      url: `/games/${game.id}/actions`,
+      payload: { playerId: first, action: { type: 'PLACE', space: 'track-wood-2' } },
+    });
+    expect(placed.statusCode).toBe(200);
+    const afterPlace = placed.json().game as { pendingMoves: { remaining: number } | null; activePlayerId?: string };
+    expect(afterPlace.pendingMoves).toEqual({ remaining: 3, colors: ['wood'] });
+    // Everything but MOVE_TRACK is refused while the lock is set.
+    const refused = await app.inject({
+      method: 'POST',
+      url: `/games/${game.id}/actions`,
+      payload: { playerId: first, action: { type: 'PASS' } },
+    });
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json().error.code).toBe('MOVES_PENDING');
+    // Two of the three moves on two different routes.
+    for (const route of ['transsiberian', 'kyiv']) {
+      const step = await app.inject({
+        method: 'POST',
+        url: `/games/${game.id}/actions`,
+        payload: { playerId: first, action: { type: 'MOVE_TRACK', route } },
+      });
+      expect(step.statusCode).toBe(200);
+    }
+    // Third move completes the lock and passes the turn to Bob.
+    const last = await app.inject({
+      method: 'POST',
+      url: `/games/${game.id}/actions`,
+      payload: { playerId: first, action: { type: 'MOVE_TRACK', route: 'stpetersburg' } },
+    });
+    const done = last.json().game as {
+      pendingMoves: unknown;
+      players: { id: string; routes: { id: string; spaces: (string | null)[] }[] }[];
+    };
+    expect(done.pendingMoves).toBeNull();
+    const ts = done.players.find((p) => p.id === first)!.routes.find((r) => r.id === 'transsiberian')!;
+    expect(ts.spaces[1]).toBe('wood'); // the wood track advanced to space 2
+    expect(await activeOf(game.id)).not.toBe(first);
+  });
+
+  it('runs the scoring phase at round close and carries the per-player total on the wire', async () => {
+    const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    // Both players pass to close round 1; wood-only, so everyone scores 0, but the phase runs.
+    for (let i = 0; i < 2; i += 1) {
+      const who = await activeOf(game.id);
+      await app.inject({
+        method: 'POST',
+        url: `/games/${game.id}/actions`,
+        payload: { playerId: who, action: { type: 'PASS' } },
+      });
+    }
+    const view = (await app.inject({ method: 'GET', url: `/games/${game.id}?viewer=p1` })).json().game as {
+      round: number;
+      players: { id: string; score: number }[];
+      log: { type: string; payload?: { closedRound?: number; scores?: unknown[] } }[];
+    };
+    expect(view.round).toBe(2);
+    expect(view.players.every((p) => p.score === 0)).toBe(true);
+    const close = view.log.find((e) => e.type === 'PASS' && e.payload?.closedRound === 1);
+    expect(close?.payload?.scores).toHaveLength(2);
+  });
+
   it("maps a wrong-turn move to 409, and reports the module's error code", async () => {
     const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
     const active = await activeOf(game.id);

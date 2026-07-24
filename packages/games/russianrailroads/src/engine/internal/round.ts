@@ -1,4 +1,6 @@
 import type { Engineer, RussianRailroadsPlayer, RussianRailroadsResult, RussianRailroadsState } from '../core';
+import { scorePlayer } from './scoring';
+import type { RoundScore } from './scoring';
 
 /**
  * The next seat to act after the current one (pg. 7): the next seat in `turnOrder` (wrapping) whose
@@ -42,40 +44,53 @@ function resetPlayers(players: readonly RussianRailroadsPlayer[]): RussianRailro
   return players.map((p) => ({ ...p, workersAvailable: p.workersTotal, passed: false }));
 }
 
+/** What `closeRound` hands back: the state changes to fold into one `record()`, plus the scoring breakdown. */
+export interface RoundClose {
+  readonly changes: Partial<RussianRailroadsState>;
+  /** Per-player points scored this round (pg. 20–21), for the closing move's log payload. */
+  readonly scores: readonly RoundScore[];
+}
+
 /**
- * Close the round once every seat has passed (pg. 7, 21–22) and return the state changes for the closing
- * `pass` to fold into one `record()`:
+ * Close the round once every seat has passed (pg. 7, 20–22): run the **scoring phase**, then clean up,
+ * then advance or end. Returns the changes for the closing `pass` to fold into one `record()`, plus the
+ * per-player scoring breakdown for the log.
  *
- *  - **Scoring** (per-round route/industry scoring, pg. 20–21) is a **stub** until RR2 — no points move.
- *  - **Cleanup** (pg. 21): return workers to supplies, clear pass flags and action-space occupancy, slide
- *    the engineer strip right.
- *  - **Advance or end**: if this wasn't the last round, increment the round and re-open placement with the
- *    round's turn-order starting seat (RR1 keeps the dealt order — the full turn-order track is RR6). If it
- *    **was** the last round (pg. 22), the game ends into a **stub** equal-scores result (every player 0, a
- *    shared victory) — real final scoring lands RR8.
+ *  - **Scoring** (pg. 20–21): each player scores their three routes (loco-reach-gated, valuation-tile per
+ *    space incl. empty spaces behind a track) + industry (an RR5 stub, 0), added to their cumulative
+ *    `score`.
+ *  - **Cleanup** (pg. 21): return workers to supplies, clear pass flags and action-space occupancy, clear
+ *    any lock, slide the engineer strip right.
+ *  - **Advance or end**: if this wasn't the last round, increment it and re-open placement with the round's
+ *    turn-order starting seat (RR1 keeps the dealt order — the full turn-order track is RR6). If it **was**
+ *    the last round (pg. 22), the game ends and `results` carry the cumulative totals; `winnerIds` are the
+ *    highest scorers (ties share). **Final** scoring — end-bonus + engineer majority — lands RR8.
  */
-export function closeRound(state: RussianRailroadsState): Partial<RussianRailroadsState> {
-  const players = resetPlayers(state.players);
+export function closeRound(state: RussianRailroadsState): RoundClose {
+  const scores = state.players.map(scorePlayer);
+  const scored = state.players.map((p, i) => ({ ...p, score: p.score + scores[i]!.gained }));
+  const players = resetPlayers(scored);
   const engineerStrip = slideEngineerStrip(state.engineerStrip);
 
   if (state.round >= state.rounds) {
-    // Stub end (RR1): equal scores, shared victory. Real per-round + final scoring land RR2/RR8.
-    const results: RussianRailroadsResult[] = players.map((p) => ({ playerId: p.id, total: 0 }));
+    const results: RussianRailroadsResult[] = players.map((p) => ({ playerId: p.id, total: p.score }));
+    const top = Math.max(...players.map((p) => p.score));
+    const winnerIds = players.filter((p) => p.score === top).map((p) => p.id);
     return {
-      players,
-      actionSpaces: {},
-      engineerStrip,
-      status: 'ended',
-      results,
-      winnerIds: players.map((p) => p.id),
+      changes: { players, actionSpaces: {}, engineerStrip, pendingMoves: null, status: 'ended', results, winnerIds },
+      scores,
     };
   }
 
   return {
-    players,
-    actionSpaces: {},
-    engineerStrip,
-    round: state.round + 1,
-    activePlayerIndex: state.turnOrder[0]!,
+    changes: {
+      players,
+      actionSpaces: {},
+      engineerStrip,
+      pendingMoves: null,
+      round: state.round + 1,
+      activePlayerIndex: state.turnOrder[0]!,
+    },
+    scores,
   };
 }

@@ -16,7 +16,19 @@ export type RussianRailroadsErrorCode =
   | 'SPACE_OCCUPIED'
   // A PLACE the seat can't pay for: not enough workers, not enough coins to substitute, or more coins
   // than the space requires (pg. 7, 14).
-  | 'INSUFFICIENT_WORKERS';
+  | 'INSUFFICIENT_WORKERS'
+  // A non-MOVE_TRACK action attempted while a track-extension lock is set (pg. 8–9): you must finish
+  // resolving your track moves first.
+  | 'MOVES_PENDING'
+  // A MOVE_TRACK with no pending lock — nothing to resolve.
+  | 'NO_PENDING_MOVES'
+  // A MOVE_TRACK naming a route that isn't one of the player's three (pg. 8).
+  | 'UNKNOWN_ROUTE'
+  // A MOVE_TRACK whose colour isn't allowed by the lock's constraint (pg. 9 build order / colour access).
+  | 'INVALID_TRACK_COLOR'
+  // A MOVE_TRACK that can't be made: no such colour track on the route, the space ahead is occupied
+  // (no leapfrog), or the track is at the route's end (pg. 9).
+  | 'ILLEGAL_TRACK_MOVE';
 
 /**
  * Thrown when a Russian Railroads action is illegal. Subclasses the shared kernel `GameError` and pins

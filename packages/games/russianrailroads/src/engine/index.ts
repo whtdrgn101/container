@@ -13,6 +13,7 @@ export type {
   Industry,
   Locomotive,
   MoveRecord,
+  PendingMoves,
   Route,
   RouteDef,
   RouteId,
@@ -22,6 +23,7 @@ export type {
   RussianRailroadsSupplies,
   SpacePlacement,
   TrackColor,
+  TrackExtension,
 } from './core';
 
 // Errors
@@ -42,7 +44,13 @@ export {
   STARTING_COINS,
   STARTING_LOCOMOTIVE,
   STARTING_WORKERS,
+  TRACK_COLORS,
+  VALUATION,
 } from './core';
+
+// Track-extension helpers the client shares (which routes a lock can advance) — DRY with the engine.
+export { legalSteps } from './internal';
+export type { TrackStep } from './internal';
 
 // Setup
 export { createGame } from './createGame';
@@ -53,4 +61,4 @@ export { viewFor } from './view';
 export type { PlayerView, RussianRailroadsView, Viewer } from './view';
 
 // Mechanics + turn-aware entry point.
-export { applyAction, legalActions, pass, place } from './actions';
+export { applyAction, legalActions, moveTrack, pass, place } from './actions';

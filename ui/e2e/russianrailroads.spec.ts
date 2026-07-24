@@ -5,10 +5,11 @@ import { expect, test } from '@playwright/test';
  * pilot: a game whose board ships from its own in-workspace **package** (`@game-hub/game-russianrailroads`)
  * plugs into the same hub, picked from the landing screen's game picker.
  *
- * RR1 is the worker-placement spine, so this drives it: pick the game, place a worker on the take-2-coins
- * space (the seat gains coins), then pass — and the activity feed narrates both.
+ * RR2 adds track extension, so this drives the whole slice: pick the game, take coins, then place on a
+ * track-extension space (which sets a pending lock), resolve two single steps by clicking routes, and pass
+ * everyone out so the round scores — with the activity feed narrating each and the score visible per player.
  */
-test('pick Russian Railroads and play the worker-placement spine: place, pass', async ({ page }) => {
+test('pick Russian Railroads and play track extension: place, lock, two clicks, score', async ({ page }) => {
   await page.goto('/');
 
   // Five games are hosted, so the picker is shown. Choose Russian Railroads, then start a hotseat game.
@@ -19,18 +20,39 @@ test('pick Russian Railroads and play the worker-placement spine: place, pass', 
   await expect(page.getByTestId('board')).toBeVisible();
   await expect(page.getByTestId('turn-info')).toContainText('Round 1');
 
-  // Both action spaces render; the take-2-coins space starts empty.
+  // The action spaces render; the take-2-coins and track spaces are present.
   await expect(page.getByTestId('rr-space-coins')).toContainText('Take 2 coins');
+  await expect(page.getByTestId('rr-space-track-wood-2')).toBeVisible();
   await expect(page.getByTestId('rr-space-track-bottom')).toBeVisible();
   await expect(page.getByTestId('rr-space-coins')).toContainText('Empty');
 
-  // The active seat places a worker on the coins space and gains 2 coins.
+  // The active seat takes coins, gaining 2 (feed narrates it), then the next seat is on the clock.
   await page.getByTestId('rr-place-coins').click();
   await expect(page.getByTestId('rr-occupied-coins')).toBeVisible();
-  await expect(page.getByTestId('rr-log')).toContainText('placed a worker');
   await expect(page.getByTestId('rr-log')).toContainText('+2 coins');
 
-  // The next seat is now on the clock; it passes.
-  await page.getByTestId('rr-pass').click();
-  await expect(page.getByTestId('rr-log')).toContainText('passed');
+  // The next seat places on the 2-worker wood space → a 3-move pending lock appears and the route rows
+  // become clickable. Resolve two of the three moves.
+  await page.getByTestId('rr-place-track-wood-2').click();
+  await expect(page.getByTestId('rr-pending')).toContainText('track move');
+  await page.getByTestId('rr-build-transsiberian').click();
+  await expect(page.getByTestId('rr-log')).toContainText('built wood track on transsiberian');
+  await page.getByTestId('rr-build-kyiv').click();
+  await page.getByTestId('rr-build-stpetersburg').click();
+  // The lock is spent; the pending prompt is gone and the turn moves on.
+  await expect(page.getByTestId('rr-pending')).toBeHidden();
+
+  // Pass everyone out to close round 1 → the scoring phase runs and the feed narrates it. Count-agnostic:
+  // keep passing the active seat until the round rolls over (the hotseat default seat count can vary).
+  await expect(async () => {
+    const info = await page.getByTestId('turn-info').textContent();
+    if (!info?.includes('Round 2')) {
+      await page.getByTestId('rr-pass').click();
+      throw new Error('round not closed yet');
+    }
+  }).toPass({ timeout: 15000 });
+  await expect(page.getByTestId('rr-log')).toContainText('scored');
+  await expect(page.getByTestId('turn-info')).toContainText('Round 2');
+  // Score is visible on every player card.
+  await expect(page.getByTestId('rr-score-p1')).toContainText('Score:');
 });
