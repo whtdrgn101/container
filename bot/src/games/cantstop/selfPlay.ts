@@ -2,6 +2,7 @@ import { DICE_COUNT, DIE_FACES, applyAction, viewFor } from '@game-hub/engine/ca
 import type { CantStopState } from '@game-hub/engine/cantstop';
 import { makeProgressGuard } from '../../kernel';
 import { decide } from './decide';
+import type { DecideFn } from './types';
 
 export interface SelfPlayOptions {
   /**
@@ -11,6 +12,11 @@ export interface SelfPlayOptions {
   readonly rng: () => number;
   /** Abandon the game after this many turns. Guards against a policy that never stops. */
   readonly maxTurns?: number;
+  /**
+   * Per-seat policy override (seat id → decide function); seats not in the map use the live `decide`.
+   * This is how the strength benchmark pits a candidate policy against a frozen baseline.
+   */
+  readonly policies?: ReadonlyMap<string, DecideFn>;
 }
 
 export interface SelfPlayResult {
@@ -35,7 +41,7 @@ const MAX_ACTIONS_PER_TURN = 500;
  * injection point the backend runner fills with `ctx.rng`.
  */
 export function playSelfPlay(initial: CantStopState, options: SelfPlayOptions): SelfPlayResult {
-  const { rng, maxTurns = DEFAULT_MAX_TURNS } = options;
+  const { rng, maxTurns = DEFAULT_MAX_TURNS, policies } = options;
   const rollDice = (): [number, number, number, number] => {
     const die = () => Math.floor(rng() * DIE_FACES) + 1;
     return Array.from({ length: DICE_COUNT }, die) as [number, number, number, number];
@@ -47,7 +53,8 @@ export function playSelfPlay(initial: CantStopState, options: SelfPlayOptions): 
 
   while (state.status === 'active' && state.turn < maxTurns) {
     const active = state.players[state.activePlayerIndex]!;
-    const action = decide(viewFor(state, active.id), active.id, { rollDice });
+    const decideFn = policies?.get(active.id) ?? decide;
+    const action = decideFn(viewFor(state, active.id), active.id, { rollDice });
     state = applyAction(state, active.id, action);
     actions += 1;
     guard.record(state.turn, active.id);

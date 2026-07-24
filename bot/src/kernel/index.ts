@@ -3,3 +3,10 @@
 export { BotError } from './errors';
 export { assertBotTurn, type SeatedView } from './turn';
 export { makeProgressGuard, type ProgressGuard, type ProgressGuardOptions } from './progress';
+export {
+  runBenchmark,
+  wilsonInterval,
+  mulberry32,
+  type BenchmarkOptions,
+  type BenchmarkResult,
+} from './benchmark';

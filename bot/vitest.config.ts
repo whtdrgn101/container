@@ -14,6 +14,7 @@ export default defineConfig({
         'src/**/tests/**', // test files + shared helpers (per-game tests/ folders)
         'src/**/index.ts', // public + folder barrels (kernel, each game, policies)
         'src/games/*/types.ts', // compile-time only (each game's options/context interfaces)
+        'src/bench.ts', // the standalone bench CLI driver (console I/O; run via `pnpm bench`, never by vitest)
       ],
       // Deliberately 90%, not the engine's 100%. The engine encodes rules — every branch is a rule
       // and deserves a test. The bot encodes *opinions*: heuristic weights get retuned constantly

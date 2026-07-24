@@ -11,7 +11,9 @@
 export { decide } from './decide';
 export { contextFor } from './context';
 export { bidFor, chooseTiedWinner, runoffBidFor, wantsBuyout } from './bid';
-export { playSelfPlay } from './selfPlay';
+export { playSelfPlay, defaultPolicy } from './selfPlay';
+export { benchmark } from './bench';
+export type { StrengthBenchOptions } from './bench';
 export { BotError } from './errors';
 export {
   AVERAGE_COLOR_VALUE,
@@ -25,5 +27,15 @@ export {
   selfOf,
 } from './valuation';
 
-export type { BidCollector, Candidate, Ctx, DecideOptions, RunoffCollector } from './types';
+export type {
+  BidCollector,
+  BidFn,
+  Candidate,
+  Ctx,
+  DecideFn,
+  DecideOptions,
+  RunoffBidFn,
+  RunoffCollector,
+  SeatPolicy,
+} from './types';
 export type { SelfPlayOptions, SelfPlayResult } from './selfPlay';

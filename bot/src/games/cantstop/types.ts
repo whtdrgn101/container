@@ -1,3 +1,5 @@
+import type { Action, CantStopView } from '@game-hub/engine/cantstop';
+
 /**
  * Options for a Can't Stop decision.
  *
@@ -15,3 +17,9 @@ export interface PairingCandidate {
   readonly columns: readonly number[];
   readonly score: number;
 }
+
+/**
+ * The shape of a decision policy — `decide`'s signature. Self-play accepts one per seat so different
+ * policies can play each other (the strength benchmark pits a candidate against a frozen baseline).
+ */
+export type DecideFn = (view: CantStopView, playerId: string, options?: DecideOptions) => Action;

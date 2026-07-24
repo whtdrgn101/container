@@ -8,8 +8,10 @@
  */
 export { decide } from './decide';
 export { playSelfPlay } from './selfPlay';
+export { benchmark } from './bench';
+export type { StrengthBenchOptions } from './bench';
 export { bustProbability, pickPairing, scorePairing, shouldRoll, turnProgress } from './policy';
 export { BotError } from '../../kernel';
 
-export type { DecideOptions, PairingCandidate } from './types';
+export type { DecideFn, DecideOptions, PairingCandidate } from './types';
 export type { SelfPlayOptions, SelfPlayResult } from './selfPlay';

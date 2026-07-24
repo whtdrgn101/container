@@ -1,5 +1,27 @@
 import type { Action, Color, GameView, PlayerState, PlayerView } from '@game-hub/engine/container';
 
+/** `decide`'s signature — the on-turn half of a Container seat's policy. */
+export type DecideFn = (view: GameView, playerId: string, options?: DecideOptions) => Action;
+
+/** `bidFor`'s signature — a seat's sealed opening bid, decided from that seat's own view. */
+export type BidFn = (view: GameView, bidderId: string) => number;
+
+/** `runoffBidFor`'s signature — a seat's extra runoff cash on top of its opening bid. */
+export type RunoffBidFn = (view: GameView, bidderId: string, openingBid: number) => number;
+
+/**
+ * A complete Container seat policy: how it plays on its turn (`decide`) **and** how it bids in someone
+ * else's delivery auction (`bidFor`/`runoffBidFor`). Container is the one game where a seat's opinions
+ * are more than a single `decide` — its sealed bids come from its own view, so a benchmark that pits
+ * two policies must route each seat's bids through *that seat's* policy, not a shared one. Self-play's
+ * `policies` map (and the strength bench) key one of these per seat.
+ */
+export interface SeatPolicy {
+  readonly decide: DecideFn;
+  readonly bidFor: BidFn;
+  readonly runoffBidFor: RunoffBidFn;
+}
+
 /**
  * Resolves every opponent's sealed bid when a bot must run a delivery auction.
  *

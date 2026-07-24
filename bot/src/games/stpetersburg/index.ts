@@ -9,6 +9,8 @@
  */
 export { decide } from './decide';
 export { playSelfPlay } from './selfPlay';
+export { benchmark } from './bench';
+export type { StrengthBenchOptions } from './bench';
 export {
   acquisitionValue,
   aristocratEndDelta,

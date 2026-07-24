@@ -3,10 +3,25 @@ import type { Color, GameState } from '@game-hub/engine/container';
 import { makeProgressGuard } from '../../kernel';
 import { bidFor, runoffBidFor } from './bid';
 import { decide } from './decide';
+import type { SeatPolicy } from './types';
+
+/**
+ * The built-in policy — the live `decide` plus its live bid functions. This is the baseline the
+ * strength benchmark freezes against: to tune, copy the policy files, build a `SeatPolicy` from the
+ * frozen copies, and bench the live one against it.
+ */
+export const defaultPolicy: SeatPolicy = { decide, bidFor, runoffBidFor };
 
 export interface SelfPlayOptions {
   /** Abandon the game after this many turns. Guards against a policy that never ends the game. */
   readonly maxTurns?: number;
+  /**
+   * Per-seat policy override (seat id → policy); seats not in the map use the built-in `defaultPolicy`.
+   * A Container policy is a *bundle* (decide + bids), not a bare `decide`, because a seat's sealed bids
+   * are decided from that seat's own view — so pitting two policies must route each seat's bids through
+   * its own. This is how the strength benchmark seats a candidate against a frozen baseline.
+   */
+  readonly policies?: ReadonlyMap<string, SeatPolicy>;
 }
 
 export interface SelfPlayResult {
@@ -37,6 +52,7 @@ const MAX_ACTIONS_PER_TURN = 40;
  */
 export function playSelfPlay(initial: GameState, options: SelfPlayOptions = {}): SelfPlayResult {
   const maxTurns = options.maxTurns ?? DEFAULT_MAX_TURNS;
+  const policyOf = (id: string): SeatPolicy => options.policies?.get(id) ?? defaultPolicy;
   let state = initial;
   let actions = 0;
   const guard = makeProgressGuard({ maxPerMarker: MAX_ACTIONS_PER_TURN, marker: 'turn', initial: state.turn });
@@ -44,13 +60,14 @@ export function playSelfPlay(initial: GameState, options: SelfPlayOptions = {}):
   while (state.status === 'active' && state.turn < maxTurns) {
     const active = state.players[state.activePlayerIndex]!;
 
-    // Every opponent bids from their own view — nobody sees another's card, exactly as at a table.
+    // Every opponent bids from their own view *and its own policy* — nobody sees another's card, and
+    // each seat's sealed bid is decided by that seat's own bid function, exactly as at a table.
     let opening: Record<string, number> = {};
     const collectBids = (_cargo: readonly Color[]): Record<string, number> => {
       const bids: Record<string, number> = {};
       for (const opponent of state.players) {
         if (opponent.id !== active.id) {
-          bids[opponent.id] = bidFor(viewFor(state, opponent.id), opponent.id);
+          bids[opponent.id] = policyOf(opponent.id).bidFor(viewFor(state, opponent.id), opponent.id);
         }
       }
       opening = bids;
@@ -58,16 +75,16 @@ export function playSelfPlay(initial: GameState, options: SelfPlayOptions = {}):
     };
 
     // On a tie the tied players add cash on top of what they already bid (pg. 16) — again each from
-    // their own view, so nobody's runoff bid is informed by anything they shouldn't know.
+    // their own view and their own policy, so nobody's runoff bid is informed by anything they shouldn't know.
     const collectRunoffBids = (_cargo: readonly Color[], tied: readonly string[]): Record<string, number> => {
       const extra: Record<string, number> = {};
       for (const id of tied) {
-        extra[id] = runoffBidFor(viewFor(state, id), id, opening[id] ?? 0);
+        extra[id] = policyOf(id).runoffBidFor(viewFor(state, id), id, opening[id] ?? 0);
       }
       return extra;
     };
 
-    const action = decide(viewFor(state, active.id), active.id, { collectBids, collectRunoffBids });
+    const action = policyOf(active.id).decide(viewFor(state, active.id), active.id, { collectBids, collectRunoffBids });
     state = applyAction(state, active.id, action);
     actions += 1;
     guard.record(state.turn, active.id);
