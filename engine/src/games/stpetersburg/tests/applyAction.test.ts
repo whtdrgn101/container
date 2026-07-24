@@ -25,7 +25,11 @@ describe('applyAction (dispatcher — SP1–SP3)', () => {
     expect(added.players[0]!.hand).toHaveLength(1); // took the upper-row card into hand
     expect(added.board.upper).toHaveLength(3);
 
-    const withHand = makeState({ players: newGame().players.map((p, i) => (i === 0 ? { ...p, hand: [card({ key: 'market', kind: 'building', name: 'Market', cost: 5 })] } : p)) });
+    const withHand = makeState({
+      players: newGame().players.map((p, i) =>
+        i === 0 ? { ...p, hand: [card({ key: 'market', kind: 'building', name: 'Market', cost: 5 })] } : p,
+      ),
+    });
     const played = applyAction(withHand, 'p1', playHand0);
     expect(played.players[0]!.playArea.building).toHaveLength(1);
     expect(played.players[0]!.hand).toHaveLength(0);

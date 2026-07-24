@@ -36,7 +36,11 @@ export function ResultsPanel({ game, resetToLanding }: ResultsPanelProps) {
               .map((r) => {
                 const isWinner = game.winnerIds.includes(r.playerId);
                 return (
-                  <tr key={r.playerId} data-testid={`result-${r.playerId}`} className={cn('border-b', isWinner && 'font-semibold')}>
+                  <tr
+                    key={r.playerId}
+                    data-testid={`result-${r.playerId}`}
+                    className={cn('border-b', isWinner && 'font-semibold')}
+                  >
                     <td className="px-2 py-1">
                       {nameOf(game.players, r.playerId)}
                       {isWinner && ' 👑'}

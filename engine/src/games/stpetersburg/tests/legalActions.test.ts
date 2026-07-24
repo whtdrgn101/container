@@ -46,7 +46,15 @@ describe('legalActions (SP1–SP3)', () => {
   });
 
   it('offers ADD_TO_HAND for a trading card but no BUY when the seat owns nothing to displace (pg. 7)', () => {
-    const tc: Card = card({ id: 'cw', key: 'carpenterWorkshop', kind: 'trading', name: 'Carpenter Workshop', cost: 4, ware: 'lumber', tradingGroup: 'worker' });
+    const tc: Card = card({
+      id: 'cw',
+      key: 'carpenterWorkshop',
+      kind: 'trading',
+      name: 'Carpenter Workshop',
+      cost: 4,
+      ware: 'lumber',
+      tradingGroup: 'worker',
+    });
     const g = makeState({ board: { ...newGame().board, upper: [tc], lower: [] } }); // empty play area → no target
     expect(g.board.upper).toHaveLength(1);
     const actions = legalActions(g);
@@ -55,11 +63,23 @@ describe('legalActions (SP1–SP3)', () => {
   });
 
   it('offers one BUY per legal displacement target for a trading card, with its instance id (SP4, pg. 7)', () => {
-    const cw: Card = card({ id: 'cw', key: 'carpenterWorkshop', kind: 'trading', name: 'Carpenter Workshop', cost: 4, ware: 'lumber', tradingGroup: 'worker' });
+    const cw: Card = card({
+      id: 'cw',
+      key: 'carpenterWorkshop',
+      kind: 'trading',
+      name: 'Carpenter Workshop',
+      cost: 4,
+      ware: 'lumber',
+      tradingGroup: 'worker',
+    });
     // Own two lumberjacks (both ware-lumber, both legal targets) plus a gold miner (ware mismatch — not).
-    const lj = (id: string): Card => card({ id, key: 'lumberjack', kind: 'worker', name: 'Lumberjack', cost: 3, ware: 'lumber' });
+    const lj = (id: string): Card =>
+      card({ id, key: 'lumberjack', kind: 'worker', name: 'Lumberjack', cost: 3, ware: 'lumber' });
     const gm = card({ id: 'gm', key: 'goldMiner', kind: 'worker', name: 'Gold Miner', cost: 4, ware: 'gold' });
-    const g = seat0Board({ worker: [lj('lj-a'), lj('lj-b'), gm], building: [], aristocrat: [] }, { upper: [cw], lower: [] });
+    const g = seat0Board(
+      { worker: [lj('lj-a'), lj('lj-b'), gm], building: [], aristocrat: [] },
+      { upper: [cw], lower: [] },
+    );
     const buys = legalActions(g).filter((a) => a.type === 'BUY');
     expect(buys).toContainEqual({ type: 'BUY', row: 'upper', index: 0, displace: 'lj-a' });
     expect(buys).toContainEqual({ type: 'BUY', row: 'upper', index: 0, displace: 'lj-b' });
@@ -74,7 +94,15 @@ describe('legalActions (SP1–SP3)', () => {
   it('offers PLAY_FROM_HAND for affordable non-trading hand cards, and for a trading card once per target', () => {
     const affordable = card({ id: 'mk', key: 'market', kind: 'building', name: 'Market', cost: 5, points: 1 });
     // A held trading card is playable only when the seat owns a legal displacement target.
-    const tradingHeld = card({ id: 'cw', key: 'carpenterWorkshop', kind: 'trading', name: 'Carpenter Workshop', cost: 4, ware: 'lumber', tradingGroup: 'worker' });
+    const tradingHeld = card({
+      id: 'cw',
+      key: 'carpenterWorkshop',
+      kind: 'trading',
+      name: 'Carpenter Workshop',
+      cost: 4,
+      ware: 'lumber',
+      tradingGroup: 'worker',
+    });
     const noTarget = seat0({ hand: [affordable, tradingHeld] }); // empty play area
     expect(legalActions(noTarget)).toContainEqual({ type: 'PLAY_FROM_HAND', index: 0 }); // the affordable building
     expect(legalActions(noTarget)).not.toContainEqual({ type: 'PLAY_FROM_HAND', index: 1, displace: 'lj' }); // no target owned
@@ -82,7 +110,11 @@ describe('legalActions (SP1–SP3)', () => {
     // Own a matching lumberjack → the held workshop becomes playable, tagged with the target's id.
     const lj = card({ id: 'lj', key: 'lumberjack', kind: 'worker', name: 'Lumberjack', cost: 3, ware: 'lumber' });
     const withTarget = makeState({
-      players: newGame().players.map((p, i) => (i === 0 ? { ...p, hand: [affordable, tradingHeld], playArea: { worker: [lj], building: [], aristocrat: [] } } : p)),
+      players: newGame().players.map((p, i) =>
+        i === 0
+          ? { ...p, hand: [affordable, tradingHeld], playArea: { worker: [lj], building: [], aristocrat: [] } }
+          : p,
+      ),
     });
     expect(legalActions(withTarget)).toContainEqual({ type: 'PLAY_FROM_HAND', index: 1, displace: 'lj' });
 
@@ -102,7 +134,8 @@ describe('legalActions (SP1–SP3)', () => {
   it('in the trading phase with only trading cards and nothing owned: no BUY, but PASS + ADD_TO_HAND', () => {
     // The trading phase's upper row is dealt from the trading stack; with an empty play area there is
     // nothing to displace, so no BUY — but they can be added to hand, so PASS + one ADD_TO_HAND per card.
-    const tc = (i: number): Card => card({ id: `t-${i}`, key: 'x', kind: 'trading', name: 'Trade', cost: 4, ware: 'lumber', tradingGroup: 'worker' });
+    const tc = (i: number): Card =>
+      card({ id: `t-${i}`, key: 'x', kind: 'trading', name: 'Trade', cost: 4, ware: 'lumber', tradingGroup: 'worker' });
     const g = makeState({ phase: 'trading', board: { ...newGame().board, upper: [tc(0), tc(1)], lower: [] } });
     const actions = legalActions(g);
     expect(actions.filter((a) => a.type === 'BUY')).toHaveLength(0);

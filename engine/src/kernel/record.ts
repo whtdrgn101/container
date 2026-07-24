@@ -26,9 +26,7 @@ export function record<S extends VersionedState>(
   payload?: Record<string, unknown>,
 ): S {
   const version = state.version + 1;
-  const entry: MoveRecord = payload
-    ? { seq: version, type, playerId, payload }
-    : { seq: version, type, playerId };
+  const entry: MoveRecord = payload ? { seq: version, type, playerId, payload } : { seq: version, type, playerId };
   // Cast bridges TypeScript's inability to prove a generic spread reconstructs exactly `S`; the runtime
   // shape is `S` with `version`/`log` overwritten, which is precisely the intent.
   return { ...state, ...changes, version, log: [...state.log, entry] } as S;

@@ -176,7 +176,10 @@ export async function applyAction<S = unknown>(
   // Lost the optimistic-concurrency race (a double-click, a stale second device): don't error the
   // user — catch the board up to the current server state, which is what the click would have shown.
   if (response.status === 409) {
-    const body = (await response.clone().json().catch(() => ({}))) as ApiError;
+    const body = (await response
+      .clone()
+      .json()
+      .catch(() => ({}))) as ApiError;
     if (body.error?.code === 'STALE_VERSION') return getGame<S>(gameId, viewer);
   }
   return unwrap<S>(response);

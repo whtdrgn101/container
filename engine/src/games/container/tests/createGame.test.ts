@@ -71,7 +71,8 @@ describe('createGame', () => {
 
   it('rejects an unknown scoring card id', () => {
     expectError(
-      () => createGame({ id: 'g1', players: [{ name: 'Ann', scoringCardId: 'nope' }, { name: 'Bob' }, { name: 'Cid' }] }),
+      () =>
+        createGame({ id: 'g1', players: [{ name: 'Ann', scoringCardId: 'nope' }, { name: 'Bob' }, { name: 'Cid' }] }),
       'INVALID_SELECTION',
     );
   });

@@ -7,7 +7,14 @@ import {
   legalActions,
   PUB_POINT_COST,
 } from '@game-hub/engine/stpetersburg';
-import type { Action, Card, CardKind, PlayerView, StPetersburgState, StPetersburgView } from '@game-hub/engine/stpetersburg';
+import type {
+  Action,
+  Card,
+  CardKind,
+  PlayerView,
+  StPetersburgState,
+  StPetersburgView,
+} from '@game-hub/engine/stpetersburg';
 
 /**
  * The tunable opinions, in one place (SP9 greedy baseline — the "frozen first cut", Stone Age's pattern).
@@ -98,7 +105,11 @@ export interface Ctx {
 
 /** Build the per-turn context from the view. */
 export function makeCtx(view: StPetersburgView): Ctx {
-  return { roundsLeft: estimateRoundsLeft(view), finalRound: view.finalRound, phaseIndex: PHASE_INDEX[view.phase] ?? 0 };
+  return {
+    roundsLeft: estimateRoundsLeft(view),
+    finalRound: view.finalRound,
+    phaseIndex: PHASE_INDEX[view.phase] ?? 0,
+  };
 }
 
 /**
@@ -116,7 +127,9 @@ function scoringEvents(kind: CardKind, ctx: Ctx): number {
 
 /** Find an owned card by instance id across the three play-area groups (a displacement target). */
 function findInPlayArea(player: PlayerView, id: string): Card | undefined {
-  return [...player.playArea.worker, ...player.playArea.building, ...player.playArea.aristocrat].find((c) => c.id === id);
+  return [...player.playArea.worker, ...player.playArea.building, ...player.playArea.aristocrat].find(
+    (c) => c.id === id,
+  );
 }
 
 /** The board score for a count of distinct aristocrats, clamped to the table's domain (pg. 5–6). */
@@ -155,7 +168,13 @@ function reservePenalty(rublesAfter: number, ctx: Ctx): number {
  * a trading upgrade) replaced `displaced`. The recurring income/points stream over the remaining scoring
  * events, plus the distinct-aristocrat end bonus, minus the ruble cost and any reserve shortfall it opens.
  */
-export function acquisitionValue(player: PlayerView, card: Card, displaced: Card | undefined, cost: number, ctx: Ctx): number {
+export function acquisitionValue(
+  player: PlayerView,
+  card: Card,
+  displaced: Card | undefined,
+  cost: number,
+  ctx: Ctx,
+): number {
   const events = scoringEvents(effectiveKind(card), ctx);
   const deltaIncome = card.income - (displaced?.income ?? 0);
   const deltaPoints = card.points - (displaced?.points ?? 0);
@@ -186,14 +205,18 @@ export function evaluate(view: StPetersburgView, player: PlayerView, action: Act
     case 'BUY': {
       const card = view.board[action.row][action.index]!;
       const displaced = action.displace ? findInPlayArea(player, action.displace) : undefined;
-      const cost = card.kind === 'trading' ? displacementCost(player, card, displaced!, action.row) : effectiveCost(player, card, action.row);
+      const cost =
+        card.kind === 'trading'
+          ? displacementCost(player, card, displaced!, action.row)
+          : effectiveCost(player, card, action.row);
       return acquisitionValue(player, card, displaced, cost, ctx);
     }
 
     case 'PLAY_FROM_HAND': {
       const card = player.hand![action.index]!; // own hand — visible on the active seat's own view
       const displaced = action.displace ? findInPlayArea(player, action.displace) : undefined;
-      const cost = card.kind === 'trading' ? displacementCost(player, card, displaced!, undefined) : handCost(player, card);
+      const cost =
+        card.kind === 'trading' ? displacementCost(player, card, displaced!, undefined) : handCost(player, card);
       const shed = ctx.finalRound ? WEIGHTS.handShed : WEIGHTS.handShedIdle;
       return acquisitionValue(player, card, displaced, cost, ctx) + shed;
     }
@@ -219,7 +242,8 @@ export function evaluate(view: StPetersburgView, player: PlayerView, action: Act
       const card = view.pendingDraw!.card;
       if (action.choice === 'hand') return ctx.finalRound ? -1 : WEIGHTS.handHold;
       const displaced = action.displace ? findInPlayArea(player, action.displace) : undefined;
-      const cost = card.kind === 'trading' ? displacementCost(player, card, displaced!, undefined) : handCost(player, card);
+      const cost =
+        card.kind === 'trading' ? displacementCost(player, card, displaced!, undefined) : handCost(player, card);
       return acquisitionValue(player, card, displaced, cost, ctx);
     }
 

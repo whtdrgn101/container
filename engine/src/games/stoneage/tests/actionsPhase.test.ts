@@ -45,11 +45,11 @@ describe('advanceActor', () => {
 
   it('skips a player with nothing to do to reach the next one', () => {
     // 3 players: p1 (active) is done, p2 placed nothing, p3 has the quarry.
-    const state = withPlacements(
-      { quarry: { p3: 2 } },
-      { phase: 'actions', activePlayerIndex: 0 },
-      ['Ann', 'Bob', 'Cara'],
-    );
+    const state = withPlacements({ quarry: { p3: 2 } }, { phase: 'actions', activePlayerIndex: 0 }, [
+      'Ann',
+      'Bob',
+      'Cara',
+    ]);
     expect(advanceActor(state).activePlayerIndex).toBe(2);
   });
 

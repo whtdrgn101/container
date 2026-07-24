@@ -1,6 +1,14 @@
 import { ACTIONS_PER_TURN, GameError, LOAN_AMOUNT, MAX_LOANS } from '../core';
 import type { BankState, Color, GameState, PlayerState } from '../core';
-import { payToBankCash, payToBankContainers, record, resolveBankWins, seatOf, tokenedContainerLots, withPlayer } from '../internal';
+import {
+  payToBankCash,
+  payToBankContainers,
+  record,
+  resolveBankWins,
+  seatOf,
+  tokenedContainerLots,
+  withPlayer,
+} from '../internal';
 import { endGame, exhaustedColorCount } from './gameEnd';
 
 /** Request a $10 loan from the Off-Shore Bank (rulebook pg. 16). A free action — max 2 outstanding. */

@@ -7,11 +7,7 @@ import { createDatabase } from '../db';
 import type { DB } from '../db';
 import { containerModule } from '../games';
 import { GameRepository, StaleVersionError } from '../repository';
-import {
-  isAllowedWsOrigin,
-  WsConnectionLimiter,
-  WS_MAX_CONNECTIONS_PER_IP,
-} from '../security';
+import { isAllowedWsOrigin, WsConnectionLimiter, WS_MAX_CONNECTIONS_PER_IP } from '../security';
 
 // Ops/security batch — REVIEW §4.2 (optimistic concurrency) + §4.7 (transport hardening). Kept out of
 // the 1200-line app.test.ts monolith (which already breaks the repo's own size rule).
@@ -88,11 +84,9 @@ describe('§4.2 optimistic concurrency', () => {
     // `await` is ever added. Force that outcome directly: make the guarded write throw, and assert the
     // handler catches it as STALE_VERSION rather than a 500 — the same contract as the pre-check.
     const game = await createGame();
-    const spy = vi
-      .spyOn(GameRepository.prototype, 'update')
-      .mockImplementationOnce(() => {
-        throw new StaleVersionError(game.id, 0);
-      });
+    const spy = vi.spyOn(GameRepository.prototype, 'update').mockImplementationOnce(() => {
+      throw new StaleVersionError(game.id, 0);
+    });
     const response = await act(game.id, 'p1', { type: 'PRODUCE' });
     expect(response.statusCode).toBe(409);
     expect((response.json() as { error: { code: string } }).error.code).toBe('STALE_VERSION');

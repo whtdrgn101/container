@@ -28,5 +28,4 @@ export type GameEndState<R> =
  * same way; only the `ended` payload differs. Type-only (excluded from the coverage gate).
  */
 export type WinnersEndState =
-  | { readonly status: 'active' }
-  | { readonly status: 'ended'; readonly winnerIds: readonly string[] };
+  { readonly status: 'active' } | { readonly status: 'ended'; readonly winnerIds: readonly string[] };

@@ -50,10 +50,7 @@ export function feed(state: StoneAgeState, playerId: string, payWithResources = 
 }
 
 /** Spend `amount` resources, cheapest kind first (`RESOURCES` is in ascending scoring value). */
-function spendLowestFirst(
-  resources: Readonly<Record<Resource, number>>,
-  amount: number,
-): Record<Resource, number> {
+function spendLowestFirst(resources: Readonly<Record<Resource, number>>, amount: number): Record<Resource, number> {
   const next = { ...resources };
   let remaining = amount;
   for (const resource of RESOURCES) {

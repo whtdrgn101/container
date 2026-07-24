@@ -162,7 +162,12 @@ export function deliver(state: GameState, delivererId: string, resolution: Deliv
     scoringWinnerId = delivererId;
     players = state.players.map((player) =>
       player.id === delivererId
-        ? { ...player, money: player.money - winningBid, scoringArea: [...player.scoringArea, ...cargo], ship: { ...player.ship, cargo: [] } }
+        ? {
+            ...player,
+            money: player.money - winningBid,
+            scoringArea: [...player.scoringArea, ...cargo],
+            ship: { ...player.ship, cargo: [] },
+          }
         : player,
     );
   } else {
@@ -182,9 +187,7 @@ export function deliver(state: GameState, delivererId: string, resolution: Deliv
   }
 
   // A buyout pays the winning bid into the Bank's cash lots (rulebook pg. 16).
-  const bankAfter = buyout
-    ? { ...state.bank, cashLots: payToBankCash(state.bank.cashLots, winningBid) }
-    : state.bank;
+  const bankAfter = buyout ? { ...state.bank, cashLots: payToBankCash(state.bank.cashLots, winningBid) } : state.bank;
 
   const advanced = advanceTurn(state, players, bankAfter);
   return record(state, advanced.players, 'DELIVER', delivererId, advanced.extra, {

@@ -1,0 +1,16 @@
+# Build outputs & deps
+**/dist/**
+**/node_modules/**
+**/coverage/**
+
+# Playwright artifacts + visual-regression baselines (snapshots must not reflow/rename)
+ui/test-results/**
+ui/playwright-report/**
+ui/e2e/**-snapshots/**
+
+# Tooling / generated
+.claude/**
+pnpm-lock.yaml
+
+# Docs are hand-wrapped — reflowing would churn every line and break intended layout
+*.md

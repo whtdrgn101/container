@@ -50,7 +50,7 @@ export function applyAction(state: GameState, playerId: string, action: Action):
   // DELIVER is a free anchor action that ends the turn — it costs no action point.
   if (action.type === 'DELIVER') {
     if (action.bids === undefined) {
-      throw new GameError('INVALID_SELECTION', 'DELIVER requires the opponents\' bids');
+      throw new GameError('INVALID_SELECTION', "DELIVER requires the opponents' bids");
     }
     return deliver(state, playerId, {
       bids: action.bids,
@@ -90,7 +90,14 @@ export function applyAction(state: GameState, playerId: string, action: Action):
       case 'SAIL':
         return sail(state, playerId, action.to);
       case 'CALL_BANK':
-        return callBank(state, playerId, action.lotIndex, action.lotKind ?? 'container', action.bid, action.containerBid);
+        return callBank(
+          state,
+          playerId,
+          action.lotIndex,
+          action.lotKind ?? 'container',
+          action.bid,
+          action.containerBid,
+        );
       case 'FACTORY_PURCHASE':
         if (action.bought === undefined) {
           throw new GameError('INVALID_SELECTION', 'FACTORY_PURCHASE requires the containers to buy');

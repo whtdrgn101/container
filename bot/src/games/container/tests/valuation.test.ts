@@ -91,7 +91,9 @@ describe('expectedAuctionBid', () => {
 
   it('never expects more than an opponent can actually pay', () => {
     // Cash is public too, so a broke table cannot bid however much it likes.
-    expect(expectedAuctionBid(table({ money: 1, scoringArea: ['red', 'blue'] }), ['white', 'green'])).toBeLessThanOrEqual(1);
+    expect(
+      expectedAuctionBid(table({ money: 1, scoringArea: ['red', 'blue'] }), ['white', 'green']),
+    ).toBeLessThanOrEqual(1);
   });
 
   it('excludes cards the bot holds itself', () => {

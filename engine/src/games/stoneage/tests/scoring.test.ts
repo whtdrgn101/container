@@ -54,7 +54,10 @@ describe('finalScoring', () => {
     const state = makeState();
     const players = [p({ id: 'p1', name: 'A', score: 20 }), p({ id: 'p2', name: 'B', score: 5 })];
     const { results, winnerIds } = finalScoring({ ...state, players });
-    expect(results.map((r) => [r.playerId, r.total])).toEqual([['p1', 20], ['p2', 5]]);
+    expect(results.map((r) => [r.playerId, r.total])).toEqual([
+      ['p1', 20],
+      ['p2', 5],
+    ]);
     expect(winnerIds).toEqual(['p1']);
   });
 

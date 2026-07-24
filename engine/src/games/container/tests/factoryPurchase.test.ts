@@ -38,15 +38,24 @@ describe('factoryPurchase', () => {
   });
 
   it('rejects buying from yourself', () => {
-    expectError(() => factoryPurchase(three(makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' })), 'p1', 'p1', [sc('white', 2)]), 'NOT_AN_OPPONENT');
+    expectError(
+      () => factoryPurchase(three(makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' })), 'p1', 'p1', [sc('white', 2)]),
+      'NOT_AN_OPPONENT',
+    );
   });
 
   it('rejects an unknown buyer', () => {
-    expectError(() => factoryPurchase(three(makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' })), 'ghost', 'p2', [sc('white', 2)]), 'PLAYER_NOT_FOUND');
+    expectError(
+      () => factoryPurchase(three(makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' })), 'ghost', 'p2', [sc('white', 2)]),
+      'PLAYER_NOT_FOUND',
+    );
   });
 
   it('rejects an unknown seller', () => {
-    expectError(() => factoryPurchase(three(makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' })), 'p1', 'ghost', [sc('white', 2)]), 'PLAYER_NOT_FOUND');
+    expectError(
+      () => factoryPurchase(three(makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' })), 'p1', 'ghost', [sc('white', 2)]),
+      'PLAYER_NOT_FOUND',
+    );
   });
 
   it('rejects buying nothing', () => {
@@ -56,7 +65,10 @@ describe('factoryPurchase', () => {
 
   it('rejects buying containers the seller does not have', () => {
     const seller = makePlayer({ id: 'p2', factoryStore: [sc('red', 3)] });
-    expectError(() => factoryPurchase(three(makePlayer({ id: 'p1' }), seller), 'p1', 'p2', [sc('red', 5)]), 'INVALID_SELECTION');
+    expectError(
+      () => factoryPurchase(three(makePlayer({ id: 'p1' }), seller), 'p1', 'p2', [sc('red', 5)]),
+      'INVALID_SELECTION',
+    );
   });
 
   it('rejects exceeding the harbor storage limit', () => {

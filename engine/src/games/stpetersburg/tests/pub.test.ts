@@ -4,8 +4,10 @@ import type { Card, PlayArea, StPetersburgPlayer, StPetersburgState } from '../c
 import { card, expectError, makeState, newGame } from './helpers';
 
 const area = (over: Partial<PlayArea> = {}): PlayArea => ({ worker: [], building: [], aristocrat: [], ...over });
-const pub = (id = 'pub-1'): Card => card({ id, key: 'pub', kind: 'building', name: 'Pub', cost: 1, income: 0, points: 0, special: 'pub' });
-const market = (id: string): Card => card({ id, key: 'market', kind: 'building', name: 'Market', cost: 5, income: 0, points: 1 });
+const pub = (id = 'pub-1'): Card =>
+  card({ id, key: 'pub', kind: 'building', name: 'Pub', cost: 1, income: 0, points: 0, special: 'pub' });
+const market = (id: string): Card =>
+  card({ id, key: 'market', kind: 'building', name: 'Market', cost: 5, income: 0, points: 1 });
 
 /** Seat 0 owns the given play area on a fresh 2-player game. */
 function withSeat0(playArea: PlayArea, over: Partial<StPetersburgPlayer> = {}): StPetersburgPlayer[] {
@@ -15,7 +17,14 @@ function withSeat0(playArea: PlayArea, over: Partial<StPetersburgPlayer> = {}): 
 
 /** A building phase one pass from closing (seat 1 about to cast the closing pass). */
 function buildingAboutToClose(players: StPetersburgPlayer[], over: Partial<StPetersburgState> = {}): StPetersburgState {
-  return makeState({ players, phase: 'building', consecutivePasses: 1, activePlayerIndex: 1, tookCardThisPhase: true, ...over });
+  return makeState({
+    players,
+    phase: 'building',
+    consecutivePasses: 1,
+    activePlayerIndex: 1,
+    tookCardThisPhase: true,
+    ...over,
+  });
 }
 
 describe('Pub — the after-building buy-points interlude (pg. 8)', () => {
@@ -36,7 +45,13 @@ describe('Pub — the after-building buy-points interlude (pg. 8)', () => {
 
   it('PUB_BUY charges 2₽/point, adds the points, then advances the (building) phase when the queue empties', () => {
     const players = withSeat0(area({ building: [pub()] }));
-    const pending = makeState({ players, phase: 'building', activePlayerIndex: 0, tookCardThisPhase: true, pendingPubBuy: { queue: [0] } });
+    const pending = makeState({
+      players,
+      phase: 'building',
+      activePlayerIndex: 0,
+      tookCardThisPhase: true,
+      pendingPubBuy: { queue: [0] },
+    });
 
     const after = pubBuy(pending, 'p1', 3); // 3 points → 6 rubles
     expect(after.players[0]!.rubles).toBe(25 - 6);
@@ -51,7 +66,13 @@ describe('Pub — the after-building buy-points interlude (pg. 8)', () => {
 
   it('PUB_BUY of 0 points declines (no cost) and still advances the queue', () => {
     const players = withSeat0(area({ building: [pub()] }));
-    const pending = makeState({ players, phase: 'building', activePlayerIndex: 0, tookCardThisPhase: false, pendingPubBuy: { queue: [0] } });
+    const pending = makeState({
+      players,
+      phase: 'building',
+      activePlayerIndex: 0,
+      tookCardThisPhase: false,
+      pendingPubBuy: { queue: [0] },
+    });
     const after = pubBuy(pending, 'p1', 0);
     expect(after.players[0]!.rubles).toBe(25);
     expect(after.players[0]!.points).toBe(0);
@@ -65,7 +86,13 @@ describe('Pub — the after-building buy-points interlude (pg. 8)', () => {
       base.players[1]!,
       { ...base.players[2]!, playArea: area({ building: [pub('p2')] }) },
     ];
-    const pending = makeState({ players, phase: 'building', activePlayerIndex: 0, tookCardThisPhase: false, pendingPubBuy: { queue: [0, 2] } });
+    const pending = makeState({
+      players,
+      phase: 'building',
+      activePlayerIndex: 0,
+      tookCardThisPhase: false,
+      pendingPubBuy: { queue: [0, 2] },
+    });
 
     const afterFirst = pubBuy(pending, 'p1', 1);
     expect(afterFirst.pendingPubBuy).toEqual({ queue: [2] });
@@ -116,7 +143,12 @@ describe('Pub — applyAction routing + legalActions', () => {
     ]);
 
     // With plenty of money the cap is 5.
-    const rich = makeState({ players: withSeat0(area({ building: [pub()] }), { rubles: 100 }), phase: 'building', activePlayerIndex: 0, pendingPubBuy: { queue: [0] } });
+    const rich = makeState({
+      players: withSeat0(area({ building: [pub()] }), { rubles: 100 }),
+      phase: 'building',
+      activePlayerIndex: 0,
+      pendingPubBuy: { queue: [0] },
+    });
     expect(legalActions(rich, 'p1').filter((a) => a.type === 'PUB_BUY')).toHaveLength(6); // 0..5
   });
 });

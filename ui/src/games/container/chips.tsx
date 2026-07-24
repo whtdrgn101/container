@@ -87,16 +87,15 @@ export function StoredChip({
   // A priced dockside lot pad (visual overhaul, 2026-07): container on a small bordered pad with its
   // price tag. Same DOM contract as ever — button/span split, testid, reprice title, "$N" text.
   const swatch = (
-    <span
-      className={cn(
-        'inline-flex h-4 w-6 rounded-sm',
-        selected && 'ring-2 ring-ring ring-offset-1',
-      )}
-    >
+    <span className={cn('inline-flex h-4 w-6 rounded-sm', selected && 'ring-2 ring-ring ring-offset-1')}>
       <ContainerSvg color={COLOR_HEX[container.color]} />
     </span>
   );
-  const label = <span className="text-[10px] font-semibold leading-none tabular-nums text-muted-foreground">${container.price}</span>;
+  const label = (
+    <span className="text-[10px] font-semibold leading-none tabular-nums text-muted-foreground">
+      ${container.price}
+    </span>
+  );
   const pad = 'flex flex-col items-center gap-0.5 rounded-md border border-border/70 bg-background/60 px-1 py-0.5';
   if (onClick) {
     return (

@@ -9,7 +9,7 @@ import { expect, test } from '@playwright/test';
  * a pairing appears → choose it → a runner is out → stop. The first roll of a turn can never bust
  * (every column is still open and markers are free), so a pairing choice always follows.
  */
-test('pick Can\'t Stop and play a turn: roll, choose a pairing, stop', async ({ page }) => {
+test("pick Can't Stop and play a turn: roll, choose a pairing, stop", async ({ page }) => {
   await page.goto('/');
 
   // Two games are hosted, so the picker is shown. Choose Can't Stop, then start a hotseat game.
@@ -49,7 +49,7 @@ test('pick Can\'t Stop and play a turn: roll, choose a pairing, stop', async ({ 
   await expect(page.getByTestId('cantstop-roll')).toBeVisible();
 });
 
-test('a Can\'t Stop game with an AI seat plays the bot\'s turn automatically', async ({ page }) => {
+test("a Can't Stop game with an AI seat plays the bot's turn automatically", async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('pick-game-cantstop').click();
   // Hand seat 2 to the AI, then start.

@@ -47,7 +47,12 @@ export function WareIcon({ ware, className }: { ware: Ware; className?: string }
             fill="none"
           />
           <path d="M18.6 16.4 q3.4 0.8 3 4.4" stroke="#cfc6ae" strokeWidth="1.8" fill="none" strokeLinecap="round" />
-          <path d="M5.4 6.4 l-1.2 -1.2 M18.8 5.8 l1.2 -1.1 M4.4 17.2 l-1.3 0.9" stroke="#cfc6ae" strokeWidth="1.3" strokeLinecap="round" />
+          <path
+            d="M5.4 6.4 l-1.2 -1.2 M18.8 5.8 l1.2 -1.1 M4.4 17.2 l-1.3 0.9"
+            stroke="#cfc6ae"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+          />
         </svg>
       );
     case 'fur':
@@ -92,7 +97,16 @@ export function CoinMark({ value, size = 24, className }: { value: number; size?
     <svg viewBox="0 0 24 24" width={size} height={size} className={className} aria-hidden focusable="false">
       <circle cx="12" cy="12" r="10" fill="#d9b45a" stroke="#8a6a1d" strokeWidth="2" />
       <circle cx="12" cy="12" r="7" fill="none" stroke="#8a6a1d" strokeWidth="0.6" opacity="0.55" />
-      <text x="12" y="12" textAnchor="middle" dominantBaseline="central" fontFamily="Georgia, 'Times New Roman', serif" fontSize="11" fontWeight="bold" fill="#5c4512">
+      <text
+        x="12"
+        y="12"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontFamily="Georgia, 'Times New Roman', serif"
+        fontSize="11"
+        fontWeight="bold"
+        fill="#5c4512"
+      >
         {value}
       </text>
     </svg>
@@ -104,14 +118,38 @@ export function CoinMark({ value, size = 24, className }: { value: number; size?
  * aristocrats score points, pg. 3). Its own 24×24 viewBox (path authored around a centred origin, then
  * translated); scale with `size`.
  */
-export function ShieldMark({ value, kind, size = 24, className }: { value: number; kind: CardKind; size?: number; className?: string }) {
+export function ShieldMark({
+  value,
+  kind,
+  size = 24,
+  className,
+}: {
+  value: number;
+  kind: CardKind;
+  size?: number;
+  className?: string;
+}) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} className={className} aria-hidden focusable="false">
       <g transform="translate(12 13)">
-        <path d="M0 -13 l11 4 v9 q0 9 -11 13 q-11 -4 -11 -13 v-9 z" fill={SHIELD_FILL[kind]} stroke="#2b2b2b" strokeWidth="1.4" />
+        <path
+          d="M0 -13 l11 4 v9 q0 9 -11 13 q-11 -4 -11 -13 v-9 z"
+          fill={SHIELD_FILL[kind]}
+          stroke="#2b2b2b"
+          strokeWidth="1.4"
+        />
         {/* laurel sprigs framing the figure */}
         <path d="M-8 -3 q-2 4 0 8 M8 -3 q2 4 0 8" stroke="#ffffff" strokeWidth="0.9" fill="none" opacity="0.5" />
-        <text x="0" y="0" textAnchor="middle" dominantBaseline="central" fontFamily="Georgia, 'Times New Roman', serif" fontSize="11" fontWeight="bold" fill="#ffffff">
+        <text
+          x="0"
+          y="0"
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontFamily="Georgia, 'Times New Roman', serif"
+          fontSize="11"
+          fontWeight="bold"
+          fill="#ffffff"
+        >
           {value}
         </text>
       </g>

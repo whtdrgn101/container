@@ -7,7 +7,15 @@ import { card, makeState, newGame } from './helpers';
 /** A game where p2 holds a secret hand card and a distinct ruble count, for redaction assertions. */
 function withSecrets() {
   const base = newGame(['Ann', 'Bob', 'Cy']);
-  const secretCard = card({ id: 'secret-market-1', key: 'market', kind: 'building', name: 'Market', cost: 5, income: 0, points: 1 });
+  const secretCard = card({
+    id: 'secret-market-1',
+    key: 'market',
+    kind: 'building',
+    name: 'Market',
+    cost: 5,
+    income: 0,
+    points: 1,
+  });
   const players: StPetersburgPlayer[] = base.players.map((p, i) =>
     i === 1 ? { ...p, rubles: 777, hand: [secretCard] } : p,
   );

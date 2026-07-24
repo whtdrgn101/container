@@ -11,11 +11,16 @@ function scenario(top: Building, p1res: Partial<Record<Resource, number>>): Ston
   return {
     ...base,
     buildings: [[top, nextTile], base.buildings[1]!],
-    players: base.players.map((p, i) => (i === 0 ? { ...p, resources: { wood: 0, brick: 0, stone: 0, gold: 0, ...p1res } } : p)),
+    players: base.players.map((p, i) =>
+      i === 0 ? { ...p, resources: { wood: 0, brick: 0, stone: 0, gold: 0, ...p1res } } : p,
+    ),
   };
 }
 
-const fixed = (resources: Partial<Record<Resource, number>>): Building => ({ id: 'f', cost: { kind: 'fixed', resources } });
+const fixed = (resources: Partial<Record<Resource, number>>): Building => ({
+  id: 'f',
+  cost: { kind: 'fixed', resources },
+});
 
 describe('build', () => {
   it('buys a fixed building: pays it, scores its value, and reveals the next tile', () => {
@@ -29,12 +34,19 @@ describe('build', () => {
   });
 
   it('scores a choice building (exactly 4 from 2 kinds) by the value paid', () => {
-    const next = build(scenario({ id: 'c', cost: { kind: 'choice', count: 4, kinds: 2 } }, { wood: 2, brick: 2 }), 'p1', 0, { wood: 2, brick: 2 });
+    const next = build(
+      scenario({ id: 'c', cost: { kind: 'choice', count: 4, kinds: 2 } }, { wood: 2, brick: 2 }),
+      'p1',
+      0,
+      { wood: 2, brick: 2 },
+    );
     expect(next.players[0]!.score).toBe(14); // 2×3 + 2×4
   });
 
   it('scores an any building (1–7, any kinds) by the value paid', () => {
-    const next = build(scenario({ id: 'a', cost: { kind: 'any', min: 1, max: 7 } }, { stone: 2 }), 'p1', 0, { stone: 2 });
+    const next = build(scenario({ id: 'a', cost: { kind: 'any', min: 1, max: 7 } }, { stone: 2 }), 'p1', 0, {
+      stone: 2,
+    });
     expect(next.players[0]!.score).toBe(10); // 2×5
   });
 

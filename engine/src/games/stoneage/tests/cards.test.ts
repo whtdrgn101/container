@@ -25,7 +25,11 @@ const player = (resources: Partial<Record<Resource, number>> = {}): StoneAgePlay
   score: 0,
 });
 
-const card = (id: string, effect: CivCard['effect']): CivCard => ({ id, effect, scoring: { kind: 'green', symbol: 'art' } });
+const card = (id: string, effect: CivCard['effect']): CivCard => ({
+  id,
+  effect,
+  scoring: { kind: 'green', symbol: 'art' },
+});
 
 describe('card slot helpers', () => {
   it('identifies and indexes card slots', () => {
@@ -79,17 +83,24 @@ describe('cardPaymentError', () => {
 
 describe('applyCardEffect', () => {
   it('applies each immediate effect kind', () => {
-    expect(applyCardEffect(player(), card('c', { kind: 'resource', resource: 'stone', amount: 2 })).resources.stone).toBe(2);
+    expect(
+      applyCardEffect(player(), card('c', { kind: 'resource', resource: 'stone', amount: 2 })).resources.stone,
+    ).toBe(2);
     expect(applyCardEffect(player(), card('c', { kind: 'food', amount: 3 })).food).toBe(15);
     expect(applyCardEffect(player(), card('c', { kind: 'foodTrack', amount: 1 })).foodTrack).toBe(1);
     // The food track ends at 10 (pg. 2) — a food-track card at the top is clamped like the field.
-    expect(applyCardEffect({ ...player(), foodTrack: 10 }, card('c', { kind: 'foodTrack', amount: 1 })).foodTrack).toBe(10);
+    expect(applyCardEffect({ ...player(), foodTrack: 10 }, card('c', { kind: 'foodTrack', amount: 1 })).foodTrack).toBe(
+      10,
+    );
     expect(applyCardEffect(player(), card('c', { kind: 'points', amount: 4 })).score).toBe(4);
     const tooled = applyCardEffect(player(), card('c', { kind: 'tool' }));
     expect(tooled.tools).toEqual([1]);
     expect(tooled.toolsUsed).toEqual([false]);
     // A tool card at three tools upgrades the lowest tile (no new tile) and keeps the used flags.
-    const upgraded = applyCardEffect({ ...player(), tools: [1, 1, 2], toolsUsed: [true, false, false] }, card('c', { kind: 'tool' }));
+    const upgraded = applyCardEffect(
+      { ...player(), tools: [1, 1, 2], toolsUsed: [true, false, false] },
+      card('c', { kind: 'tool' }),
+    );
     expect(upgraded.tools).toEqual([2, 1, 2]);
     expect(upgraded.toolsUsed).toEqual([true, false, false]);
     expect(applyCardEffect(player({ wood: 1 }), card('c', { kind: 'none' })).resources.wood).toBe(1); // unchanged

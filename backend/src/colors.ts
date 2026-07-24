@@ -25,9 +25,10 @@ export class ColorRepository {
 
   /** The colour each seat holds in a game, as `{ playerId: colorId }`. Empty for a game with no rows. */
   listForGame(gameId: string): Record<string, string> {
-    const rows = this.db
-      .prepare('SELECT player_id, color FROM game_colors WHERE game_id = ?')
-      .all(gameId) as { player_id: string; color: string }[];
+    const rows = this.db.prepare('SELECT player_id, color FROM game_colors WHERE game_id = ?').all(gameId) as {
+      player_id: string;
+      color: string;
+    }[];
     return Object.fromEntries(rows.map((row) => [row.player_id, row.color]));
   }
 }

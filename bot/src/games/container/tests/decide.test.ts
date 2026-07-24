@@ -3,7 +3,7 @@ import type { GameState } from '@game-hub/engine/container';
 import { describe, expect, it, vi } from 'vitest';
 import { decide } from '../decide';
 import { BotError } from '../errors';
-import { makeGame, makePlayer, newGame, sc, viewOf } from './helpers';
+import { makeGame, makePlayer, newGame, viewOf } from './helpers';
 
 const CARD = SCORING_CARDS[0]!;
 

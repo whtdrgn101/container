@@ -26,9 +26,7 @@ export interface SeatHelpers<P extends { readonly id: string }> {
  * return `null` and the 404 would silently become a 500. Injecting the thrower keeps the exact subclass
  * each game already threw — no backend change, byte-identical behaviour.
  */
-export function makeSeating<P extends { readonly id: string }>(
-  onMissing: (playerId: string) => never,
-): SeatHelpers<P> {
+export function makeSeating<P extends { readonly id: string }>(onMissing: (playerId: string) => never): SeatHelpers<P> {
   return {
     seatOf(state, playerId) {
       const index = state.players.findIndex((player) => player.id === playerId);

@@ -51,7 +51,10 @@ export function benchmark(options: StrengthBenchOptions): BenchmarkResult {
     baseline: options.baseline ?? defaultPolicy,
     makeInitial: (seed) => {
       const cardIds = shuffledCardIds(seed, seats);
-      const players: NewPlayer[] = Array.from({ length: seats }, (_, i) => ({ name: `P${i + 1}`, scoringCardId: cardIds[i] }));
+      const players: NewPlayer[] = Array.from({ length: seats }, (_, i) => ({
+        name: `P${i + 1}`,
+        scoringCardId: cardIds[i],
+      }));
       return createGame({ id: `bench-${seed}`, players });
     },
     play: (initial, policyBySeat) => {

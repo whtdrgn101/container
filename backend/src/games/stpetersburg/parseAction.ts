@@ -41,7 +41,15 @@ export function parseStPetersburgAction(raw: unknown): ParseResult<Action> {
   if (typeof raw !== 'object' || raw === null) {
     return { ok: false, message: 'action must be an object' };
   }
-  const action = raw as { type?: unknown; row?: unknown; index?: unknown; displace?: unknown; points?: unknown; stack?: unknown; choice?: unknown };
+  const action = raw as {
+    type?: unknown;
+    row?: unknown;
+    index?: unknown;
+    displace?: unknown;
+    points?: unknown;
+    stack?: unknown;
+    choice?: unknown;
+  };
 
   if (action.type === 'PASS') {
     return { ok: true, action: { type: 'PASS' } };
@@ -57,7 +65,15 @@ export function parseStPetersburgAction(raw: unknown): ParseResult<Action> {
     if (!isDisplace(action.displace)) {
       return { ok: false, message: 'BUY.displace must be a card id string when present' };
     }
-    return { ok: true, action: { type: 'BUY', row: action.row, index: action.index, ...(action.displace !== undefined ? { displace: action.displace } : {}) } };
+    return {
+      ok: true,
+      action: {
+        type: 'BUY',
+        row: action.row,
+        index: action.index,
+        ...(action.displace !== undefined ? { displace: action.displace } : {}),
+      },
+    };
   }
 
   if (action.type === 'ADD_TO_HAND') {
@@ -77,7 +93,14 @@ export function parseStPetersburgAction(raw: unknown): ParseResult<Action> {
     if (!isDisplace(action.displace)) {
       return { ok: false, message: 'PLAY_FROM_HAND.displace must be a card id string when present' };
     }
-    return { ok: true, action: { type: 'PLAY_FROM_HAND', index: action.index, ...(action.displace !== undefined ? { displace: action.displace } : {}) } };
+    return {
+      ok: true,
+      action: {
+        type: 'PLAY_FROM_HAND',
+        index: action.index,
+        ...(action.displace !== undefined ? { displace: action.displace } : {}),
+      },
+    };
   }
 
   if (action.type === 'PUB_BUY') {
@@ -101,7 +124,14 @@ export function parseStPetersburgAction(raw: unknown): ParseResult<Action> {
     if (!isDisplace(action.displace)) {
       return { ok: false, message: 'OBSERVATORY_RESOLVE.displace must be a card id string when present' };
     }
-    return { ok: true, action: { type: 'OBSERVATORY_RESOLVE', choice: action.choice, ...(action.displace !== undefined ? { displace: action.displace } : {}) } };
+    return {
+      ok: true,
+      action: {
+        type: 'OBSERVATORY_RESOLVE',
+        choice: action.choice,
+        ...(action.displace !== undefined ? { displace: action.displace } : {}),
+      },
+    };
   }
 
   return { ok: false, message: `unknown action type: ${String(action.type)}` };

@@ -27,7 +27,10 @@ const player = (over: Partial<StoneAgePlayer> = {}): StoneAgePlayer => ({
   score: 0,
   ...over,
 });
-const fixed = (resources: Partial<Record<Resource, number>>): Building => ({ id: 'f', cost: { kind: 'fixed', resources } });
+const fixed = (resources: Partial<Record<Resource, number>>): Building => ({
+  id: 'f',
+  cost: { kind: 'fixed', resources },
+});
 const base = () => createGame({ id: 'g', players: [{ name: 'Ann' }, { name: 'Bob' }] });
 /** `base()` with player 1 replaced — the view most tests score placements against. */
 const viewWith = (p1: Partial<StoneAgePlayer>, over: Partial<StoneAgeState> = {}): StoneAgeView => {
@@ -93,7 +96,9 @@ describe('placementValue', () => {
     expect(value(early, 'hut', 2)).toBeGreaterThan(value(late, 'hut', 2));
     // Even outside rounds 1–2 the hut stays attractive while the horizon is long (the old gate is gone).
     const round5 = viewFor({ ...s, round: 5 }, 'p1');
-    expect(value(round5, 'hut', 2) - 2 * WEIGHTS.workerShadow).toBeGreaterThan(value(round5, 'forest', 1) - WEIGHTS.workerShadow);
+    expect(value(round5, 'hut', 2) - 2 * WEIGHTS.workerShadow).toBeGreaterThan(
+      value(round5, 'forest', 1) - WEIGHTS.workerShadow,
+    );
   });
 
   it('keeps valuing tools past two, until the ladder is maxed', () => {
@@ -173,7 +178,9 @@ describe('pickPlacement', () => {
 
 describe('building/card payments', () => {
   it('pays a fixed cost only when affordable', () => {
-    expect(buildingPaymentFor(fixed({ wood: 2, brick: 1 }), player({ resources: { wood: 2, brick: 1, stone: 0, gold: 0 } }))).toEqual({ wood: 2, brick: 1 });
+    expect(
+      buildingPaymentFor(fixed({ wood: 2, brick: 1 }), player({ resources: { wood: 2, brick: 1, stone: 0, gold: 0 } })),
+    ).toEqual({ wood: 2, brick: 1 });
     expect(buildingPaymentFor(fixed({ wood: 2 }), player())).toBeNull();
   });
 
@@ -190,7 +197,9 @@ describe('building/card payments', () => {
     const rich = player({ resources: { wood: 5, brick: 0, stone: 0, gold: 5 } });
     expect(buildingPaymentFor(any, rich)).toEqual({ gold: 5, wood: 2 });
     // Fewer than max banked → spend everything; below min → null.
-    expect(buildingPaymentFor(any, player({ resources: { stone: 2, wood: 0, brick: 0, gold: 0 } }))).toEqual({ stone: 2 });
+    expect(buildingPaymentFor(any, player({ resources: { stone: 2, wood: 0, brick: 0, gold: 0 } }))).toEqual({
+      stone: 2,
+    });
     expect(buildingPaymentFor(any, player())).toBeNull();
   });
 
@@ -201,7 +210,12 @@ describe('building/card payments', () => {
 });
 
 describe('chooseTools', () => {
-  const withRoll = (dice: number[], tools: number[], toolsUsed: boolean[], place: 'forest' | 'hunt' = 'forest'): StoneAgeState => ({
+  const withRoll = (
+    dice: number[],
+    tools: number[],
+    toolsUsed: boolean[],
+    place: 'forest' | 'hunt' = 'forest',
+  ): StoneAgeState => ({
     ...base(),
     pendingGather: { place, dice },
     players: base().players.map((p, i) => (i === 0 ? { ...p, tools, toolsUsed } : p)),

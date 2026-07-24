@@ -19,10 +19,7 @@ export interface SeatedView<P extends { readonly id: string }> {
  * illegal move (those stay `GameError`s). Returns the active player so a caller that needs it (Stone
  * Age reads the seat's resources straight off it) doesn't re-index.
  */
-export function assertBotTurn<P extends { readonly id: string }>(
-  view: SeatedView<P>,
-  playerId: string,
-): P {
+export function assertBotTurn<P extends { readonly id: string }>(view: SeatedView<P>, playerId: string): P {
   if (view.status === 'ended') {
     throw new BotError(`Game "${view.id}" has ended — there is nothing to decide`);
   }

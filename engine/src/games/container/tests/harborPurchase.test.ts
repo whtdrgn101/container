@@ -28,7 +28,10 @@ describe('harborPurchase', () => {
   });
 
   it('rejects when the ship is not docked at a harbor', () => {
-    expectError(() => harborPurchase(three(makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' })), 'p1', [sc('red', 2)]), 'SHIP_NOT_DOCKED');
+    expectError(
+      () => harborPurchase(three(makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' })), 'p1', [sc('red', 2)]),
+      'SHIP_NOT_DOCKED',
+    );
   });
 
   it('rejects buying nothing', () => {
@@ -56,6 +59,9 @@ describe('harborPurchase', () => {
   });
 
   it('rejects an unknown buyer', () => {
-    expectError(() => harborPurchase(three(makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' })), 'ghost', [sc('red', 2)]), 'PLAYER_NOT_FOUND');
+    expectError(
+      () => harborPurchase(three(makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' })), 'ghost', [sc('red', 2)]),
+      'PLAYER_NOT_FOUND',
+    );
   });
 });

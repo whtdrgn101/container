@@ -46,7 +46,9 @@ test('only the registry reaches into a game', () => {
   const offenders = sourceFiles(SRC)
     .filter((path) => !path.startsWith(GAME_DIR))
     .filter((path) => path !== join(SRC, 'games', 'registry.ts'))
-    .filter((path) => /^\s*import\s[^;]*from\s+'[^']*games\/(container|cantstop|stoneage)\//m.test(readFileSync(path, 'utf8')))
+    .filter((path) =>
+      /^\s*import\s[^;]*from\s+'[^']*games\/(container|cantstop|stoneage)\//m.test(readFileSync(path, 'utf8')),
+    )
     .map((path) => path.slice(SRC.length + 1));
 
   expect(offenders, 'only games/registry.ts may name a specific game').toEqual([]);

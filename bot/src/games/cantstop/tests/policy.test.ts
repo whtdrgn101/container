@@ -56,7 +56,11 @@ describe('pickPairing', () => {
   it('always returns one of the legal options', () => {
     const state = makeState({ phase: 'selecting', dice: [1, 2, 3, 4] });
     // Options are [3,7], [4,6], [5,5]; whichever the weights favour, it must be a real one.
-    expect([[3, 7], [4, 6], [5, 5]]).toContainEqual(pickPairing(state));
+    expect([
+      [3, 7],
+      [4, 6],
+      [5, 5],
+    ]).toContainEqual(pickPairing(state));
   });
 
   it('takes a pairing that claims a column over one that does not', () => {

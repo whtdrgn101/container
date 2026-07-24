@@ -9,7 +9,6 @@ import type { ErrorResponse } from '../module';
  */
 export function mapStoneAgeError(error: unknown): ErrorResponse | null {
   if (!(error instanceof GameError)) return null;
-  const status =
-    error.code === 'PLAYER_NOT_FOUND' ? 404 : error.code === 'INVALID_PLAYER_COUNT' ? 400 : 409;
+  const status = error.code === 'PLAYER_NOT_FOUND' ? 404 : error.code === 'INVALID_PLAYER_COUNT' ? 400 : 409;
   return { status, code: error.code, message: error.message };
 }

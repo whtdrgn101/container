@@ -4,11 +4,36 @@ import { cn } from '@/lib/utils';
  * published game's art. */
 const PIPS: Record<number, ReadonlyArray<readonly [number, number]>> = {
   1: [[2, 2]],
-  2: [[1, 1], [3, 3]],
-  3: [[1, 1], [2, 2], [3, 3]],
-  4: [[1, 1], [3, 1], [1, 3], [3, 3]],
-  5: [[1, 1], [3, 1], [2, 2], [1, 3], [3, 3]],
-  6: [[1, 1], [3, 1], [1, 2], [3, 2], [1, 3], [3, 3]],
+  2: [
+    [1, 1],
+    [3, 3],
+  ],
+  3: [
+    [1, 1],
+    [2, 2],
+    [3, 3],
+  ],
+  4: [
+    [1, 1],
+    [3, 1],
+    [1, 3],
+    [3, 3],
+  ],
+  5: [
+    [1, 1],
+    [3, 1],
+    [2, 2],
+    [1, 3],
+    [3, 3],
+  ],
+  6: [
+    [1, 1],
+    [3, 1],
+    [1, 2],
+    [3, 2],
+    [1, 3],
+    [3, 3],
+  ],
 };
 
 /**
@@ -36,7 +61,6 @@ export function Die({ value, className }: { value: number; className?: string })
         strokeWidth="0.14"
       />
       {pips.map(([cx, cy], i) => (
-        // eslint-disable-next-line react/no-array-index-key -- fixed pip positions per face
         <circle key={i} cx={cx} cy={cy} r="0.38" fill="currentColor" />
       ))}
     </svg>

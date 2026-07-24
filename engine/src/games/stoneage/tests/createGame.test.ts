@@ -7,8 +7,32 @@ describe('createGame', () => {
   it('sets up each player with the starting people, food and empty holdings', () => {
     const state = createGame({ id: 'g1', players: [{ name: 'Ann' }, { name: 'Bob' }] });
     expect(state.players).toEqual([
-      { id: 'p1', name: 'Ann', people: STARTING_PEOPLE, food: STARTING_FOOD, foodTrack: 0, tools: [], toolsUsed: [], resources: { wood: 0, brick: 0, stone: 0, gold: 0 }, civCards: [], buildings: 0, score: 0 },
-      { id: 'p2', name: 'Bob', people: STARTING_PEOPLE, food: STARTING_FOOD, foodTrack: 0, tools: [], toolsUsed: [], resources: { wood: 0, brick: 0, stone: 0, gold: 0 }, civCards: [], buildings: 0, score: 0 },
+      {
+        id: 'p1',
+        name: 'Ann',
+        people: STARTING_PEOPLE,
+        food: STARTING_FOOD,
+        foodTrack: 0,
+        tools: [],
+        toolsUsed: [],
+        resources: { wood: 0, brick: 0, stone: 0, gold: 0 },
+        civCards: [],
+        buildings: 0,
+        score: 0,
+      },
+      {
+        id: 'p2',
+        name: 'Bob',
+        people: STARTING_PEOPLE,
+        food: STARTING_FOOD,
+        foodTrack: 0,
+        tools: [],
+        toolsUsed: [],
+        resources: { wood: 0, brick: 0, stone: 0, gold: 0 },
+        civCards: [],
+        buildings: 0,
+        score: 0,
+      },
     ]);
   });
 

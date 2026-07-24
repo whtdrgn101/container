@@ -43,7 +43,11 @@ export function takeGather(state: StoneAgeState, playerId: string, toolIndices: 
     const resource = PLACE_RESOURCE[pending.place];
     amount = Math.floor(total / RESOURCE_THRESHOLD[resource]);
     kind = resource;
-    updated = { ...player, resources: { ...player.resources, [resource]: player.resources[resource] + amount }, toolsUsed };
+    updated = {
+      ...player,
+      resources: { ...player.resources, [resource]: player.resources[resource] + amount },
+      toolsUsed,
+    };
   }
 
   const players = withPlayer(state, seat, updated);
@@ -52,5 +56,11 @@ export function takeGather(state: StoneAgeState, playerId: string, toolIndices: 
   const placements = { ...state.placements, [pending.place]: restOfPlace };
 
   const after: StoneAgeState = { ...state, players, placements, pendingGather: null };
-  return record(after, 'TAKE', playerId, advanceActor(after), { place: pending.place, dice: pending.dice, boost, amount, kind });
+  return record(after, 'TAKE', playerId, advanceActor(after), {
+    place: pending.place,
+    dice: pending.dice,
+    boost,
+    amount,
+    kind,
+  });
 }

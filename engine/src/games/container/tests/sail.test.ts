@@ -9,7 +9,12 @@ describe('sail', () => {
   it('sails from the ocean to an opponent harbor', () => {
     const next = sail(newGame(3), 'p1', { kind: 'harbor', playerId: 'p2' });
     expect(getPlayer(next, 'p1').ship.location).toEqual({ kind: 'harbor', playerId: 'p2' });
-    expect(next.log.at(-1)).toEqual({ seq: 1, type: 'SAIL', playerId: 'p1', payload: { to: { kind: 'harbor', playerId: 'p2' } } });
+    expect(next.log.at(-1)).toEqual({
+      seq: 1,
+      type: 'SAIL',
+      playerId: 'p1',
+      payload: { to: { kind: 'harbor', playerId: 'p2' } },
+    });
   });
 
   it('sails from the ocean to Container Island', () => {

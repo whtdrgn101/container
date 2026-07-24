@@ -20,14 +20,20 @@ describe('feed', () => {
 
   it('covers a shortfall with resources, spending the least valuable first', () => {
     // 2 food, 5 people → short 3. wood(1) then brick(2) cover it; stone/gold untouched.
-    const next = feed(feeding({ food: 2, foodTrack: 0, people: 5, resources: { wood: 1, brick: 5, stone: 0, gold: 2 } }), 'p1');
+    const next = feed(
+      feeding({ food: 2, foodTrack: 0, people: 5, resources: { wood: 1, brick: 5, stone: 0, gold: 2 } }),
+      'p1',
+    );
     expect(next.players[0]!.food).toBe(0);
     expect(next.players[0]!.resources).toEqual({ wood: 0, brick: 3, stone: 0, gold: 2 });
     expect(next.log.at(-1)).toMatchObject({ payload: { paidFood: 2, paidResources: 3 } });
   });
 
   it('takes the −10 penalty (and loses all food) when it cannot pay the shortfall', () => {
-    const next = feed(feeding({ food: 1, foodTrack: 0, people: 5, score: 15, resources: { wood: 1, brick: 0, stone: 0, gold: 0 } }), 'p1');
+    const next = feed(
+      feeding({ food: 1, foodTrack: 0, people: 5, score: 15, resources: { wood: 1, brick: 0, stone: 0, gold: 0 } }),
+      'p1',
+    );
     expect(next.players[0]!.food).toBe(0);
     expect(next.players[0]!.resources.wood).toBe(1); // resources kept — partial payment doesn't help
     expect(next.players[0]!.score).toBe(5);
@@ -35,7 +41,11 @@ describe('feed', () => {
   });
 
   it('takes the penalty when the player declines to pay (payWithResources = false)', () => {
-    const next = feed(feeding({ food: 2, foodTrack: 0, people: 5, score: 4, resources: { wood: 9, brick: 0, stone: 0, gold: 0 } }), 'p1', false);
+    const next = feed(
+      feeding({ food: 2, foodTrack: 0, people: 5, score: 4, resources: { wood: 9, brick: 0, stone: 0, gold: 0 } }),
+      'p1',
+      false,
+    );
     expect(next.players[0]!.resources.wood).toBe(9); // not spent
     expect(next.players[0]!.score).toBe(0); // max(0, 4 − 10)
   });
@@ -47,9 +57,7 @@ describe('feed', () => {
     const base = makeState({ phase: 'feeding', activePlayerIndex: 1, startPlayerIndex: 0 });
     const state: StoneAgeState = {
       ...base,
-      players: base.players.map((p, i) =>
-        i === 0 ? { ...p, food: 10, people: 3 } : { ...p, food: 100, people: 1 },
-      ),
+      players: base.players.map((p, i) => (i === 0 ? { ...p, food: 10, people: 3 } : { ...p, food: 100, people: 1 })),
     };
     const next = feed(state, 'p1');
     expect(next.players[0]!.food).toBe(7); // p1 (seat 0) fed: 10 − 3

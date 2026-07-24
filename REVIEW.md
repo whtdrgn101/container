@@ -512,11 +512,20 @@ parameterized. Real gaps:
 
 ## Tier 5 — Worth knowing
 
-- **No linter or formatter of any kind** — no ESLint, Prettier, editorconfig, or hooks; no `lint`
-  script in any package. Yet **8 `eslint-disable` comments exist for a linter that isn't installed**,
-  including two suppressing `react-hooks/exhaustive-deps`. They are inert, and they create a false
-  impression that something is checking. That's the exact rule that would protect the ref-vs-dep
-  arrangement in `useGameTransport`.
+- ~~**No linter or formatter of any kind**~~ ✅ **Fixed.** ESLint 9 flat config (`eslint.config.js`)
+  + Prettier (`.prettierrc.json`, printWidth 120 chosen to minimise the one-time reflow) now run in CI
+  after `typecheck` (`pnpm lint` + `pnpm format:check`). ESLint is deliberately a *fast* hazard check
+  (typescript-eslint **recommended**, not type-checked — `typecheck` already owns types) plus
+  `react-hooks` rules-of-hooks/exhaustive-deps as **errors**, scoped to `ui/**`; Prettier owns style.
+  The 8 inert disables were resolved: the two `react-hooks/exhaustive-deps` in `App.tsx` are now
+  **live, justified suppressions** (both are genuine ref-vs-dep cases where listing the dep re-runs the
+  effect on a stale value — the fix would reintroduce the bug), and the six `react/no-array-index-key`
+  comments (for a rule the pragmatic config leaves off, since ~16 more legitimate positional-key uses
+  are undisabled) were **removed** as dead. *(Original finding follows.)* No ESLint, Prettier,
+  editorconfig, or hooks; no `lint` script in any package. Yet 8 `eslint-disable` comments exist for a
+  linter that isn't installed, including two suppressing `react-hooks/exhaustive-deps`. They are inert,
+  and they create a false impression that something is checking. That's the exact rule that would
+  protect the ref-vs-dep arrangement in `useGameTransport`.
 - **Container's auction side-channel has a real fetch race** — the effect refires on `auctionKey`
   changes with no cancellation, and three paths write the same setter, so responses can land out of
   order. `App.tsx` already does this correctly with a `live` flag for rematch. It matters mainly

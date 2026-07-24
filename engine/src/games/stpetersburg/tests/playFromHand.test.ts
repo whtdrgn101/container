@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { handCost, playFromHand } from '../actions';
-import type { Board, Card, PlayArea, StPetersburgPlayer, StPetersburgState } from '../core';
+import type { Card, PlayArea, StPetersburgPlayer, StPetersburgState } from '../core';
 import { card, expectError, makeState, newGame } from './helpers';
 
 /** A game whose seat-0 player and/or board/phase are overridden. */
@@ -10,13 +10,27 @@ function game(seat0: Partial<StPetersburgPlayer> = {}, rest: Partial<StPetersbur
   return makeState({ players, ...rest });
 }
 
-const emptyArea = (worker: Card[] = [], building: Card[] = [], aristocrat: Card[] = []): PlayArea => ({ worker, building, aristocrat });
-const lumberjacks = (n: number): Card[] => Array.from({ length: n }, (_, i) => card({ id: `lj-${i}`, key: 'lumberjack' }));
+const emptyArea = (worker: Card[] = [], building: Card[] = [], aristocrat: Card[] = []): PlayArea => ({
+  worker,
+  building,
+  aristocrat,
+});
+const lumberjacks = (n: number): Card[] =>
+  Array.from({ length: n }, (_, i) => card({ id: `lj-${i}`, key: 'lumberjack' }));
 const market = (id = 'mk-1'): Card =>
   card({ id, key: 'market', kind: 'building', name: 'Market', cost: 5, income: 0, points: 1 });
-const lumberjack = (id = 'lj-1'): Card => card({ id, key: 'lumberjack', kind: 'worker', name: 'Lumberjack', cost: 3, ware: 'lumber' });
+const lumberjack = (id = 'lj-1'): Card =>
+  card({ id, key: 'lumberjack', kind: 'worker', name: 'Lumberjack', cost: 3, ware: 'lumber' });
 const tradingCard = (id = 'cw'): Card =>
-  card({ id, key: 'carpenterWorkshop', kind: 'trading', name: 'Carpenter Workshop', cost: 4, ware: 'lumber', tradingGroup: 'worker' });
+  card({
+    id,
+    key: 'carpenterWorkshop',
+    kind: 'trading',
+    name: 'Carpenter Workshop',
+    cost: 4,
+    ware: 'lumber',
+    tradingGroup: 'worker',
+  });
 
 describe('playFromHand (pg. 3)', () => {
   it('plays a hand card into the play area, charges its cost, and passes the turn', () => {
@@ -29,7 +43,11 @@ describe('playFromHand (pg. 3)', () => {
     expect(after.consecutivePasses).toBe(0); // a play is an action
     expect(after.tookCardThisPhase).toBe(false); // NOT set — the card came from the hand, not the board
     expect(after.version).toBe(1);
-    expect(after.log.at(-1)).toMatchObject({ type: 'PLAY_FROM_HAND', playerId: 'p1', payload: { cardKey: 'market', cost: 5 } });
+    expect(after.log.at(-1)).toMatchObject({
+      type: 'PLAY_FROM_HAND',
+      playerId: 'p1',
+      payload: { cardKey: 'market', cost: 5 },
+    });
   });
 
   it('is playable in any phase (pg. 3 Remember: play any hand card in any phase)', () => {

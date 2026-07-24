@@ -17,7 +17,9 @@ async function setSeats(page: import('@playwright/test').Page, n: number) {
   }
 }
 
-test('lobby: two players join a shared Saint Petersburg game with picked colours, and each sees their own seat', async ({ browser }) => {
+test('lobby: two players join a shared Saint Petersburg game with picked colours, and each sees their own seat', async ({
+  browser,
+}) => {
   const hostCtx = await browser.newContext();
   const guestCtx = await browser.newContext();
   const host = await hostCtx.newPage();
@@ -71,7 +73,9 @@ test('lobby: two players join a shared Saint Petersburg game with picked colours
   await guestCtx.close();
 });
 
-test('resume: rejoin an in-progress Saint Petersburg game by seat — own rubles visible, opponent’s hidden', async ({ browser }) => {
+test('resume: rejoin an in-progress Saint Petersburg game by seat — own rubles visible, opponent’s hidden', async ({
+  browser,
+}) => {
   const firstCtx = await browser.newContext();
   const secondCtx = await browser.newContext();
   const starter = await firstCtx.newPage();
@@ -103,7 +107,10 @@ test('resume: rejoin an in-progress Saint Petersburg game by seat — own rubles
   await secondCtx.close();
 });
 
-test('abandon: a soft-deleted Saint Petersburg game is readable but refuses to be played', async ({ page, request }) => {
+test('abandon: a soft-deleted Saint Petersburg game is readable but refuses to be played', async ({
+  page,
+  request,
+}) => {
   await page.goto('/');
   await page.getByTestId('pick-game-stpetersburg').click();
   await page.getByTestId('remove-player-2').click(); // 2-seat game

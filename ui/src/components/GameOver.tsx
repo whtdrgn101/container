@@ -43,11 +43,7 @@ export function GameOver({ winnerNames, onNewGame, children }: GameOverProps) {
         {children}
         <div className="mt-3 flex flex-wrap gap-2">
           {rematch && (
-            <Button
-              data-testid="rematch"
-              disabled={rematch.busy || rematch.waiting}
-              onClick={rematch.onRematch}
-            >
+            <Button data-testid="rematch" disabled={rematch.busy || rematch.waiting} onClick={rematch.onRematch}>
               {rematchLabel}
             </Button>
           )}

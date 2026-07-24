@@ -9,9 +9,7 @@ type Claimed = Readonly<Record<number, string>>;
 const runnerCount = (runners: Runners): number => Object.keys(runners).length;
 
 /** The three ways to split four dice into two pairs, each summed into a column number (rules step 1). */
-export function splitSums(
-  dice: readonly [number, number, number, number],
-): Array<readonly [number, number]> {
+export function splitSums(dice: readonly [number, number, number, number]): Array<readonly [number, number]> {
   const [a, b, c, d] = dice;
   return [
     [a + b, c + d],
@@ -46,13 +44,7 @@ function advanceOne(runners: Runners, progress: Progress, col: number): Runners 
  * budget forces it — two new columns but one marker left. Doubles advance the one column up to twice
  * with no choice (rules example: "place the third marker two spaces up in the 7 column").
  */
-function optionsForPair(
-  runners: Runners,
-  progress: Progress,
-  claimed: Claimed,
-  x: number,
-  y: number,
-): number[][] {
+function optionsForPair(runners: Runners, progress: Progress, claimed: Claimed, x: number, y: number): number[][] {
   if (x === y) {
     let working = runners;
     const advanced: number[] = [];
@@ -109,11 +101,7 @@ export function isLegalSelection(state: CantStopState, columns: readonly number[
 }
 
 /** Apply a validated selection to the runners, advancing each listed column once (doubles appear twice). */
-export function applySelection(
-  runners: Runners,
-  progress: Progress,
-  columns: readonly number[],
-): Runners {
+export function applySelection(runners: Runners, progress: Progress, columns: readonly number[]): Runners {
   let working = runners;
   for (const col of columns) {
     working = advanceOne(working, progress, col);

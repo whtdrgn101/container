@@ -63,9 +63,7 @@ export function WaitingRoom({
 }: WaitingRoomProps) {
   const hasEmptySeat = lobby.members.some((member) => member === null);
   // Which seats this client holds and can pick a colour for, in seat order.
-  const mineClaimed = mySeats
-    .filter((seat) => lobby.members[seat] != null)
-    .sort((a, b) => a - b);
+  const mineClaimed = mySeats.filter((seat) => lobby.members[seat] != null).sort((a, b) => a - b);
 
   return (
     <Card className="mx-auto max-w-md" data-testid="lobby">
@@ -88,7 +86,6 @@ export function WaitingRoom({
         <ul className="space-y-1" data-testid="lobby-seats">
           {lobby.members.map((member, i) => (
             <li
-              // eslint-disable-next-line react/no-array-index-key -- fixed positional seats
               key={i}
               data-testid={`lobby-seat-${i}`}
               className={cn(

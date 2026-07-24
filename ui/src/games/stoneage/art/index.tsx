@@ -87,7 +87,10 @@ export function FieldIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden>
       <path d="M12 21V8" stroke="#8a5a2b" strokeWidth="1.6" fill="none" />
-      <path d="M12 8c-2-2-4-2-5-1 1 2 3 3 5 2Zm0 0c2-2 4-2 5-1-1 2-3 3-5 2Zm0 4c-2-2-4-2-5-1 1 2 3 3 5 2Zm0 0c2-2 4-2 5-1-1 2-3 3-5 2Z" fill="#d9a441" />
+      <path
+        d="M12 8c-2-2-4-2-5-1 1 2 3 3 5 2Zm0 0c2-2 4-2 5-1-1 2-3 3-5 2Zm0 4c-2-2-4-2-5-1 1 2 3 3 5 2Zm0 0c2-2 4-2 5-1-1 2-3 3-5 2Z"
+        fill="#d9a441"
+      />
     </svg>
   );
 }

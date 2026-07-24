@@ -14,7 +14,15 @@ import {
   RESOURCE_VALUE,
   RESOURCES,
 } from '@game-hub/engine/stoneage';
-import type { Building, CardScoring, CivCard, PlaceId, Resource, StoneAgePlayer, StoneAgeView } from '@game-hub/engine/stoneage';
+import type {
+  Building,
+  CardScoring,
+  CivCard,
+  PlaceId,
+  Resource,
+  StoneAgePlayer,
+  StoneAgeView,
+} from '@game-hub/engine/stoneage';
 import type { Payment } from '@game-hub/engine/stoneage';
 
 /** Average pips on a Stone Age die — used to estimate the yield of placing workers on a dice place. */
@@ -257,7 +265,11 @@ export function placementValue(
     const pay = building ? buildingPaymentFor(building, residual) : null;
     if (!pay) return WEIGHTS.unaffordable;
     return (
-      paymentValue(pay) - paymentWorth(pay, player, roundsLeft) + held.builder + WEIGHTS.buildTempo + (contested ? WEIGHTS.denial.purchase : 0)
+      paymentValue(pay) -
+      paymentWorth(pay, player, roundsLeft) +
+      held.builder +
+      WEIGHTS.buildTempo +
+      (contested ? WEIGHTS.denial.purchase : 0)
     );
   }
 
@@ -280,7 +292,9 @@ export function placementValue(
     // Food that closes an actual this-round shortfall is dearest — it amortizes the −10 starvation hit.
     const urgent = Math.max(0, player.people - player.food - player.foodTrack);
     const covered = Math.min(foodGain, deficit);
-    return covered * WEIGHTS.starvingFoodValue + (foodGain - covered) * WEIGHTS.foodValue + Math.min(foodGain, urgent) * 1.5;
+    return (
+      covered * WEIGHTS.starvingFoodValue + (foodGain - covered) * WEIGHTS.foodValue + Math.min(foodGain, urgent) * 1.5
+    );
   }
 
   if (isResourcePlace(place)) {
@@ -328,7 +342,9 @@ export function pickPlacement(view: StoneAgeView, playerId: string): { place: Pl
   let bestScore = -Infinity;
   for (const action of legalActions(view, playerId)) {
     if (action.type !== 'PLACE') continue;
-    const score = placementValue(view, player, action.place, action.count, roundsLeft, residual) - action.count * WEIGHTS.workerShadow;
+    const score =
+      placementValue(view, player, action.place, action.count, roundsLeft, residual) -
+      action.count * WEIGHTS.workerShadow;
     if (score > bestScore) {
       bestScore = score;
       best = { place: action.place, count: action.count };

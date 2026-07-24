@@ -147,7 +147,9 @@ export function BoardMap({
                 transform: 'translate(-50%, -50%)',
               }}
             >
-              <span className={cn('block h-7 w-12 drop-shadow sm:h-8 sm:w-14', isActive && 'motion-safe:animate-pulse')}>
+              <span
+                className={cn('block h-7 w-12 drop-shadow sm:h-8 sm:w-14', isActive && 'motion-safe:animate-pulse')}
+              >
                 <ShipSvg tint={seatColorOf(game.players, p.id, colors).hull} cargo={p.ship.cargo} />
               </span>
               <span

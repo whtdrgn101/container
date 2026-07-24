@@ -12,14 +12,18 @@ function scenario(slot: number, effect: CardEffect, p1res: Partial<Record<Resour
   return {
     ...base,
     cardDisplay: base.cardDisplay.map((c, i) => (i === slot ? testCard(effect) : c)),
-    players: base.players.map((p, i) => (i === 0 ? { ...p, resources: { wood: 0, brick: 0, stone: 0, gold: 0, ...p1res } } : p)),
+    players: base.players.map((p, i) =>
+      i === 0 ? { ...p, resources: { wood: 0, brick: 0, stone: 0, gold: 0, ...p1res } } : p,
+    ),
   };
 }
 
 describe('acquireCard', () => {
   it('pays the slot cost, applies the immediate effect, keeps the card, and empties the slot', () => {
     // Slot 0 costs 1 resource; pay 1 wood for a card granting 2 brick.
-    const next = acquireCard(scenario(0, { kind: 'resource', resource: 'brick', amount: 2 }, { wood: 1 }), 'p1', 0, { wood: 1 });
+    const next = acquireCard(scenario(0, { kind: 'resource', resource: 'brick', amount: 2 }, { wood: 1 }), 'p1', 0, {
+      wood: 1,
+    });
     expect(next.players[0]!.resources).toMatchObject({ wood: 0, brick: 2 });
     expect(next.players[0]!.civCards).toEqual(['tc']); // kept for final scoring
     expect(next.cardDisplay[0]).toBeNull(); // slot emptied
@@ -41,6 +45,12 @@ describe('acquireCard', () => {
     expectError(() => acquireCard(scenario(0, { kind: 'none' }, { wood: 2 }), 'p1', 0, { wood: 2 }), 'INVALID_CARD');
     expectError(() => acquireCard(makeState({ phase: 'actions' }), 'p1', 0, { wood: 1 }), 'INVALID_CARD'); // no person
     const emptySlot = withPlacements({ card1: { p1: 1 } }, { phase: 'actions', activePlayerIndex: 0 });
-    expectError(() => acquireCard({ ...emptySlot, cardDisplay: emptySlot.cardDisplay.map((c, i) => (i === 0 ? null : c)) }, 'p1', 0, { wood: 1 }), 'INVALID_CARD');
+    expectError(
+      () =>
+        acquireCard({ ...emptySlot, cardDisplay: emptySlot.cardDisplay.map((c, i) => (i === 0 ? null : c)) }, 'p1', 0, {
+          wood: 1,
+        }),
+      'INVALID_CARD',
+    );
   });
 });

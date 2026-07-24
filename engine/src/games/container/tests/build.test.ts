@@ -32,7 +32,10 @@ describe('buildFactory', () => {
         { id: 'p1-f4', color: 'blue' },
       ],
     });
-    expectError(() => buildFactory(makeGame([p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]), 'p1', 'yellow'), 'FACTORY_LIMIT_REACHED');
+    expectError(
+      () => buildFactory(makeGame([p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]), 'p1', 'yellow'),
+      'FACTORY_LIMIT_REACHED',
+    );
   });
 
   it('throws DUPLICATE_FACTORY_COLOR for a color you already have', () => {
@@ -72,7 +75,11 @@ describe('buildWarehouse', () => {
   });
 
   it('throws WAREHOUSE_LIMIT_REACHED at 5 warehouses', () => {
-    const state = makeGame([makePlayer({ id: 'p1', money: 100, warehouses: 5 }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
+    const state = makeGame([
+      makePlayer({ id: 'p1', money: 100, warehouses: 5 }),
+      makePlayer({ id: 'p2' }),
+      makePlayer({ id: 'p3' }),
+    ]);
     expectError(() => buildWarehouse(state, 'p1'), 'WAREHOUSE_LIMIT_REACHED');
   });
 

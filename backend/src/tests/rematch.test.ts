@@ -57,7 +57,11 @@ describe('rematch', () => {
     return app.inject({ method: 'POST', url: `/games/${id}/cantstop/roll`, payload: { playerId } });
   };
   const select = (id: string, playerId: string, columns: number[]) =>
-    app.inject({ method: 'POST', url: `/games/${id}/actions`, payload: { playerId, action: { type: 'SELECT', columns } } });
+    app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId, action: { type: 'SELECT', columns } },
+    });
   const stop = (id: string, playerId: string) =>
     app.inject({ method: 'POST', url: `/games/${id}/actions`, payload: { playerId, action: { type: 'STOP' } } });
   const rematch = (id: string, controlledIds: string[] | null) =>
@@ -145,7 +149,13 @@ describe('rematch', () => {
     const created = await botApp.inject({
       method: 'POST',
       url: '/games',
-      payload: { gameType: 'cantstop', players: [{ name: 'Ann', bot: true }, { name: 'Bob', bot: true }] },
+      payload: {
+        gameType: 'cantstop',
+        players: [
+          { name: 'Ann', bot: true },
+          { name: 'Bob', bot: true },
+        ],
+      },
     });
     const id = created.json().game.id as string;
     expect(created.json().game.status).toBe('ended');

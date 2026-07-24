@@ -14,7 +14,12 @@ describe('gather (roll — step 1)', () => {
     expect(next.players[0]!.resources.wood).toBe(0); // nothing taken until the take step
     expect(next.placements.forest).toEqual({ p1: 3 }); // people stay on the board
     expect(next.activePlayerIndex).toBe(0); // turn does not advance yet
-    expect(next.log.at(-1)).toEqual({ seq: 1, type: 'GATHER', playerId: 'p1', payload: { place: 'forest', dice: [3, 4, 3] } });
+    expect(next.log.at(-1)).toEqual({
+      seq: 1,
+      type: 'GATHER',
+      playerId: 'p1',
+      payload: { place: 'forest', dice: [3, 4, 3] },
+    });
   });
 
   it('rejects rolling where you have no people, a non-dice place, or the wrong dice', () => {

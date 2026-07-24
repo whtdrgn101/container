@@ -41,7 +41,11 @@ export function harborPurchase(state: GameState, buyerId: string, bought: readon
   const loaded = bought.map((container) => container.color);
   const players = state.players.map((player, index) => {
     if (index === buyerSeat) {
-      return { ...player, money: player.money - cost, ship: { ...player.ship, cargo: [...player.ship.cargo, ...loaded] } };
+      return {
+        ...player,
+        money: player.money - cost,
+        ship: { ...player.ship, cargo: [...player.ship.cargo, ...loaded] },
+      };
     }
     if (index === sellerSeat) {
       return { ...player, money: player.money + cost, harborStore: sellerRemaining };
@@ -49,5 +53,12 @@ export function harborPurchase(state: GameState, buyerId: string, bought: readon
     return player;
   });
 
-  return record(state, players, 'HARBOR_PURCHASE', buyerId, {}, { sellerId: location.playerId, cost, count: bought.length });
+  return record(
+    state,
+    players,
+    'HARBOR_PURCHASE',
+    buyerId,
+    {},
+    { sellerId: location.playerId, cost, count: bought.length },
+  );
 }

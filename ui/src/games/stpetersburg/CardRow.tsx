@@ -1,6 +1,5 @@
 import { effectiveCost } from '@game-hub/engine/stpetersburg';
 import type { Card, CardKind, PlayerView, StPetersburgView } from '@game-hub/engine/stpetersburg';
-import { cn } from '@/lib/utils';
 import { CardFace, GiltRail, MalachiteBoard, PhaseMedallion, StackCabinet } from './art';
 import { tradeOptions } from './PlayerPanel';
 import type { TradeOption } from './PlayerPanel';
@@ -19,7 +18,12 @@ import type { TradeOption } from './PlayerPanel';
 
 /** Cream text for chrome sitting directly on the dark malachite (matches the art files' `#e8e2d4` family). */
 const ON_MALACHITE = '#e8e2d4';
-const STACK_LABEL: Record<CardKind, string> = { worker: 'Worker', building: 'Building', aristocrat: 'Aristocrat', trading: 'Trading' };
+const STACK_LABEL: Record<CardKind, string> = {
+  worker: 'Worker',
+  building: 'Building',
+  aristocrat: 'Aristocrat',
+  trading: 'Trading',
+};
 
 /** One face-up row card: a buyable `sp-buy` button, or a static `sp-card` tile, plus the free "+ Hand" take. */
 function RowCard({
@@ -51,9 +55,10 @@ function RowCard({
   const tradingCost = rowTradeOpts.length ? Math.min(...rowTradeOpts.map((o) => o.cost)) : undefined;
   // A plain card's effective price for the active seat (pg. 6), and whether it's affordable right now.
   const plainCost = active ? effectiveCost(active, card, row) : card.cost;
-  const plainAffordable = acting && active && !trading && active.rubles !== null && active.rubles >= plainCost ? plainCost : undefined;
+  const plainAffordable =
+    acting && active && !trading && active.rubles !== null && active.rubles >= plainCost ? plainCost : undefined;
   const affordable = trading ? tradingCost : plainAffordable;
-  const shown = trading ? affordable ?? card.cost : plainCost;
+  const shown = trading ? (affordable ?? card.cost) : plainCost;
 
   const onClick =
     affordable === undefined

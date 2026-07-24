@@ -76,7 +76,8 @@ const counterModule: GameModule<CounterState, CounterAction> = {
   // A game that keeps no move log at all — the repository must cope.
   movesOf: () => [],
 
-  mapError: (error) => (error instanceof CounterError ? { status: 418, code: 'BAD_BUMP', message: error.message } : null),
+  mapError: (error) =>
+    error instanceof CounterError ? { status: 418, code: 'BAD_BUMP', message: error.message } : null,
 };
 
 describe('a non-Container game hosted through the GameModule seam', () => {
@@ -133,7 +134,7 @@ describe('a non-Container game hosted through the GameModule seam', () => {
     expect((response.json().game as CounterState).count).toBe(before + 5);
   });
 
-  it('rejects a payload the module refuses to parse, with the module\'s reason', async () => {
+  it("rejects a payload the module refuses to parse, with the module's reason", async () => {
     const game = await create();
     const response = await app.inject({
       method: 'POST',
@@ -280,10 +281,18 @@ describe('hosting two games at once', () => {
 
   it('enforces each game’s own seat range on lobbies', async () => {
     // 2 seats is legal for the counter and illegal for Container; 5 is the reverse.
-    expect((await app.inject({ method: 'POST', url: '/lobbies', payload: { gameType: 'counter', seats: 2 } })).statusCode).toBe(201);
-    expect((await app.inject({ method: 'POST', url: '/lobbies', payload: { gameType: 'container', seats: 2 } })).statusCode).toBe(400);
-    expect((await app.inject({ method: 'POST', url: '/lobbies', payload: { gameType: 'container', seats: 5 } })).statusCode).toBe(201);
-    expect((await app.inject({ method: 'POST', url: '/lobbies', payload: { gameType: 'counter', seats: 5 } })).statusCode).toBe(400);
+    expect(
+      (await app.inject({ method: 'POST', url: '/lobbies', payload: { gameType: 'counter', seats: 2 } })).statusCode,
+    ).toBe(201);
+    expect(
+      (await app.inject({ method: 'POST', url: '/lobbies', payload: { gameType: 'container', seats: 2 } })).statusCode,
+    ).toBe(400);
+    expect(
+      (await app.inject({ method: 'POST', url: '/lobbies', payload: { gameType: 'container', seats: 5 } })).statusCode,
+    ).toBe(201);
+    expect(
+      (await app.inject({ method: 'POST', url: '/lobbies', payload: { gameType: 'counter', seats: 5 } })).statusCode,
+    ).toBe(400);
   });
 
   it('starts a lobby as the game the lobby was created for', async () => {
@@ -368,7 +377,8 @@ describe('hosting two games at once', () => {
     const counter = await createOf('counter', [{ name: 'Ann' }, { name: 'Bo' }]);
 
     // The active seat of a freshly-dealt game, from the module's own summary (no field read off state).
-    const activeOf = async (id: string) => (await app.inject({ method: 'GET', url: `/games/${id}` })).json().activePlayerId as string;
+    const activeOf = async (id: string) =>
+      (await app.inject({ method: 'GET', url: `/games/${id}` })).json().activePlayerId as string;
     const act = (id: string, playerId: string, action: unknown) =>
       app.inject({ method: 'POST', url: `/games/${id}/actions`, payload: { playerId, action } });
 
@@ -376,13 +386,26 @@ describe('hosting two games at once', () => {
     // row's game_type to its own engine, none of which the core understands.
     expect((await act(container.id, await activeOf(container.id), { type: 'PRODUCE' })).statusCode).toBe(200);
     // Can't Stop's dice are server-only — the roll is its module route, not a client `/actions` move.
-    expect((await app.inject({ method: 'POST', url: `/games/${cantstop.id}/cantstop/roll`, payload: { playerId: await activeOf(cantstop.id) } })).statusCode).toBe(200);
-    expect((await act(stoneage.id, await activeOf(stoneage.id), { type: 'PLACE', place: 'forest', count: 1 })).statusCode).toBe(200);
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: `/games/${cantstop.id}/cantstop/roll`,
+          payload: { playerId: await activeOf(cantstop.id) },
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (await act(stoneage.id, await activeOf(stoneage.id), { type: 'PLACE', place: 'forest', count: 1 })).statusCode,
+    ).toBe(200);
     expect((await act(stpetersburg.id, await activeOf(stpetersburg.id), { type: 'PASS' })).statusCode).toBe(200);
     expect((await act(counter.id, 'p1', { type: 'BUMP', by: 1 })).statusCode).toBe(200);
 
     // All five are in the in-progress list, each tagged with its own type.
-    const listed = (await app.inject({ method: 'GET', url: '/games' })).json().games as { id: string; gameType: string }[];
+    const listed = (await app.inject({ method: 'GET', url: '/games' })).json().games as {
+      id: string;
+      gameType: string;
+    }[];
     const byId = new Map(listed.map((g) => [g.id, g.gameType]));
     expect(byId.get(container.id)).toBe('container');
     expect(byId.get(cantstop.id)).toBe('cantstop');
@@ -400,9 +423,13 @@ describe('hosting two games at once', () => {
     const container = await createOf('container', threeNames);
 
     // Its own namespace has no routes → a plain 404 (there is no endpoint to hit), for its own row…
-    expect((await app.inject({ method: 'GET', url: `/games/${stpetersburg.id}/stpetersburg/auction` })).statusCode).toBe(404);
+    expect(
+      (await app.inject({ method: 'GET', url: `/games/${stpetersburg.id}/stpetersburg/auction` })).statusCode,
+    ).toBe(404);
     // …and for another game's row too (still nothing registered there).
-    expect((await app.inject({ method: 'GET', url: `/games/${container.id}/stpetersburg/anything` })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'GET', url: `/games/${container.id}/stpetersburg/anything` })).statusCode).toBe(
+      404,
+    );
 
     // The reverse — a Saint Petersburg row asked for Container's real endpoint — is refused by the guard,
     // not served, so a namespaced URL can never hand one game's state to another's module.
@@ -434,7 +461,11 @@ describe('a game whose type is no longer hosted', () => {
   it('says so rather than 500ing or loading it with the wrong rules', async () => {
     const db = createDatabase();
     // Create a counter game, then rebuild the server *without* the counter registered.
-    const withCounter = buildApp({ db, registry: new GameRegistry().register(counterModule), defaultGameType: 'counter' });
+    const withCounter = buildApp({
+      db,
+      registry: new GameRegistry().register(counterModule),
+      defaultGameType: 'counter',
+    });
     await withCounter.ready();
     const id = (
       await withCounter.inject({ method: 'POST', url: '/games', payload: { players: [{ name: 'Ann' }] } })

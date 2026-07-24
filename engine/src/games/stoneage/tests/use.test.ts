@@ -19,7 +19,10 @@ describe('use', () => {
   it('tool maker → upgrades the lowest tool once you hold three, keeping used state', () => {
     // With 3 tools the ladder upgrades the lowest value rather than adding a tile; used flags stay put.
     const base = acting({ toolMaker: { p1: 1 } });
-    const withTools = { ...base, players: base.players.map((p, i) => (i === 0 ? { ...p, tools: [1, 1, 2], toolsUsed: [true, false, false] } : p)) };
+    const withTools = {
+      ...base,
+      players: base.players.map((p, i) => (i === 0 ? { ...p, tools: [1, 1, 2], toolsUsed: [true, false, false] } : p)),
+    };
     const next = use(withTools, 'p1', 'toolMaker');
     expect(next.players[0]!.tools).toEqual([2, 1, 2]); // lowest 1 upgraded
     expect(next.players[0]!.toolsUsed).toEqual([true, false, false]); // unchanged (no new tile)
@@ -37,7 +40,10 @@ describe('use', () => {
     const maxedPeople = { ...hutState, players: hutState.players.map((p, i) => (i === 0 ? { ...p, people: 10 } : p)) };
     expect(use(maxedPeople, 'p1', 'hut').players[0]!.people).toBe(10);
     const fieldState = acting({ field: { p1: 1 } });
-    const maxedTrack = { ...fieldState, players: fieldState.players.map((p, i) => (i === 0 ? { ...p, foodTrack: 10 } : p)) };
+    const maxedTrack = {
+      ...fieldState,
+      players: fieldState.players.map((p, i) => (i === 0 ? { ...p, foodTrack: 10 } : p)),
+    };
     expect(use(maxedTrack, 'p1', 'field').players[0]!.foodTrack).toBe(10);
   });
 

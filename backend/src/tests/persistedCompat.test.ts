@@ -38,7 +38,10 @@ afterEach(async () => {
 describe('end-state union — persisted-data compatibility (no migration)', () => {
   it('plays an action on an old-shape ACTIVE Container blob carrying stale results/winnerIds', async () => {
     // A blob written by the *pre-union* engine: an active game that still has the empty end-state keys.
-    const modern = createContainer({ id: 'legacy-active', players: [{ name: 'Ann' }, { name: 'Bob' }, { name: 'Cid' }] });
+    const modern = createContainer({
+      id: 'legacy-active',
+      players: [{ name: 'Ann' }, { name: 'Bob' }, { name: 'Cid' }],
+    });
     const legacyBlob = { ...modern, results: [], winnerIds: [] };
     expect('results' in legacyBlob).toBe(true); // the exact shape an old database holds
     repo.create(containerModule, legacyBlob);
@@ -62,7 +65,10 @@ describe('end-state union — persisted-data compatibility (no migration)', () =
 
   it('renders a summary for an old-shape ENDED Container blob (real results/winnerIds)', async () => {
     // An old ended blob carried genuine values — the union changed nothing about the ended arm.
-    const modern = createContainer({ id: 'legacy-ended', players: [{ name: 'Ann' }, { name: 'Bob' }, { name: 'Cid' }] });
+    const modern = createContainer({
+      id: 'legacy-ended',
+      players: [{ name: 'Ann' }, { name: 'Bob' }, { name: 'Cid' }],
+    });
     const endedBlob = {
       ...modern,
       status: 'ended' as const,
@@ -90,7 +96,7 @@ describe('end-state union — persisted-data compatibility (no migration)', () =
     expect(game.results).toHaveLength(3);
   });
 
-  it('summarizes all three games\' legacy ACTIVE shapes (the three ways the old code disagreed)', async () => {
+  it("summarizes all three games' legacy ACTIVE shapes (the three ways the old code disagreed)", async () => {
     // Each game's *pre-union* active blob, reconstructed exactly:
     //  - Container: results: []      (empty array while active)
     //  - Stone Age: results: null    (null while active)

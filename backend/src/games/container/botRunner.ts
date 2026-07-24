@@ -88,9 +88,7 @@ export class BotRunner {
     }
 
     if (auction.phase === 'runoff') {
-      const next = tiedForLead(auction, state).find(
-        (id) => botIds.has(id) && auction.runoffBids[id] === undefined,
-      );
+      const next = tiedForLead(auction, state).find((id) => botIds.has(id) && auction.runoffBids[id] === undefined);
       if (!next) return false;
       const extra = runoffBidFor(viewFor(state, next), next, auction.bids[next] ?? 0);
       return this.placeBotBid(state, auction, next, extra);

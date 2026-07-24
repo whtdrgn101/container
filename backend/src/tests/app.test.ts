@@ -59,9 +59,7 @@ function reader(socket: WsClient): () => Promise<ContainerStateMessage> {
     else queue.push(msg);
   });
   return () =>
-    queue.length
-      ? Promise.resolve(queue.shift()!)
-      : new Promise<ContainerStateMessage>((r) => pending.push(r));
+    queue.length ? Promise.resolve(queue.shift()!) : new Promise<ContainerStateMessage>((r) => pending.push(r));
 }
 
 describe('POST /games', () => {
@@ -138,9 +136,9 @@ describe('GET /games/:id', () => {
   it('lists in-progress games as secret-free summaries for resuming', async () => {
     const game = await createThreePlayerGame();
     const response = await app.inject({ method: 'GET', url: '/games' });
-    const summary = (response.json().games as { id: string; players: { id: string; name: string }[]; activePlayerId: string }[]).find(
-      (g) => g.id === game.id,
-    )!;
+    const summary = (
+      response.json().games as { id: string; players: { id: string; name: string }[]; activePlayerId: string }[]
+    ).find((g) => g.id === game.id)!;
     expect(summary.players.map((p) => p.name)).toEqual(['Ann', 'Bob', 'Cid']);
     expect(summary.activePlayerId).toBe('p1');
     expect(summary.players[0]).not.toHaveProperty('scoringCard'); // no hidden info in the summary
@@ -1093,7 +1091,10 @@ describe('Bot seats — creating', () => {
     expect(bots).toEqual(['p2', 'p3']);
 
     // The bot list travels with the game everywhere, so a client can label the seats.
-    const fetched = await app.inject({ method: 'GET', url: '/games/' + (await createWithBots([false, true, false])).game.id });
+    const fetched = await app.inject({
+      method: 'GET',
+      url: '/games/' + (await createWithBots([false, true, false])).game.id,
+    });
     expect(fetched.json().bots).toEqual(['p2']);
   });
 

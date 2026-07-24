@@ -7,7 +7,6 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../app';
 import { createDatabase } from '../db';
 import type { DB } from '../db';
-import { containerModule } from '../games';
 import { GameRepository } from '../repository';
 
 /**

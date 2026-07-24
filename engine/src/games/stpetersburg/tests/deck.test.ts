@@ -25,7 +25,9 @@ describe('deck data', () => {
   });
 
   it('flags exactly the six special cards (pg. 7–8)', () => {
-    const specials = CARD_DEFS.filter((d) => d.special).map((d) => d.special).sort();
+    const specials = CARD_DEFS.filter((d) => d.special)
+      .map((d) => d.special)
+      .sort();
     expect(specials).toEqual(['mariinskij', 'observatory', 'potemkin', 'pub', 'taxman', 'warehouse']);
   });
 
@@ -50,7 +52,10 @@ describe('mintStack', () => {
   it('carries tradingGroup on trading cards and the special flag where set', () => {
     const trading = mintStack('trading');
     expect(trading).toHaveLength(30);
-    expect(trading.find((c) => c.key === 'mariinskij')).toMatchObject({ tradingGroup: 'building', special: 'mariinskij' });
+    expect(trading.find((c) => c.key === 'mariinskij')).toMatchObject({
+      tradingGroup: 'building',
+      special: 'mariinskij',
+    });
     const building = mintStack('building');
     expect(building.find((c) => c.key === 'pub')).toMatchObject({ special: 'pub' });
     expect(building.find((c) => c.key === 'market')?.special).toBeUndefined();

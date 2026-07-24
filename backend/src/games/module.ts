@@ -54,7 +54,11 @@ export interface GameModule<S, A> {
    * deterministic; the module must not call `Math.random` itself, or replay and reproducible tests
    * both die. (Container shuffles its scoring deck with this.)
    */
-  createGame(opts: { readonly id: string; readonly players: readonly { readonly name: string }[]; readonly rng: () => number }): S;
+  createGame(opts: {
+    readonly id: string;
+    readonly players: readonly { readonly name: string }[];
+    readonly rng: () => number;
+  }): S;
 
   /** Apply a move. Throws the game's own domain error, which `mapError` turns into a status. */
   applyAction(state: S, playerId: string, action: A): S;
@@ -143,8 +147,7 @@ export type Viewer = string | readonly string[] | null;
 
 /** Either a typed action or the reason the payload wasn't one. */
 export type ParseResult<A> =
-  | { readonly ok: true; readonly action: A }
-  | { readonly ok: false; readonly message: string };
+  { readonly ok: true; readonly action: A } | { readonly ok: false; readonly message: string };
 
 /** A domain error mapped onto the wire. The core sends this verbatim. */
 export interface ErrorResponse {

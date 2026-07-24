@@ -61,7 +61,10 @@ describe('legalActions', () => {
   });
 
   it('offers only free actions (End turn / Request loan) when no actions remain', () => {
-    const state = makeGame([makePlayer({ id: 'p1', factoryStore: [sc('white', 2)] }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], { actionsRemaining: 0 });
+    const state = makeGame(
+      [makePlayer({ id: 'p1', factoryStore: [sc('white', 2)] }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })],
+      { actionsRemaining: 0 },
+    );
     expect(types(state)).toEqual(['END_TURN', 'REQUEST_LOAN']);
   });
 
@@ -83,7 +86,11 @@ describe('legalActions', () => {
   });
 
   it('omits PRODUCE when the factory district is full', () => {
-    const state = makeGame([makePlayer({ id: 'p1', factoryStore: [sc('white', 2), sc('white', 3)], factoryLimit: 2 }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
+    const state = makeGame([
+      makePlayer({ id: 'p1', factoryStore: [sc('white', 2), sc('white', 3)], factoryLimit: 2 }),
+      makePlayer({ id: 'p2' }),
+      makePlayer({ id: 'p3' }),
+    ]);
     expect(types(state)).not.toContain('PRODUCE');
   });
 
@@ -95,7 +102,11 @@ describe('legalActions', () => {
     });
 
     it('offers an off-turn player nothing once they are at the loan cap', () => {
-      const state = makeGame([makePlayer({ id: 'p1' }), makePlayer({ id: 'p2', loans: MAX_LOANS }), makePlayer({ id: 'p3' })]);
+      const state = makeGame([
+        makePlayer({ id: 'p1' }),
+        makePlayer({ id: 'p2', loans: MAX_LOANS }),
+        makePlayer({ id: 'p3' }),
+      ]);
       expect(legalActions(state, 'p2')).toEqual([]);
     });
 
@@ -166,7 +177,11 @@ describe('legalActions', () => {
   });
 
   it('offers no PRODUCE or BUILD_FACTORY for a factory-less player', () => {
-    const state = makeGame([makePlayer({ id: 'p1', factories: [], money: 100 }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
+    const state = makeGame([
+      makePlayer({ id: 'p1', factories: [], money: 100 }),
+      makePlayer({ id: 'p2' }),
+      makePlayer({ id: 'p3' }),
+    ]);
     const actions = types(state);
     expect(actions).not.toContain('PRODUCE');
     expect(actions).not.toContain('BUILD_FACTORY');
@@ -174,7 +189,11 @@ describe('legalActions', () => {
   });
 
   it('omits BUILD_WAREHOUSE at the warehouse limit', () => {
-    const state = makeGame([makePlayer({ id: 'p1', money: 100, warehouses: 5, harborLimit: 5 }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
+    const state = makeGame([
+      makePlayer({ id: 'p1', money: 100, warehouses: 5, harborLimit: 5 }),
+      makePlayer({ id: 'p2' }),
+      makePlayer({ id: 'p3' }),
+    ]);
     expect(types(state)).not.toContain('BUILD_WAREHOUSE');
   });
 

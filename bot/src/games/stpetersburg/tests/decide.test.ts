@@ -45,9 +45,14 @@ describe('Saint Petersburg bot — guards & redaction', () => {
 describe('Saint Petersburg bot — horizon & aristocrat end value', () => {
   it('estimates 1 round left in the final round, else scales with the tightest stack', () => {
     expect(estimateRoundsLeft(view({ finalRound: true }))).toBe(1);
-    const short = view({ board: { upper: [], lower: [], stacks: { worker: 2, building: 20, aristocrat: 20, trading: 20 }, discard: 0 }, players: [player(), player({ id: 'p2' })] });
+    const short = view({
+      board: { upper: [], lower: [], stacks: { worker: 2, building: 20, aristocrat: 20, trading: 20 }, discard: 0 },
+      players: [player(), player({ id: 'p2' })],
+    });
     expect(estimateRoundsLeft(short)).toBe(1); // round(2/2) = 1
-    const long = view({ board: { upper: [], lower: [], stacks: { worker: 30, building: 30, aristocrat: 30, trading: 30 }, discard: 0 } });
+    const long = view({
+      board: { upper: [], lower: [], stacks: { worker: 30, building: 30, aristocrat: 30, trading: 30 }, discard: 0 },
+    });
     expect(estimateRoundsLeft(long)).toBe(8); // clamped to the ceiling
   });
 
@@ -61,14 +66,22 @@ describe('Saint Petersburg bot — horizon & aristocrat end value', () => {
 
   it('prices a displacement that removes the last copy of a distinct aristocrat', () => {
     // Owns two identities (scribe, judge). Displacing the lone judge with another scribe drops distinct 2→1.
-    const p = player({ playArea: { worker: [], building: [], aristocrat: [card('scribe', 'scribe-1'), card('judge', 'judge-1')] } });
+    const p = player({
+      playArea: { worker: [], building: [], aristocrat: [card('scribe', 'scribe-1'), card('judge', 'judge-1')] },
+    });
     const delta = aristocratEndDelta(p, card('scribe', 'scribe-2'), card('judge', 'judge-1'));
     expect(delta).toBeLessThan(0); // 3 (two distinct) → 1 (one distinct)
   });
 
   it('keeps the distinct count when a displaced identity still has another copy', () => {
     // Two scribes + a judge. Displacing one scribe (a copy remains) with a controller keeps 2 distinct → 3.
-    const p = player({ playArea: { worker: [], building: [], aristocrat: [card('scribe', 'scribe-1'), card('scribe', 'scribe-2'), card('judge', 'judge-1')] } });
+    const p = player({
+      playArea: {
+        worker: [],
+        building: [],
+        aristocrat: [card('scribe', 'scribe-1'), card('scribe', 'scribe-2'), card('judge', 'judge-1')],
+      },
+    });
     const delta = aristocratEndDelta(p, card('controller', 'controller-1'), card('scribe', 'scribe-1'));
     expect(delta).toBe(3); // distinct 2 (scribe,judge) → 3 (scribe,judge,controller): 6 − 3
   });
@@ -89,22 +102,46 @@ describe('Saint Petersburg bot — action valuation', () => {
   });
 
   it('values buying a worker positively (a recurring income engine)', () => {
-    const v = view({ board: { upper: [card('lumberjack')], lower: [], stacks: { worker: 20, building: 20, aristocrat: 20, trading: 20 }, discard: 0 } });
+    const v = view({
+      board: {
+        upper: [card('lumberjack')],
+        lower: [],
+        stacks: { worker: 20, building: 20, aristocrat: 20, trading: 20 },
+        discard: 0,
+      },
+    });
     expect(evaluate(v, player(), { type: 'BUY', row: 'upper', index: 0 }, ctx)).toBeGreaterThan(0);
   });
 
   it('values a profitable green upgrade (weaving mill over shepherd) via displacement', () => {
     const shepherd = card('shepherd', 'shepherd-1');
     const p = player({ playArea: { worker: [shepherd], building: [], aristocrat: [] } });
-    const v = view({ players: [p], board: { upper: [card('weavingMill')], lower: [], stacks: { worker: 20, building: 20, aristocrat: 20, trading: 20 }, discard: 0 } });
+    const v = view({
+      players: [p],
+      board: {
+        upper: [card('weavingMill')],
+        lower: [],
+        stacks: { worker: 20, building: 20, aristocrat: 20, trading: 20 },
+        discard: 0,
+      },
+    });
     const val = evaluate(v, p, { type: 'BUY', row: 'upper', index: 0, displace: 'shepherd-1' }, ctx);
     expect(val).toBeGreaterThan(0); // +3 income/round for a difference cost of 3
   });
 
   it('never adds to hand in the final round, and discounts a normal add', () => {
     const finalCtx = makeCtx(view({ finalRound: true }));
-    const v = view({ board: { upper: [card('theater')], lower: [], stacks: { worker: 20, building: 20, aristocrat: 20, trading: 20 }, discard: 0 } });
-    expect(evaluate({ ...v, finalRound: true }, player(), { type: 'ADD_TO_HAND', row: 'upper', index: 0 }, finalCtx)).toBe(-Infinity);
+    const v = view({
+      board: {
+        upper: [card('theater')],
+        lower: [],
+        stacks: { worker: 20, building: 20, aristocrat: 20, trading: 20 },
+        discard: 0,
+      },
+    });
+    expect(
+      evaluate({ ...v, finalRound: true }, player(), { type: 'ADD_TO_HAND', row: 'upper', index: 0 }, finalCtx),
+    ).toBe(-Infinity);
     // A normal add is finite (a discounted, deferred acquisition).
     expect(Number.isFinite(evaluate(v, player(), { type: 'ADD_TO_HAND', row: 'upper', index: 0 }, ctx))).toBe(true);
     // A trading card is addable too (estimated future displacement cost).
@@ -137,14 +174,22 @@ describe('Saint Petersburg bot — the SP5 interludes (pub / observatory)', () =
     expect(earlyPick.type).toBe('PUB_BUY');
     expect(earlyPick).toEqual({ type: 'PUB_BUY', points: 0 }); // declines while rubles still compound
 
-    const late = view({ pendingPubBuy: { queue: [0] }, phase: 'building', finalRound: true, players: [player({ rubles: 20 })] });
+    const late = view({
+      pendingPubBuy: { queue: [0] },
+      phase: 'building',
+      finalRound: true,
+      players: [player({ rubles: 20 })],
+    });
     const latePick = pickAction(late, 'p1');
     expect(latePick.type).toBe('PUB_BUY');
     expect((latePick as { points: number }).points).toBeGreaterThan(0); // converts spare rubles to VP at the end
   });
 
   it('resolves a pending Observatory draw by buying a worthwhile card (defensive path)', () => {
-    const v = view({ phase: 'building', pendingDraw: { seat: 0, stack: 'building', card: card('theater', 'theater-7'), observatoryId: 'observatory-1' } });
+    const v = view({
+      phase: 'building',
+      pendingDraw: { seat: 0, stack: 'building', card: card('theater', 'theater-7'), observatoryId: 'observatory-1' },
+    });
     const pick = pickAction(v, 'p1');
     expect(pick.type).toBe('OBSERVATORY_RESOLVE');
     expect((pick as { choice: string }).choice).toBe('buy'); // a 6-point Theater is worth taking
@@ -156,7 +201,12 @@ describe('Saint Petersburg bot — the SP5 interludes (pub / observatory)', () =
   });
 
   it('scores each Observatory resolve choice (defensive: discard / hand / buy a trading upgrade)', () => {
-    const draw = { seat: 0, stack: 'worker' as const, card: card('weavingMill', 'weavingMill-1'), observatoryId: 'observatory-1' };
+    const draw = {
+      seat: 0,
+      stack: 'worker' as const,
+      card: card('weavingMill', 'weavingMill-1'),
+      observatoryId: 'observatory-1',
+    };
     const shepherd = card('shepherd', 'shepherd-1');
     const p = player({ playArea: { worker: [shepherd], building: [], aristocrat: [] } });
     const v = view({ players: [p], pendingDraw: draw });
@@ -168,6 +218,8 @@ describe('Saint Petersburg bot — the SP5 interludes (pub / observatory)', () =
     const finalV = view({ players: [p], pendingDraw: draw, finalRound: true });
     expect(evaluate(finalV, p, { type: 'OBSERVATORY_RESOLVE', choice: 'hand' }, makeCtx(finalV))).toBeLessThan(0);
     // Buying the drawn trading card by displacing the shepherd is the profitable upgrade path.
-    expect(evaluate(v, p, { type: 'OBSERVATORY_RESOLVE', choice: 'buy', displace: 'shepherd-1' }, ctx)).toBeGreaterThan(0);
+    expect(evaluate(v, p, { type: 'OBSERVATORY_RESOLVE', choice: 'buy', displace: 'shepherd-1' }, ctx)).toBeGreaterThan(
+      0,
+    );
   });
 });

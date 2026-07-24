@@ -15,7 +15,9 @@ describe('endTurn', () => {
   });
 
   it('wraps from the last seat back to the first', () => {
-    const state = makeGame([makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], { activePlayerIndex: 2 });
+    const state = makeGame([makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], {
+      activePlayerIndex: 2,
+    });
     expect(endTurn(state, 'p3').activePlayerIndex).toBe(0);
   });
 

@@ -28,7 +28,11 @@ interface DriveView {
   readonly players: readonly {
     readonly id: string;
     readonly rubles: number | null;
-    readonly playArea: { readonly worker: readonly Card[]; readonly building: readonly Card[]; readonly aristocrat: readonly Card[] };
+    readonly playArea: {
+      readonly worker: readonly Card[];
+      readonly building: readonly Card[];
+      readonly aristocrat: readonly Card[];
+    };
   }[];
   readonly board: { readonly discard: number };
   readonly activePlayerIndex: number;
@@ -56,7 +60,12 @@ function reader(socket: WsClient): () => Promise<{ type: string; game: PlayerVie
 }
 
 interface PlayerViewShape {
-  readonly players: readonly { readonly id: string; readonly rubles: number | null; readonly hand: unknown; readonly handCount: number }[];
+  readonly players: readonly {
+    readonly id: string;
+    readonly rubles: number | null;
+    readonly hand: unknown;
+    readonly handCount: number;
+  }[];
   readonly board: { readonly stacks: Record<string, number> };
   readonly round: number;
   readonly phase: string;
@@ -137,7 +146,11 @@ describe('Saint Petersburg', () => {
   it('coexists — a Saint Petersburg game and a Stone Age game are told apart on read', async () => {
     const sp = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
     const sa = (
-      await app.inject({ method: 'POST', url: '/games', payload: { gameType: 'stoneage', players: [{ name: 'Cy' }, { name: 'Di' }] } })
+      await app.inject({
+        method: 'POST',
+        url: '/games',
+        payload: { gameType: 'stoneage', players: [{ name: 'Cy' }, { name: 'Di' }] },
+      })
     ).json().game as { id: string };
 
     const spRead = await app.inject({ method: 'GET', url: `/games/${sp.id}` });
@@ -173,7 +186,8 @@ describe('Saint Petersburg', () => {
           payload: { playerId, action },
         })
       ).json();
-    const read = async (viewer: string) => (await app.inject({ method: 'GET', url: `/games/${id}?viewer=${viewer}` })).json().game as PlayerViewShapeFull;
+    const read = async (viewer: string) =>
+      (await app.inject({ method: 'GET', url: `/games/${id}?viewer=${viewer}` })).json().game as PlayerViewShapeFull;
     const activeId = (game: PlayerViewShapeFull) => game.players[game.activePlayerIndex]!.id;
 
     // Both seats buy a worker from the upper row.
@@ -219,7 +233,13 @@ describe('Saint Petersburg', () => {
     const activeId = (g: PlayerViewShapeFull) => g.players[g.activePlayerIndex]!.id;
     const step = async (action: unknown) => {
       const seat = activeId(game);
-      game = (await app.inject({ method: 'POST', url: `/games/${id}/actions?viewer=${seat}`, payload: { playerId: seat, action } })).json().game;
+      game = (
+        await app.inject({
+          method: 'POST',
+          url: `/games/${id}/actions?viewer=${seat}`,
+          payload: { playerId: seat, action },
+        })
+      ).json().game;
     };
 
     game = (await app.inject({ method: 'GET', url: `/games/${id}?viewer=p1` })).json().game;
@@ -253,7 +273,8 @@ describe('Saint Petersburg', () => {
 
     // Redaction still holds after the round transitions: each seat sees its own rubles, the opponent's null.
     for (const seat of ['p1', 'p2']) {
-      const view = (await app.inject({ method: 'GET', url: `/games/${id}?viewer=${seat}` })).json().game as PlayerViewShapeFull;
+      const view = (await app.inject({ method: 'GET', url: `/games/${id}?viewer=${seat}` })).json()
+        .game as PlayerViewShapeFull;
       expect(view.players.find((p) => p.id === seat)!.rubles).not.toBeNull();
       expect(view.players.find((p) => p.id !== seat)!.rubles).toBeNull();
     }
@@ -264,19 +285,30 @@ describe('Saint Petersburg', () => {
   type HandView = {
     phase: string;
     activePlayerIndex: number;
-    players: { id: string; rubles: number | null; playArea: { worker: unknown[] }; hand: { id: string; cost: number }[] | null; handCount: number }[];
+    players: {
+      id: string;
+      rubles: number | null;
+      playArea: { worker: unknown[] };
+      hand: { id: string; cost: number }[] | null;
+      handCount: number;
+    }[];
     board: { upper: unknown[] };
   };
 
   it('adds a card to hand over REST — the row slot empties; opponents see the count, owner the contents (SP3)', async () => {
     const id = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game.id as string;
-    const read = async (viewer: string) => (await app.inject({ method: 'GET', url: `/games/${id}?viewer=${viewer}` })).json().game as HandView;
+    const read = async (viewer: string) =>
+      (await app.inject({ method: 'GET', url: `/games/${id}?viewer=${viewer}` })).json().game as HandView;
 
     // The active seat adds an upper-row card to its hand — free.
     const start = await read('p1');
     const owner = start.players[start.activePlayerIndex]!.id;
     const opp = start.players.find((p) => p.id !== owner)!.id;
-    const res = await app.inject({ method: 'POST', url: `/games/${id}/actions?viewer=${owner}`, payload: { playerId: owner, action: { type: 'ADD_TO_HAND', row: 'upper', index: 0 } } });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions?viewer=${owner}`,
+      payload: { playerId: owner, action: { type: 'ADD_TO_HAND', row: 'upper', index: 0 } },
+    });
     expect(res.statusCode).toBe(200);
 
     // Owner's own view: contents visible, rubles unchanged (add is free), the row slot emptied.
@@ -291,7 +323,9 @@ describe('Saint Petersburg', () => {
     // Opponent's view: the owner's hand is a COUNT only — contents null, and the taken card's instance id
     // is nowhere on the opponent's wire (it left the shared row and the hand is redacted).
     const oppRaw = (await app.inject({ method: 'GET', url: `/games/${id}?viewer=${opp}` })).json();
-    const oppOwner = (oppRaw.game.players as { id: string; hand: unknown; handCount: number }[]).find((p) => p.id === owner)!;
+    const oppOwner = (oppRaw.game.players as { id: string; hand: unknown; handCount: number }[]).find(
+      (p) => p.id === owner,
+    )!;
     expect(oppOwner.hand).toBeNull();
     expect(oppOwner.handCount).toBe(1);
     expect(JSON.stringify(oppRaw.game)).not.toContain(takenId);
@@ -302,8 +336,15 @@ describe('Saint Petersburg', () => {
   it('plays a card from hand in a later phase over REST — the cost is charged (SP3)', async () => {
     const id = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game.id as string;
     const act = async (playerId: string, action: unknown) =>
-      (await app.inject({ method: 'POST', url: `/games/${id}/actions?viewer=${playerId}`, payload: { playerId, action } })).json();
-    const read = async (viewer: string) => (await app.inject({ method: 'GET', url: `/games/${id}?viewer=${viewer}` })).json().game as HandView;
+      (
+        await app.inject({
+          method: 'POST',
+          url: `/games/${id}/actions?viewer=${playerId}`,
+          payload: { playerId, action },
+        })
+      ).json();
+    const read = async (viewer: string) =>
+      (await app.inject({ method: 'GET', url: `/games/${id}?viewer=${viewer}` })).json().game as HandView;
     const activeId = (g: HandView) => g.players[g.activePlayerIndex]!.id;
 
     // The active seat (the "holder") adds a worker to hand in the worker phase.
@@ -340,7 +381,8 @@ describe('Saint Petersburg', () => {
     const id = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game.id as string;
     const act = async (playerId: string, action: unknown) =>
       app.inject({ method: 'POST', url: `/games/${id}/actions?viewer=${playerId}`, payload: { playerId, action } });
-    const read = async () => (await app.inject({ method: 'GET', url: `/games/${id}?viewer=p1` })).json().game as HandView;
+    const read = async () =>
+      (await app.inject({ method: 'GET', url: `/games/${id}?viewer=p1` })).json().game as HandView;
     const add = { type: 'ADD_TO_HAND', row: 'upper', index: 0 } as const;
 
     // The holder fills its hand to the limit of 3, handing the turn back through the other seat each time.
@@ -391,15 +433,26 @@ describe('Saint Petersburg', () => {
     await app2.ready();
     try {
       const id = (
-        await app2.inject({ method: 'POST', url: '/games', payload: { gameType: 'stpetersburg', players: [{ name: 'Ann' }, { name: 'Bob' }] } })
+        await app2.inject({
+          method: 'POST',
+          url: '/games',
+          payload: { gameType: 'stpetersburg', players: [{ name: 'Ann' }, { name: 'Bob' }] },
+        })
       ).json().game.id as string;
 
       const readAs = async (viewer: string) =>
         (await app2.inject({ method: 'GET', url: `/games/${id}?viewer=${viewer}` })).json().game as DriveView;
       const post = async (seat: string, action: Action) =>
-        (await app2.inject({ method: 'POST', url: `/games/${id}/actions?viewer=${seat}`, payload: { playerId: seat, action } })).json().game as DriveView;
+        (
+          await app2.inject({
+            method: 'POST',
+            url: `/games/${id}/actions?viewer=${seat}`,
+            payload: { playerId: seat, action },
+          })
+        ).json().game as DriveView;
       const activeId = (g: DriveView) => g.players[g.activePlayerIndex]!.id;
-      const isTradeBuy = (a: Action): a is Extract<Action, { type: 'BUY' }> => a.type === 'BUY' && a.displace !== undefined;
+      const isTradeBuy = (a: Action): a is Extract<Action, { type: 'BUY' }> =>
+        a.type === 'BUY' && a.displace !== undefined;
 
       let cursor = await readAs('p1');
       let done: { seat: string; before: DriveView; action: Extract<Action, { type: 'BUY' }> } | undefined;
@@ -426,7 +479,10 @@ describe('Saint Petersburg', () => {
       expect(target).toBeDefined(); // the card we're about to displace, in the buyer's play area
 
       const after = await post(seat, action);
-      const log = after.log.at(-1) as { type: string; payload: { cost: number; cardKey: string; displacedName?: string } };
+      const log = after.log.at(-1) as {
+        type: string;
+        payload: { cost: number; cardKey: string; displacedName?: string };
+      };
       expect(log.type).toBe('BUY');
       expect(log.payload.displacedName).toBeTruthy(); // the feed names the displaced card
       // The displaced card is gone from the play area; the discard grew by exactly one.
@@ -442,7 +498,11 @@ describe('Saint Petersburg', () => {
   });
 
   it('creates via a lobby and enforces the 2–4 seat range', async () => {
-    const tooMany = await app.inject({ method: 'POST', url: '/lobbies', payload: { seats: 5, gameType: 'stpetersburg' } });
+    const tooMany = await app.inject({
+      method: 'POST',
+      url: '/lobbies',
+      payload: { seats: 5, gameType: 'stpetersburg' },
+    });
     expect(tooMany.statusCode).toBe(400);
     const ok = await app.inject({ method: 'POST', url: '/lobbies', payload: { seats: 4, gameType: 'stpetersburg' } });
     expect(ok.statusCode).toBe(201);
@@ -461,7 +521,8 @@ describe('Saint Petersburg', () => {
     expect(view.board.stacks).toMatchObject({ worker: 25, building: 28, aristocrat: 27, trading: 30 });
 
     // A spectator sees no rubles at all.
-    const spec = (await app.inject({ method: 'GET', url: `/games/${id}?viewer=nobody` })).json().game as PlayerViewShape;
+    const spec = (await app.inject({ method: 'GET', url: `/games/${id}?viewer=nobody` })).json()
+      .game as PlayerViewShape;
     expect(spec.players.every((p) => p.rubles === null)).toBe(true);
   });
 
@@ -469,7 +530,8 @@ describe('Saint Petersburg', () => {
 
   it('accepts the SP5 client actions and cleanly refuses them out of context (parseAction + engine locks)', async () => {
     const id = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game.id as string;
-    const start = (await app.inject({ method: 'GET', url: `/games/${id}?viewer=p1` })).json().game as PlayerViewShapeFull;
+    const start = (await app.inject({ method: 'GET', url: `/games/${id}?viewer=p1` })).json()
+      .game as PlayerViewShapeFull;
     const seat = start.players[start.activePlayerIndex]!.id;
     const post = (action: unknown) =>
       app.inject({ method: 'POST', url: `/games/${id}/actions?viewer=${seat}`, payload: { playerId: seat, action } });
@@ -509,7 +571,11 @@ describe('Saint Petersburg', () => {
     await app2.ready();
     try {
       const id = (
-        await app2.inject({ method: 'POST', url: '/games', payload: { gameType: 'stpetersburg', players: [{ name: 'Ann' }, { name: 'Bob' }] } })
+        await app2.inject({
+          method: 'POST',
+          url: '/games',
+          payload: { gameType: 'stpetersburg', players: [{ name: 'Ann' }, { name: 'Bob' }] },
+        })
       ).json().game.id as string;
 
       type SpecCard = { id: string; kind: string; special?: string };
@@ -520,11 +586,23 @@ describe('Saint Petersburg', () => {
         observatoryUsed: string[];
         pendingPubBuy?: { queue: number[] };
         pendingDraw?: { seat: number; stack: string; card: SpecCard; observatoryId: string };
-        players: { id: string; rubles: number | null; points: number; hand: SpecCard[] | null; handCount: number; playArea: { worker: SpecCard[]; building: SpecCard[]; aristocrat: SpecCard[] } }[];
+        players: {
+          id: string;
+          rubles: number | null;
+          points: number;
+          hand: SpecCard[] | null;
+          handCount: number;
+          playArea: { worker: SpecCard[]; building: SpecCard[]; aristocrat: SpecCard[] };
+        }[];
       };
-      const readAs = async (viewer: string) => (await app2.inject({ method: 'GET', url: `/games/${id}?viewer=${viewer}` })).json().game as SpecView;
+      const readAs = async (viewer: string) =>
+        (await app2.inject({ method: 'GET', url: `/games/${id}?viewer=${viewer}` })).json().game as SpecView;
       const post = async (seat: string, action: unknown) =>
-        app2.inject({ method: 'POST', url: `/games/${id}/actions?viewer=${seat}`, payload: { playerId: seat, action } });
+        app2.inject({
+          method: 'POST',
+          url: `/games/${id}/actions?viewer=${seat}`,
+          payload: { playerId: seat, action },
+        });
       const activeId = (g: SpecView) => g.players[g.activePlayerIndex]!.id;
       const owns = (g: SpecView, seat: string, special: string) =>
         g.players.find((p) => p.id === seat)!.playArea.building.some((c) => c.special === special);
@@ -570,8 +648,12 @@ describe('Saint Petersburg', () => {
 
         // Building phase, I own an unflipped Observatory → use it (draw the top of a ≥2-card stack).
         if (view.phase === 'building' && !observatoryResolved) {
-          const obs = me.playArea.building.find((c) => c.special === 'observatory' && !view.observatoryUsed.includes(c.id));
-          const stack = (['worker', 'building', 'aristocrat', 'trading'] as const).find((k) => view.board.stacks[k]! >= 2);
+          const obs = me.playArea.building.find(
+            (c) => c.special === 'observatory' && !view.observatoryUsed.includes(c.id),
+          );
+          const stack = (['worker', 'building', 'aristocrat', 'trading'] as const).find(
+            (k) => view.board.stacks[k]! >= 2,
+          );
           if (obs && stack) {
             await post(seat, { type: 'OBSERVATORY_DRAW', stack });
             continue;
@@ -581,13 +663,21 @@ describe('Saint Petersburg', () => {
         // Warehouse (pg. 8): once I own one and a phase has ≥5 board cards, hold a 4th card in hand — proof
         // the limit rose above 3 (a non-owner's HAND_FULL at 3 is the SP3 test). Hand the turn back via an
         // opponent pass between adds.
-        if (!warehouseChecked && owns(view, seat, 'warehouse') && view.board.upper.length + view.board.lower.length >= 5) {
+        if (
+          !warehouseChecked &&
+          owns(view, seat, 'warehouse') &&
+          view.board.upper.length + view.board.lower.length >= 5
+        ) {
           const opp = view.players.find((p) => p.id !== seat)!.id;
           let handCount = me.handCount;
           let guard = 0;
           while (handCount < 4 && guard < 12) {
             const g = await readAs(seat);
-            if (activeId(g) !== seat) { await post(opp, { type: 'PASS' }); guard += 1; continue; }
+            if (activeId(g) !== seat) {
+              await post(opp, { type: 'PASS' });
+              guard += 1;
+              continue;
+            }
             const row = g.board.upper.length > 0 ? 'upper' : 'lower';
             const res = await post(seat, { type: 'ADD_TO_HAND', row, index: 0 });
             if (res.statusCode !== 200) break;
@@ -600,10 +690,14 @@ describe('Saint Petersburg', () => {
 
         // Otherwise: grab a special building we don't yet own (cheap: pub/warehouse/observatory/potemkin),
         // else buy the cheapest affordable card, else pass to move the phase along and accrue income.
-        const rows = [...view.board.upper.map((c, i) => ({ c, row: 'upper' as const, i })), ...view.board.lower.map((c, i) => ({ c, row: 'lower' as const, i }))];
+        const rows = [
+          ...view.board.upper.map((c, i) => ({ c, row: 'upper' as const, i })),
+          ...view.board.lower.map((c, i) => ({ c, row: 'lower' as const, i })),
+        ];
         const special = rows.find(({ c }) => c.kind === 'building' && c.special && !owns(view, seat, c.special));
         const target = special ?? rows.find(({ c }) => c.kind !== 'trading');
-        if (target && (await post(seat, { type: 'BUY', row: target.row, index: target.i })).statusCode === 200) continue;
+        if (target && (await post(seat, { type: 'BUY', row: target.row, index: target.i })).statusCode === 200)
+          continue;
         await post(seat, { type: 'PASS' });
       }
 
@@ -620,7 +714,15 @@ describe('Saint Petersburg', () => {
   // ── SP6 game end + final scoring (pg. 5–6) ──
 
   /** A throwaway aristocrat card instance (only its identity `key` matters for final scoring). */
-  const aristocrat = (key: string, id = `${key}-1`): Card => ({ id, key, kind: 'aristocrat', name: key, cost: 4, income: 0, points: 0 });
+  const aristocrat = (key: string, id = `${key}-1`): Card => ({
+    id,
+    key,
+    kind: 'aristocrat',
+    name: key,
+    cost: 4,
+    income: 0,
+    points: 0,
+  });
 
   it('ends the game into final scoring at the final round’s trading close — exact breakdown + winners (SP6)', async () => {
     // Seed a near-end state through the repository seam (the persistedCompat.test.ts pattern) — deterministic
@@ -634,22 +736,53 @@ describe('Saint Petersburg', () => {
       consecutivePasses: 1, // 2 players → one more consecutive pass closes trading → the game ends
       activePlayerIndex: 0,
       players: [
-        { id: 'p1', name: 'Ann', rubles: 25, points: 40, playArea: { worker: [], building: [], aristocrat: [aristocrat('scribe', 'p1-a1'), aristocrat('clerk', 'p1-a2')] }, hand: [] },
-        { id: 'p2', name: 'Bob', rubles: 5, points: 10, playArea: { worker: [], building: [], aristocrat: [] }, hand: [aristocrat('judge', 'p2-h1')] },
+        {
+          id: 'p1',
+          name: 'Ann',
+          rubles: 25,
+          points: 40,
+          playArea: {
+            worker: [],
+            building: [],
+            aristocrat: [aristocrat('scribe', 'p1-a1'), aristocrat('clerk', 'p1-a2')],
+          },
+          hand: [],
+        },
+        {
+          id: 'p2',
+          name: 'Bob',
+          rubles: 5,
+          points: 10,
+          playArea: { worker: [], building: [], aristocrat: [] },
+          hand: [aristocrat('judge', 'p2-h1')],
+        },
       ],
     };
     new GameRepository(db).create(stPetersburgModule, seeded);
 
     // Before the close: an opponent's rubles + hand are redacted for p1.
-    const before = (await app.inject({ method: 'GET', url: '/games/sp-end?viewer=p1' })).json().game as { status: string; players: { rubles: number | null; hand: unknown }[] };
+    const before = (await app.inject({ method: 'GET', url: '/games/sp-end?viewer=p1' })).json().game as {
+      status: string;
+      players: { rubles: number | null; hand: unknown }[];
+    };
     expect(before.status).toBe('active');
     expect(before.players[1]!.rubles).toBeNull();
     expect(before.players[1]!.hand).toBeNull();
 
     // The closing PASS ends the game.
-    const res = await app.inject({ method: 'POST', url: '/games/sp-end/actions?viewer=p1', payload: { playerId: 'p1', action: { type: 'PASS' } } });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/games/sp-end/actions?viewer=p1',
+      payload: { playerId: 'p1', action: { type: 'PASS' } },
+    });
     expect(res.statusCode).toBe(200);
-    const ended = res.json().game as { status: string; round: number; results: StPetersburgResult[]; winnerIds: string[]; players: { id: string; rubles: number | null; hand: unknown[] | null }[] };
+    const ended = res.json().game as {
+      status: string;
+      round: number;
+      results: StPetersburgResult[];
+      winnerIds: string[];
+      players: { id: string; rubles: number | null; hand: unknown[] | null }[];
+    };
 
     expect(ended.status).toBe('ended');
     expect(ended.round).toBe(base.round); // did NOT roll into a new round
@@ -665,7 +798,9 @@ describe('Saint Petersburg', () => {
     expect(ended.players[1]!.hand).toHaveLength(1);
 
     // And a subsequent read, even as a spectator, is fully revealed.
-    const spec = (await app.inject({ method: 'GET', url: '/games/sp-end?viewer=nobody' })).json().game as { players: { rubles: number | null }[] };
+    const spec = (await app.inject({ method: 'GET', url: '/games/sp-end?viewer=nobody' })).json().game as {
+      players: { rubles: number | null }[];
+    };
     expect(spec.players.every((p) => p.rubles !== null)).toBe(true);
 
     // Ended games drop out of the in-progress resume list (summarize.status = 'ended', filtered in listActive).
@@ -691,17 +826,36 @@ describe('Saint Petersburg', () => {
         // deal empties it (places the last trading card).
         upper: base.board.stacks.worker.slice(0, 7),
         lower: [],
-        stacks: { worker: base.board.stacks.worker.slice(7), building: [], aristocrat: [], trading: base.board.stacks.trading.slice(0, 1) },
+        stacks: {
+          worker: base.board.stacks.worker.slice(7),
+          building: [],
+          aristocrat: [],
+          trading: base.board.stacks.trading.slice(0, 1),
+        },
         discard: 0,
       },
     };
     new GameRepository(db).create(stPetersburgModule, seeded);
 
-    type SeqView = { status: string; phase: string; finalRound: boolean; round: number; activePlayerIndex: number; players: { id: string }[] };
-    const read = async () => (await app.inject({ method: 'GET', url: '/games/sp-seq?viewer=p1' })).json().game as SeqView;
+    type SeqView = {
+      status: string;
+      phase: string;
+      finalRound: boolean;
+      round: number;
+      activePlayerIndex: number;
+      players: { id: string }[];
+    };
+    const read = async () =>
+      (await app.inject({ method: 'GET', url: '/games/sp-seq?viewer=p1' })).json().game as SeqView;
     const passActive = async (g: SeqView) => {
       const seat = g.players[g.activePlayerIndex]!.id;
-      return (await app.inject({ method: 'POST', url: `/games/sp-seq/actions?viewer=${seat}`, payload: { playerId: seat, action: { type: 'PASS' } } })).json().game as SeqView;
+      return (
+        await app.inject({
+          method: 'POST',
+          url: `/games/sp-seq/actions?viewer=${seat}`,
+          payload: { playerId: seat, action: { type: 'PASS' } },
+        })
+      ).json().game as SeqView;
     };
 
     // The aristocrat close arms finalRound (its refill emptied the trading stack) and opens the trading phase.
@@ -759,7 +913,15 @@ describe('Saint Petersburg', () => {
  */
 describe('Saint Petersburg — full seeded games to a real end (SP7)', () => {
   /** Every action type Saint Petersburg logs — used to prove no log entry is an unknown move. */
-  const KNOWN_TYPES = new Set(['BUY', 'ADD_TO_HAND', 'PLAY_FROM_HAND', 'PASS', 'PUB_BUY', 'OBSERVATORY_DRAW', 'OBSERVATORY_RESOLVE']);
+  const KNOWN_TYPES = new Set([
+    'BUY',
+    'ADD_TO_HAND',
+    'PLAY_FROM_HAND',
+    'PASS',
+    'PUB_BUY',
+    'OBSERVATORY_DRAW',
+    'OBSERVATORY_RESOLVE',
+  ]);
 
   type FullCard = { id: string; kind: string; special?: string };
   type FullView = {
@@ -784,7 +946,15 @@ describe('Saint Petersburg — full seeded games to a real end (SP7)', () => {
     winnerIds?: string[];
     log: { type: string; seq: number }[];
   };
-  type Coverage = { upperBuy: boolean; lowerBuy: boolean; addToHand: boolean; playFromHand: boolean; tradeDisplace: boolean; pubBuy: boolean; observatory: boolean };
+  type Coverage = {
+    upperBuy: boolean;
+    lowerBuy: boolean;
+    addToHand: boolean;
+    playFromHand: boolean;
+    tradeDisplace: boolean;
+    pubBuy: boolean;
+    observatory: boolean;
+  };
 
   /**
    * Play one seeded game to its end over REST, returning the ended (fully-revealed) view + the coverage
@@ -792,14 +962,35 @@ describe('Saint Petersburg — full seeded games to a real end (SP7)', () => {
    * the Pub/Observatory windows), takes a card to hand early then plays it, prefers a trading-card
    * displacement, and buys from whichever row it hasn't used yet — so one game touches the whole surface.
    */
-  async function playToEnd(app: FastifyInstance, playerCount: number, seed: number): Promise<{ ended: FullView; cover: Coverage; steps: number }> {
+  async function playToEnd(
+    app: FastifyInstance,
+    playerCount: number,
+    _seed: number,
+  ): Promise<{ ended: FullView; cover: Coverage; steps: number }> {
     const names = [{ name: 'Ann' }, { name: 'Bob' }, { name: 'Cid' }, { name: 'Dee' }].slice(0, playerCount);
-    const id = (await app.inject({ method: 'POST', url: '/games', payload: { gameType: 'stpetersburg', players: names } })).json().game.id as string;
-    const readAs = async (seat: string) => (await app.inject({ method: 'GET', url: `/games/${id}?viewer=${seat}` })).json().game as FullView;
+    const id = (
+      await app.inject({ method: 'POST', url: '/games', payload: { gameType: 'stpetersburg', players: names } })
+    ).json().game.id as string;
+    const readAs = async (seat: string) =>
+      (await app.inject({ method: 'GET', url: `/games/${id}?viewer=${seat}` })).json().game as FullView;
     const post = async (seat: string, action: unknown) =>
-      (await app.inject({ method: 'POST', url: `/games/${id}/actions?viewer=${seat}`, payload: { playerId: seat, action } })).json().game as FullView;
+      (
+        await app.inject({
+          method: 'POST',
+          url: `/games/${id}/actions?viewer=${seat}`,
+          payload: { playerId: seat, action },
+        })
+      ).json().game as FullView;
 
-    const cover: Coverage = { upperBuy: false, lowerBuy: false, addToHand: false, playFromHand: false, tradeDisplace: false, pubBuy: false, observatory: false };
+    const cover: Coverage = {
+      upperBuy: false,
+      lowerBuy: false,
+      addToHand: false,
+      playFromHand: false,
+      tradeDisplace: false,
+      pubBuy: false,
+      observatory: false,
+    };
     let lastVersion = -1;
 
     let view = await readAs('p1');
@@ -825,9 +1016,13 @@ describe('Saint Petersburg — full seeded games to a real end (SP7)', () => {
       }
       // Observatory draw (building phase): view stacks are counts, so legalActions can't offer this —
       // drive it directly, exactly as a client would from its own view.
-      const observatory = me.playArea.building.find((c) => c.special === 'observatory' && !view.observatoryUsed.includes(c.id));
+      const observatory = me.playArea.building.find(
+        (c) => c.special === 'observatory' && !view.observatoryUsed.includes(c.id),
+      );
       if (view.phase === 'building' && observatory) {
-        const stack = (['building', 'aristocrat', 'worker', 'trading'] as const).find((k) => view.board.stacks[k]! >= 2);
+        const stack = (['building', 'aristocrat', 'worker', 'trading'] as const).find(
+          (k) => view.board.stacks[k]! >= 2,
+        );
         if (stack) {
           cover.observatory = true;
           view = await post(seat, { type: 'OBSERVATORY_DRAW', stack });
@@ -839,7 +1034,10 @@ describe('Saint Petersburg — full seeded games to a real end (SP7)', () => {
       const actions = legalActions(view as unknown as StPetersburgState, seat);
 
       // A trading-card displacement whenever one is legal (pg. 7).
-      const trade = actions.find((a): a is Extract<Action, { type: 'BUY' | 'PLAY_FROM_HAND' }> => (a.type === 'BUY' || a.type === 'PLAY_FROM_HAND') && a.displace !== undefined);
+      const trade = actions.find(
+        (a): a is Extract<Action, { type: 'BUY' | 'PLAY_FROM_HAND' }> =>
+          (a.type === 'BUY' || a.type === 'PLAY_FROM_HAND') && a.displace !== undefined,
+      );
       if (trade) {
         cover.tradeDisplace = true;
         view = await post(seat, trade);
@@ -868,7 +1066,12 @@ describe('Saint Petersburg — full seeded games to a real end (SP7)', () => {
         ...view.board.lower.map((c, i) => ({ c, row: 'lower' as const, i })),
       ];
       const special = rows.find(({ c }) => c.kind === 'building' && c.special && !ownedSpecials.has(c.special));
-      const specialBuy = special && actions.find((a): a is Extract<Action, { type: 'BUY' }> => a.type === 'BUY' && a.row === special.row && a.index === special.i);
+      const specialBuy =
+        special &&
+        actions.find(
+          (a): a is Extract<Action, { type: 'BUY' }> =>
+            a.type === 'BUY' && a.row === special.row && a.index === special.i,
+        );
       if (special && specialBuy) {
         if (special.row === 'upper') cover.upperBuy = true;
         else cover.lowerBuy = true;
@@ -876,7 +1079,9 @@ describe('Saint Petersburg — full seeded games to a real end (SP7)', () => {
         continue;
       }
       // Otherwise buy — preferring the row we haven't covered yet, so both get exercised.
-      const plainBuys = actions.filter((a): a is Extract<Action, { type: 'BUY' }> => a.type === 'BUY' && a.displace === undefined);
+      const plainBuys = actions.filter(
+        (a): a is Extract<Action, { type: 'BUY' }> => a.type === 'BUY' && a.displace === undefined,
+      );
       const lower = plainBuys.find((a) => a.row === 'lower');
       const upper = plainBuys.find((a) => a.row === 'upper');
       const pick = (!cover.lowerBuy && lower) || (!cover.upperBuy && upper) || lower || upper;
@@ -936,7 +1141,15 @@ describe('Saint Petersburg — full seeded games to a real end (SP7)', () => {
         expect(steps).toBeLessThan(5000); // terminated well within the cap
 
         // The whole action surface was exercised in this one seeded game.
-        expect(cover).toEqual({ upperBuy: true, lowerBuy: true, addToHand: true, playFromHand: true, tradeDisplace: true, pubBuy: true, observatory: true });
+        expect(cover).toEqual({
+          upperBuy: true,
+          lowerBuy: true,
+          addToHand: true,
+          playFromHand: true,
+          tradeDisplace: true,
+          pubBuy: true,
+          observatory: true,
+        });
 
         assertCoherentEnd(ended);
         assertLogReplaysSanely(ended);
@@ -960,7 +1173,16 @@ describe('mapStPetersburgError', () => {
     expect(mapStPetersburgError(new GameError('INVALID_DISPLACE_TARGET', 'x'))?.status).toBe(409);
     expect(mapStPetersburgError(new GameError('HAND_FULL', 'x'))?.status).toBe(409);
     // SP5 special-card codes all map to 409 (a legal-looking move this state refuses).
-    for (const code of ['PUB_PENDING', 'DRAW_PENDING', 'NO_PUB_PENDING', 'NO_DRAW_PENDING', 'INVALID_PUB_POINTS', 'OBSERVATORY_UNAVAILABLE', 'STACK_TOO_SMALL', 'INVALID_RESOLVE_CHOICE'] as const) {
+    for (const code of [
+      'PUB_PENDING',
+      'DRAW_PENDING',
+      'NO_PUB_PENDING',
+      'NO_DRAW_PENDING',
+      'INVALID_PUB_POINTS',
+      'OBSERVATORY_UNAVAILABLE',
+      'STACK_TOO_SMALL',
+      'INVALID_RESOLVE_CHOICE',
+    ] as const) {
       expect(mapStPetersburgError(new GameError(code, 'x'))?.status).toBe(409);
     }
     expect(mapStPetersburgError(new Error('not ours'))).toBeNull();
@@ -993,7 +1215,13 @@ describe('Saint Petersburg bots (SP9)', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/games',
-      payload: { gameType: 'stpetersburg', players: [{ name: 'Ann', bot: true }, { name: 'Bob', bot: true }] },
+      payload: {
+        gameType: 'stpetersburg',
+        players: [
+          { name: 'Ann', bot: true },
+          { name: 'Bob', bot: true },
+        ],
+      },
     });
     expect(response.statusCode).toBe(201);
     const game = response.json().game;

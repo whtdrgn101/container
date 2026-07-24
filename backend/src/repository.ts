@@ -20,9 +20,7 @@ export class SchemaUnsupportedError extends Error {
     readonly rowVersion: number,
     readonly moduleVersion: number,
   ) {
-    super(
-      `Game "${gameId}" was saved at schema v${rowVersion}, newer than this server's v${moduleVersion}`,
-    );
+    super(`Game "${gameId}" was saved at schema v${rowVersion}, newer than this server's v${moduleVersion}`);
     this.name = 'SchemaUnsupportedError';
   }
 }
@@ -107,8 +105,7 @@ export class GameRepository {
    */
   typeOf(id: string): string | undefined {
     const row = this.db.prepare(`SELECT game_type FROM games WHERE id = ?`).get(id) as
-      | { game_type: string }
-      | undefined;
+      { game_type: string } | undefined;
     return row?.game_type;
   }
 
@@ -128,8 +125,7 @@ export class GameRepository {
    */
   get(module: AnyGameModule, id: string): unknown {
     const row = this.db.prepare(`SELECT state, schema_version FROM games WHERE id = ?`).get(id) as
-      | { state: string; schema_version: number }
-      | undefined;
+      { state: string; schema_version: number } | undefined;
     return row ? this.upgraded(module, id, row.state, row.schema_version) : undefined;
   }
 
@@ -186,8 +182,7 @@ export class GameRepository {
   /** True if this game has been abandoned (and so must not be played on). False for an unknown game. */
   isAbandoned(id: string): boolean {
     const row = this.db.prepare(`SELECT abandoned_at FROM games WHERE id = ?`).get(id) as
-      | { abandoned_at: string | null }
-      | undefined;
+      { abandoned_at: string | null } | undefined;
     return row?.abandoned_at != null;
   }
 
@@ -268,10 +263,7 @@ export class GameRepository {
       // A live write is always at the module's current shape, so it re-stamps `schema_version` too —
       // keeping the column truthful even if a migration and a move land in the same session.
       const args = [JSON.stringify(s), module.versionOf(s), now, this.schemaVersionOf(module), id];
-      const result =
-        expectedVersion === undefined
-          ? updateGame.run(...args)
-          : updateGame.run(...args, expectedVersion);
+      const result = expectedVersion === undefined ? updateGame.run(...args) : updateGame.run(...args, expectedVersion);
       if (expectedVersion !== undefined && result.changes === 0) {
         throw new StaleVersionError(id, expectedVersion);
       }

@@ -25,7 +25,10 @@ const owning = (resources: Partial<Record<Resource, number>>): StoneAgePlayer =>
   score: 0,
 });
 
-const fixed = (resources: Partial<Record<Resource, number>>): Building => ({ id: 'f', cost: { kind: 'fixed', resources } });
+const fixed = (resources: Partial<Record<Resource, number>>): Building => ({
+  id: 'f',
+  cost: { kind: 'fixed', resources },
+});
 const choice: Building = { id: 'c', cost: { kind: 'choice', count: 4, kinds: 2 } };
 const any: Building = { id: 'a', cost: { kind: 'any', min: 1, max: 7 } };
 
@@ -64,8 +67,12 @@ describe('payment maths', () => {
 
 describe('buildingPaymentError', () => {
   it('accepts an exact payment for a fixed building and rejects a wrong one', () => {
-    expect(buildingPaymentError(fixed({ wood: 2, brick: 1 }), { wood: 2, brick: 1 }, owning({ wood: 2, brick: 1 }))).toBeNull();
-    expect(buildingPaymentError(fixed({ wood: 2, brick: 1 }), { wood: 2 }, owning({ wood: 2 }))).toMatch(/exact resources/);
+    expect(
+      buildingPaymentError(fixed({ wood: 2, brick: 1 }), { wood: 2, brick: 1 }, owning({ wood: 2, brick: 1 })),
+    ).toBeNull();
+    expect(buildingPaymentError(fixed({ wood: 2, brick: 1 }), { wood: 2 }, owning({ wood: 2 }))).toMatch(
+      /exact resources/,
+    );
   });
 
   it('rejects a payment the player cannot afford or that is not whole', () => {
@@ -76,7 +83,9 @@ describe('buildingPaymentError', () => {
   it('enforces a choice building: exactly N resources from exactly K kinds', () => {
     expect(buildingPaymentError(choice, { wood: 2, brick: 2 }, owning({ wood: 2, brick: 2 }))).toBeNull();
     expect(buildingPaymentError(choice, { wood: 3 }, owning({ wood: 3 }))).toMatch(/exactly 4 resources/);
-    expect(buildingPaymentError(choice, { wood: 2, brick: 1, stone: 1 }, owning({ wood: 2, brick: 1, stone: 1 }))).toMatch(/2 different kinds/);
+    expect(
+      buildingPaymentError(choice, { wood: 2, brick: 1, stone: 1 }, owning({ wood: 2, brick: 1, stone: 1 })),
+    ).toMatch(/2 different kinds/);
   });
 
   it('enforces an any building: a total within its min..max', () => {

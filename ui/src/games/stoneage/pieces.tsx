@@ -7,7 +7,10 @@ export function AnyPips({ count }: { count: number }) {
   return (
     <span className="inline-flex items-center gap-0.5" aria-hidden>
       {Array.from({ length: count }, (_, i) => (
-        <span key={i} className="grid h-3.5 w-3.5 place-items-center rounded-full border border-dashed border-current text-[8px] font-bold opacity-70">
+        <span
+          key={i}
+          className="grid h-3.5 w-3.5 place-items-center rounded-full border border-dashed border-current text-[8px] font-bold opacity-70"
+        >
           ?
         </span>
       ))}
@@ -25,7 +28,9 @@ export function CostPips({ cost }: { cost: BuildingCost }) {
     return (
       <span className="inline-flex flex-wrap items-center gap-0.5" aria-hidden>
         {RESOURCES.flatMap((r) =>
-          Array.from({ length: cost.resources[r] ?? 0 }, (_, i) => <ResourceIcon key={`${r}-${i}`} resource={r} className="h-4 w-4" />),
+          Array.from({ length: cost.resources[r] ?? 0 }, (_, i) => (
+            <ResourceIcon key={`${r}-${i}`} resource={r} className="h-4 w-4" />
+          )),
         )}
       </span>
     );
@@ -35,7 +40,10 @@ export function CostPips({ cost }: { cost: BuildingCost }) {
     return (
       <span className="inline-flex items-center gap-1" aria-hidden>
         {Array.from({ length: cost.kinds }, (_, k) => (
-          <span key={k} className="inline-flex gap-0.5 rounded border border-dashed border-current px-0.5 py-px opacity-90">
+          <span
+            key={k}
+            className="inline-flex gap-0.5 rounded border border-dashed border-current px-0.5 py-px opacity-90"
+          >
             <AnyPips count={perKind} />
           </span>
         ))}

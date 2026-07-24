@@ -3,14 +3,17 @@ import type { Color, PlayerState } from '../index';
 import { ACTIONS_PER_TURN, deliver, getPlayer, STARTING_MONEY } from '../index';
 import { expectError, makeGame, makePlayer, newGame } from './helpers';
 
-const atIsland = (cargo: Color[]) =>
-  makePlayer({ id: 'p1', ship: { location: { kind: 'island' }, cargo } });
+const atIsland = (cargo: Color[]) => makePlayer({ id: 'p1', ship: { location: { kind: 'island' }, cargo } });
 
 const three = (p1: PlayerState, p2: PlayerState, p3: PlayerState) => makeGame([p1, p2, p3]);
 
 describe('deliver', () => {
   it('awards cargo to the highest bidder and pays the deliverer double', () => {
-    const state = three(atIsland(['red', 'blue']), makePlayer({ id: 'p2', money: 10 }), makePlayer({ id: 'p3', money: 10 }));
+    const state = three(
+      atIsland(['red', 'blue']),
+      makePlayer({ id: 'p2', money: 10 }),
+      makePlayer({ id: 'p3', money: 10 }),
+    );
     const next = deliver(state, 'p1', { bids: { p2: 5, p3: 3 } });
 
     // p2 wins with $5: pays $5 and takes both containers to their scoring area.
@@ -24,7 +27,11 @@ describe('deliver', () => {
     // Turn passes on.
     expect(next.activePlayerIndex).toBe(1);
     expect(next.actionsRemaining).toBe(ACTIONS_PER_TURN);
-    expect(next.log.at(-1)).toMatchObject({ type: 'DELIVER', playerId: 'p1', payload: { winnerId: 'p2', winningBid: 5 } });
+    expect(next.log.at(-1)).toMatchObject({
+      type: 'DELIVER',
+      playerId: 'p1',
+      payload: { winnerId: 'p2', winningBid: 5 },
+    });
   });
 
   // Rulebook pg. 16: "If there is still a tie after a runoff auction, the player delivering
@@ -137,12 +144,21 @@ describe('deliver', () => {
   });
 
   it('rejects delivering when the ship is not at the island', () => {
-    expectError(() => deliver(three(makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })), 'p1', { bids: {} }), 'INVALID_DELIVERY');
+    expectError(
+      () =>
+        deliver(three(makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })), 'p1', {
+          bids: {},
+        }),
+      'INVALID_DELIVERY',
+    );
   });
 
   it('rejects delivering with an empty ship', () => {
     const p1 = makePlayer({ id: 'p1', ship: { location: { kind: 'island' }, cargo: [] } });
-    expectError(() => deliver(three(p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })), 'p1', { bids: {} }), 'INVALID_DELIVERY');
+    expectError(
+      () => deliver(three(p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })), 'p1', { bids: {} }),
+      'INVALID_DELIVERY',
+    );
   });
 
   it('rejects a negative bid', () => {
@@ -181,13 +197,20 @@ describe('deliver', () => {
   });
 
   it('lets the deliverer buy out the auction and keep the containers', () => {
-    const state = three(atIsland(['red', 'green']), makePlayer({ id: 'p2', money: 10 }), makePlayer({ id: 'p3', money: 10 }));
+    const state = three(
+      atIsland(['red', 'green']),
+      makePlayer({ id: 'p2', money: 10 }),
+      makePlayer({ id: 'p3', money: 10 }),
+    );
     const next = deliver(state, 'p1', { bids: { p2: 5, p3: 3 }, buyout: true }); // highest bid is $5 → buyout costs $5
     expect(getPlayer(next, 'p1').scoringArea).toEqual(['red', 'green']); // deliverer keeps them
     expect(getPlayer(next, 'p1').money).toBe(STARTING_MONEY - 5); // paid buyout, no subsidy
     expect(getPlayer(next, 'p1').ship.cargo).toEqual([]);
     expect(getPlayer(next, 'p2').money).toBe(10); // the bidder pays nothing on a buyout
-    expect(next.log.at(-1)).toMatchObject({ type: 'DELIVER', payload: { winnerId: 'p1', winningBid: 5, buyout: true } });
+    expect(next.log.at(-1)).toMatchObject({
+      type: 'DELIVER',
+      payload: { winnerId: 'p1', winningBid: 5, buyout: true },
+    });
   });
 
   it('rejects a buyout the deliverer cannot afford', () => {

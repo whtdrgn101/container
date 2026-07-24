@@ -1,5 +1,14 @@
 import type { GameEndState, Viewer } from '../../kernel';
-import type { Card, CardKind, PendingDraw, PendingPubBuy, Phase, PlayArea, StPetersburgState, StPetersburgResult } from './core';
+import type {
+  Card,
+  CardKind,
+  PendingDraw,
+  PendingPubBuy,
+  Phase,
+  PlayArea,
+  StPetersburgState,
+  StPetersburgResult,
+} from './core';
 
 // `Viewer` is a kernel primitive; re-export it so consumers import it from this surface.
 export type { Viewer } from '../../kernel';

@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyAction, endTurn, getPlayer, repayLoan, requestLoan, STARTING_MONEY } from '../index';
 import { expectError, makeGame, makePlayer } from './helpers';
 
-const three = (p1: ReturnType<typeof makePlayer>) =>
-  makeGame([p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
+const three = (p1: ReturnType<typeof makePlayer>) => makeGame([p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
 
 describe('requestLoan', () => {
   it('takes $10 and adds a loan', () => {
@@ -79,7 +78,9 @@ describe('start-of-turn interest', () => {
   });
 
   it('seizes from the ship when the scoring area is empty', () => {
-    const next = advanceToP2(makePlayer({ id: 'p2', loans: 2, money: 1, ship: { location: { kind: 'ocean' }, cargo: ['green'] } }));
+    const next = advanceToP2(
+      makePlayer({ id: 'p2', loans: 2, money: 1, ship: { location: { kind: 'ocean' }, cargo: ['green'] } }),
+    );
     expect(getPlayer(next, 'p2').ship.cargo).toEqual([]); // $1 paid, 1 seized from cargo
   });
 
@@ -89,7 +90,9 @@ describe('start-of-turn interest', () => {
   });
 
   it('seizes from the factory when nothing else remains', () => {
-    const next = advanceToP2(makePlayer({ id: 'p2', loans: 2, money: 1, factoryStore: [{ color: 'yellow', price: 2 }] }));
+    const next = advanceToP2(
+      makePlayer({ id: 'p2', loans: 2, money: 1, factoryStore: [{ color: 'yellow', price: 2 }] }),
+    );
     expect(getPlayer(next, 'p2').factoryStore).toEqual([]);
   });
 

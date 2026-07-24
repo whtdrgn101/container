@@ -1,11 +1,4 @@
-import {
-  CARD_KINDS,
-  GameError,
-  MAX_PLAYERS,
-  MIN_PLAYERS,
-  STARTING_RUBLES,
-  WORKER_ROW_SEED,
-} from './core';
+import { CARD_KINDS, GameError, MAX_PLAYERS, MIN_PLAYERS, STARTING_RUBLES, WORKER_ROW_SEED } from './core';
 import type { Card, CardKind, StPetersburgPlayer, StPetersburgState } from './core';
 import { dealMarkers, mintStack, shuffle } from './internal';
 

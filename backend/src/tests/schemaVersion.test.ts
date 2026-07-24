@@ -121,8 +121,9 @@ describe('state-schema migration on read (REVIEW §4.1)', () => {
   const seedV1ThenBootV2 = async (): Promise<{ v2: FastifyInstance; id: string }> => {
     const v1 = buildApp({ db, registry: new GameRegistry().register(counterV1), defaultGameType: 'counter' });
     await v1.ready();
-    const id = (await v1.inject({ method: 'POST', url: '/games', payload: { players: [{ name: 'Ann' }, { name: 'Bo' }] } }))
-      .json().game.id as string;
+    const id = (
+      await v1.inject({ method: 'POST', url: '/games', payload: { players: [{ name: 'Ann' }, { name: 'Bo' }] } })
+    ).json().game.id as string;
     await v1.close();
 
     const v2 = buildApp({ db, registry: new GameRegistry().register(counterV2), defaultGameType: 'counter' });
@@ -204,8 +205,9 @@ describe('state-schema downgrade refusal (REVIEW §4.1)', () => {
     db = createDatabase();
     app = buildApp({ db, registry: new GameRegistry().register(counterV2), defaultGameType: 'counter' });
     await app.ready();
-    id = (await app.inject({ method: 'POST', url: '/games', payload: { players: [{ name: 'Ann' }, { name: 'Bo' }] } }))
-      .json().game.id as string;
+    id = (
+      await app.inject({ method: 'POST', url: '/games', payload: { players: [{ name: 'Ann' }, { name: 'Bo' }] } })
+    ).json().game.id as string;
     // Stamp the row NEWER than the module reads — as if a future server wrote it, then we rolled back.
     db.prepare(`UPDATE games SET schema_version = 3 WHERE id = ?`).run(id);
   });

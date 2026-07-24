@@ -75,10 +75,7 @@ export function hasActionablePlacements(state: StoneAgeState, playerId: string):
 }
 
 /** Return all of a player's people — remove them from every place (fixed board + building slots). */
-function clearPlayer(
-  placements: StoneAgeState['placements'],
-  playerId: string,
-): StoneAgeState['placements'] {
+function clearPlayer(placements: StoneAgeState['placements'], playerId: string): StoneAgeState['placements'] {
   const next = {} as Record<PlaceId, Record<string, number>>;
   for (const place of ALL_PLACES) {
     const { [playerId]: _removed, ...rest } = placements[place];

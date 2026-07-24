@@ -34,11 +34,7 @@ import { displacementCost, handCost } from './buy';
  * `tookCardThisPhase`: the card came from a *stack*, not the board rows, so the pg. 8 board-refill gate
  * (about cards taken from the board) is untouched.
  */
-export function observatoryDraw(
-  state: StPetersburgState,
-  playerId: string,
-  stack: Card['kind'],
-): StPetersburgState {
+export function observatoryDraw(state: StPetersburgState, playerId: string, stack: Card['kind']): StPetersburgState {
   const seat = seatOf(state, playerId);
   const player = state.players[seat]!;
 
@@ -114,13 +110,19 @@ export function observatoryResolve(
     let cost: number;
     if (card.kind === 'trading') {
       if (displace === undefined) {
-        throw new GameError('DISPLACE_REQUIRED', `${card.name} is a trading card — name a card of yours to displace (pg. 7)`);
+        throw new GameError(
+          'DISPLACE_REQUIRED',
+          `${card.name} is a trading card — name a card of yours to displace (pg. 7)`,
+        );
       }
       displaced = validateDisplacement(player, card, displace, state.observatoryUsed);
       cost = displacementCost(player, card, displaced, undefined);
     } else {
       if (displace !== undefined) {
-        throw new GameError('DISPLACE_NOT_ALLOWED', `${card.name} is not a trading card — it displaces nothing (pg. 7)`);
+        throw new GameError(
+          'DISPLACE_NOT_ALLOWED',
+          `${card.name} is not a trading card — it displaces nothing (pg. 7)`,
+        );
       }
       cost = handCost(player, card); // drawn from no row → base reductions only, min 1 (Potjomkin pays 2)
     }

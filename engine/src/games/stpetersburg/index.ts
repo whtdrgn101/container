@@ -58,5 +58,16 @@ export type { BoardView, PlayerView, StPetersburgView, Viewer } from './view';
 // exported so the UI can show a card's real price (printed cost struck through when reductions apply, and
 // the trading-card difference math) with the exact rule the buy / hand-play charges. `legalDisplaceTargets`
 // lets the UI build a trading card's displacement picker (pg. 7).
-export { addToHand, applyAction, buy, costReductions, displacementCost, effectiveCost, handCost, legalActions, pass, playFromHand } from './actions';
+export {
+  addToHand,
+  applyAction,
+  buy,
+  costReductions,
+  displacementCost,
+  effectiveCost,
+  handCost,
+  legalActions,
+  pass,
+  playFromHand,
+} from './actions';
 export { legalDisplaceTargets, unusedObservatories } from './internal';

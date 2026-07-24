@@ -79,7 +79,14 @@ function Vignette({ kind }: { kind: CardKind }) {
         <g opacity="0.16">
           <rect x="30" y="92" width="26" height="36" rx="3" fill="#8f5a86" />
           <rect x="78" y="92" width="26" height="36" rx="3" fill="#8f5a86" />
-          <path d="M58 110 h14 m0 0 l-5 -5 m5 5 l-5 5" stroke="#4b2f45" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M58 110 h14 m0 0 l-5 -5 m5 5 l-5 5"
+            stroke="#4b2f45"
+            strokeWidth="4"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </g>
       );
   }
@@ -99,7 +106,16 @@ export function CardFace({ card, effectiveCost, width = W }: { card: Card; effec
       <title>{title}</title>
 
       {/* card ground + border */}
-      <rect x="1.25" y="1.25" width={W - 2.5} height={H - 2.5} rx="9" fill={style.ground} stroke={style.border} strokeWidth="2.5" />
+      <rect
+        x="1.25"
+        y="1.25"
+        width={W - 2.5}
+        height={H - 2.5}
+        rx="9"
+        fill={style.ground}
+        stroke={style.border}
+        strokeWidth="2.5"
+      />
 
       {/* header band — solid, or a tri-band clipped to the rounded top for trading cards */}
       {card.kind === 'trading' ? (
@@ -136,15 +152,40 @@ export function CardFace({ card, effectiveCost, width = W }: { card: Card; effec
 
       {/* effective-cost badge, top-left */}
       <circle cx="22" cy="52" r="15" fill={style.badge} />
-      <text x="22" y="52" textAnchor="middle" dominantBaseline="central" fontFamily="Georgia, 'Times New Roman', serif" fontSize="16" fontWeight="bold" fill="#f4eeda">
+      <text
+        x="22"
+        y="52"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontFamily="Georgia, 'Times New Roman', serif"
+        fontSize="16"
+        fontWeight="bold"
+        fill="#f4eeda"
+      >
         {shown}
       </text>
       {reduced && (
         <g>
-          <text x="44" y="52" dominantBaseline="central" fontFamily="Georgia, 'Times New Roman', serif" fontSize="12" fill={style.badge} opacity="0.85">
+          <text
+            x="44"
+            y="52"
+            dominantBaseline="central"
+            fontFamily="Georgia, 'Times New Roman', serif"
+            fontSize="12"
+            fill={style.badge}
+            opacity="0.85"
+          >
             {card.cost}
           </text>
-          <line x1="43" y1="52" x2={card.cost >= 10 ? 58 : 51} y2="52" stroke={style.badge} strokeWidth="1.4" opacity="0.85" />
+          <line
+            x1="43"
+            y1="52"
+            x2={card.cost >= 10 ? 58 : 51}
+            y2="52"
+            stroke={style.badge}
+            strokeWidth="1.4"
+            opacity="0.85"
+          />
         </g>
       )}
 

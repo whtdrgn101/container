@@ -56,11 +56,23 @@ function callBankContainer(state: GameState, playerId: string, lotIndex: number,
   });
 
   const auction: BankAuction = { lotKind: 'container', lotIndex, highBidderId: playerId, bid, reserved: [] };
-  return record(state, players, 'CALL_BANK', playerId, { bank: withAuction(state, existing, auction) }, { lotKind: 'container', lotIndex, bid });
+  return record(
+    state,
+    players,
+    'CALL_BANK',
+    playerId,
+    { bank: withAuction(state, existing, auction) },
+    { lotKind: 'container', lotIndex, bid },
+  );
 }
 
 /** Cash lot: bid containers (removed from your board) to win the cash. Only the count matters. */
-function callBankCash(state: GameState, playerId: string, lotIndex: number, containerBid: readonly StoredContainer[]): GameState {
+function callBankCash(
+  state: GameState,
+  playerId: string,
+  lotIndex: number,
+  containerBid: readonly StoredContainer[],
+): GameState {
   const player = state.players[seatOf(state, playerId)]!;
   const bank = state.bank;
 
@@ -96,8 +108,21 @@ function callBankCash(state: GameState, playerId: string, lotIndex: number, cont
     return current;
   });
 
-  const auction: BankAuction = { lotKind: 'cash', lotIndex, highBidderId: playerId, bid: count, reserved: [...containerBid] };
-  return record(state, players, 'CALL_BANK', playerId, { bank: withAuction(state, existing, auction) }, { lotKind: 'cash', lotIndex, count });
+  const auction: BankAuction = {
+    lotKind: 'cash',
+    lotIndex,
+    highBidderId: playerId,
+    bid: count,
+    reserved: [...containerBid],
+  };
+  return record(
+    state,
+    players,
+    'CALL_BANK',
+    playerId,
+    { bank: withAuction(state, existing, auction) },
+    { lotKind: 'cash', lotIndex, count },
+  );
 }
 
 /**

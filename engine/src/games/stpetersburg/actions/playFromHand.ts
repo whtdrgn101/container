@@ -40,7 +40,10 @@ export function playFromHand(
   let cost: number;
   if (card.kind === 'trading') {
     if (displace === undefined) {
-      throw new GameError('DISPLACE_REQUIRED', `${card.name} is a trading card — name a card of yours to displace (pg. 7)`);
+      throw new GameError(
+        'DISPLACE_REQUIRED',
+        `${card.name} is a trading card — name a card of yours to displace (pg. 7)`,
+      );
     }
     displaced = validateDisplacement(player, card, displace, state.observatoryUsed);
     cost = displacementCost(player, card, displaced, undefined);
@@ -64,10 +67,16 @@ export function playFromHand(
     players: withPlayer(state, seat, updated),
     board: discarded ? { ...state.board, discard: state.board.discard + discarded } : state.board,
   };
-  return record(after, 'PLAY_FROM_HAND', playerId, { consecutivePasses: 0, activePlayerIndex: nextSeatIndex(after) }, {
-    cardKey: card.key,
-    cardName: card.name,
-    cost,
-    ...(displaced ? { displacedKey: displaced.key, displacedName: displaced.name } : {}),
-  });
+  return record(
+    after,
+    'PLAY_FROM_HAND',
+    playerId,
+    { consecutivePasses: 0, activePlayerIndex: nextSeatIndex(after) },
+    {
+      cardKey: card.key,
+      cardName: card.name,
+      cost,
+      ...(displaced ? { displacedKey: displaced.key, displacedName: displaced.name } : {}),
+    },
+  );
 }

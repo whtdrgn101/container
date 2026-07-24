@@ -45,7 +45,14 @@ export function stop(state: CantStopState, playerId: string): CantStopState {
 
   const claimCount = Object.values(claimed).filter((id) => id === player.id).length;
   // The turn ends either way, so the roll count resets (a win freezes the board; a normal stop passes).
-  const banked: Partial<CantStopState> = { players, claimed, runners: {}, dice: null, phase: 'rolling', rollsThisTurn: 0 };
+  const banked: Partial<CantStopState> = {
+    players,
+    claimed,
+    runners: {},
+    dice: null,
+    phase: 'rolling',
+    rollsThisTurn: 0,
+  };
 
   if (claimCount >= WIN_COLUMNS) {
     return record(state, 'STOP', playerId, { ...banked, status: 'ended', winnerIds: [player.id] });

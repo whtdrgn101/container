@@ -27,9 +27,8 @@ export class RematchRepository {
   constructor(private readonly db: DB) {}
 
   get(gameId: string): Rematch | undefined {
-    const row = this.db
-      .prepare(`SELECT agreed, new_game_id FROM rematches WHERE game_id = ?`)
-      .get(gameId) as RematchRow | undefined;
+    const row = this.db.prepare(`SELECT agreed, new_game_id FROM rematches WHERE game_id = ?`).get(gameId) as
+      RematchRow | undefined;
     if (!row) return undefined;
     return { gameId, agreed: JSON.parse(row.agreed) as string[], newGameId: row.new_game_id };
   }

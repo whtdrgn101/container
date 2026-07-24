@@ -31,10 +31,7 @@ describe('producePlacements', () => {
   });
 
   it('declines when the factory district is full', () => {
-    const state = makeGame([
-      makePlayer({ id: 'p1', factoryLimit: 1, factoryStore: [sc('white', 2)] }),
-      ...others(),
-    ]);
+    const state = makeGame([makePlayer({ id: 'p1', factoryLimit: 1, factoryStore: [sc('white', 2)] }), ...others()]);
     expect(producePlacements(ctxFor(state, 'p1'))).toBeNull();
   });
 
@@ -99,10 +96,7 @@ describe('repriceArrangement', () => {
   });
 
   it('reprices to the asking price, keeping the same containers', () => {
-    const state = makeGame([
-      makePlayer({ id: 'p1', factoryStore: [sc('white', 6), sc('red', 1)] }),
-      ...others(),
-    ]);
+    const state = makeGame([makePlayer({ id: 'p1', factoryStore: [sc('white', 6), sc('red', 1)] }), ...others()]);
     const arrangement = repriceArrangement(ctxFor(state, 'p1'), 'factory')!;
     expect(arrangement).toEqual([sc('white', 3), sc('red', 3)]);
   });
@@ -240,9 +234,9 @@ describe('bank policies', () => {
         auctions: [{ lotKind: 'container', lotIndex: 0, highBidderId: 'p2', bid: 1, reserved: [] }],
       }),
     });
-    expect(rank(ctxFor(state, 'p1'), { type: 'CALL_BANK', lotKind: 'container', lotIndex: 0 })!.action).toMatchObject(
-      { bid: 2 },
-    );
+    expect(rank(ctxFor(state, 'p1'), { type: 'CALL_BANK', lotKind: 'container', lotIndex: 0 })!.action).toMatchObject({
+      bid: 2,
+    });
   });
 
   it('walks away once the price reaches what the lot is worth', () => {
@@ -321,12 +315,8 @@ describe('economy policies', () => {
 
   it('wants a warehouse only once the harbor is full', () => {
     const roomy = makeGame([makePlayer({ id: 'p1', harborLimit: 2, harborStore: [] }), ...others()]);
-    const full = makeGame([
-      makePlayer({ id: 'p1', harborLimit: 1, harborStore: [sc('white', 2)] }),
-      ...others(),
-    ]);
-    const score = (state: ReturnType<typeof makeGame>) =>
-      rank(ctxFor(state, 'p1'), { type: 'BUILD_WAREHOUSE' })!.score;
+    const full = makeGame([makePlayer({ id: 'p1', harborLimit: 1, harborStore: [sc('white', 2)] }), ...others()]);
+    const score = (state: ReturnType<typeof makeGame>) => rank(ctxFor(state, 'p1'), { type: 'BUILD_WAREHOUSE' })!.score;
     expect(score(full)).toBeGreaterThan(score(roomy));
   });
 

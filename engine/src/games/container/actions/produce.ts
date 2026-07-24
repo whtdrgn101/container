@@ -37,10 +37,7 @@ export function produce(state: GameState, playerId: string, placements?: readonl
   const capacity = Math.min(producibleColors.length, room);
 
   if (capacity === 0) {
-    throw new GameError(
-      'OUT_OF_SUPPLY',
-      `Player "${playerId}" has no factory colors left in the supply to produce`,
-    );
+    throw new GameError('OUT_OF_SUPPLY', `Player "${playerId}" has no factory colors left in the supply to produce`);
   }
 
   let produced: readonly StoredContainer[];
@@ -48,7 +45,10 @@ export function produce(state: GameState, playerId: string, placements?: readonl
     produced = producibleColors.slice(0, capacity).map((color) => ({ color, price: DEFAULT_FACTORY_LOT }));
   } else {
     if (placements.length !== capacity) {
-      throw new GameError('INVALID_SELECTION', `Must produce exactly ${capacity} container(s), got ${placements.length}`);
+      throw new GameError(
+        'INVALID_SELECTION',
+        `Must produce exactly ${capacity} container(s), got ${placements.length}`,
+      );
     }
     if (!isSubMultiset(colorsOf(placements), factoryColors)) {
       throw new GameError('INVALID_SELECTION', 'Selected colors do not match available factories');

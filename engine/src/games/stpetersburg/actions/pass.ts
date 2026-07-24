@@ -1,5 +1,13 @@
 import type { StPetersburgState } from '../core';
-import { finalScoring, nextSeatIndex, pubOwnerSeats, record, roundTransition, scoreAndRefill, scorePlayers } from '../internal';
+import {
+  finalScoring,
+  nextSeatIndex,
+  pubOwnerSeats,
+  record,
+  roundTransition,
+  scoreAndRefill,
+  scorePlayers,
+} from '../internal';
 
 /**
  * Pass (pg. 3). Always legal on your turn, and **not sticky** — a passed player may act again next turn.
@@ -40,11 +48,17 @@ export function pass(state: StPetersburgState, playerId: string): StPetersburgSt
   if (state.phase === 'building') {
     const pubSeats = pubOwnerSeats(state);
     if (pubSeats.length > 0) {
-      return record(state, 'PASS', playerId, {
-        players: scorePlayers(state),
-        pendingPubBuy: { queue: pubSeats },
-        activePlayerIndex: pubSeats[0]!,
-      }, { closedPhase: 'building', pubPending: true });
+      return record(
+        state,
+        'PASS',
+        playerId,
+        {
+          players: scorePlayers(state),
+          pendingPubBuy: { queue: pubSeats },
+          activePlayerIndex: pubSeats[0]!,
+        },
+        { closedPhase: 'building', pubPending: true },
+      );
     }
   }
   return record(state, 'PASS', playerId, scoreAndRefill(state), { closedPhase: state.phase });

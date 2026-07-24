@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createGame } from '../createGame';
 import { applyAction, legalActions } from '../actions';
-import type { StPetersburgState } from '../core';
 
 /**
  * A cheap, high-value invariant sweep (roadmap SP7, item 5): drive seeded full games choosing only
@@ -33,7 +32,11 @@ const NAMES = ['Ann', 'Bob', 'Cid', 'Dee'];
 /** Play one seeded game to its end, asserting the legalActions⊆applyAction invariant at each step. */
 function fuzzGame(playerCount: number, seed: number): { steps: number; ended: boolean } {
   const rng = makeRng(seed);
-  let state = createGame({ id: `fuzz-${playerCount}-${seed}`, players: NAMES.slice(0, playerCount).map((name) => ({ name })), rng });
+  let state = createGame({
+    id: `fuzz-${playerCount}-${seed}`,
+    players: NAMES.slice(0, playerCount).map((name) => ({ name })),
+    rng,
+  });
   const active = () => state.players[state.activePlayerIndex]!.id;
 
   let steps = 0;

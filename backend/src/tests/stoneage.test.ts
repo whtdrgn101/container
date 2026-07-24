@@ -40,10 +40,12 @@ describe('Stone Age bootstrap', () => {
     const game = res.json().game;
     expect(game.round).toBe(1);
     expect(game.phase).toBe('placement');
-    expect(game.players.map((p: { name: string; people: number; food: number }) => [p.name, p.people, p.food])).toEqual([
-      ['Ann', 5, 12],
-      ['Bob', 5, 12],
-    ]);
+    expect(game.players.map((p: { name: string; people: number; food: number }) => [p.name, p.people, p.food])).toEqual(
+      [
+        ['Ann', 5, 12],
+        ['Bob', 5, 12],
+      ],
+    );
   });
 
   it('places people over REST (SA1) and passes the turn', async () => {
@@ -80,7 +82,7 @@ describe('Stone Age bootstrap', () => {
     expect(badPayload.statusCode).toBe(400); // parseAction rejects an unknown place
   });
 
-  it('enforces Stone Age\'s 2–4 seat range on lobbies', async () => {
+  it("enforces Stone Age's 2–4 seat range on lobbies", async () => {
     const tooMany = await app.inject({ method: 'POST', url: '/lobbies', payload: { seats: 5, gameType: 'stoneage' } });
     expect(tooMany.statusCode).toBe(400);
     const ok = await app.inject({ method: 'POST', url: '/lobbies', payload: { seats: 4, gameType: 'stoneage' } });
@@ -116,12 +118,20 @@ describe('Stone Age gathering (SA2)', () => {
   });
 
   const placeAction = (id: string, playerId: string, place: string, count: number) =>
-    app.inject({ method: 'POST', url: `/games/${id}/actions`, payload: { playerId, action: { type: 'PLACE', place, count } } });
+    app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId, action: { type: 'PLACE', place, count } },
+    });
 
   const roll = (id: string, playerId: string, place: string) =>
     app.inject({ method: 'POST', url: `/games/${id}/stoneage/roll`, payload: { playerId, place } });
   const take = (id: string, playerId: string, toolIndices: number[] = []) =>
-    app.inject({ method: 'POST', url: `/games/${id}/actions`, payload: { playerId, action: { type: 'TAKE_GATHER', toolIndices } } });
+    app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId, action: { type: 'TAKE_GATHER', toolIndices } },
+    });
 
   it('gathers resources by rolling dice server-side', async () => {
     const created = await app.inject({
@@ -184,7 +194,11 @@ describe('Stone Age gathering (SA2)', () => {
     await placeAction(id, 'p1', 'forest', 4);
 
     // Ann takes a value-1 tool, then rolls the forest and adds the tool to the total.
-    await app.inject({ method: 'POST', url: `/games/${id}/actions`, payload: { playerId: 'p1', action: { type: 'USE', place: 'toolMaker' } } });
+    await app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId: 'p1', action: { type: 'USE', place: 'toolMaker' } },
+    });
     dice.enqueue([2, 2, 2, 2]); // total 8; +1 tool = 9 → wood 9/3 = 3 (without the tool it'd be 8/3 = 2)
     const rolled = await roll(id, 'p1', 'forest');
     expect(rolled.json().game.players[0].tools).toEqual([1]);
@@ -236,7 +250,11 @@ describe('Stone Age gathering (SA2)', () => {
     expect(feeding.json().game.phase).toBe('feeding');
 
     // Both players feed (12 starting food ≥ 5 people, so no shortfall) → the round rolls over.
-    await app.inject({ method: 'POST', url: `/games/${id}/actions`, payload: { playerId: 'p1', action: { type: 'FEED' } } });
+    await app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId: 'p1', action: { type: 'FEED' } },
+    });
     const afterFeed = await app.inject({
       method: 'POST',
       url: `/games/${id}/actions`,
@@ -288,11 +306,19 @@ describe('Stone Age buildings (SA9)', () => {
   });
 
   const place = (id: string, playerId: string, p: string, count: number) =>
-    app.inject({ method: 'POST', url: `/games/${id}/actions`, payload: { playerId, action: { type: 'PLACE', place: p, count } } });
+    app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId, action: { type: 'PLACE', place: p, count } },
+    });
   const roll = (id: string, playerId: string, p: string) =>
     app.inject({ method: 'POST', url: `/games/${id}/stoneage/roll`, payload: { playerId, place: p } });
   const take = (id: string, playerId: string) =>
-    app.inject({ method: 'POST', url: `/games/${id}/actions`, payload: { playerId, action: { type: 'TAKE_GATHER', toolIndices: [] } } });
+    app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId, action: { type: 'TAKE_GATHER', toolIndices: [] } },
+    });
 
   it('deals a building stack per player and buys a building for its exact points', async () => {
     const created = await app.inject({
@@ -422,7 +448,13 @@ describe('Stone Age bots (SA12)', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/games',
-      payload: { gameType: 'stoneage', players: [{ name: 'Ann', bot: true }, { name: 'Bob', bot: true }] },
+      payload: {
+        gameType: 'stoneage',
+        players: [
+          { name: 'Ann', bot: true },
+          { name: 'Bob', bot: true },
+        ],
+      },
     });
     expect(response.statusCode).toBe(201);
     const game = response.json().game;
@@ -450,7 +482,9 @@ describe('Stone Age bots (SA12)', () => {
     expect(placed.statusCode).toBe(200);
     // The bot placed too (p2 has people on the board), and it's p1's move again (or the phase moved on).
     const game = placed.json().game;
-    const p2Placed = Object.values(game.placements).some((byPlayer) => (byPlayer as Record<string, number>)['p2'] !== undefined);
+    const p2Placed = Object.values(game.placements).some(
+      (byPlayer) => (byPlayer as Record<string, number>)['p2'] !== undefined,
+    );
     expect(p2Placed).toBe(true);
   });
 });

@@ -29,7 +29,9 @@ describe('final scoring', () => {
   });
 
   it('scores the two-value color at $10 when every color was collected', () => {
-    const [score] = finalScoring([makePlayer({ id: 'p1', scoringArea: ['white', 'white', 'red', 'green', 'blue', 'yellow'] })]);
+    const [score] = finalScoring([
+      makePlayer({ id: 'p1', scoringArea: ['white', 'white', 'red', 'green', 'blue', 'yellow'] }),
+    ]);
     expect(score?.discardedColor).toBe('white');
     expect(score?.islandScore).toBe(6 + 10 + 4 + 2); // red + green@$10 + blue + yellow
   });
@@ -60,7 +62,11 @@ describe('final scoring', () => {
 
 describe('winner determination', () => {
   it('picks the highest total', () => {
-    const players = [makePlayer({ id: 'p1', money: 30 }), makePlayer({ id: 'p2', money: 20 }), makePlayer({ id: 'p3', money: 10 })];
+    const players = [
+      makePlayer({ id: 'p1', money: 30 }),
+      makePlayer({ id: 'p2', money: 20 }),
+      makePlayer({ id: 'p3', money: 10 }),
+    ];
     const { extra } = endGame(makeGame(players), players, makeBank());
     if (extra.status !== 'ended') throw new Error(`expected ended, got ${extra.status}`);
     expect(extra.winnerIds).toEqual(['p1']);
@@ -79,7 +85,11 @@ describe('winner determination', () => {
   });
 
   it('shares victory when still tied after the factory tiebreak', () => {
-    const players = [makePlayer({ id: 'p1', money: 20 }), makePlayer({ id: 'p2', money: 20 }), makePlayer({ id: 'p3', money: 10 })];
+    const players = [
+      makePlayer({ id: 'p1', money: 20 }),
+      makePlayer({ id: 'p2', money: 20 }),
+      makePlayer({ id: 'p3', money: 10 }),
+    ];
     const { extra } = endGame(makeGame(players), players, makeBank());
     if (extra.status !== 'ended') throw new Error('expected ended');
     expect(extra.winnerIds).toEqual(['p1', 'p2']);
@@ -105,7 +115,13 @@ describe('game end trigger', () => {
 
   it('ends the game when a second color is exhausted, then scores', () => {
     const supply = makeSupply({ containers: { white: 0, red: 1, green: 5, blue: 5, yellow: 5 } });
-    const p1 = makePlayer({ id: 'p1', factories: [{ id: 'p1-f1', color: 'red' }], factoryStore: [], factoryLimit: 2, money: 30 });
+    const p1 = makePlayer({
+      id: 'p1',
+      factories: [{ id: 'p1-f1', color: 'red' }],
+      factoryStore: [],
+      factoryLimit: 2,
+      money: 30,
+    });
     let state = makeGame([p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], { supply });
 
     state = applyAction(state, 'p1', { type: 'PRODUCE' }); // red supply 1 → 0 (2 colors gone)

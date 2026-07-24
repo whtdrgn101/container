@@ -45,9 +45,7 @@ function ContainerLots({
               {lot.length === 0 ? (
                 <span className="text-xs text-muted-foreground">empty</span>
               ) : (
-                lot.map((color, ci) => (
-                  <ContainerChip key={ci} color={color} />
-                ))
+                lot.map((color, ci) => <ContainerChip key={ci} color={color} />)
               )}
             </div>
             {auction && (
@@ -106,7 +104,8 @@ function CashLots({
     <div className="flex flex-wrap gap-3">
       {game.bank.cashLots.map((cash, i) => {
         const auction = game.bank.auctions.find((a) => a.lotKind === 'cash' && a.lotIndex === i);
-        const callable = canDrive && legal.some((a) => a.type === 'CALL_BANK' && a.lotKind === 'cash' && a.lotIndex === i);
+        const callable =
+          canDrive && legal.some((a) => a.type === 'CALL_BANK' && a.lotKind === 'cash' && a.lotIndex === i);
         const minCount = auction ? auction.bid + 1 : 1;
         const count = bankCount[i] ?? minCount;
         const board = activePlayer

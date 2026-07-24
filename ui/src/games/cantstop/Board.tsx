@@ -87,11 +87,7 @@ export default function CantStopBoard({
   const claimsOf = (playerId: string) => Object.values(game.claimed).filter((id) => id === playerId).length;
   const winner = game.status === 'ended' ? game.players.find((p) => game.winnerIds.includes(p.id)) : undefined;
 
-  const turnLine = winner
-    ? `${winner.name} wins!`
-    : canDrive
-      ? 'Your move'
-      : `Waiting for ${active?.name ?? '—'}`;
+  const turnLine = winner ? `${winner.name} wins!` : canDrive ? 'Your move' : `Waiting for ${active?.name ?? '—'}`;
 
   return (
     <div data-testid="board" className="space-y-4">
@@ -168,7 +164,7 @@ export default function CantStopBoard({
             const used = i < usedMarkers;
             return (
               <span
-                key={i} // eslint-disable-line react/no-array-index-key -- fixed 3 marker slots
+                key={i}
                 data-testid={used ? 'marker-used' : 'marker-free'}
                 aria-label={used ? 'Marker in play' : 'Marker available'}
                 className={cn(
@@ -183,67 +179,67 @@ export default function CantStopBoard({
         <div className="overflow-x-auto" role="group" aria-label="Column board — first to claim three columns wins">
           <div className="flex min-w-max items-end gap-1">
             {COLUMNS.map((col) => {
-            const height = COLUMN_HEIGHTS[col]!;
-            const claimedBy = game.claimed[col];
-            const claimedSeat = claimedBy ? game.players.findIndex((p) => p.id === claimedBy) : -1;
-            const runnerAt = game.runners[col];
-            const levels = Array.from({ length: height }, (_, i) => height - i); // top → bottom
-            const label = claimedBy
-              ? `Column ${col}, won by ${game.players[claimedSeat]?.name}`
-              : runnerAt
-                ? `Column ${col}, runner at ${runnerAt} of ${height}`
-                : `Column ${col}, ${height} to the top`;
-            return (
-              <div
-                key={col}
-                data-testid={`column-${col}`}
-                role="img"
-                aria-label={label}
-                className="flex flex-col items-center gap-1"
-              >
+              const height = COLUMN_HEIGHTS[col]!;
+              const claimedBy = game.claimed[col];
+              const claimedSeat = claimedBy ? game.players.findIndex((p) => p.id === claimedBy) : -1;
+              const runnerAt = game.runners[col];
+              const levels = Array.from({ length: height }, (_, i) => height - i); // top → bottom
+              const label = claimedBy
+                ? `Column ${col}, won by ${game.players[claimedSeat]?.name}`
+                : runnerAt
+                  ? `Column ${col}, runner at ${runnerAt} of ${height}`
+                  : `Column ${col}, ${height} to the top`;
+              return (
                 <div
-                  className={cn(
-                    'flex h-5 w-6 items-center justify-center rounded text-[11px] font-semibold tabular-nums',
-                    claimedBy ? cn(seatColor(claimedBy), 'text-white') : 'bg-muted text-muted-foreground',
-                  )}
-                  title={claimedBy ? `Won by ${game.players[claimedSeat]?.name}` : `Column ${col}`}
-                  data-testid={claimedBy ? `claimed-${col}` : undefined}
+                  key={col}
+                  data-testid={`column-${col}`}
+                  role="img"
+                  aria-label={label}
+                  className="flex flex-col items-center gap-1"
                 >
-                  {col}
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  {levels.map((level) => {
-                    const runnerHere = game.runners[col] === level;
-                    const squares = game.players
-                      .map((player) => ({ id: player.id, here: player.progress[col] === level }))
-                      .filter((s) => s.here);
-                    return (
-                      <div
-                        key={level}
-                        className={cn(
-                          'flex h-4 w-6 items-center justify-center gap-0.5 rounded-sm border',
-                          level === height ? 'border-foreground/40' : 'border-border',
-                          runnerHere && 'bg-foreground/10',
-                        )}
-                      >
-                        {runnerHere && (
-                          <span
-                            data-testid={`runner-${col}`}
-                            className="reveal-in h-2.5 w-2.5 rounded-full border-2 border-foreground bg-background"
-                            aria-label={`Runner in column ${col}`}
-                          />
-                        )}
-                        {/* Banked progress is the rulebook's player-coloured *squares* — distinct from
+                  <div
+                    className={cn(
+                      'flex h-5 w-6 items-center justify-center rounded text-[11px] font-semibold tabular-nums',
+                      claimedBy ? cn(seatColor(claimedBy), 'text-white') : 'bg-muted text-muted-foreground',
+                    )}
+                    title={claimedBy ? `Won by ${game.players[claimedSeat]?.name}` : `Column ${col}`}
+                    data-testid={claimedBy ? `claimed-${col}` : undefined}
+                  >
+                    {col}
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    {levels.map((level) => {
+                      const runnerHere = game.runners[col] === level;
+                      const squares = game.players
+                        .map((player) => ({ id: player.id, here: player.progress[col] === level }))
+                        .filter((s) => s.here);
+                      return (
+                        <div
+                          key={level}
+                          className={cn(
+                            'flex h-4 w-6 items-center justify-center gap-0.5 rounded-sm border',
+                            level === height ? 'border-foreground/40' : 'border-border',
+                            runnerHere && 'bg-foreground/10',
+                          )}
+                        >
+                          {runnerHere && (
+                            <span
+                              data-testid={`runner-${col}`}
+                              className="reveal-in h-2.5 w-2.5 rounded-full border-2 border-foreground bg-background"
+                              aria-label={`Runner in column ${col}`}
+                            />
+                          )}
+                          {/* Banked progress is the rulebook's player-coloured *squares* — distinct from
                             the round temporary runners above. */}
-                        {squares.map(({ id }) => (
-                          <span key={id} className={cn('h-2 w-2 rounded-[2px]', seatColor(id))} aria-hidden />
-                        ))}
-                      </div>
-                    );
-                  })}
+                          {squares.map(({ id }) => (
+                            <span key={id} className={cn('h-2 w-2 rounded-[2px]', seatColor(id))} aria-hidden />
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            );
+              );
             })}
           </div>
         </div>
@@ -252,51 +248,57 @@ export default function CantStopBoard({
       {/* Controls: roll / choose a pairing / stop. Hidden once the game ends — the shared GameOver
           screen above takes over. Only the driving client sees live buttons. */}
       {game.status !== 'ended' && (
-      <div className="space-y-2 rounded-lg border bg-card p-3">
-        <div className="text-center text-xs text-muted-foreground">
-          Rolls this turn:{' '}
-          <span data-testid="roll-count" className="font-semibold tabular-nums text-foreground">
-            {game.rollsThisTurn}
-          </span>
+        <div className="space-y-2 rounded-lg border bg-card p-3">
+          <div className="text-center text-xs text-muted-foreground">
+            Rolls this turn:{' '}
+            <span data-testid="roll-count" className="font-semibold tabular-nums text-foreground">
+              {game.rollsThisTurn}
+            </span>
+          </div>
+          {!canDrive ? (
+            <p className="text-center text-sm text-muted-foreground">
+              Waiting for {active?.name ?? 'the other player'}…
+            </p>
+          ) : game.phase === 'selecting' ? (
+            <div className="space-y-2">
+              <div className="reveal-in flex items-center justify-center gap-2">
+                <span className="text-sm text-muted-foreground">You rolled</span>
+                {(game.dice ?? []).map((die, i) => (
+                  <span key={i} data-testid={`die-${i}`} className="inline-block h-8 w-8">
+                    <Die value={die} />
+                  </span>
+                ))}
+              </div>
+              <div className="flex flex-wrap justify-center gap-2">
+                {pairings.map((columns) => (
+                  <Button
+                    key={columns.join('-')}
+                    size="sm"
+                    data-testid={`cantstop-select-${columns.join('-')}`}
+                    disabled={busy}
+                    onClick={() => doAct({ type: 'SELECT', columns })}
+                  >
+                    {columns.join(' + ')}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-2">
+              <Button data-testid="cantstop-roll" disabled={busy || !canRoll} onClick={doRoll}>
+                Roll dice
+              </Button>
+              <Button
+                variant="outline"
+                data-testid="cantstop-stop"
+                disabled={busy || !canStop}
+                onClick={() => doAct({ type: 'STOP' })}
+              >
+                Stop &amp; bank
+              </Button>
+            </div>
+          )}
         </div>
-        {!canDrive ? (
-          <p className="text-center text-sm text-muted-foreground">Waiting for {active?.name ?? 'the other player'}…</p>
-        ) : game.phase === 'selecting' ? (
-          <div className="space-y-2">
-            <div className="reveal-in flex items-center justify-center gap-2">
-              <span className="text-sm text-muted-foreground">You rolled</span>
-              {(game.dice ?? []).map((die, i) => (
-                // eslint-disable-next-line react/no-array-index-key -- dice are positional
-                <span key={i} data-testid={`die-${i}`} className="inline-block h-8 w-8">
-                  <Die value={die} />
-                </span>
-              ))}
-            </div>
-            <div className="flex flex-wrap justify-center gap-2">
-              {pairings.map((columns) => (
-                <Button
-                  key={columns.join('-')}
-                  size="sm"
-                  data-testid={`cantstop-select-${columns.join('-')}`}
-                  disabled={busy}
-                  onClick={() => doAct({ type: 'SELECT', columns })}
-                >
-                  {columns.join(' + ')}
-                </Button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center gap-2">
-            <Button data-testid="cantstop-roll" disabled={busy || !canRoll} onClick={doRoll}>
-              Roll dice
-            </Button>
-            <Button variant="outline" data-testid="cantstop-stop" disabled={busy || !canStop} onClick={() => doAct({ type: 'STOP' })}>
-              Stop &amp; bank
-            </Button>
-          </div>
-        )}
-      </div>
       )}
 
       {/* The activity feed — the whole log is public in Can't Stop. Shared frame; the per-game part is

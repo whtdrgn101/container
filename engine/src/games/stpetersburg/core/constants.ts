@@ -107,10 +107,37 @@ export const CARD_DEFS: readonly CardDef[] = [
   // Specials (pg. 7–8). Potemkin's Village: pays 2 on buy, worth 6 when displaced (SP5). Pub: buy up to
   // 5 points at 2 rubles each after building scoring. Warehouse: hand limit 4. Observatory: 1 point, or
   // skip it to draw the top of a stack.
-  { key: 'potemkin', kind: 'building', name: "Potemkin's Village", cost: 2, income: 0, points: 0, count: 1, special: 'potemkin' },
+  {
+    key: 'potemkin',
+    kind: 'building',
+    name: "Potemkin's Village",
+    cost: 2,
+    income: 0,
+    points: 0,
+    count: 1,
+    special: 'potemkin',
+  },
   { key: 'pub', kind: 'building', name: 'Pub', cost: 1, income: 0, points: 0, count: 2, special: 'pub' },
-  { key: 'warehouse', kind: 'building', name: 'Warehouse', cost: 2, income: 0, points: 0, count: 1, special: 'warehouse' },
-  { key: 'observatory', kind: 'building', name: 'Observatory', cost: 6, income: 0, points: 1, count: 2, special: 'observatory' },
+  {
+    key: 'warehouse',
+    kind: 'building',
+    name: 'Warehouse',
+    cost: 2,
+    income: 0,
+    points: 0,
+    count: 1,
+    special: 'warehouse',
+  },
+  {
+    key: 'observatory',
+    kind: 'building',
+    name: 'Observatory',
+    cost: 6,
+    income: 0,
+    points: 1,
+    count: 2,
+    special: 'observatory',
+  },
 
   // ── Aristocrats (orange): 27. Pay a mix of income + points (pg. 1). Costs 4–18.
   { key: 'scribe', kind: 'aristocrat', name: 'Scribe', cost: 4, income: 1, points: 0, count: 6 },
@@ -124,39 +151,262 @@ export const CARD_DEFS: readonly CardDef[] = [
   // ── Worker trading cards (green): 10, one ware each, pairing with a basic worker (pg. 7–8). Printed
   //    costs 4/6/8/10/12; counts 1/1/2/3/3. Carpenter workshop & gold smelter keep income 3 and add a
   //    cost-reduction (SP5); weaving mill & wharf raise income to 6; fur shop adds 2 points to income 3.
-  { key: 'carpenterWorkshop', kind: 'trading', name: 'Carpenter Workshop', cost: 4, income: 3, points: 0, count: 1, ware: 'lumber', tradingGroup: 'worker' },
-  { key: 'goldSmelter', kind: 'trading', name: 'Gold Smelter', cost: 6, income: 3, points: 0, count: 1, ware: 'gold', tradingGroup: 'worker' },
-  { key: 'weavingMill', kind: 'trading', name: 'Weaving Mill', cost: 8, income: 6, points: 0, count: 2, ware: 'wool', tradingGroup: 'worker' },
-  { key: 'furShop', kind: 'trading', name: 'Fur Shop', cost: 10, income: 3, points: 2, count: 3, ware: 'fur', tradingGroup: 'worker' },
-  { key: 'wharf', kind: 'trading', name: 'Wharf', cost: 12, income: 6, points: 1, count: 3, ware: 'ship', tradingGroup: 'worker' },
+  {
+    key: 'carpenterWorkshop',
+    kind: 'trading',
+    name: 'Carpenter Workshop',
+    cost: 4,
+    income: 3,
+    points: 0,
+    count: 1,
+    ware: 'lumber',
+    tradingGroup: 'worker',
+  },
+  {
+    key: 'goldSmelter',
+    kind: 'trading',
+    name: 'Gold Smelter',
+    cost: 6,
+    income: 3,
+    points: 0,
+    count: 1,
+    ware: 'gold',
+    tradingGroup: 'worker',
+  },
+  {
+    key: 'weavingMill',
+    kind: 'trading',
+    name: 'Weaving Mill',
+    cost: 8,
+    income: 6,
+    points: 0,
+    count: 2,
+    ware: 'wool',
+    tradingGroup: 'worker',
+  },
+  {
+    key: 'furShop',
+    kind: 'trading',
+    name: 'Fur Shop',
+    cost: 10,
+    income: 3,
+    points: 2,
+    count: 3,
+    ware: 'fur',
+    tradingGroup: 'worker',
+  },
+  {
+    key: 'wharf',
+    kind: 'trading',
+    name: 'Wharf',
+    cost: 12,
+    income: 6,
+    points: 1,
+    count: 3,
+    ware: 'ship',
+    tradingGroup: 'worker',
+  },
 
   // ── Building trading cards (blue): 10, one copy each (pg. 7). Only Mariinskij Theater is enumerated
   //    by the rulebook (cost 10; +1 ruble per aristocrat at building scoring — SP5). The other nine are
   //    ADAPTED (famous St Petersburg buildings; documented cost/point spread in the printed style).
-  { key: 'mariinskij', kind: 'trading', name: 'Mariinskij Theater', cost: 10, income: 0, points: 0, count: 1, tradingGroup: 'building', special: 'mariinskij' },
-  { key: 'nikolaiChurch', kind: 'trading', name: 'St Nicholas Church', cost: 6, income: 0, points: 2, count: 1, tradingGroup: 'building' }, // ADAPTED
-  { key: 'peterAndPaul', kind: 'trading', name: 'Peter and Paul Fortress', cost: 9, income: 0, points: 3, count: 1, tradingGroup: 'building' }, // ADAPTED
-  { key: 'kunstkamera', kind: 'trading', name: 'Kunstkamera', cost: 12, income: 0, points: 4, count: 1, tradingGroup: 'building' }, // ADAPTED
-  { key: 'stIsaac', kind: 'trading', name: "St Isaac's Cathedral", cost: 15, income: 0, points: 5, count: 1, tradingGroup: 'building' }, // ADAPTED
-  { key: 'admiralty', kind: 'trading', name: 'Admiralty', cost: 18, income: 0, points: 6, count: 1, tradingGroup: 'building' }, // ADAPTED
-  { key: 'hermitage', kind: 'trading', name: 'Hermitage', cost: 21, income: 0, points: 7, count: 1, tradingGroup: 'building' }, // ADAPTED
-  { key: 'summerPalace', kind: 'trading', name: 'Summer Palace', cost: 24, income: 0, points: 8, count: 1, tradingGroup: 'building' }, // ADAPTED
-  { key: 'winterPalace', kind: 'trading', name: 'Winter Palace', cost: 27, income: 0, points: 9, count: 1, tradingGroup: 'building' }, // ADAPTED
-  { key: 'resurrectionChurch', kind: 'trading', name: 'Church of the Resurrection', cost: 29, income: 0, points: 10, count: 1, tradingGroup: 'building' }, // ADAPTED
+  {
+    key: 'mariinskij',
+    kind: 'trading',
+    name: 'Mariinskij Theater',
+    cost: 10,
+    income: 0,
+    points: 0,
+    count: 1,
+    tradingGroup: 'building',
+    special: 'mariinskij',
+  },
+  {
+    key: 'nikolaiChurch',
+    kind: 'trading',
+    name: 'St Nicholas Church',
+    cost: 6,
+    income: 0,
+    points: 2,
+    count: 1,
+    tradingGroup: 'building',
+  }, // ADAPTED
+  {
+    key: 'peterAndPaul',
+    kind: 'trading',
+    name: 'Peter and Paul Fortress',
+    cost: 9,
+    income: 0,
+    points: 3,
+    count: 1,
+    tradingGroup: 'building',
+  }, // ADAPTED
+  {
+    key: 'kunstkamera',
+    kind: 'trading',
+    name: 'Kunstkamera',
+    cost: 12,
+    income: 0,
+    points: 4,
+    count: 1,
+    tradingGroup: 'building',
+  }, // ADAPTED
+  {
+    key: 'stIsaac',
+    kind: 'trading',
+    name: "St Isaac's Cathedral",
+    cost: 15,
+    income: 0,
+    points: 5,
+    count: 1,
+    tradingGroup: 'building',
+  }, // ADAPTED
+  {
+    key: 'admiralty',
+    kind: 'trading',
+    name: 'Admiralty',
+    cost: 18,
+    income: 0,
+    points: 6,
+    count: 1,
+    tradingGroup: 'building',
+  }, // ADAPTED
+  {
+    key: 'hermitage',
+    kind: 'trading',
+    name: 'Hermitage',
+    cost: 21,
+    income: 0,
+    points: 7,
+    count: 1,
+    tradingGroup: 'building',
+  }, // ADAPTED
+  {
+    key: 'summerPalace',
+    kind: 'trading',
+    name: 'Summer Palace',
+    cost: 24,
+    income: 0,
+    points: 8,
+    count: 1,
+    tradingGroup: 'building',
+  }, // ADAPTED
+  {
+    key: 'winterPalace',
+    kind: 'trading',
+    name: 'Winter Palace',
+    cost: 27,
+    income: 0,
+    points: 9,
+    count: 1,
+    tradingGroup: 'building',
+  }, // ADAPTED
+  {
+    key: 'resurrectionChurch',
+    kind: 'trading',
+    name: 'Church of the Resurrection',
+    cost: 29,
+    income: 0,
+    points: 10,
+    count: 1,
+    tradingGroup: 'building',
+  }, // ADAPTED
 
   // ── Aristocrat trading cards (orange): 10, one copy each (pg. 7). Enumerated exemplars: Abbot (pg. 1
   //    — cost 6, income 1, point 1) and Tax man (pg. 8 — cost 17; +1 ruble per worker at aristocrat
   //    scoring, SP5). The other eight are ADAPTED (a documented income+point spread in the printed style).
   { key: 'abbot', kind: 'trading', name: 'Abbot', cost: 6, income: 1, points: 1, count: 1, tradingGroup: 'aristocrat' },
-  { key: 'taxman', kind: 'trading', name: 'Tax Man', cost: 17, income: 0, points: 0, count: 1, tradingGroup: 'aristocrat', special: 'taxman' },
-  { key: 'senator', kind: 'trading', name: 'Senator', cost: 8, income: 2, points: 1, count: 1, tradingGroup: 'aristocrat' }, // ADAPTED
-  { key: 'shipBuilderMaster', kind: 'trading', name: 'Master Ship Builder', cost: 10, income: 2, points: 2, count: 1, tradingGroup: 'aristocrat' }, // ADAPTED
-  { key: 'mintMaster', kind: 'trading', name: 'Master of the Mint', cost: 12, income: 4, points: 1, count: 1, tradingGroup: 'aristocrat' }, // ADAPTED
-  { key: 'generalGovernor', kind: 'trading', name: 'Governor-General', cost: 14, income: 3, points: 3, count: 1, tradingGroup: 'aristocrat' }, // ADAPTED
-  { key: 'chancellor', kind: 'trading', name: 'Chancellor', cost: 16, income: 5, points: 2, count: 1, tradingGroup: 'aristocrat' }, // ADAPTED
-  { key: 'admiral', kind: 'trading', name: 'Admiral', cost: 18, income: 4, points: 4, count: 1, tradingGroup: 'aristocrat' }, // ADAPTED
-  { key: 'fieldMarshal', kind: 'trading', name: 'Field Marshal', cost: 20, income: 6, points: 3, count: 1, tradingGroup: 'aristocrat' }, // ADAPTED
-  { key: 'metropolitan', kind: 'trading', name: 'Metropolitan', cost: 22, income: 5, points: 5, count: 1, tradingGroup: 'aristocrat' }, // ADAPTED
+  {
+    key: 'taxman',
+    kind: 'trading',
+    name: 'Tax Man',
+    cost: 17,
+    income: 0,
+    points: 0,
+    count: 1,
+    tradingGroup: 'aristocrat',
+    special: 'taxman',
+  },
+  {
+    key: 'senator',
+    kind: 'trading',
+    name: 'Senator',
+    cost: 8,
+    income: 2,
+    points: 1,
+    count: 1,
+    tradingGroup: 'aristocrat',
+  }, // ADAPTED
+  {
+    key: 'shipBuilderMaster',
+    kind: 'trading',
+    name: 'Master Ship Builder',
+    cost: 10,
+    income: 2,
+    points: 2,
+    count: 1,
+    tradingGroup: 'aristocrat',
+  }, // ADAPTED
+  {
+    key: 'mintMaster',
+    kind: 'trading',
+    name: 'Master of the Mint',
+    cost: 12,
+    income: 4,
+    points: 1,
+    count: 1,
+    tradingGroup: 'aristocrat',
+  }, // ADAPTED
+  {
+    key: 'generalGovernor',
+    kind: 'trading',
+    name: 'Governor-General',
+    cost: 14,
+    income: 3,
+    points: 3,
+    count: 1,
+    tradingGroup: 'aristocrat',
+  }, // ADAPTED
+  {
+    key: 'chancellor',
+    kind: 'trading',
+    name: 'Chancellor',
+    cost: 16,
+    income: 5,
+    points: 2,
+    count: 1,
+    tradingGroup: 'aristocrat',
+  }, // ADAPTED
+  {
+    key: 'admiral',
+    kind: 'trading',
+    name: 'Admiral',
+    cost: 18,
+    income: 4,
+    points: 4,
+    count: 1,
+    tradingGroup: 'aristocrat',
+  }, // ADAPTED
+  {
+    key: 'fieldMarshal',
+    kind: 'trading',
+    name: 'Field Marshal',
+    cost: 20,
+    income: 6,
+    points: 3,
+    count: 1,
+    tradingGroup: 'aristocrat',
+  }, // ADAPTED
+  {
+    key: 'metropolitan',
+    kind: 'trading',
+    name: 'Metropolitan',
+    cost: 22,
+    income: 5,
+    points: 5,
+    count: 1,
+    tradingGroup: 'aristocrat',
+  }, // ADAPTED
 ];
 
 /** Total copies of a given group in the deck (sum of `count`). Used by setup + the totals test. */

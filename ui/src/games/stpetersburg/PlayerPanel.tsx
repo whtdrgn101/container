@@ -4,7 +4,6 @@ import {
   handCost,
   handLimit,
   legalDisplaceTargets,
-  PHASES,
 } from '@game-hub/engine/stpetersburg';
 import type { Card, CardKind, Phase, PlayerView } from '@game-hub/engine/stpetersburg';
 import { cn } from '@/lib/utils';
@@ -179,7 +178,8 @@ function HandFan({
                 ? Math.min(...options.map((o) => o.cost))
                 : card.cost
               : handCost(player, card);
-            const canPlay = playable && (trading ? options.length > 0 : player.rubles !== null && player.rubles >= cost);
+            const canPlay =
+              playable && (trading ? options.length > 0 : player.rubles !== null && player.rubles >= cost);
             const title = trading
               ? options.length
                 ? `${card.name} — upgrade by displacing a card you own (from ${cost}₽)`
@@ -242,7 +242,10 @@ function PlayerHeader({
             data-testid={`sp-marker-${phase}-${player.id}`}
             title={`Starts the ${phase} phase`}
             aria-label={`Starting player marker: ${phase} phase`}
-            className={cn('inline-flex h-4 w-4 items-center justify-center rounded-full border text-[9px] font-semibold', KIND_CLASS[phase])}
+            className={cn(
+              'inline-flex h-4 w-4 items-center justify-center rounded-full border text-[9px] font-semibold',
+              KIND_CLASS[phase],
+            )}
           >
             {PHASE_MARK[phase]}
           </span>
@@ -257,11 +260,19 @@ function PlayerHeader({
             {player.rubles}₽
           </span>
         ) : (
-          <span data-testid={`sp-rubles-hidden-${player.id}`} className="text-xs text-muted-foreground" title="Rubles are secret">
+          <span
+            data-testid={`sp-rubles-hidden-${player.id}`}
+            className="text-xs text-muted-foreground"
+            title="Rubles are secret"
+          >
             🔒 rubles
           </span>
         )}
-        <span data-testid={`sp-handcount-${player.id}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground" title={`${player.handCount} card(s) in hand`}>
+        <span
+          data-testid={`sp-handcount-${player.id}`}
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground"
+          title={`${player.handCount} card(s) in hand`}
+        >
           🖐 {player.handCount}
         </span>
       </span>
@@ -315,11 +326,23 @@ export function PlayerPanel(props: PlayerPanelProps) {
         className={cn('rounded-lg border p-3 text-sm', isActive ? 'border-primary bg-primary/5' : 'bg-card')}
       >
         <div className="flex items-center justify-between gap-2">
-          <PlayerHeader player={player} isActive={isActive} isBot={isBot} colorId={colorId} startsPhases={startsPhases} />
+          <PlayerHeader
+            player={player}
+            isActive={isActive}
+            isBot={isBot}
+            colorId={colorId}
+            startsPhases={startsPhases}
+          />
         </div>
         <PlayAreaColumns player={player} />
         {player.hand !== null ? (
-          <HandFan player={player} playable={props.playable} busy={props.busy} onPlay={props.onPlay} onTrade={props.onTrade} />
+          <HandFan
+            player={player}
+            playable={props.playable}
+            busy={props.busy}
+            onPlay={props.onPlay}
+            onTrade={props.onTrade}
+          />
         ) : null}
       </div>
     );
@@ -340,7 +363,13 @@ export function PlayerPanel(props: PlayerPanelProps) {
         onClick={onToggleExpand}
       >
         <span className="flex flex-1 items-center justify-between gap-2">
-          <PlayerHeader player={player} isActive={isActive} isBot={isBot} colorId={colorId} startsPhases={startsPhases} />
+          <PlayerHeader
+            player={player}
+            isActive={isActive}
+            isBot={isBot}
+            colorId={colorId}
+            startsPhases={startsPhases}
+          />
         </span>
         <span className="flex w-full items-center justify-between gap-2">
           <KindCounts player={player} />

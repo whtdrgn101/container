@@ -18,16 +18,38 @@ const DECK_SLOTS = [
   { x: 39, y: 13.4 },
 ] as const;
 
-export function ShipSvg({ tint = '#334155', cargo = [], className }: { tint?: string; cargo?: readonly Color[]; className?: string }) {
+export function ShipSvg({
+  tint = '#334155',
+  cargo = [],
+  className,
+}: {
+  tint?: string;
+  cargo?: readonly Color[];
+  className?: string;
+}) {
   return (
     <svg viewBox="0 0 72 40" className={cn('block h-full w-full', className)} aria-hidden focusable="false">
       {/* hull: rounded stern (left), squared vertical bow face (right) */}
-      <path d="M8 24 L66 24 L66.5 25 L66.5 32.5 L64 34.5 Q34 37 12 34.5 Q7 32 7 27 Q7 25 8 24 Z" fill={tint} stroke="rgba(0,0,0,0.3)" strokeWidth="0.6" />
+      <path
+        d="M8 24 L66 24 L66.5 25 L66.5 32.5 L64 34.5 Q34 37 12 34.5 Q7 32 7 27 Q7 25 8 24 Z"
+        fill={tint}
+        stroke="rgba(0,0,0,0.3)"
+        strokeWidth="0.6"
+      />
       <path d="M8 24 L66 24 L66.5 25 L66.5 27.5 L8.5 27.5 Q7.4 26 8 24 Z" fill="#ffffff" opacity="0.15" />
       <path d="M9 31.5 L65.5 31.5" stroke="rgba(0,0,0,0.22)" strokeWidth="0.8" />
       <path d="M12 34.5 Q34 37 64 34.5 L66.5 31.5 L66.5 32.5 L64 34.5 Q34 37 12 34.5 Z" fill="rgba(0,0,0,0.25)" />
       {/* wheelhouse aft, mast + house flag */}
-      <rect x="10" y="11.5" width="10.5" height="12.5" rx="1" fill="#e8e4da" stroke="rgba(0,0,0,0.3)" strokeWidth="0.5" />
+      <rect
+        x="10"
+        y="11.5"
+        width="10.5"
+        height="12.5"
+        rx="1"
+        fill="#e8e4da"
+        stroke="rgba(0,0,0,0.3)"
+        strokeWidth="0.5"
+      />
       <rect x="12" y="13.6" width="6.6" height="2.4" rx="0.5" fill="#35507a" opacity="0.85" />
       <rect x="12" y="17.6" width="6.6" height="1.6" rx="0.4" fill="#35507a" opacity="0.5" />
       <rect x="14.6" y="6" width="1.6" height="5.5" fill="#c8beac" />
@@ -40,8 +62,21 @@ export function ShipSvg({ tint = '#334155', cargo = [], className }: { tint?: st
         const slot = DECK_SLOTS[i]!;
         return (
           <g key={i}>
-            <rect x={slot.x} y={slot.y} width="9.2" height="4.8" rx="0.6" fill={COLOR_HEX[color]} stroke="rgba(0,0,0,0.35)" strokeWidth="0.4" />
-            <path d={`M${slot.x + 2.3} ${slot.y} v4.8 M${slot.x + 4.6} ${slot.y} v4.8 M${slot.x + 6.9} ${slot.y} v4.8`} stroke="rgba(0,0,0,0.15)" strokeWidth="0.35" />
+            <rect
+              x={slot.x}
+              y={slot.y}
+              width="9.2"
+              height="4.8"
+              rx="0.6"
+              fill={COLOR_HEX[color]}
+              stroke="rgba(0,0,0,0.35)"
+              strokeWidth="0.4"
+            />
+            <path
+              d={`M${slot.x + 2.3} ${slot.y} v4.8 M${slot.x + 4.6} ${slot.y} v4.8 M${slot.x + 6.9} ${slot.y} v4.8`}
+              stroke="rgba(0,0,0,0.15)"
+              strokeWidth="0.35"
+            />
           </g>
         );
       })}

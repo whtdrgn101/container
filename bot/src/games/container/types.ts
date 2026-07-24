@@ -37,10 +37,7 @@ export type BidCollector = (cargo: readonly Color[]) => Readonly<Record<string, 
  * Resolves the extra cash each tied player adds in a runoff (pg. 16), keyed by player id.
  * Like the opening bids, these are secret and belong to the bidders — the bot must ask.
  */
-export type RunoffCollector = (
-  cargo: readonly Color[],
-  tied: readonly string[],
-) => Readonly<Record<string, number>>;
+export type RunoffCollector = (cargo: readonly Color[], tied: readonly string[]) => Readonly<Record<string, number>>;
 
 export interface DecideOptions {
   readonly collectBids?: BidCollector;

@@ -33,7 +33,11 @@ describe('applyAction', () => {
   });
 
   it('locks the turn to TAKE_GATHER while a roll is pending', () => {
-    const rolled = applyAction(withPlacements({ forest: { p1: 2 } }, { phase: 'actions', activePlayerIndex: 0 }), 'p1', gatherForest);
+    const rolled = applyAction(
+      withPlacements({ forest: { p1: 2 } }, { phase: 'actions', activePlayerIndex: 0 }),
+      'p1',
+      gatherForest,
+    );
     expectError(() => applyAction(rolled, 'p1', useField), 'GATHER_PENDING');
   });
 
@@ -73,7 +77,10 @@ describe('legalActions', () => {
   });
 
   it('offers only TAKE_GATHER while a roll is pending', () => {
-    const rolled = withPlacements({ forest: { p1: 2 } }, { phase: 'actions', activePlayerIndex: 0, pendingGather: { place: 'forest', dice: [1, 1] } });
+    const rolled = withPlacements(
+      { forest: { p1: 2 } },
+      { phase: 'actions', activePlayerIndex: 0, pendingGather: { place: 'forest', dice: [1, 1] } },
+    );
     expect(legalActions(rolled)).toEqual([{ type: 'TAKE_GATHER', toolIndices: [] }]);
   });
 

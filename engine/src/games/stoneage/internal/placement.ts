@@ -71,7 +71,11 @@ function occupancy(state: StoneAgeState, place: PlaceId): number {
  * Tool-maker/field take exactly 1, the hut exactly 2 (so you need two people), the hunt any number,
  * and the four resource places 1..(whatever of the shared 7 remains).
  */
-export function countRange(state: StoneAgeState, place: PlaceId, playerId: string): { min: number; max: number } | null {
+export function countRange(
+  state: StoneAgeState,
+  place: PlaceId,
+  playerId: string,
+): { min: number; max: number } | null {
   if (state.placements[place][playerId] !== undefined) return null; // already placed here this round
   const available = availableToPlace(state, playerId);
   if (available < 1) return null;

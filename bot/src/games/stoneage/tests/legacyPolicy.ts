@@ -12,7 +12,6 @@ import {
   ALL_PLACES,
   buildingIndex,
   buildingPaymentError,
-  CARD_COST,
   cardIndex,
   HUNT_THRESHOLD,
   isBuildingPlace,
@@ -25,7 +24,14 @@ import {
   RESOURCE_VALUE,
   RESOURCES,
 } from '@game-hub/engine/stoneage';
-import type { Action, Building, FixedPlaceId, PlaceId, Resource, StoneAgePlayer, StoneAgeView } from '@game-hub/engine/stoneage';
+import type {
+  Building,
+  FixedPlaceId,
+  PlaceId,
+  Resource,
+  StoneAgePlayer,
+  StoneAgeView,
+} from '@game-hub/engine/stoneage';
 import type { Payment } from '@game-hub/engine/stoneage';
 import { BotError } from '../../../kernel';
 import { cardPaymentFor, chooseTools, foodDeficit } from '../policy';
@@ -59,7 +65,10 @@ function pickPlacement(view: StoneAgeView, playerId: string): { place: PlaceId; 
   for (const action of legalActions(view, playerId)) {
     if (action.type !== 'PLACE') continue;
     const cur = options.get(action.place);
-    options.set(action.place, { min: Math.min(cur?.min ?? action.count, action.count), max: Math.max(cur?.max ?? action.count, action.count) });
+    options.set(action.place, {
+      min: Math.min(cur?.min ?? action.count, action.count),
+      max: Math.max(cur?.max ?? action.count, action.count),
+    });
   }
   let best: PlaceId | null = null;
   let bestScore = -Infinity;

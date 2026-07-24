@@ -73,7 +73,9 @@ export default function App() {
     setGameType((current) => current ?? selected.id);
     setLobbySeats((current) => (current === 0 ? selected.minPlayers : current));
     setNames((current) => (current.length === 0 ? NAME_POOL.slice(0, selected.minPlayers) : current));
-    setSeatIsBot((current) => (current.length === 0 ? NAME_POOL.slice(0, selected.minPlayers).map(() => false) : current));
+    setSeatIsBot((current) =>
+      current.length === 0 ? NAME_POOL.slice(0, selected.minPlayers).map(() => false) : current,
+    );
   }, [selected]);
 
   /** Run async work with busy/error handling but no state assignment (for lobby flows). */
@@ -277,7 +279,10 @@ export default function App() {
         .catch(() => undefined);
     }, 1500);
     return () => clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- enterGameAs is stable enough for this poll
+    // enterGameAs closes only over stable setters and its own args (viewerFor(ids), not the outer
+    // viewer), so its identity changing never changes its behaviour — listing it would only tear down
+    // and rebuild this poll on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lobbyId, lobbyOpen, mySeats]);
 
   // Seat identity comes from the payload (`players`), never by reading the opaque `game` blob — a
@@ -323,7 +328,10 @@ export default function App() {
     };
     setRematch(r);
     if (r.newGameId && r.newGameId !== gameId) void goToRematch(r.newGameId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- react to each fresh push, not to closures
+    // Fire once per FRESH push only. Adding gameId/goToRematch would re-run on the same lastMessage
+    // whenever navigation or `viewer` changes, re-triggering the redirect on a stale message —
+    // goToRematch genuinely depends on `viewer`, so memoizing it wouldn't remove that hazard.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastMessage]);
 
   /** Propose or accept a rematch on behalf of this client's seats. */
@@ -349,7 +357,10 @@ export default function App() {
     myNames && myNames.length > 0
       ? myNames.join(' & ')
       : lobby && mySeats.length > 0
-        ? mySeats.map((seat) => lobby.members[seat]?.name).filter(Boolean).join(' & ')
+        ? mySeats
+            .map((seat) => lobby.members[seat]?.name)
+            .filter(Boolean)
+            .join(' & ')
         : null;
 
   /**

@@ -74,10 +74,13 @@ export function AuctionPanel({
           knowing exactly what they're level on, which is the whole tension of the round.
         */}
         {auction.phase === 'runoff' && auction.revealed && (
-          <p className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs" data-testid="runoff-banner">
+          <p
+            className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs"
+            data-testid="runoff-banner"
+          >
             Tied at ${Math.max(0, ...Object.values(auction.revealed))} —{' '}
-            {auction.bidders.map((b) => nameOf(game.players, b.playerId)).join(' and ')} add cash to their
-            existing bid. Highest total wins.
+            {auction.bidders.map((b) => nameOf(game.players, b.playerId)).join(' and ')} add cash to their existing bid.
+            Highest total wins.
           </p>
         )}
 
@@ -119,7 +122,7 @@ export function AuctionPanel({
                     setBidDraft(0);
                   }}
                 >
-                  I'm {nameOf(game.players, seatsStillToBid[0]!)} — enter my bid
+                  I&apos;m {nameOf(game.players, seatsStillToBid[0]!)} — enter my bid
                 </Button>
               </div>
             ) : (
@@ -213,7 +216,10 @@ export function AuctionPanel({
                   refuses to guess, so the choice must be made here before Deliver unlocks.
                 */}
                 {auction.choiceRequired.length > 0 && (
-                  <div className="space-y-2 rounded-md border border-destructive/40 bg-destructive/10 p-2" data-testid="tie-choice">
+                  <div
+                    className="space-y-2 rounded-md border border-destructive/40 bg-destructive/10 p-2"
+                    data-testid="tie-choice"
+                  >
                     <p className="text-xs font-medium text-destructive">
                       Still tied at ${auction.winningBid} — you choose who gets the cargo:
                     </p>

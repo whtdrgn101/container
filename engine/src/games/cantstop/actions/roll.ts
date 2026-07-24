@@ -5,8 +5,7 @@ import { legalSelections, record } from '../internal';
 /** Validate the injected dice: exactly four whole faces of 1–6. Defensive — the route builds these. */
 function assertValidDice(dice: readonly number[]): asserts dice is [number, number, number, number] {
   const valid =
-    dice.length === DICE_COUNT &&
-    dice.every((die) => Number.isInteger(die) && die >= 1 && die <= DIE_FACES);
+    dice.length === DICE_COUNT && dice.every((die) => Number.isInteger(die) && die >= 1 && die <= DIE_FACES);
   if (!valid) {
     throw new GameError('INVALID_ROLL', `A roll is ${DICE_COUNT} dice of 1–${DIE_FACES}, got [${dice.join(', ')}]`);
   }
@@ -30,7 +29,13 @@ export function roll(
 
   const rolled: CantStopState = { ...state, dice };
   if (legalSelections(rolled).length > 0) {
-    return record(state, 'ROLL', playerId, { phase: 'selecting', dice, rollsThisTurn: state.rollsThisTurn + 1 }, { dice });
+    return record(
+      state,
+      'ROLL',
+      playerId,
+      { phase: 'selecting', dice, rollsThisTurn: state.rollsThisTurn + 1 },
+      { dice },
+    );
   }
 
   // Blown it: discard the turn's runners and pass to the next seat (whose roll count starts fresh).

@@ -443,6 +443,11 @@ pnpm test:backend           # backend integration tests (Fastify inject + :memor
 pnpm test:e2e               # Playwright (auto-starts API + UI); needs: pnpm --filter @game-hub/ui exec playwright install chromium
 pnpm typecheck              # strict typecheck across all packages
 
+# Lint & format (ESLint 9 flat config + Prettier — both run in CI after typecheck)
+pnpm lint                   # ESLint: hooks-deps + real hazards only (fast; NOT a second typecheck). Style is Prettier's.
+pnpm format                 # Prettier --write . (single quotes, semicolons, trailing commas, printWidth 120)
+pnpm format:check           # Prettier --check . (the CI gate; *.md is ignored so hand-wrapped docs don't reflow)
+
 # Dev (run both in separate terminals)
 pnpm dev:backend            # API on :3001
 pnpm dev:ui                 # UI on :5173 (proxies /api → :3001)

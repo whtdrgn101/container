@@ -102,7 +102,9 @@ test('SP2: drive a full round (mostly passes) into round 2 — the round transit
   await expect(page.getByTestId('sp-lower-row').locator('[data-testid^="sp-buy-"]').first()).toBeVisible();
 });
 
-test('SP3: add a card to hand, then play it in a later phase — the slot empties, the feed narrates, the cost is charged', async ({ page }) => {
+test('SP3: add a card to hand, then play it in a later phase — the slot empties, the feed narrates, the cost is charged', async ({
+  page,
+}) => {
   await page.goto('/');
   await page.getByTestId('pick-game-stpetersburg').click();
   await page.getByTestId('remove-player-2').click(); // 2-seat game (Ann, Bob)
@@ -143,17 +145,35 @@ test('SP3: add a card to hand, then play it in a later phase — the slot emptie
  * while securing a building + aristocrat as displacement targets, then — once income makes it affordable —
  * plays the held trading card by displacement in the UI and asserts the swap + the "upgraded …" feed line.
  */
-test('SP4: play a trading card by displacement — the play area swaps and the feed narrates the upgrade', async ({ page, request }) => {
+test('SP4: play a trading card by displacement — the play area swaps and the feed narrates the upgrade', async ({
+  page,
+  request,
+}) => {
   test.setTimeout(120_000);
 
-  type SpCard = { id: string; key: string; kind: string; name: string; cost: number; ware?: string; tradingGroup?: 'worker' | 'building' | 'aristocrat'; special?: string };
+  type SpCard = {
+    id: string;
+    key: string;
+    kind: string;
+    name: string;
+    cost: number;
+    ware?: string;
+    tradingGroup?: 'worker' | 'building' | 'aristocrat';
+    special?: string;
+  };
   type SpView = {
     activePlayerIndex: number;
     round: number;
-    players: { id: string; rubles: number | null; hand: SpCard[] | null; playArea: { worker: SpCard[]; building: SpCard[]; aristocrat: SpCard[] } }[];
+    players: {
+      id: string;
+      rubles: number | null;
+      hand: SpCard[] | null;
+      playArea: { worker: SpCard[]; building: SpCard[]; aristocrat: SpCard[] };
+    }[];
     board: { upper: SpCard[]; lower: SpCard[]; discard: number };
   };
-  const placedCount = (pa: SpView['players'][number]['playArea']) => pa.worker.length + pa.building.length + pa.aristocrat.length;
+  const placedCount = (pa: SpView['players'][number]['playArea']) =>
+    pa.worker.length + pa.building.length + pa.aristocrat.length;
 
   /** The already-placed cards a trading card may displace (pg. 7) — colour group, ware match for green. */
   const targetsFor = (owned: SpView['players'][number]['playArea'], tc: SpCard): SpCard[] => {
@@ -183,7 +203,10 @@ test('SP4: play a trading card by displacement — the play area swaps and the f
   // The controls are ready when Pass is enabled OR an SP5 interlude prompt is showing (which hides Pass).
   const settle = () =>
     expect(async () => {
-      const passReady = await page.getByTestId('sp-pass').isEnabled().catch(() => false);
+      const passReady = await page
+        .getByTestId('sp-pass')
+        .isEnabled()
+        .catch(() => false);
       const prompt = (await has('sp-pub-prompt')) || (await has('sp-observatory-prompt'));
       expect(passReady || prompt).toBe(true);
     }).toPass({ timeout: 20_000 });
@@ -232,7 +255,10 @@ test('SP4: play a trading card by displacement — the play area swaps and the f
         try {
           const pickerBox = page.getByTestId('sp-displace-picker');
           await pickerBox.waitFor({ state: 'visible', timeout: 2000 });
-          await pickerBox.locator('button[data-testid^="sp-displace-"]:not([data-testid="sp-displace-cancel"])').first().click();
+          await pickerBox
+            .locator('button[data-testid^="sp-displace-"]:not([data-testid="sp-displace-cancel"])')
+            .first()
+            .click();
         } catch {
           // No picker appeared → a single legal target, already played.
         }
@@ -261,7 +287,12 @@ test('SP4: play a trading card by displacement — the play area swaps and the f
     // income source (worker/aristocrat) so money will keep growing — stop spending and just pass: income
     // accrues each round until P1's play becomes affordable. This converges fast and avoids draining money.
     const readyToWait =
-      hand.some((c) => c.kind === 'trading' && (c.tradingGroup === 'building' || c.tradingGroup === 'aristocrat') && targetsFor(me.playArea, c).length > 0) &&
+      hand.some(
+        (c) =>
+          c.kind === 'trading' &&
+          (c.tradingGroup === 'building' || c.tradingGroup === 'aristocrat') &&
+          targetsFor(me.playArea, c).length > 0,
+      ) &&
       (me.playArea.worker.length > 0 || me.playArea.aristocrat.length > 0);
 
     // P2 — grab a blue/orange trading card into hand (free) while there's room, so a placed building/
@@ -339,7 +370,9 @@ test('SP6: an ended game renders the final-scoring results screen (GameOver)', a
   let state = (await (await request.get(`/api/games/${gameId}`)).json()).game as S;
   for (let i = 0; i < 400 && state.status !== 'ended'; i += 1) {
     const seat = state.players[state.activePlayerIndex]!.id;
-    const res = await request.post(`/api/games/${gameId}/actions`, { data: { playerId: seat, action: { type: 'PASS' } } });
+    const res = await request.post(`/api/games/${gameId}/actions`, {
+      data: { playerId: seat, action: { type: 'PASS' } },
+    });
     state = (await res.json()).game as S;
   }
   expect(state.status).toBe('ended');

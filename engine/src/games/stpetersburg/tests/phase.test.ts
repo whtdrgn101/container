@@ -8,10 +8,16 @@ const area = (over: Partial<PlayArea> = {}): PlayArea => ({ worker: [], building
 const controller = (id = 'ctrl-1'): Card =>
   card({ id, key: 'controller', kind: 'aristocrat', name: 'Controller', cost: 14, income: 4, points: 1 });
 const buildingCards = (n: number): Card[] =>
-  Array.from({ length: n }, (_, i) => card({ id: `b-${i}`, key: 'market', kind: 'building', name: 'Market', cost: 5, income: 0, points: 1 }));
+  Array.from({ length: n }, (_, i) =>
+    card({ id: `b-${i}`, key: 'market', kind: 'building', name: 'Market', cost: 5, income: 0, points: 1 }),
+  );
 
 /** A game with seat-0 overridden + arbitrary board — for phase-close fixtures. */
-function game(seat0: Partial<StPetersburgPlayer> = {}, board: Partial<Board> = {}, rest: Partial<StPetersburgState> = {}): StPetersburgState {
+function game(
+  seat0: Partial<StPetersburgPlayer> = {},
+  board: Partial<Board> = {},
+  rest: Partial<StPetersburgState> = {},
+): StPetersburgState {
   const base = newGame(['Ann', 'Bob']);
   const players = base.players.map((p, i) => (i === 0 ? { ...p, ...seat0 } : p));
   return makeState({ players, board: { ...base.board, ...board }, ...rest });
@@ -34,7 +40,9 @@ describe('phase helpers', () => {
 describe('scoreAndRefill', () => {
   it('scores the phase kind — coin → rubles (secret), shield → points (public) (pg. 4)', () => {
     // Aristocrat phase, seat 0 owns a controller (income 4, points 1). Board: 4 workers in the upper row.
-    const changes = scoreAndRefill(game({ playArea: area({ aristocrat: [controller()] }) }, {}, { phase: 'aristocrat' }));
+    const changes = scoreAndRefill(
+      game({ playArea: area({ aristocrat: [controller()] }) }, {}, { phase: 'aristocrat' }),
+    );
     expect(changes.players![0]!.rubles).toBe(29); // 25 + 4
     expect(changes.players![0]!.points).toBe(1); // 0 + 1
     // A player with no cards of the kind scores nothing.
@@ -46,9 +54,31 @@ describe('scoreAndRefill', () => {
     // A green worker *trading* card lives in the worker group and scores at worker-close by its printed
     // values (item 5: the upgrade rides the card data through the existing phase machinery). Weaving mill
     // raises income to 6; the fur shop keeps income 3 and adds 2 victory points.
-    const weavingMill = card({ id: 'wm', key: 'weavingMill', kind: 'trading', name: 'Weaving Mill', cost: 8, income: 6, points: 0, ware: 'wool', tradingGroup: 'worker' });
-    const furShop = card({ id: 'fs', key: 'furShop', kind: 'trading', name: 'Fur Shop', cost: 10, income: 3, points: 2, ware: 'fur', tradingGroup: 'worker' });
-    const changes = scoreAndRefill(game({ playArea: area({ worker: [weavingMill, furShop] }) }, {}, { tookCardThisPhase: true }));
+    const weavingMill = card({
+      id: 'wm',
+      key: 'weavingMill',
+      kind: 'trading',
+      name: 'Weaving Mill',
+      cost: 8,
+      income: 6,
+      points: 0,
+      ware: 'wool',
+      tradingGroup: 'worker',
+    });
+    const furShop = card({
+      id: 'fs',
+      key: 'furShop',
+      kind: 'trading',
+      name: 'Fur Shop',
+      cost: 10,
+      income: 3,
+      points: 2,
+      ware: 'fur',
+      tradingGroup: 'worker',
+    });
+    const changes = scoreAndRefill(
+      game({ playArea: area({ worker: [weavingMill, furShop] }) }, {}, { tookCardThisPhase: true }),
+    );
     expect(changes.players![0]!.rubles).toBe(25 + 6 + 3); // both incomes
     expect(changes.players![0]!.points).toBe(2); // the fur shop's 2 points
   });
@@ -69,7 +99,11 @@ describe('scoreAndRefill', () => {
   it('deals what it can when the next stack is short (SP6 owns the end trigger)', () => {
     // Empty rows (all bought) → need 8, but only 3 buildings left → deal 3.
     const changes = scoreAndRefill(
-      game({}, { upper: [], lower: [], stacks: { worker: [], building: buildingCards(3), aristocrat: [], trading: [] } }, { tookCardThisPhase: true }),
+      game(
+        {},
+        { upper: [], lower: [], stacks: { worker: [], building: buildingCards(3), aristocrat: [], trading: [] } },
+        { tookCardThisPhase: true },
+      ),
     );
     expect(changes.board!.upper).toHaveLength(3);
     expect(changes.board!.stacks.building).toHaveLength(0);
@@ -101,14 +135,20 @@ describe('roundTransition (pg. 5)', () => {
     // A round-2 setup at the trading close: lower has 3 leftovers, upper has 5 (trading) cards, a card was
     // taken this phase so the worker refill runs. Worker stack has plenty.
     const lower = buildingCards(3);
-    const upper = Array.from({ length: 5 }, (_, i) => card({ id: `t-${i}`, key: 'x', kind: 'trading', name: 'T', cost: 4 }));
+    const upper = Array.from({ length: 5 }, (_, i) =>
+      card({ id: `t-${i}`, key: 'x', kind: 'trading', name: 'T', cost: 4 }),
+    );
     const workers = Array.from({ length: 10 }, (_, i) => card({ id: `w-${i}`, key: 'lumberjack' }));
-    const before = game({}, { upper, lower, discard: 2, stacks: { worker: workers, building: [], aristocrat: [], trading: [] } }, {
-      phase: 'trading',
-      round: 1,
-      tookCardThisPhase: true,
-      startingPlayers: { worker: 0, building: 1, aristocrat: 0, trading: 1 },
-    });
+    const before = game(
+      {},
+      { upper, lower, discard: 2, stacks: { worker: workers, building: [], aristocrat: [], trading: [] } },
+      {
+        phase: 'trading',
+        round: 1,
+        tookCardThisPhase: true,
+        startingPlayers: { worker: 0, building: 1, aristocrat: 0, trading: 1 },
+      },
+    );
     const changes = roundTransition(before);
 
     expect(changes.round).toBe(2);
@@ -134,10 +174,14 @@ describe('roundTransition (pg. 5)', () => {
     // play-test bug this corrects. lower empty, upper = the 4 seeded workers, worker stack has 6 to give.
     const upper = Array.from({ length: 4 }, (_, i) => card({ id: `w-${i}`, key: 'lumberjack' }));
     const workers = Array.from({ length: 6 }, (_, i) => card({ id: `ws-${i}`, key: 'lumberjack' }));
-    const before = game({}, { upper, lower: [], discard: 0, stacks: { worker: workers, building: [], aristocrat: [], trading: [] } }, {
-      phase: 'trading',
-      tookCardThisPhase: false,
-    });
+    const before = game(
+      {},
+      { upper, lower: [], discard: 0, stacks: { worker: workers, building: [], aristocrat: [], trading: [] } },
+      {
+        phase: 'trading',
+        tookCardThisPhase: false,
+      },
+    );
     const changes = roundTransition(before);
     expect(changes.board!.discard).toBe(0); // nothing in the lower row to discard
     expect(changes.board!.lower).toEqual(upper); // the 4 slid down to become the new lower row

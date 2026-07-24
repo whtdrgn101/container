@@ -62,8 +62,9 @@ describe('colours across the platform', () => {
   });
 
   const createLobby = async (seats = 2) =>
-    (await app.inject({ method: 'POST', url: '/lobbies', payload: { gameType: 'cantstop', seats } })).json()
-      .lobby as { id: string };
+    (await app.inject({ method: 'POST', url: '/lobbies', payload: { gameType: 'cantstop', seats } })).json().lobby as {
+      id: string;
+    };
   const join = (id: string, name: string, color?: string) =>
     app.inject({ method: 'POST', url: `/lobbies/${id}/join`, payload: { name, ...(color ? { color } : {}) } });
 
@@ -128,10 +129,18 @@ describe('colours across the platform', () => {
     const lobby = await createLobby();
     await join(lobby.id, 'Ann', 'rose');
     await join(lobby.id, 'Bob', 'sky');
-    const taken = await app.inject({ method: 'POST', url: `/lobbies/${lobby.id}/color`, payload: { seat: 1, color: 'rose' } });
+    const taken = await app.inject({
+      method: 'POST',
+      url: `/lobbies/${lobby.id}/color`,
+      payload: { seat: 1, color: 'rose' },
+    });
     expect(taken.statusCode).toBe(409);
     expect(taken.json().error.code).toBe('COLOR_TAKEN');
-    const empty = await app.inject({ method: 'POST', url: `/lobbies/${lobby.id}/color`, payload: { seat: 3, color: 'amber' } });
+    const empty = await app.inject({
+      method: 'POST',
+      url: `/lobbies/${lobby.id}/color`,
+      payload: { seat: 3, color: 'amber' },
+    });
     expect(empty.statusCode).toBe(409);
     expect(empty.json().error.code).toBe('SEAT_NOT_CLAIMED');
   });
@@ -187,7 +196,13 @@ describe('colours across the platform', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/games',
-      payload: { gameType: 'cantstop', players: [{ name: 'Ann', color: 'amber' }, { name: 'Bob', color: 'amber' }] },
+      payload: {
+        gameType: 'cantstop',
+        players: [
+          { name: 'Ann', color: 'amber' },
+          { name: 'Bob', color: 'amber' },
+        ],
+      },
     });
     expect(res.statusCode).toBe(409);
     expect(res.json().error.code).toBe('COLOR_TAKEN');
@@ -203,7 +218,10 @@ describe('colours across the platform', () => {
       url: '/games',
       payload: {
         gameType: 'cantstop',
-        players: [{ name: 'Ann', bot: true, color: 'amber' }, { name: 'Bob', bot: true, color: 'emerald' }],
+        players: [
+          { name: 'Ann', bot: true, color: 'amber' },
+          { name: 'Bob', bot: true, color: 'emerald' },
+        ],
       },
     });
     const id = created.json().game.id as string;

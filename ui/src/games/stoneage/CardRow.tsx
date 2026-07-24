@@ -7,7 +7,15 @@ import {
   CARD_PLACES,
   RESOURCES,
 } from '@game-hub/engine/stoneage';
-import type { CardEffect, CardScoring, CivCard, PlaceId, Resource, StoneAgePlayer, StoneAgeView } from '@game-hub/engine/stoneage';
+import type {
+  CardEffect,
+  CardScoring,
+  CivCard,
+  PlaceId,
+  Resource,
+  StoneAgePlayer,
+  StoneAgeView,
+} from '@game-hub/engine/stoneage';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { FieldIcon, FoodIcon, Hut, Meeple, ResourceIcon, SYMBOL_ICON, ToolIcon } from './art';
@@ -35,16 +43,30 @@ function EffectLine({ effect }: { effect: CardEffect }) {
     case 'resource':
       return (
         <span className="flex items-center gap-1">
-          {Array.from({ length: effect.amount }, (_, i) => <ResourceIcon key={i} resource={effect.resource} className="h-4 w-4" />)}
+          {Array.from({ length: effect.amount }, (_, i) => (
+            <ResourceIcon key={i} resource={effect.resource} className="h-4 w-4" />
+          ))}
           +{effect.amount} {RESOURCE_LABEL[effect.resource].toLowerCase()}
         </span>
       );
     case 'food':
-      return <span className="flex items-center gap-1"><FoodIcon className="h-4 w-4" /> +{effect.amount} food</span>;
+      return (
+        <span className="flex items-center gap-1">
+          <FoodIcon className="h-4 w-4" /> +{effect.amount} food
+        </span>
+      );
     case 'foodTrack':
-      return <span className="flex items-center gap-1"><FieldIcon className="h-4 w-4" /> +{effect.amount} food track</span>;
+      return (
+        <span className="flex items-center gap-1">
+          <FieldIcon className="h-4 w-4" /> +{effect.amount} food track
+        </span>
+      );
     case 'tool':
-      return <span className="flex items-center gap-1"><ToolIcon className="h-4 w-4" /> Take a tool</span>;
+      return (
+        <span className="flex items-center gap-1">
+          <ToolIcon className="h-4 w-4" /> Take a tool
+        </span>
+      );
     case 'points':
       return <span className="font-medium">+{effect.amount} pts</span>;
     default:
@@ -91,7 +113,19 @@ export interface CardRowProps {
  * on a slot during placement, then in the action phase pay its position cost — any resources, never food
  * — to take the card (its immediate effect fires and it's kept for scoring), or **Pass**.
  */
-export function CardRow({ game, active, canDrive, placing, acting, pending, busy, onPlace, onAcquire, playerName, seatColorOf }: CardRowProps) {
+export function CardRow({
+  game,
+  active,
+  canDrive,
+  placing,
+  acting,
+  pending,
+  busy,
+  onPlace,
+  onAcquire,
+  playerName,
+  seatColorOf,
+}: CardRowProps) {
   // In-progress payment per card slot (which resources you'll spend when you press Acquire).
   const [pay, setPay] = useState<Record<number, Partial<Record<Resource, number>>>>({});
   const bumpPay = (slot: number, resource: Resource, by: number, owned: number) =>
@@ -110,67 +144,135 @@ export function CardRow({ game, active, canDrive, placing, acting, pending, busy
           const card: CivCard | null = game.cardDisplay[slot] ?? null;
           const occupants = Object.entries(game.placements[placeId] ?? {});
           const mineHere = !!active && (game.placements[placeId]?.[active.id] ?? undefined) !== undefined;
-          const canPlaceHere = canDrive && placing && !!card && occupants.length === 0 && !!active && availableToPlace(game, active.id) >= 1;
+          const canPlaceHere =
+            canDrive &&
+            placing &&
+            !!card &&
+            occupants.length === 0 &&
+            !!active &&
+            availableToPlace(game, active.id) >= 1;
           const draft = pay[slot] ?? {};
-          const canAcquire = acting && canDrive && mineHere && !!card && !!active && cardPaymentError(slot, draft, active) === null;
+          const canAcquire =
+            acting && canDrive && mineHere && !!card && !!active && cardPaymentError(slot, draft, active) === null;
           return (
-            <div key={placeId} data-testid={`place-${placeId}`} className="flex flex-col overflow-hidden rounded-md border">
+            <div
+              key={placeId}
+              data-testid={`place-${placeId}`}
+              className="flex flex-col overflow-hidden rounded-md border"
+            >
               {/* The header band is the card's type at a glance: green = culture set, sand = multiplier. */}
               <div
                 className={cn(
                   'flex items-center justify-between gap-2 px-3 py-1.5',
                   !card && 'bg-muted text-muted-foreground',
-                  card && (card.scoring.kind === 'green' ? 'bg-[#5d7c42] text-[#f3f0e2]' : 'bg-[#cfa95d] text-[#46392a]'),
+                  card &&
+                    (card.scoring.kind === 'green' ? 'bg-[#5d7c42] text-[#f3f0e2]' : 'bg-[#cfa95d] text-[#46392a]'),
                 )}
               >
                 <span className="text-sm font-semibold">{card ? cardTitle(card.scoring) : `Card ${slot + 1}`}</span>
-                {card && card.scoring.kind === 'green' && (() => { const Icon = SYMBOL_ICON[card.scoring.symbol]!; return <Icon className="h-4 w-4" />; })()}
+                {card &&
+                  card.scoring.kind === 'green' &&
+                  (() => {
+                    const Icon = SYMBOL_ICON[card.scoring.symbol]!;
+                    return <Icon className="h-4 w-4" />;
+                  })()}
               </div>
               <div className="flex flex-1 flex-col bg-card px-3 py-2">
-              {card ? (
-                <div className="space-y-1 text-xs">
-                  <div><span className="mr-1 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Now</span><EffectLine effect={card.effect} /></div>
-                  <div><span className="mr-1 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">End</span><ScoringLine scoring={card.scoring} /></div>
-                </div>
-              ) : (
-                <div className="text-xs text-muted-foreground">empty</div>
-              )}
-              <div className="mt-1 flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground">
-                <AnyPips count={CARD_COST[slot]!} />
-                {CARD_COST[slot]} res
-              </div>
-              {occupants.length > 0 && (
-                <div className="mt-1 flex flex-wrap gap-x-2 text-xs">
-                  {occupants.map(([id, n]) => (
-                    <span key={id} className={cn('flex items-center gap-1 font-medium', seatColorOf(id).text)}>
-                      <span className={cn('inline-block h-2 w-2 rounded-full', seatColorOf(id).dot)} aria-hidden />
-                      {playerName(id)}×{n}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {canPlaceHere && (
-                <Button size="sm" className="mt-2 self-end" data-testid={`place-${placeId}-go`} disabled={busy} onClick={() => onPlace(placeId)}>
-                  Place worker
-                </Button>
-              )}
-              {acting && canDrive && mineHere && card && active && !pending && (
-                <div className="mt-2 space-y-1.5 border-t pt-2">
-                  {RESOURCES.filter((r) => active.resources[r] > 0).map((r) => (
-                    <div key={r} className="flex items-center gap-1 text-xs">
-                      <ResourceIcon resource={r} className="h-4 w-4" />
-                      <span className="w-9">{RESOURCE_LABEL[r]}</span>
-                      <Button size="sm" variant="outline" aria-label={`Less ${r}`} data-testid={`card-pay-${slot}-${r}-dec`} disabled={busy} onClick={() => bumpPay(slot, r, -1, active.resources[r])}>−</Button>
-                      <span className="w-4 text-center tabular-nums" data-testid={`card-pay-${slot}-${r}`}>{draft[r] ?? 0}</span>
-                      <Button size="sm" variant="outline" aria-label={`More ${r}`} data-testid={`card-pay-${slot}-${r}-inc`} disabled={busy} onClick={() => bumpPay(slot, r, 1, active.resources[r])}>+</Button>
+                {card ? (
+                  <div className="space-y-1 text-xs">
+                    <div>
+                      <span className="mr-1 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
+                        Now
+                      </span>
+                      <EffectLine effect={card.effect} />
                     </div>
-                  ))}
-                  <div className="flex items-center justify-end gap-1 pt-1">
-                    <Button size="sm" variant="outline" data-testid={`card-pass-${slot}`} disabled={busy} onClick={() => onAcquire(slot, {})}>Pass</Button>
-                    <Button size="sm" data-testid={`acquire-${slot}`} disabled={busy || !canAcquire} onClick={() => onAcquire(slot, draft)}>Take</Button>
+                    <div>
+                      <span className="mr-1 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
+                        End
+                      </span>
+                      <ScoringLine scoring={card.scoring} />
+                    </div>
                   </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground">empty</div>
+                )}
+                <div className="mt-1 flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground">
+                  <AnyPips count={CARD_COST[slot]!} />
+                  {CARD_COST[slot]} res
                 </div>
-              )}
+                {occupants.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-x-2 text-xs">
+                    {occupants.map(([id, n]) => (
+                      <span key={id} className={cn('flex items-center gap-1 font-medium', seatColorOf(id).text)}>
+                        <span className={cn('inline-block h-2 w-2 rounded-full', seatColorOf(id).dot)} aria-hidden />
+                        {playerName(id)}×{n}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {canPlaceHere && (
+                  <Button
+                    size="sm"
+                    className="mt-2 self-end"
+                    data-testid={`place-${placeId}-go`}
+                    disabled={busy}
+                    onClick={() => onPlace(placeId)}
+                  >
+                    Place worker
+                  </Button>
+                )}
+                {acting && canDrive && mineHere && card && active && !pending && (
+                  <div className="mt-2 space-y-1.5 border-t pt-2">
+                    {RESOURCES.filter((r) => active.resources[r] > 0).map((r) => (
+                      <div key={r} className="flex items-center gap-1 text-xs">
+                        <ResourceIcon resource={r} className="h-4 w-4" />
+                        <span className="w-9">{RESOURCE_LABEL[r]}</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          aria-label={`Less ${r}`}
+                          data-testid={`card-pay-${slot}-${r}-dec`}
+                          disabled={busy}
+                          onClick={() => bumpPay(slot, r, -1, active.resources[r])}
+                        >
+                          −
+                        </Button>
+                        <span className="w-4 text-center tabular-nums" data-testid={`card-pay-${slot}-${r}`}>
+                          {draft[r] ?? 0}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          aria-label={`More ${r}`}
+                          data-testid={`card-pay-${slot}-${r}-inc`}
+                          disabled={busy}
+                          onClick={() => bumpPay(slot, r, 1, active.resources[r])}
+                        >
+                          +
+                        </Button>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-end gap-1 pt-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        data-testid={`card-pass-${slot}`}
+                        disabled={busy}
+                        onClick={() => onAcquire(slot, {})}
+                      >
+                        Pass
+                      </Button>
+                      <Button
+                        size="sm"
+                        data-testid={`acquire-${slot}`}
+                        disabled={busy || !canAcquire}
+                        onClick={() => onAcquire(slot, draft)}
+                      >
+                        Take
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           );

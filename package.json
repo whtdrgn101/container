@@ -2,6 +2,7 @@
   "name": "game-hub-monorepo",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "description": "Game Hub — a self-hosted board-game platform. TypeScript monorepo: a shared engine, a Fastify REST API over SQLite, and a React UI. Container and Can't Stop are the games built on it.",
   "license": "BSD-3-Clause",
   "engines": {
@@ -15,8 +16,21 @@
     "test:backend": "pnpm --filter @game-hub/backend test",
     "test:e2e": "pnpm --filter @game-hub/ui test:e2e",
     "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "build": "pnpm -r build",
     "dev:backend": "pnpm --filter @game-hub/backend dev",
     "dev:ui": "pnpm --filter @game-hub/ui dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^9.1.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^15.15.0",
+    "prettier": "^3.9.6",
+    "typescript-eslint": "^8.65.0"
   }
 }

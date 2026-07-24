@@ -61,8 +61,14 @@ export function Scene() {
       <g fill="#5c4526">
         <path d="M10 22 l1.4 -2.8 0.7 1.5 2.4 -0.6 2.7 0.9 1 2.4 -0.7 2.1 -1.3 -0.15 -0.5 2.2 -1 0 0.15 -2.2 -2.1 0.3 -0.3 1.9 -1 0 0 -2.4 Z" />
         <path d="M11.7 19.7 l0.45 -1.8 0.75 1.4 Z M13.2 19.8 l0.75 -1.7 0.45 1.5 Z" />
-        <path d="M20 27 l1.2 -2.4 0.6 1.3 2 -0.5 2.3 0.75 0.85 2 -0.6 1.8 -1.1 -0.12 -0.4 1.9 -0.85 0 0.12 -1.9 -1.8 0.25 -0.25 1.6 -0.85 0 0 -2 Z" opacity="0.9" />
-        <path d="M6 30 l1 -2 0.5 1.1 1.7 -0.4 1.9 0.6 0.7 1.7 -0.5 1.5 -0.9 -0.1 -0.35 1.6 -0.7 0 0.1 -1.6 -1.5 0.2 -0.2 1.35 -0.7 0 0 -1.7 Z" opacity="0.8" />
+        <path
+          d="M20 27 l1.2 -2.4 0.6 1.3 2 -0.5 2.3 0.75 0.85 2 -0.6 1.8 -1.1 -0.12 -0.4 1.9 -0.85 0 0.12 -1.9 -1.8 0.25 -0.25 1.6 -0.85 0 0 -2 Z"
+          opacity="0.9"
+        />
+        <path
+          d="M6 30 l1 -2 0.5 1.1 1.7 -0.4 1.9 0.6 0.7 1.7 -0.5 1.5 -0.9 -0.1 -0.35 1.6 -0.7 0 0.1 -1.6 -1.5 0.2 -0.2 1.35 -0.7 0 0 -1.7 Z"
+          opacity="0.8"
+        />
       </g>
 
       {/* top-center: the forest */}
@@ -96,7 +102,10 @@ export function Scene() {
       <path d="M92.2 33 Q92.6 38 93 43" fill="none" stroke="#cfe6ec" strokeWidth="0.8" opacity="0.8" />
 
       {/* the river: a pool at the falls, then down the right edge past gravel panning banks */}
-      <path d="M86 44 Q93 40 100 44 L100 100 L70 100 Q72 88 76 78 Q80 66 81 56 Q81.5 48 86 44 Z" fill="url(#sa-river)" />
+      <path
+        d="M86 44 Q93 40 100 44 L100 100 L70 100 Q72 88 76 78 Q80 66 81 56 Q81.5 48 86 44 Z"
+        fill="url(#sa-river)"
+      />
       <path d="M87 48 Q85 58 83.5 66 Q81 76 78 86" fill="none" stroke="#e5f2f2" strokeWidth="0.7" opacity="0.65" />
       <path d="M93 52 Q91 64 88 74 Q85.5 84 83 94" fill="none" stroke="#dcecee" strokeWidth="0.5" opacity="0.55" />
       <path d="M70 100 Q72 88 76 78 Q78 72 79 66 Q76.5 74 73 82 Q70 90 68 100 Z" fill="#d8c9a2" />
@@ -127,7 +136,13 @@ export function Scene() {
         <path d="M41 68 L46.5 57 L52 68 Z" fill="#b08f56" opacity="0.6" />
         <path d="M44.8 68 L46.5 61 L48.4 68 Z" fill="#6e451f" />
         <path d="M39 68 h15" stroke="#8a6a40" strokeWidth="0.55" />
-        <path d="M47 52.5 q0.9 -2.8 -0.55 -4.5 q2.2 0.95 2.2 3.7" fill="none" stroke="#efe6d2" strokeWidth="0.65" opacity="0.75" />
+        <path
+          d="M47 52.5 q0.9 -2.8 -0.55 -4.5 q2.2 0.95 2.2 3.7"
+          fill="none"
+          stroke="#efe6d2"
+          strokeWidth="0.65"
+          opacity="0.75"
+        />
       </g>
 
       {/* the tool maker: fire ring, knapped flint, a propped spear */}

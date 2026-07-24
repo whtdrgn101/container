@@ -3,7 +3,6 @@ import Database from 'better-sqlite3';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../app';
 import { createDatabase } from '../db';
 import type { DB } from '../db';
@@ -119,9 +118,7 @@ describe('lobby retention sweep (§4.3)', () => {
     const removed = repo.deleteExpiredOpen(iso(-OPEN_LOBBY_TTL_MS));
     expect(removed).toBe(1); // only old-open
 
-    const remaining = new Set(
-      (db.prepare(`SELECT id FROM lobbies`).all() as { id: string }[]).map((r) => r.id),
-    );
+    const remaining = new Set((db.prepare(`SELECT id FROM lobbies`).all() as { id: string }[]).map((r) => r.id));
     expect(remaining.has('old-open')).toBe(false); // swept
     expect(remaining.has('old-started')).toBe(true); // started lobbies are kept — resolvable by code
     expect(remaining.has('recent-open')).toBe(true); // inside the TTL window
@@ -190,9 +187,11 @@ describe('the lobbies.status migration (§4.3)', () => {
     const path = join(dir, 'fresh.sqlite');
     const db = createDatabase(path);
     try {
-      const indexes = (db.prepare(`SELECT name FROM sqlite_master WHERE type = 'index'`).all() as {
-        name: string;
-      }[]).map((r) => r.name);
+      const indexes = (
+        db.prepare(`SELECT name FROM sqlite_master WHERE type = 'index'`).all() as {
+          name: string;
+        }[]
+      ).map((r) => r.name);
       expect(indexes).toContain('idx_games_active_updated');
       expect(indexes).toContain('idx_lobbies_status_created');
     } finally {

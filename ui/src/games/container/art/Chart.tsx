@@ -35,11 +35,19 @@ export function Chart({ harbors }: ChartProps) {
   const routeTargets = [ISLAND, BANK, ...harbors.map((h) => ({ x: h.left, y: HARBOR_TOP }))];
   const routes = routeTargets.map((t) => `M${OCEAN.x} ${OCEAN.y} L${t.x} ${t.y}`).join(' ');
   const graticule =
-    [10, 30, 50, 70, 90].map((x) => `M${x} 0 V100`).join(' ') + ' ' + [12, 34, 56, 78].map((y) => `M0 ${y} H100`).join(' ');
+    [10, 30, 50, 70, 90].map((x) => `M${x} 0 V100`).join(' ') +
+    ' ' +
+    [12, 34, 56, 78].map((y) => `M0 ${y} H100`).join(' ');
   const hatch = Array.from({ length: 24 }, (_, i) => `M${2 + i * 4.2} 92 l1.6 2.4`).join(' ');
 
   return (
-    <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden focusable="false">
+    <svg
+      className="absolute inset-0 h-full w-full"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      aria-hidden
+      focusable="false"
+    >
       <rect width="100" height="100" fill={SEA} />
       {/* parchment mottling */}
       <ellipse cx="22" cy="60" rx="26" ry="18" fill="#dcc79e" opacity="0.5" />
@@ -54,7 +62,12 @@ export function Chart({ harbors }: ChartProps) {
         <g key={i}>
           <rect x={h.left - 4} y={89.2} width="8" height="0.9" fill={h.tint} opacity="0.9" />
           <rect x={h.left - 4} y={90.1} width="8" height="1.5" fill={INK} opacity="0.75" />
-          <path d={`M${h.left - 3} 91.6 v1.8 M${h.left} 91.6 v1.8 M${h.left + 3} 91.6 v1.8`} stroke={INK} strokeWidth="0.4" opacity="0.7" />
+          <path
+            d={`M${h.left - 3} 91.6 v1.8 M${h.left} 91.6 v1.8 M${h.left + 3} 91.6 v1.8`}
+            stroke={INK}
+            strokeWidth="0.4"
+            opacity="0.7"
+          />
         </g>
       ))}
 
@@ -95,7 +108,11 @@ export function Chart({ harbors }: ChartProps) {
       {/* rhumb routes from the ocean waypoint, and the charted waypoint itself */}
       <path d={routes} stroke="#8a5a2b" strokeWidth="0.5" strokeDasharray="1.6 1.6" opacity="0.9" fill="none" />
       <circle cx={OCEAN.x} cy={OCEAN.y} r="2.6" fill="none" stroke="#8a5a2b" strokeWidth="0.5" />
-      <path d={`M${OCEAN.x} ${OCEAN.y - 3.4} V${OCEAN.y + 3.4} M${OCEAN.x - 3.4} ${OCEAN.y} H${OCEAN.x + 3.4}`} stroke="#8a5a2b" strokeWidth="0.5" />
+      <path
+        d={`M${OCEAN.x} ${OCEAN.y - 3.4} V${OCEAN.y + 3.4} M${OCEAN.x - 3.4} ${OCEAN.y} H${OCEAN.x + 3.4}`}
+        stroke="#8a5a2b"
+        strokeWidth="0.5"
+      />
       <circle cx={OCEAN.x} cy={OCEAN.y} r="4.4" fill="none" stroke="#8a5a2b" strokeWidth="0.25" opacity="0.6" />
     </svg>
   );
@@ -111,7 +128,11 @@ export function CompassRose({ className }: { className?: string }) {
       <path d="M20 37 L22.4 22.4 L20 20 L17.6 22.4 Z" fill={INK} opacity="0.75" />
       <path d="M3 20 L17.6 17.6 L20 20 L17.6 22.4 Z" fill={INK} opacity="0.75" />
       <path d="M37 20 L22.4 22.4 L20 20 L22.4 17.6 Z" fill={INK} opacity="0.75" />
-      <path d="M9.4 9.4 L16.4 13.2 L18 18 Z M30.6 9.4 L23.6 13.2 L22 18 Z M9.4 30.6 L16.4 26.8 L18 22 Z M30.6 30.6 L23.6 26.8 L22 22 Z" fill={INK} opacity="0.45" />
+      <path
+        d="M9.4 9.4 L16.4 13.2 L18 18 Z M30.6 9.4 L23.6 13.2 L22 18 Z M9.4 30.6 L16.4 26.8 L18 22 Z M30.6 30.6 L23.6 26.8 L22 22 Z"
+        fill={INK}
+        opacity="0.45"
+      />
       <text x="20" y="2.8" fontSize="4" textAnchor="middle" fill={INK} fontWeight="bold">
         N
       </text>

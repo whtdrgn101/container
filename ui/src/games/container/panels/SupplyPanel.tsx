@@ -50,8 +50,7 @@ export function SupplyPanel({
                   count === 0 && 'font-semibold text-destructive',
                 )}
               >
-                <ContainerChip color={color} />
-                ×{count}
+                <ContainerChip color={color} />×{count}
               </span>
             );
           })}
@@ -82,8 +81,7 @@ export function SupplyPanel({
                     buildColor === color && 'ring-2 ring-ring',
                   )}
                 >
-                  <ContainerChip color={color} />
-                  ×{count}
+                  <ContainerChip color={color} />×{count}
                 </button>
               );
             })}
@@ -94,17 +92,21 @@ export function SupplyPanel({
             <span data-testid="supply-warehouses">Warehouses: {game.supply.warehouses}</span>
           </div>
 
-          {activePlayer && canDrive && buildColor && buildableColors.includes(buildColor) && nextFactoryCost !== undefined && (
-            <Button
-              size="sm"
-              className="sm:ml-auto"
-              data-testid="build-factory"
-              disabled={busy}
-              onClick={() => act(activePlayer.id, { type: 'BUILD_FACTORY', color: buildColor })}
-            >
-              <FactoryIcon className="h-4 w-4" aria-hidden /> Build {buildColor} factory (${nextFactoryCost})
-            </Button>
-          )}
+          {activePlayer &&
+            canDrive &&
+            buildColor &&
+            buildableColors.includes(buildColor) &&
+            nextFactoryCost !== undefined && (
+              <Button
+                size="sm"
+                className="sm:ml-auto"
+                data-testid="build-factory"
+                disabled={busy}
+                onClick={() => act(activePlayer.id, { type: 'BUILD_FACTORY', color: buildColor })}
+              >
+                <FactoryIcon className="h-4 w-4" aria-hidden /> Build {buildColor} factory (${nextFactoryCost})
+              </Button>
+            )}
         </div>
       </CardContent>
     </Card>

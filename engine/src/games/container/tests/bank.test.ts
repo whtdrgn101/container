@@ -34,7 +34,9 @@ describe('callBank — container lots (bid cash)', () => {
 
   it('outbids the current leader, refunding them', () => {
     const bank = makeBank({ tokens: 0, auctions: [containerAuction({ highBidderId: 'p2', bid: 3 })] });
-    const state = makeGame([makePlayer({ id: 'p1' }), makePlayer({ id: 'p2', money: 17 }), makePlayer({ id: 'p3' })], { bank });
+    const state = makeGame([makePlayer({ id: 'p1' }), makePlayer({ id: 'p2', money: 17 }), makePlayer({ id: 'p3' })], {
+      bank,
+    });
     const next = callBank(state, 'p1', 0, 'container', 4);
     expect(next.bank.auctions[0]).toMatchObject({ highBidderId: 'p1', bid: 4 });
     expect(getPlayer(next, 'p1').money).toBe(16);
@@ -63,8 +65,21 @@ describe('callBank — container lots (bid cash)', () => {
 
   it('rejects too-low and unaffordable bids', () => {
     expectError(() => callBank(three(), 'p1', 0, 'container', 0), 'BID_TOO_LOW');
-    expectError(() => callBank(three({ bank: makeBank({ tokens: 0, auctions: [containerAuction({ bid: 3 })] }) }), 'p1', 0, 'container', 3), 'BID_TOO_LOW');
-    expectError(() => callBank(three({}, makePlayer({ id: 'p1', money: 2 })), 'p1', 0, 'container', 3), 'INSUFFICIENT_FUNDS');
+    expectError(
+      () =>
+        callBank(
+          three({ bank: makeBank({ tokens: 0, auctions: [containerAuction({ bid: 3 })] }) }),
+          'p1',
+          0,
+          'container',
+          3,
+        ),
+      'BID_TOO_LOW',
+    );
+    expectError(
+      () => callBank(three({}, makePlayer({ id: 'p1', money: 2 })), 'p1', 0, 'container', 3),
+      'INSUFFICIENT_FUNDS',
+    );
   });
 
   it('rejects a container-lot call with no bid', () => {
@@ -77,13 +92,18 @@ describe('callBank — cash lots (bid containers)', () => {
 
   it('starts a cash-lot auction, reserving containers off the board', () => {
     const next = callBank(three({}, bidder()), 'p1', 0, 'cash', undefined, [sc('white', 2)]);
-    expect(next.bank.auctions).toEqual([{ lotKind: 'cash', lotIndex: 0, highBidderId: 'p1', bid: 1, reserved: [sc('white', 2)] }]);
+    expect(next.bank.auctions).toEqual([
+      { lotKind: 'cash', lotIndex: 0, highBidderId: 'p1', bid: 1, reserved: [sc('white', 2)] },
+    ]);
     expect(getPlayer(next, 'p1').factoryStore).toEqual([sc('red', 3)]);
     expect(next.bank.tokens).toBe(0);
   });
 
   it('outbids, returning the previous leader’s reserved containers', () => {
-    const bank = makeBank({ tokens: 0, auctions: [cashAuction({ highBidderId: 'p2', bid: 1, reserved: [sc('green', 2)] })] });
+    const bank = makeBank({
+      tokens: 0,
+      auctions: [cashAuction({ highBidderId: 'p2', bid: 1, reserved: [sc('green', 2)] })],
+    });
     const state = makeGame([bidder(), makePlayer({ id: 'p2', factoryStore: [] }), makePlayer({ id: 'p3' })], { bank });
     const next = callBank(state, 'p1', 0, 'cash', undefined, [sc('white', 2), sc('red', 3)]);
     expect(next.bank.auctions[0]).toMatchObject({ highBidderId: 'p1', bid: 2 });
@@ -99,7 +119,10 @@ describe('callBank — cash lots (bid containers)', () => {
 
   it('rejects a cash lot with no money', () => {
     const bank = makeBank({ cashLots: [0, 2, 3] });
-    expectError(() => callBank(three({ bank }, bidder()), 'p1', 0, 'cash', undefined, [sc('white', 2)]), 'INVALID_BANK_LOT');
+    expectError(
+      () => callBank(three({ bank }, bidder()), 'p1', 0, 'cash', undefined, [sc('white', 2)]),
+      'INVALID_BANK_LOT',
+    );
   });
 
   it('rejects bidding containers you do not have', () => {
@@ -112,16 +135,29 @@ describe('callBank — cash lots (bid containers)', () => {
   });
 
   it('rejects an outbid that is not more containers, and a second cash auction (type limit)', () => {
-    const bank = makeBank({ tokens: 0, auctions: [cashAuction({ bid: 2, reserved: [sc('green', 2), sc('blue', 2)] })] });
-    expectError(() => callBank(three({ bank }, bidder()), 'p1', 0, 'cash', undefined, [sc('white', 2), sc('red', 3)]), 'BID_TOO_LOW');
+    const bank = makeBank({
+      tokens: 0,
+      auctions: [cashAuction({ bid: 2, reserved: [sc('green', 2), sc('blue', 2)] })],
+    });
+    expectError(
+      () => callBank(three({ bank }, bidder()), 'p1', 0, 'cash', undefined, [sc('white', 2), sc('red', 3)]),
+      'BID_TOO_LOW',
+    );
     const two = makeBank({ tokens: 2, auctions: [cashAuction({ lotIndex: 0, bid: 1 })] });
-    expectError(() => callBank(three({ bank: two }, bidder()), 'p1', 1, 'cash', undefined, [sc('white', 2)]), 'AUCTION_TYPE_LIMIT');
+    expectError(
+      () => callBank(three({ bank: two }, bidder()), 'p1', 1, 'cash', undefined, [sc('white', 2)]),
+      'AUCTION_TYPE_LIMIT',
+    );
   });
 });
 
 describe('loadHolding', () => {
   const atBank = (holding: string[], cargo: string[] = []) =>
-    makePlayer({ id: 'p1', ship: { location: { kind: 'bank' }, cargo: cargo as never }, holdingArea: holding as never });
+    makePlayer({
+      id: 'p1',
+      ship: { location: { kind: 'bank' }, cargo: cargo as never },
+      holdingArea: holding as never,
+    });
 
   it('loads holding onto the ship at the Bank', () => {
     const next = loadHolding(three({}, atBank(['red', 'blue'])), 'p1');
@@ -148,7 +184,10 @@ describe('winning a Bank auction at the start of your turn', () => {
       tokens: 0,
       auctions: [containerAuction({ lotIndex: 0, highBidderId: 'p1', bid: 4 })],
     });
-    const state = makeGame([makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], { activePlayerIndex: 2, bank });
+    const state = makeGame([makePlayer({ id: 'p1' }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], {
+      activePlayerIndex: 2,
+      bank,
+    });
     const next = endTurn(state, 'p3');
     expect(getPlayer(next, 'p1').holdingArea).toEqual(['red', 'blue']);
     expect(next.bank.auctions).toEqual([]);
@@ -162,7 +201,10 @@ describe('winning a Bank auction at the start of your turn', () => {
       tokens: 0,
       auctions: [cashAuction({ lotIndex: 0, highBidderId: 'p1', bid: 2, reserved: [sc('white', 2), sc('red', 3)] })],
     });
-    const state = makeGame([makePlayer({ id: 'p1', money: 10 }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], { activePlayerIndex: 2, bank });
+    const state = makeGame([makePlayer({ id: 'p1', money: 10 }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })], {
+      activePlayerIndex: 2,
+      bank,
+    });
     const next = endTurn(state, 'p3');
     expect(getPlayer(next, 'p1').money).toBe(15); // + $5 from cash lot I
     expect(next.bank.cashLots[0]).toBe(0);
@@ -173,7 +215,10 @@ describe('winning a Bank auction at the start of your turn', () => {
 
 describe('Bank pot routing', () => {
   const advanceToP2 = (over: Partial<ReturnType<typeof makePlayer>>, bank = makeBank()) =>
-    endTurn(makeGame([makePlayer({ id: 'p1' }), makePlayer({ id: 'p2', ...over }), makePlayer({ id: 'p3' })], { bank }), 'p1');
+    endTurn(
+      makeGame([makePlayer({ id: 'p1' }), makePlayer({ id: 'p2', ...over }), makePlayer({ id: 'p3' })], { bank }),
+      'p1',
+    );
 
   it('routes loan interest into the Bank cash lots', () => {
     const next = advanceToP2({ loans: 2, money: 5 });
@@ -205,7 +250,12 @@ describe('bank actions via applyAction / legalActions', () => {
     expect(container.actionsRemaining).toBe(1);
 
     const cashState = three({}, makePlayer({ id: 'p1', factoryStore: [sc('white', 2)] }));
-    const cash = applyAction(cashState, 'p1', { type: 'CALL_BANK', lotKind: 'cash', lotIndex: 0, containerBid: [sc('white', 2)] });
+    const cash = applyAction(cashState, 'p1', {
+      type: 'CALL_BANK',
+      lotKind: 'cash',
+      lotIndex: 0,
+      containerBid: [sc('white', 2)],
+    });
     expect(cash.bank.auctions[0]).toMatchObject({ lotKind: 'cash', bid: 1 });
 
     const p1 = makePlayer({ id: 'p1', ship: { location: { kind: 'bank' }, cargo: [] }, holdingArea: ['red'] });
@@ -227,16 +277,28 @@ describe('bank actions via applyAction / legalActions', () => {
     expect(actions).not.toContainEqual({ type: 'CALL_BANK', lotKind: 'container', lotIndex: 1 });
 
     const led = makeBank({ tokens: 0, auctions: [containerAuction({ lotIndex: 0, highBidderId: 'p1', bid: 3 })] });
-    expect(legalActions(three({ bank: led }))).not.toContainEqual({ type: 'CALL_BANK', lotKind: 'container', lotIndex: 0 });
+    expect(legalActions(three({ bank: led }))).not.toContainEqual({
+      type: 'CALL_BANK',
+      lotKind: 'container',
+      lotIndex: 0,
+    });
     const poor = makeBank({ tokens: 0, auctions: [containerAuction({ lotIndex: 0, highBidderId: 'p2', bid: 3 })] });
-    expect(legalActions(three({ bank: poor }, makePlayer({ id: 'p1', money: 3 })))).not.toContainEqual({ type: 'CALL_BANK', lotKind: 'container', lotIndex: 0 });
+    expect(legalActions(three({ bank: poor }, makePlayer({ id: 'p1', money: 3 })))).not.toContainEqual({
+      type: 'CALL_BANK',
+      lotKind: 'container',
+      lotIndex: 0,
+    });
   });
 
   it('offers cash-lot CALL_BANK to start and outbid, gated by board containers, empty lots, and the type limit', () => {
     const p1 = makePlayer({ id: 'p1', factoryStore: [sc('white', 2), sc('red', 3)] }); // 2 board containers
     expect(legalActions(three({}, p1))).toContainEqual({ type: 'CALL_BANK', lotKind: 'cash', lotIndex: 0 });
 
-    const bank = makeBank({ tokens: 0, cashLots: [3, 0, 3], auctions: [cashAuction({ lotIndex: 0, highBidderId: 'p2', bid: 1 })] });
+    const bank = makeBank({
+      tokens: 0,
+      cashLots: [3, 0, 3],
+      auctions: [cashAuction({ lotIndex: 0, highBidderId: 'p2', bid: 1 })],
+    });
     const actions = legalActions(three({ bank }, p1));
     expect(actions).toContainEqual({ type: 'CALL_BANK', lotKind: 'cash', lotIndex: 0 }); // outbid (2 > 1)
     expect(actions).not.toContainEqual({ type: 'CALL_BANK', lotKind: 'cash', lotIndex: 1 }); // $0 lot
@@ -246,10 +308,18 @@ describe('bank actions via applyAction / legalActions', () => {
   it('omits a cash-lot auction you lead or cannot outbid', () => {
     const led = makeBank({ tokens: 0, auctions: [cashAuction({ lotIndex: 0, highBidderId: 'p1', bid: 1 })] });
     const p1 = makePlayer({ id: 'p1', factoryStore: [sc('white', 2)] });
-    expect(legalActions(three({ bank: led }, p1))).not.toContainEqual({ type: 'CALL_BANK', lotKind: 'cash', lotIndex: 0 });
+    expect(legalActions(three({ bank: led }, p1))).not.toContainEqual({
+      type: 'CALL_BANK',
+      lotKind: 'cash',
+      lotIndex: 0,
+    });
 
     const highBid = makeBank({ tokens: 0, auctions: [cashAuction({ lotIndex: 0, highBidderId: 'p2', bid: 3 })] });
-    expect(legalActions(three({ bank: highBid }, p1))).not.toContainEqual({ type: 'CALL_BANK', lotKind: 'cash', lotIndex: 0 });
+    expect(legalActions(three({ bank: highBid }, p1))).not.toContainEqual({
+      type: 'CALL_BANK',
+      lotKind: 'cash',
+      lotIndex: 0,
+    });
   });
 
   it('offers LOAD_FROM_BANK when docked at the Bank with a holding area', () => {

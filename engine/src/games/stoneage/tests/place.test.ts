@@ -8,7 +8,12 @@ describe('place', () => {
     expect(next.placements.toolMaker).toEqual({ p1: 1 });
     expect(next.activePlayerIndex).toBe(1); // Bob is up
     expect(next.phase).toBe('placement');
-    expect(next.log.at(-1)).toEqual({ seq: 1, type: 'PLACE', playerId: 'p1', payload: { place: 'toolMaker', count: 1 } });
+    expect(next.log.at(-1)).toEqual({
+      seq: 1,
+      type: 'PLACE',
+      playerId: 'p1',
+      payload: { place: 'toolMaker', count: 1 },
+    });
   });
 
   it('places the hut’s two people and a chosen number on the hunt', () => {

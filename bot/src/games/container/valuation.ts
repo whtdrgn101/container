@@ -49,10 +49,7 @@ export function gainFrom(me: PlayerState, extra: readonly Color[]): number {
  * Used to estimate what an opponent (whose card is hidden) will pay for cargo.
  */
 export const AVERAGE_COLOR_VALUE =
-  SCORING_CARDS.reduce(
-    (sum, card) => sum + COLORS.reduce((cardSum, color) => cardSum + card.values[color], 0),
-    0,
-  ) /
+  SCORING_CARDS.reduce((sum, card) => sum + COLORS.reduce((cardSum, color) => cardSum + card.values[color], 0), 0) /
   (SCORING_CARDS.length * COLORS.length);
 
 /**

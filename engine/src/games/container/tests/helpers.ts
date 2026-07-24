@@ -1,11 +1,5 @@
 import { expect } from 'vitest';
-import {
-  ACTIONS_PER_TURN,
-  createGame,
-  GameError,
-  SCORING_CARDS,
-  STARTING_MONEY,
-} from '../index';
+import { ACTIONS_PER_TURN, createGame, GameError, SCORING_CARDS, STARTING_MONEY } from '../index';
 import type { BankState, Color, GameErrorCode, GameState, PlayerState, StoredContainer, Supply } from '../index';
 
 /** Shorthand for a stored container ({ color, price }). */

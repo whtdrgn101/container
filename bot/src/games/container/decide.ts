@@ -31,8 +31,7 @@ function buildDelivery(ctx: Ctx, options: DecideOptions): Action {
   // A tie sends it to a runoff (pg. 16). The tied players' extra cash is theirs to decide, so — like
   // the opening bids — the bot has to ask for it rather than invent it.
   const opening = deliveryOutcome(state, ctx.me.id, bids);
-  const runoffBids =
-    opening.finalists.length > 1 ? (options.collectRunoffBids?.(cargo, opening.finalists) ?? {}) : {};
+  const runoffBids = opening.finalists.length > 1 ? (options.collectRunoffBids?.(cargo, opening.finalists) ?? {}) : {};
 
   // Ask the engine how this actually resolves rather than re-deriving the tie rule here — the bot
   // must agree with `deliver` exactly, or it will offer a choice the engine rejects (or skip one it
@@ -41,8 +40,7 @@ function buildDelivery(ctx: Ctx, options: DecideOptions): Action {
   const buyout = wantsBuyout(ctx, winningBid);
 
   // Still level after the runoff and not buying out? Then the cargo is the deliverer's to award.
-  const chosenWinnerId =
-    !buyout && finalists.length > 1 ? chooseTiedWinner(ctx, finalists, cargo) : undefined;
+  const chosenWinnerId = !buyout && finalists.length > 1 ? chooseTiedWinner(ctx, finalists, cargo) : undefined;
 
   return {
     type: 'DELIVER',

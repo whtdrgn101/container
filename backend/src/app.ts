@@ -370,7 +370,9 @@ export function buildApp(options: AppOptions): FastifyInstance {
     for (const pick of picks) {
       if (pick === undefined) continue;
       if (!palette.includes(pick)) {
-        return reply.code(400).send({ error: { code: 'INVALID_COLOR', message: `"${pick}" is not a colour in this game` } });
+        return reply
+          .code(400)
+          .send({ error: { code: 'INVALID_COLOR', message: `"${pick}" is not a colour in this game` } });
       }
       if (seen.has(pick)) {
         return reply.code(409).send({ error: { code: 'COLOR_TAKEN', message: `Colour "${pick}" is already taken` } });
@@ -401,7 +403,10 @@ export function buildApp(options: AppOptions): FastifyInstance {
 
     // Assign colours: honour each seat's pick, fill the rest with the first free palette colour in
     // order (so a table with no picks reproduces today's seat-order tints — visual baselines hold).
-    const assigned = assignColors(module.colors, seats.map((seat) => seat.color));
+    const assigned = assignColors(
+      module.colors,
+      seats.map((seat) => seat.color),
+    );
     colorSeats.setForGame(gameId, Object.fromEntries(players.map((player, seat) => [player.id, assigned[seat]!])));
 
     // A bot in an early seat should already have played by the time anyone sees the board.
@@ -519,8 +524,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
           return;
         }
         // No `?viewer` ⇒ follow the active player; `?viewer=p1,p3` ⇒ those seats; `?viewer=` ⇒ spectator.
-        const viewer =
-          request.query.viewer !== undefined ? request.query.viewer.split(',').filter(Boolean) : null;
+        const viewer = request.query.viewer !== undefined ? request.query.viewer.split(',').filter(Boolean) : null;
         const unsubscribe = hub.subscribe(request.params.id, socket, viewer);
         socket.on('close', unsubscribe);
         tick(request.params.id); // a watching client is enough to drive stalled bot turns
@@ -574,13 +578,18 @@ export function buildApp(options: AppOptions): FastifyInstance {
       // Validate each seat's colour pick against this game's palette (invalid → 400) and for duplicates
       // (→ 409), rather than let `assignColors` quietly default a bad pick. An absent/all-unpicked list
       // passes untouched, so a colour-less create still behaves exactly as it did before this feature.
-      if (rejectColorPicks(reply, module.colors, request.body.players.map((seat) => seat.color))) return reply;
+      if (
+        rejectColorPicks(
+          reply,
+          module.colors,
+          request.body.players.map((seat) => seat.color),
+        )
+      )
+        return reply;
       try {
         const started = startGame(module, request.body.players);
         const gameId = module.summarize(started).id;
-        return reply
-          .code(201)
-          .send(gamePayload(module, gameId, started, module.summarize(started).activePlayerId));
+        return reply.code(201).send(gamePayload(module, gameId, started, module.summarize(started).activePlayerId));
       } catch (error) {
         return sendGameError(reply, module, error);
       }
@@ -887,7 +896,9 @@ export function buildApp(options: AppOptions): FastifyInstance {
     exceptSeat: number,
   ): FastifyReply | null => {
     if (!palette.includes(color)) {
-      return reply.code(400).send({ error: { code: 'INVALID_COLOR', message: `"${color}" is not a colour in this game` } });
+      return reply
+        .code(400)
+        .send({ error: { code: 'INVALID_COLOR', message: `"${color}" is not a colour in this game` } });
     }
     if (members.some((member, seat) => seat !== exceptSeat && member?.color === color)) {
       return reply.code(409).send({ error: { code: 'COLOR_TAKEN', message: `Colour "${color}" is already taken` } });
@@ -1051,9 +1062,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       );
       const gameId = module.summarize(started).id;
       lobbies.update({ ...lobby, status: 'started', gameId });
-      return reply
-        .code(201)
-        .send(gamePayload(module, gameId, started, module.summarize(started).activePlayerId));
+      return reply.code(201).send(gamePayload(module, gameId, started, module.summarize(started).activePlayerId));
     } catch (error) {
       return sendGameError(reply, module, error);
     }

@@ -25,6 +25,10 @@ export type Action =
   | { readonly type: 'BUILD'; readonly stack: number; readonly resources: Readonly<Partial<Record<Resource, number>>> }
   // Acquire (or decline) the civilization card your person stands on (SA10). `slot` is its display index;
   // `resources` is the payment (any kinds, never food) — an empty payment declines.
-  | { readonly type: 'ACQUIRE_CARD'; readonly slot: number; readonly resources: Readonly<Partial<Record<Resource, number>>> };
+  | {
+      readonly type: 'ACQUIRE_CARD';
+      readonly slot: number;
+      readonly resources: Readonly<Partial<Record<Resource, number>>>;
+    };
 
 export type ActionType = Action['type'];

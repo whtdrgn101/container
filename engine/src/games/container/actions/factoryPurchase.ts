@@ -34,7 +34,10 @@ export function factoryPurchase(
   }
 
   if (buyer.harborStore.length + bought.length > buyer.harborLimit) {
-    throw new GameError('STORAGE_LIMIT_EXCEEDED', `Player "${buyerId}" has no harbor room for ${bought.length} container(s)`);
+    throw new GameError(
+      'STORAGE_LIMIT_EXCEEDED',
+      `Player "${buyerId}" has no harbor room for ${bought.length} container(s)`,
+    );
   }
 
   const cost = bought.reduce((sum, container) => sum + container.price, 0);

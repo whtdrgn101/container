@@ -43,7 +43,10 @@ describe('roll', () => {
   });
 
   it('rejects the wrong number of dice', () => {
-    expectError(() => roll(makeState(), 'p1', [1, 2, 3] as unknown as [number, number, number, number]), 'INVALID_ROLL');
+    expectError(
+      () => roll(makeState(), 'p1', [1, 2, 3] as unknown as [number, number, number, number]),
+      'INVALID_ROLL',
+    );
   });
 
   it('rejects a die outside 1–6', () => {

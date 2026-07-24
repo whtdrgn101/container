@@ -13,10 +13,7 @@ const totalPrice = (containers: readonly { price: number }[]): number =>
  * This is the middleman move, so it only pays when the bot can buy below its own harbor asking
  * price — otherwise it is moving containers for a loss and filling harbor space it needs.
  */
-export function rankFactoryPurchase(
-  ctx: Ctx,
-  action: Extract<Action, { type: 'FACTORY_PURCHASE' }>,
-): Candidate | null {
+export function rankFactoryPurchase(ctx: Ctx, action: Extract<Action, { type: 'FACTORY_PURCHASE' }>): Candidate | null {
   const seller = ctx.view.players.find((player) => player.id === action.sellerId);
   if (!seller) {
     return null;

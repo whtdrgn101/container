@@ -46,6 +46,10 @@ jobs:
 
       - run: pnpm typecheck # all four packages (ui included)
 
+      - run: pnpm lint # ESLint 9 flat config: hooks-deps + real hazards (fast, not a second typecheck)
+
+      - run: pnpm format:check # Prettier — style is enforced here, not in ESLint
+
       - run: pnpm test # engine + bot + backend; `ui` has no unit `test` script so it's skipped
 
   e2e:

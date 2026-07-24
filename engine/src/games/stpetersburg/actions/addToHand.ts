@@ -50,9 +50,15 @@ export function addToHand(state: StPetersburgState, playerId: string, row: Row, 
     board: { ...state.board, [row]: newRow },
   };
   // A card left the board this phase → the pg. 8 refill for this phase runs (not skipped).
-  return record(after, 'ADD_TO_HAND', playerId, { consecutivePasses: 0, tookCardThisPhase: true, activePlayerIndex: nextSeatIndex(after) }, {
-    cardKey: card.key,
-    cardName: card.name,
-    row,
-  });
+  return record(
+    after,
+    'ADD_TO_HAND',
+    playerId,
+    { consecutivePasses: 0, tookCardThisPhase: true, activePlayerIndex: nextSeatIndex(after) },
+    {
+      cardKey: card.key,
+      cardName: card.name,
+      row,
+    },
+  );
 }

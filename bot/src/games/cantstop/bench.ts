@@ -41,7 +41,10 @@ export function benchmark(options: StrengthBenchOptions): BenchmarkResult {
     candidate: options.candidate ?? decide,
     baseline: options.baseline ?? decide,
     makeInitial: (seed) => ({
-      state: createGame({ id: `bench-${seed}`, players: Array.from({ length: seats }, (_, i) => ({ name: `P${i + 1}` })) }),
+      state: createGame({
+        id: `bench-${seed}`,
+        players: Array.from({ length: seats }, (_, i) => ({ name: `P${i + 1}` })),
+      }),
       rng: mulberry32(seed * 2654435761 + 7919),
     }),
     play: ({ state, rng }, policyBySeat) => {

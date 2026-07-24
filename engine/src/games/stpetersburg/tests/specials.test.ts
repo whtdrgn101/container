@@ -2,21 +2,84 @@ import { describe, expect, it } from 'vitest';
 import { displacementCost } from '../actions';
 import { handLimit, HAND_LIMIT, WAREHOUSE_HAND_LIMIT } from '../core';
 import type { Card, PlayArea, StPetersburgPlayer } from '../core';
-import { displaceValueOf, mariinskijBonus, pubOwnerSeats, scorePlayers, taxmanBonus, unusedObservatories } from '../internal';
+import {
+  displaceValueOf,
+  mariinskijBonus,
+  pubOwnerSeats,
+  scorePlayers,
+  taxmanBonus,
+  unusedObservatories,
+} from '../internal';
 import { card, makeState, newGame } from './helpers';
 
 const area = (over: Partial<PlayArea> = {}): PlayArea => ({ worker: [], building: [], aristocrat: [], ...over });
 
 // ── Special-card fixtures (pg. 7–8) ──
-const pub = (id = 'pub-1'): Card => card({ id, key: 'pub', kind: 'building', name: 'Pub', cost: 1, income: 0, points: 0, special: 'pub' });
-const warehouse = (id = 'wh-1'): Card => card({ id, key: 'warehouse', kind: 'building', name: 'Warehouse', cost: 2, income: 0, points: 0, special: 'warehouse' });
-const observatory = (id = 'obs-1'): Card => card({ id, key: 'observatory', kind: 'building', name: 'Observatory', cost: 6, income: 0, points: 1, special: 'observatory' });
-const potemkin = (id = 'pot-1'): Card => card({ id, key: 'potemkin', kind: 'building', name: "Potemkin's Village", cost: 2, income: 0, points: 0, special: 'potemkin' });
-const mariinskij = (id = 'mar-1'): Card => card({ id, key: 'mariinskij', kind: 'trading', name: 'Mariinskij Theater', cost: 10, income: 0, points: 0, tradingGroup: 'building', special: 'mariinskij' });
-const taxman = (id = 'tax-1'): Card => card({ id, key: 'taxman', kind: 'trading', name: 'Tax Man', cost: 17, income: 0, points: 0, tradingGroup: 'aristocrat', special: 'taxman' });
-const worker = (id: string): Card => card({ id, key: 'lumberjack', kind: 'worker', name: 'Lumberjack', cost: 3, income: 3 });
-const aristocrat = (id: string): Card => card({ id, key: 'scribe', kind: 'aristocrat', name: 'Scribe', cost: 4, income: 1, points: 0 });
-const market = (id: string): Card => card({ id, key: 'market', kind: 'building', name: 'Market', cost: 5, income: 0, points: 1 });
+const pub = (id = 'pub-1'): Card =>
+  card({ id, key: 'pub', kind: 'building', name: 'Pub', cost: 1, income: 0, points: 0, special: 'pub' });
+const warehouse = (id = 'wh-1'): Card =>
+  card({
+    id,
+    key: 'warehouse',
+    kind: 'building',
+    name: 'Warehouse',
+    cost: 2,
+    income: 0,
+    points: 0,
+    special: 'warehouse',
+  });
+const observatory = (id = 'obs-1'): Card =>
+  card({
+    id,
+    key: 'observatory',
+    kind: 'building',
+    name: 'Observatory',
+    cost: 6,
+    income: 0,
+    points: 1,
+    special: 'observatory',
+  });
+const potemkin = (id = 'pot-1'): Card =>
+  card({
+    id,
+    key: 'potemkin',
+    kind: 'building',
+    name: "Potemkin's Village",
+    cost: 2,
+    income: 0,
+    points: 0,
+    special: 'potemkin',
+  });
+const mariinskij = (id = 'mar-1'): Card =>
+  card({
+    id,
+    key: 'mariinskij',
+    kind: 'trading',
+    name: 'Mariinskij Theater',
+    cost: 10,
+    income: 0,
+    points: 0,
+    tradingGroup: 'building',
+    special: 'mariinskij',
+  });
+const taxman = (id = 'tax-1'): Card =>
+  card({
+    id,
+    key: 'taxman',
+    kind: 'trading',
+    name: 'Tax Man',
+    cost: 17,
+    income: 0,
+    points: 0,
+    tradingGroup: 'aristocrat',
+    special: 'taxman',
+  });
+const worker = (id: string): Card =>
+  card({ id, key: 'lumberjack', kind: 'worker', name: 'Lumberjack', cost: 3, income: 3 });
+const aristocrat = (id: string): Card =>
+  card({ id, key: 'scribe', kind: 'aristocrat', name: 'Scribe', cost: 4, income: 1, points: 0 });
+const market = (id: string): Card =>
+  card({ id, key: 'market', kind: 'building', name: 'Market', cost: 5, income: 0, points: 1 });
 
 /** A fresh 2-player game with seat 0's play area overridden. */
 function seat0(playArea: PlayArea, over: Partial<StPetersburgPlayer> = {}) {
@@ -42,7 +105,14 @@ describe('displaceValueOf — Potemkin worth 6 when displaced (pg. 8)', () => {
 
   it('a trading card upgrading a Potemkin computes the difference against 6, not its printed 2', () => {
     // St Isaac's (blue trading, cost 15) displacing a Potemkin: 15 − 6 = 9 (would be 13 against cost 2).
-    const stIsaac = card({ id: 'iss', key: 'stIsaac', kind: 'trading', name: "St Isaac's Cathedral", cost: 15, tradingGroup: 'building' });
+    const stIsaac = card({
+      id: 'iss',
+      key: 'stIsaac',
+      kind: 'trading',
+      name: "St Isaac's Cathedral",
+      cost: 15,
+      tradingGroup: 'building',
+    });
     const player = { playArea: area({ building: [potemkin()] }) };
     expect(displacementCost(player, stIsaac, potemkin(), undefined)).toBe(9);
   });
@@ -50,7 +120,9 @@ describe('displaceValueOf — Potemkin worth 6 when displaced (pg. 8)', () => {
 
 describe('Mariinskij Theater — +1₽ per aristocrat at building scoring (pg. 7)', () => {
   it('pays the owner 1 ruble per aristocrat when buildings score; nothing for a non-owner', () => {
-    const owner = seat0(area({ building: [mariinskij(), market('m')], aristocrat: [aristocrat('a1'), aristocrat('a2')] }));
+    const owner = seat0(
+      area({ building: [mariinskij(), market('m')], aristocrat: [aristocrat('a1'), aristocrat('a2')] }),
+    );
     const state = makeState({ players: [owner.player, owner.base.players[1]!], phase: 'building' });
     const scored = scorePlayers(state);
     // Building scoring: +2₽ (2 aristocrats via Mariinskij) and +1★ (the market). Mariinskij itself scores nothing.
@@ -65,7 +137,9 @@ describe('Mariinskij Theater — +1₽ per aristocrat at building scoring (pg. 7
 
 describe('Tax man — +1₽ per worker at aristocrat scoring (pg. 7)', () => {
   it('pays the owner 1 ruble per worker when aristocrats score; nothing for a non-owner', () => {
-    const owner = seat0(area({ aristocrat: [taxman(), aristocrat('a1')], worker: [worker('w1'), worker('w2'), worker('w3')] }));
+    const owner = seat0(
+      area({ aristocrat: [taxman(), aristocrat('a1')], worker: [worker('w1'), worker('w2'), worker('w3')] }),
+    );
     const state = makeState({ players: [owner.player, owner.base.players[1]!], phase: 'aristocrat' });
     const scored = scorePlayers(state);
     // Aristocrat scoring: the scribe pays income 1, plus +3₽ (3 workers via Tax man). Tax man scores nothing.

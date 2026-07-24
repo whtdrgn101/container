@@ -9,7 +9,12 @@ describe('produce', () => {
     expect(getPlayer(next, 'p1').money).toBe(STARTING_MONEY - UNION_WAGE);
     expect(getPlayer(next, 'p2').money).toBe(STARTING_MONEY + UNION_WAGE);
     expect(getPlayer(next, 'p3').money).toBe(STARTING_MONEY);
-    expect(next.log.at(-1)).toEqual({ seq: 1, type: 'PRODUCE', playerId: 'p1', payload: { produced: [sc('white', 2)] } });
+    expect(next.log.at(-1)).toEqual({
+      seq: 1,
+      type: 'PRODUCE',
+      playerId: 'p1',
+      payload: { produced: [sc('white', 2)] },
+    });
   });
 
   it('wraps the right neighbor for the last seat', () => {
@@ -128,7 +133,11 @@ describe('produce', () => {
   });
 
   it('throws NO_FACTORIES when the player has no factories', () => {
-    const state = makeGame([makePlayer({ id: 'p1', factories: [] }), makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]);
+    const state = makeGame([
+      makePlayer({ id: 'p1', factories: [] }),
+      makePlayer({ id: 'p2' }),
+      makePlayer({ id: 'p3' }),
+    ]);
     expectError(() => produce(state, 'p1'), 'NO_FACTORIES');
   });
 

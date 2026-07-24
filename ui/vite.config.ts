@@ -11,15 +11,9 @@ export default defineConfig({
       // Consume the engine as source so Vite transpiles it (shared types + logic). One alias per
       // subpath — the engine is a per-game platform now, with no bare `@game-hub/engine` entry.
       '@game-hub/engine/kernel': fileURLToPath(new URL('../engine/src/kernel/index.ts', import.meta.url)),
-      '@game-hub/engine/container': fileURLToPath(
-        new URL('../engine/src/games/container/index.ts', import.meta.url),
-      ),
-      '@game-hub/engine/cantstop': fileURLToPath(
-        new URL('../engine/src/games/cantstop/index.ts', import.meta.url),
-      ),
-      '@game-hub/engine/stoneage': fileURLToPath(
-        new URL('../engine/src/games/stoneage/index.ts', import.meta.url),
-      ),
+      '@game-hub/engine/container': fileURLToPath(new URL('../engine/src/games/container/index.ts', import.meta.url)),
+      '@game-hub/engine/cantstop': fileURLToPath(new URL('../engine/src/games/cantstop/index.ts', import.meta.url)),
+      '@game-hub/engine/stoneage': fileURLToPath(new URL('../engine/src/games/stoneage/index.ts', import.meta.url)),
       '@game-hub/engine/stpetersburg': fileURLToPath(
         new URL('../engine/src/games/stpetersburg/index.ts', import.meta.url),
       ),

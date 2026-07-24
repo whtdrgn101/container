@@ -7,12 +7,19 @@ import {
   HUNT_THRESHOLD,
   isBuildingPlace,
   paymentValue,
-  placedBy,
   PLACE_RESOURCE,
   RESOURCE_THRESHOLD,
   RESOURCES,
 } from '@game-hub/engine/stoneage';
-import type { Building, BuildingCost, CardPlaceId, FixedPlaceId, PlaceId, Resource, StoneAgeView } from '@game-hub/engine/stoneage';
+import type {
+  Building,
+  BuildingCost,
+  CardPlaceId,
+  FixedPlaceId,
+  PlaceId,
+  Resource,
+  StoneAgeView,
+} from '@game-hub/engine/stoneage';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { GameOver } from '@/components/GameOver';
@@ -46,7 +53,10 @@ const placeLabel = (place: PlaceId): string => {
 };
 /** A short cost/scoring summary for a building tile. */
 const costLabel = (cost: BuildingCost): string => {
-  if (cost.kind === 'fixed') return RESOURCES.filter((r) => cost.resources[r]).map((r) => `${cost.resources[r]}× ${RESOURCE_LABEL[r]}`).join(' + ');
+  if (cost.kind === 'fixed')
+    return RESOURCES.filter((r) => cost.resources[r])
+      .map((r) => `${cost.resources[r]}× ${RESOURCE_LABEL[r]}`)
+      .join(' + ');
   if (cost.kind === 'choice') return `any ${cost.count} from ${cost.kinds} kinds`;
   return `any ${cost.min}–${cost.max} resources`;
 };
@@ -59,16 +69,25 @@ const SEAT_COLOR = [
   { id: 'green', dot: 'bg-green-600', text: 'text-green-700', ring: 'ring-green-600' },
   { id: 'yellow', dot: 'bg-yellow-400', text: 'text-yellow-600', ring: 'ring-yellow-500' },
 ] as const;
-const SEAT_COLOR_BY_ID = new Map<string, (typeof SEAT_COLOR)[number]>(
-  SEAT_COLOR.map((color) => [color.id, color]),
-);
+const SEAT_COLOR_BY_ID = new Map<string, (typeof SEAT_COLOR)[number]>(SEAT_COLOR.map((color) => [color.id, color]));
 
 /**
  * Stone Age's board — the illustrated landscape (`BoardMap`) plus the buildings/cards markets, the
  * player boards, the floating gather panel, and the end-of-game results. The full game is playable
  * (SA1–SA11); the AI bot arrives in SA12.
  */
-export default function StoneAgeBoard({ gameId, game, bots, colors, controlledIds, viewer, busy, guard, onPayload, onLeave }: BoardProps<StoneAgeView>) {
+export default function StoneAgeBoard({
+  gameId,
+  game,
+  bots,
+  colors,
+  controlledIds,
+  viewer,
+  busy,
+  guard,
+  onPayload,
+  onLeave,
+}: BoardProps<StoneAgeView>) {
   // In-progress building payment, per stack index (the resources you'll pay when you press Build).
   const [pay, setPay] = useState<Record<number, Partial<Record<Resource, number>>>>({});
   // Tools selected to add to the pending dice roll (by index into the player's tools).
@@ -129,16 +148,18 @@ export default function StoneAgeBoard({ gameId, game, bots, colors, controlledId
 
   // A rolled gather awaiting the take (SA4b): show the dice, let the player add tools, preview the yield.
   const pending = game.pendingGather;
-  const gatherPreview = pending && active
-    ? (() => {
-        const diceTotal = pending.dice.reduce((sum, d) => sum + d, 0);
-        const boost = selectedTools.reduce((sum, i) => sum + (active.tools[i] ?? 0), 0);
-        const total = diceTotal + boost;
-        const threshold = pending.place === 'hunt' ? HUNT_THRESHOLD : RESOURCE_THRESHOLD[PLACE_RESOURCE[pending.place]];
-        const kind = pending.place === 'hunt' ? 'food' : RESOURCE_LABEL[PLACE_RESOURCE[pending.place]];
-        return { diceTotal, boost, total, amount: Math.floor(total / threshold), kind };
-      })()
-    : null;
+  const gatherPreview =
+    pending && active
+      ? (() => {
+          const diceTotal = pending.dice.reduce((sum, d) => sum + d, 0);
+          const boost = selectedTools.reduce((sum, i) => sum + (active.tools[i] ?? 0), 0);
+          const total = diceTotal + boost;
+          const threshold =
+            pending.place === 'hunt' ? HUNT_THRESHOLD : RESOURCE_THRESHOLD[PLACE_RESOURCE[pending.place]];
+          const kind = pending.place === 'hunt' ? 'food' : RESOURCE_LABEL[PLACE_RESOURCE[pending.place]];
+          return { diceTotal, boost, total, amount: Math.floor(total / threshold), kind };
+        })()
+      : null;
 
   // Feeding maths for the active player (pg. 7): food-track production first, then 1 food per person.
   const feed = active
@@ -152,19 +173,20 @@ export default function StoneAgeBoard({ gameId, game, bots, colors, controlledId
 
   const remaining = active ? availableToPlace(game, active.id) : 0;
   const waitingFor = active?.name ?? 'the next player';
-  const banner = game.status === 'ended'
-    ? 'Game over.'
-    : placing
-      ? canDrive
-        ? `Your turn — place your people (${remaining} still in hand)`
-        : `Waiting for ${waitingFor} to place…`
-      : acting
+  const banner =
+    game.status === 'ended'
+      ? 'Game over.'
+      : placing
         ? canDrive
-          ? 'Your turn — use your placed people (gather, take actions, buy buildings)'
-          : `Waiting for ${waitingFor} to take their actions…`
-        : canDrive
-          ? 'Feeding phase — feed your people (1 food each)'
-          : `Waiting for ${waitingFor} to feed…`;
+          ? `Your turn — place your people (${remaining} still in hand)`
+          : `Waiting for ${waitingFor} to place…`
+        : acting
+          ? canDrive
+            ? 'Your turn — use your placed people (gather, take actions, buy buildings)'
+            : `Waiting for ${waitingFor} to take their actions…`
+          : canDrive
+            ? 'Feeding phase — feed your people (1 food each)'
+            : `Waiting for ${waitingFor} to feed…`;
 
   const playerName = (id: string) => game.players.find((p) => p.id === id)?.name ?? id;
   // Picked colour first (colors[id] → its palette entry), falling back to the seat-index colour — which
@@ -177,15 +199,20 @@ export default function StoneAgeBoard({ gameId, game, bots, colors, controlledId
   const meeplesFor = (byPlayer: Readonly<Record<string, number>>) =>
     Object.entries(byPlayer).map(([id, n]) => (
       <span key={id} className="flex items-center gap-0.5" title={`${playerName(id)} ×${n}`}>
-        {Array.from({ length: n }, (_, k) => <Meeple key={k} className={cn('h-4 w-4 drop-shadow-sm', seatColorOf(id).text)} />)}
-        <span className="sr-only">{playerName(id)} ×{n}</span>
+        {Array.from({ length: n }, (_, k) => (
+          <Meeple key={k} className={cn('h-4 w-4 drop-shadow-sm', seatColorOf(id).text)} />
+        ))}
+        <span className="sr-only">
+          {playerName(id)} ×{n}
+        </span>
       </span>
     ));
   // The move's action text only — the shared `ActivityFeed` renders the actor's name and bot badge.
   const describeMove = (entry: StoneAgeView['log'][number]): string => {
     const p = (entry.payload ?? {}) as Record<string, unknown>;
     if (entry.type === 'PLACE') return `placed ${p['count']} on ${placeLabel(p['place'] as PlaceId)}`;
-    if (entry.type === 'GATHER') return `rolled ${(p['dice'] as number[])?.join('+')} at ${placeLabel(p['place'] as PlaceId)}`;
+    if (entry.type === 'GATHER')
+      return `rolled ${(p['dice'] as number[])?.join('+')} at ${placeLabel(p['place'] as PlaceId)}`;
     if (entry.type === 'TAKE') {
       const boost = p['boost'] as number;
       return `took ${p['amount']} ${p['kind']}${boost > 0 ? ` (+${boost} from tools)` : ''}`;
@@ -232,7 +259,9 @@ export default function StoneAgeBoard({ gameId, game, bots, colors, controlledId
                 .sort((a, b) => b.total - a.total)
                 .map((r) => (
                   <tr key={r.playerId} data-testid={`sa-result-${r.playerId}`} className="border-t">
-                    <td className={cn('py-1 pr-2 font-medium', seatColorOf(r.playerId).text)}>{playerName(r.playerId)}</td>
+                    <td className={cn('py-1 pr-2 font-medium', seatColorOf(r.playerId).text)}>
+                      {playerName(r.playerId)}
+                    </td>
                     <td className="px-1 tabular-nums text-muted-foreground">{r.breakdown.green}</td>
                     <td className="px-1 tabular-nums text-muted-foreground">{r.breakdown.farmers}</td>
                     <td className="px-1 tabular-nums text-muted-foreground">{r.breakdown.toolMakers}</td>
@@ -248,7 +277,9 @@ export default function StoneAgeBoard({ gameId, game, bots, colors, controlledId
       )}
       <TurnBanner testId="sa-banner" canDrive={canDrive} className="mb-0">
         <span className="font-medium">
-          {myNames && myNames.length > 0 && <span className="text-muted-foreground">You are {myNames.join(' & ')} — </span>}
+          {myNames && myNames.length > 0 && (
+            <span className="text-muted-foreground">You are {myNames.join(' & ')} — </span>
+          )}
           {banner}
         </span>
         {active && <span className="text-xs text-muted-foreground">{active.name}’s turn</span>}
@@ -256,11 +287,16 @@ export default function StoneAgeBoard({ gameId, game, bots, colors, controlledId
 
       {/* Feeding phase (pg. 7): pay 1 food per person; cover any shortfall with resources or take −10. */}
       {feedingPhase && canDrive && active && (
-        <div data-testid="feed-panel" className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-3 py-2 text-sm">
+        <div
+          data-testid="feed-panel"
+          className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-3 py-2 text-sm"
+        >
           <span>
             {active.name} needs <span className="font-medium tabular-nums">{active.people}</span> food · has{' '}
             <span className="font-medium tabular-nums">{feed.produced}</span>
-            {active.foodTrack > 0 && <span className="text-muted-foreground"> (incl. +{active.foodTrack} produced)</span>}
+            {active.foodTrack > 0 && (
+              <span className="text-muted-foreground"> (incl. +{active.foodTrack} produced)</span>
+            )}
           </span>
           {feed.shortfall === 0 ? (
             <Button size="sm" className="ml-auto" data-testid="feed-go" disabled={busy} onClick={() => doFeed(true)}>
@@ -274,7 +310,13 @@ export default function StoneAgeBoard({ gameId, game, bots, colors, controlledId
                   Pay {feed.shortfall} resources
                 </Button>
               )}
-              <Button size="sm" variant="outline" data-testid="feed-penalty" disabled={busy} onClick={() => doFeed(false)}>
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="feed-penalty"
+                disabled={busy}
+                onClick={() => doFeed(false)}
+              >
                 Take −10
               </Button>
             </span>
@@ -301,7 +343,10 @@ export default function StoneAgeBoard({ gameId, game, bots, colors, controlledId
         {/* The gather panel floats over the board during the action phase (SA13). */}
         {pending && gatherPreview && canDrive && active && (
           <div className="absolute inset-0 z-20 flex items-start justify-center rounded-xl bg-background/60 p-3 backdrop-blur-sm">
-            <div data-testid="gather-panel" className="reveal-in w-full max-w-md space-y-2 rounded-lg border bg-card p-3 shadow-xl">
+            <div
+              data-testid="gather-panel"
+              className="reveal-in w-full max-w-md space-y-2 rounded-lg border bg-card p-3 shadow-xl"
+            >
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Gathering — {placeLabel(pending.place)}</span>
                 <span className="text-xs text-muted-foreground">
@@ -310,8 +355,11 @@ export default function StoneAgeBoard({ gameId, game, bots, colors, controlledId
               </div>
               <div className="flex flex-wrap items-center gap-1">
                 {pending.dice.map((d, i) => (
-                  // eslint-disable-next-line react/no-array-index-key -- dice are positional
-                  <span key={i} data-testid={`die-${i}`} className="grid h-8 w-8 place-items-center rounded-md border-2 border-amber-900/30 bg-[#f6efe0] text-sm font-bold tabular-nums text-amber-950 shadow-inner">
+                  <span
+                    key={i}
+                    data-testid={`die-${i}`}
+                    className="grid h-8 w-8 place-items-center rounded-md border-2 border-amber-900/30 bg-[#f6efe0] text-sm font-bold tabular-nums text-amber-950 shadow-inner"
+                  >
                     {d}
                   </span>
                 ))}
@@ -322,13 +370,25 @@ export default function StoneAgeBoard({ gameId, game, bots, colors, controlledId
               </div>
               {active.tools.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1">
-                  <span className="mr-1 flex items-center gap-1 text-xs text-muted-foreground"><ToolIcon className="h-3.5 w-3.5" /> Add tools:</span>
+                  <span className="mr-1 flex items-center gap-1 text-xs text-muted-foreground">
+                    <ToolIcon className="h-3.5 w-3.5" /> Add tools:
+                  </span>
                   {active.tools.map((value, i) => {
                     const toolUsed = active.toolsUsed[i];
                     const selected = selectedTools.includes(i);
                     return (
-                      <Button key={i} size="sm" variant={selected ? 'default' : 'outline'} data-testid={`tool-${i}`} aria-pressed={selected} disabled={busy || toolUsed} title={toolUsed ? 'Already used this round' : `Tool +${value}`} onClick={() => toggleTool(i)}>
-                        +{value}{toolUsed ? ' ·used' : ''}
+                      <Button
+                        key={i}
+                        size="sm"
+                        variant={selected ? 'default' : 'outline'}
+                        data-testid={`tool-${i}`}
+                        aria-pressed={selected}
+                        disabled={busy || toolUsed}
+                        title={toolUsed ? 'Already used this round' : `Tool +${value}`}
+                        onClick={() => toggleTool(i)}
+                      >
+                        +{value}
+                        {toolUsed ? ' ·used' : ''}
                       </Button>
                     );
                   })}
@@ -337,9 +397,13 @@ export default function StoneAgeBoard({ gameId, game, bots, colors, controlledId
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1 text-sm">
                   →{' '}
-                  <span className="font-medium" data-testid="gather-yield">{gatherPreview.amount} {gatherPreview.kind}</span>
+                  <span className="font-medium" data-testid="gather-yield">
+                    {gatherPreview.amount} {gatherPreview.kind}
+                  </span>
                 </span>
-                <Button size="sm" data-testid="take-gather" disabled={busy} onClick={() => doTake(selectedTools)}>Take</Button>
+                <Button size="sm" data-testid="take-gather" disabled={busy} onClick={() => doTake(selectedTools)}>
+                  Take
+                </Button>
               </div>
             </div>
           </div>
@@ -358,31 +422,63 @@ export default function StoneAgeBoard({ gameId, game, bots, colors, controlledId
               const top: Building | undefined = stack[0];
               const occupants = Object.entries(game.placements[placeId] ?? {});
               const mineHere = !!active && (game.placements[placeId]?.[active.id] ?? undefined) !== undefined;
-              const canPlaceHere = canDrive && placing && !!top && occupants.length === 0 && !!active && availableToPlace(game, active.id) >= 1;
+              const canPlaceHere =
+                canDrive &&
+                placing &&
+                !!top &&
+                occupants.length === 0 &&
+                !!active &&
+                availableToPlace(game, active.id) >= 1;
               const draft = pay[i] ?? {};
               const draftCount = RESOURCES.reduce((sum, r) => sum + (draft[r] ?? 0), 0);
-              const canBuild = acting && canDrive && mineHere && !!top && !!active && draftCount > 0 && buildingPaymentError(top, draft, active) === null;
+              const canBuild =
+                acting &&
+                canDrive &&
+                mineHere &&
+                !!top &&
+                !!active &&
+                draftCount > 0 &&
+                buildingPaymentError(top, draft, active) === null;
               return (
-                <div key={placeId} data-testid={`place-${placeId}`} className="flex flex-col rounded-md border bg-card px-3 py-2">
+                <div
+                  key={placeId}
+                  data-testid={`place-${placeId}`}
+                  className="flex flex-col rounded-md border bg-card px-3 py-2"
+                >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium">Building {i + 1}</span>
                     <span className="text-xs tabular-nums text-muted-foreground">{stack.length} left</span>
                   </div>
-                  <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground" title={top ? costLabel(top.cost) : 'empty'}>
+                  <div
+                    className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground"
+                    title={top ? costLabel(top.cost) : 'empty'}
+                  >
                     <Hut className="h-3.5 w-3.5 flex-none" />
                     {top ? (
                       <>
                         <CostPips cost={top.cost} />
-                        {top.cost.kind === 'fixed' && <span className="tabular-nums">= {paymentValue(top.cost.resources)} pts</span>}
+                        {top.cost.kind === 'fixed' && (
+                          <span className="tabular-nums">= {paymentValue(top.cost.resources)} pts</span>
+                        )}
                         <span className="sr-only">{costLabel(top.cost)}</span>
                       </>
                     ) : (
                       'empty'
                     )}
                   </div>
-                  {occupants.length > 0 && <div className="mt-1 flex flex-wrap items-center gap-0.5">{meeplesFor(game.placements[placeId] ?? {})}</div>}
+                  {occupants.length > 0 && (
+                    <div className="mt-1 flex flex-wrap items-center gap-0.5">
+                      {meeplesFor(game.placements[placeId] ?? {})}
+                    </div>
+                  )}
                   {canPlaceHere && (
-                    <Button size="sm" className="mt-2 self-end" data-testid={`place-${placeId}-go`} disabled={busy} onClick={() => doPlace(placeId, 1)}>
+                    <Button
+                      size="sm"
+                      className="mt-2 self-end"
+                      data-testid={`place-${placeId}-go`}
+                      disabled={busy}
+                      onClick={() => doPlace(placeId, 1)}
+                    >
                       Place worker
                     </Button>
                   )}
@@ -392,16 +488,53 @@ export default function StoneAgeBoard({ gameId, game, bots, colors, controlledId
                         <div key={r} className="flex items-center gap-1 text-xs">
                           <ResourceIcon resource={r} className="h-4 w-4" />
                           <span className="w-9">{RESOURCE_LABEL[r]}</span>
-                          <Button size="sm" variant="outline" aria-label={`Less ${r}`} data-testid={`pay-${i}-${r}-dec`} disabled={busy} onClick={() => bumpPay(i, r, -1, active.resources[r])}>−</Button>
-                          <span className="w-4 text-center tabular-nums" data-testid={`pay-${i}-${r}`}>{draft[r] ?? 0}</span>
-                          <Button size="sm" variant="outline" aria-label={`More ${r}`} data-testid={`pay-${i}-${r}-inc`} disabled={busy} onClick={() => bumpPay(i, r, 1, active.resources[r])}>+</Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            aria-label={`Less ${r}`}
+                            data-testid={`pay-${i}-${r}-dec`}
+                            disabled={busy}
+                            onClick={() => bumpPay(i, r, -1, active.resources[r])}
+                          >
+                            −
+                          </Button>
+                          <span className="w-4 text-center tabular-nums" data-testid={`pay-${i}-${r}`}>
+                            {draft[r] ?? 0}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            aria-label={`More ${r}`}
+                            data-testid={`pay-${i}-${r}-inc`}
+                            disabled={busy}
+                            onClick={() => bumpPay(i, r, 1, active.resources[r])}
+                          >
+                            +
+                          </Button>
                         </div>
                       ))}
                       <div className="flex items-center justify-between gap-1 pt-1">
-                        <span className="text-xs text-muted-foreground" data-testid={`build-value-${i}`}>+{paymentValue(draft)} pts</span>
+                        <span className="text-xs text-muted-foreground" data-testid={`build-value-${i}`}>
+                          +{paymentValue(draft)} pts
+                        </span>
                         <span className="flex gap-1">
-                          <Button size="sm" variant="outline" data-testid={`decline-${i}`} disabled={busy} onClick={() => doBuild(i, {})}>Pass</Button>
-                          <Button size="sm" data-testid={`build-${i}`} disabled={busy || !canBuild} onClick={() => doBuild(i, draft)}>Build</Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            data-testid={`decline-${i}`}
+                            disabled={busy}
+                            onClick={() => doBuild(i, {})}
+                          >
+                            Pass
+                          </Button>
+                          <Button
+                            size="sm"
+                            data-testid={`build-${i}`}
+                            disabled={busy || !canBuild}
+                            onClick={() => doBuild(i, draft)}
+                          >
+                            Build
+                          </Button>
                         </span>
                       </div>
                     </div>

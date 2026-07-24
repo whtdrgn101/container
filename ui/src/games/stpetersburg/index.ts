@@ -16,7 +16,8 @@ import { StPetersburgStatus } from './Status';
 export const stPetersburgClient: GameClient<StPetersburgView> = {
   id: GAME_TYPE,
   name: 'Saint Petersburg',
-  blurb: 'A card-buying engine game: hire workers, raise buildings, and court aristocrats across four phases each round.',
+  blurb:
+    'A card-buying engine game: hire workers, raise buildings, and court aristocrats across four phases each round.',
   rules: [
     '2–4 players over ~7–10 rounds of four phases: worker → building → aristocrat → trading.',
     'On your turn buy a card, add one to your hidden hand, play one from hand, or pass.',

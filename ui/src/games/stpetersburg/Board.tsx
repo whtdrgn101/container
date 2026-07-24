@@ -1,5 +1,13 @@
 import { useState } from 'react';
-import { CARD_KINDS, PHASES, PUB_MAX_POINTS, PUB_POINT_COST, handCost, handLimit, unusedObservatories } from '@game-hub/engine/stpetersburg';
+import {
+  CARD_KINDS,
+  PHASES,
+  PUB_MAX_POINTS,
+  PUB_POINT_COST,
+  handCost,
+  handLimit,
+  unusedObservatories,
+} from '@game-hub/engine/stpetersburg';
 import type { Card, CardKind, Phase, PlayerView, StPetersburgView } from '@game-hub/engine/stpetersburg';
 import { Button } from '@/components/ui/button';
 import { ActivityFeed } from '@/components/ActivityFeed';
@@ -54,19 +62,32 @@ export default function StPetersburgBoard({
 
   // An open displacement picker (pg. 7): the trading card being bought/played, and how each candidate target
   // resolves to a `BUY`/`PLAY_FROM_HAND`. Shown when a trading card has more than one legal target.
-  const [picker, setPicker] = useState<{ title: string; options: TradeOption[]; act: (targetId: string) => void } | null>(null);
+  const [picker, setPicker] = useState<{
+    title: string;
+    options: TradeOption[];
+    act: (targetId: string) => void;
+  } | null>(null);
   // Which collapsed opponent tableaus are expanded (read-only, their cards are public).
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggleExpand = (id: string) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
 
   // Which phases each seat opens next (its starting-player markers, pg. 5) — indexed by seat.
-  const markersFor = (seatIndex: number): Phase[] => PHASES.filter((phase) => game.startingPlayers[phase] === seatIndex);
+  const markersFor = (seatIndex: number): Phase[] =>
+    PHASES.filter((phase) => game.startingPlayers[phase] === seatIndex);
 
   const run = (work: () => Promise<spApi.StPetersburgPayload>) => guard(async () => onPayload(await work()));
   const doBuy = (row: 'upper' | 'lower', index: number, displace?: string) => {
     if (!canDrive || !active) return;
     setPicker(null);
-    void run(() => spApi.act(gameId, active.id, { type: 'BUY', row, index, ...(displace ? { displace } : {}) }, viewer, game.version));
+    void run(() =>
+      spApi.act(
+        gameId,
+        active.id,
+        { type: 'BUY', row, index, ...(displace ? { displace } : {}) },
+        viewer,
+        game.version,
+      ),
+    );
   };
   const doAdd = (row: 'upper' | 'lower', index: number) => {
     if (!canDrive || !active) return;
@@ -75,7 +96,15 @@ export default function StPetersburgBoard({
   const doPlay = (index: number, displace?: string) => {
     if (!canDrive || !active) return;
     setPicker(null);
-    void run(() => spApi.act(gameId, active.id, { type: 'PLAY_FROM_HAND', index, ...(displace ? { displace } : {}) }, viewer, game.version));
+    void run(() =>
+      spApi.act(
+        gameId,
+        active.id,
+        { type: 'PLAY_FROM_HAND', index, ...(displace ? { displace } : {}) },
+        viewer,
+        game.version,
+      ),
+    );
   };
   const doPass = () => {
     if (!canDrive || !active) return;
@@ -100,7 +129,15 @@ export default function StPetersburgBoard({
   const doResolve = (choice: 'buy' | 'hand' | 'discard', displace?: string) => {
     if (!canDrive || !active) return;
     setPicker(null);
-    void run(() => spApi.act(gameId, active.id, { type: 'OBSERVATORY_RESOLVE', choice, ...(displace ? { displace } : {}) }, viewer, game.version));
+    void run(() =>
+      spApi.act(
+        gameId,
+        active.id,
+        { type: 'OBSERVATORY_RESOLVE', choice, ...(displace ? { displace } : {}) },
+        viewer,
+        game.version,
+      ),
+    );
   };
 
   // Buy/play a trading card by displacement (pg. 7): a single legal target acts at once, otherwise open the
@@ -111,7 +148,9 @@ export default function StPetersburgBoard({
     else setPicker({ title, options, act });
   };
   const onRowTrade = (card: Card, row: 'upper' | 'lower', index: number, options: TradeOption[]) =>
-    startTrade(`Upgrade to ${card.name} — choose a card to displace`, options, (targetId) => doBuy(row, index, targetId));
+    startTrade(`Upgrade to ${card.name} — choose a card to displace`, options, (targetId) =>
+      doBuy(row, index, targetId),
+    );
   const onHandTrade = (card: Card, index: number, options: TradeOption[]) =>
     startTrade(`Play ${card.name} — choose a card to displace`, options, (targetId) => doPlay(index, targetId));
 
@@ -120,7 +159,8 @@ export default function StPetersburgBoard({
 
   // Observatory (pg. 8): the active driving seat may draw (instead of a normal action) in the building phase
   // if it owns an unflipped one; a stack is drawable only when it holds ≥2 cards ("not the last card").
-  const myObservatories = acting && active && game.phase === 'building' ? unusedObservatories(active, game.observatoryUsed) : [];
+  const myObservatories =
+    acting && active && game.phase === 'building' ? unusedObservatories(active, game.observatoryUsed) : [];
   const canUseObservatory = myObservatories.length > 0;
 
   // Own seat(s) get the full tableau; everyone else the compact expandable row. Hotseat (no bound seats)
@@ -268,8 +308,14 @@ export default function StPetersburgBoard({
               const card = game.pendingDraw.card;
               const trading = card.kind === 'trading';
               const opts = trading ? tradeOptions(active, card) : [];
-              const buyCost = trading ? (opts.length ? Math.min(...opts.map((o) => o.cost)) : undefined) : handCost(active, card);
-              const canBuy = trading ? opts.length > 0 : active.rubles !== null && buyCost !== undefined && active.rubles >= buyCost;
+              const buyCost = trading
+                ? opts.length
+                  ? Math.min(...opts.map((o) => o.cost))
+                  : undefined
+                : handCost(active, card);
+              const canBuy = trading
+                ? opts.length > 0
+                : active.rubles !== null && buyCost !== undefined && active.rubles >= buyCost;
               const canHand = active.handCount < handLimit(active);
               return (
                 <>
@@ -283,19 +329,38 @@ export default function StPetersburgBoard({
                       size="sm"
                       data-testid="sp-observatory-buy"
                       disabled={busy || !canBuy}
-                      title={canBuy ? `Buy and place${buyCost !== undefined ? ` for ${buyCost}₽` : ''}` : 'Cannot afford / nothing to displace'}
+                      title={
+                        canBuy
+                          ? `Buy and place${buyCost !== undefined ? ` for ${buyCost}₽` : ''}`
+                          : 'Cannot afford / nothing to displace'
+                      }
                       onClick={() =>
                         trading
-                          ? startTrade(`Buy ${card.name} — choose a card to displace`, opts, (targetId) => doResolve('buy', targetId))
+                          ? startTrade(`Buy ${card.name} — choose a card to displace`, opts, (targetId) =>
+                              doResolve('buy', targetId),
+                            )
                           : doResolve('buy')
                       }
                     >
                       Buy{buyCost !== undefined ? ` · ${buyCost}₽` : ''}
                     </Button>
-                    <Button variant="outline" size="sm" data-testid="sp-observatory-hand" disabled={busy || !canHand} title={canHand ? 'Add to hand (free)' : 'Hand full'} onClick={() => doResolve('hand')}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      data-testid="sp-observatory-hand"
+                      disabled={busy || !canHand}
+                      title={canHand ? 'Add to hand (free)' : 'Hand full'}
+                      onClick={() => doResolve('hand')}
+                    >
                       Add to hand
                     </Button>
-                    <Button variant="ghost" size="sm" data-testid="sp-observatory-discard" disabled={busy} onClick={() => doResolve('discard')}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      data-testid="sp-observatory-discard"
+                      disabled={busy}
+                      onClick={() => doResolve('discard')}
+                    >
                       Discard
                     </Button>
                   </div>
@@ -303,7 +368,9 @@ export default function StPetersburgBoard({
               );
             })()
           ) : (
-            <span className="text-sm text-muted-foreground">Waiting for {active.name} to resolve the Observatory draw…</span>
+            <span className="text-sm text-muted-foreground">
+              Waiting for {active.name} to resolve the Observatory draw…
+            </span>
           )}
         </div>
       ) : null}
@@ -326,7 +393,11 @@ export default function StPetersburgBoard({
                       size="sm"
                       data-testid={`sp-observatory-draw-${kind}`}
                       disabled={busy || game.board.stacks[kind] < 2}
-                      title={game.board.stacks[kind] < 2 ? `The ${kind} stack has too few cards` : `Draw the top ${kind} card`}
+                      title={
+                        game.board.stacks[kind] < 2
+                          ? `The ${kind} stack has too few cards`
+                          : `Draw the top ${kind} card`
+                      }
                       onClick={() => doObservatoryDraw(kind)}
                     >
                       {kind[0]!.toUpperCase()}

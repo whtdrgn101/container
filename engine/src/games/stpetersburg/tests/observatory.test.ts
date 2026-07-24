@@ -5,11 +5,43 @@ import { legalDisplaceTargets, roundTransition } from '../internal';
 import { card, expectError, makeState, newGame } from './helpers';
 
 const area = (over: Partial<PlayArea> = {}): PlayArea => ({ worker: [], building: [], aristocrat: [], ...over });
-const observatory = (id = 'obs-1'): Card => card({ id, key: 'observatory', kind: 'building', name: 'Observatory', cost: 6, income: 0, points: 1, special: 'observatory' });
-const market = (id: string): Card => card({ id, key: 'market', kind: 'building', name: 'Market', cost: 5, income: 0, points: 1 });
-const potemkin = (id = 'pot-1'): Card => card({ id, key: 'potemkin', kind: 'building', name: "Potemkin's Village", cost: 2, income: 0, points: 0, special: 'potemkin' });
-const worker = (id: string): Card => card({ id, key: 'lumberjack', kind: 'worker', name: 'Lumberjack', cost: 3, income: 3, ware: 'lumber' });
-const carpenterWorkshop = (id = 'cw'): Card => card({ id, key: 'carpenterWorkshop', kind: 'trading', name: 'Carpenter Workshop', cost: 4, income: 3, ware: 'lumber', tradingGroup: 'worker' });
+const observatory = (id = 'obs-1'): Card =>
+  card({
+    id,
+    key: 'observatory',
+    kind: 'building',
+    name: 'Observatory',
+    cost: 6,
+    income: 0,
+    points: 1,
+    special: 'observatory',
+  });
+const market = (id: string): Card =>
+  card({ id, key: 'market', kind: 'building', name: 'Market', cost: 5, income: 0, points: 1 });
+const potemkin = (id = 'pot-1'): Card =>
+  card({
+    id,
+    key: 'potemkin',
+    kind: 'building',
+    name: "Potemkin's Village",
+    cost: 2,
+    income: 0,
+    points: 0,
+    special: 'potemkin',
+  });
+const worker = (id: string): Card =>
+  card({ id, key: 'lumberjack', kind: 'worker', name: 'Lumberjack', cost: 3, income: 3, ware: 'lumber' });
+const carpenterWorkshop = (id = 'cw'): Card =>
+  card({
+    id,
+    key: 'carpenterWorkshop',
+    kind: 'trading',
+    name: 'Carpenter Workshop',
+    cost: 4,
+    income: 3,
+    ware: 'lumber',
+    tradingGroup: 'worker',
+  });
 
 /** Board with explicit, known stacks so a draw is deterministic. */
 function board(stacks: Partial<Record<CardKind, Card[]>>, over: Partial<Board> = {}): Board {
@@ -34,19 +66,53 @@ describe('OBSERVATORY_DRAW (pg. 8)', () => {
     expect(after.board.stacks.building).toHaveLength(2); // top popped
     expect(after.board.stacks.building[0]!.id).toBe('b2');
     expect(after.activePlayerIndex).toBe(0); // turn stays locked to the drawer
-    expect(after.log.at(-1)).toMatchObject({ type: 'OBSERVATORY_DRAW', payload: { stack: 'building', cardName: 'Market' } });
+    expect(after.log.at(-1)).toMatchObject({
+      type: 'OBSERVATORY_DRAW',
+      payload: { stack: 'building', cardName: 'Market' },
+    });
   });
 
   it('refuses when it is not the building phase, when no unflipped Observatory is owned, and on a ≤1-card stack', () => {
     const b = board({ building: [market('a'), market('b')] });
     // Wrong phase.
-    expectError(() => observatoryDraw(makeState({ players: [{ ...newGame().players[0]!, playArea: area({ building: [observatory()] }) }, newGame().players[1]!], phase: 'worker', board: b }), 'p1', 'building'), 'OBSERVATORY_UNAVAILABLE');
+    expectError(
+      () =>
+        observatoryDraw(
+          makeState({
+            players: [
+              { ...newGame().players[0]!, playArea: area({ building: [observatory()] }) },
+              newGame().players[1]!,
+            ],
+            phase: 'worker',
+            board: b,
+          }),
+          'p1',
+          'building',
+        ),
+      'OBSERVATORY_UNAVAILABLE',
+    );
     // No Observatory owned.
     expectError(() => observatoryDraw(buildingGame(area(), b), 'p1', 'building'), 'OBSERVATORY_UNAVAILABLE');
     // The only Observatory is already flipped this round.
-    expectError(() => observatoryDraw(buildingGame(area({ building: [observatory('obs-1')] }), b, { observatoryUsed: ['obs-1'] }), 'p1', 'building'), 'OBSERVATORY_UNAVAILABLE');
+    expectError(
+      () =>
+        observatoryDraw(
+          buildingGame(area({ building: [observatory('obs-1')] }), b, { observatoryUsed: ['obs-1'] }),
+          'p1',
+          'building',
+        ),
+      'OBSERVATORY_UNAVAILABLE',
+    );
     // Stack has just its last card — may not be drawn.
-    expectError(() => observatoryDraw(buildingGame(area({ building: [observatory()] }), board({ aristocrat: [market('last')] })), 'p1', 'aristocrat'), 'STACK_TOO_SMALL');
+    expectError(
+      () =>
+        observatoryDraw(
+          buildingGame(area({ building: [observatory()] }), board({ aristocrat: [market('last')] })),
+          'p1',
+          'aristocrat',
+        ),
+      'STACK_TOO_SMALL',
+    );
   });
 });
 
@@ -54,7 +120,12 @@ describe('OBSERVATORY_RESOLVE (pg. 8)', () => {
   /** A game with a pending draw of `drawn`, seat 0 the drawer with the given play area + rubles. */
   function pending(drawn: Card, playArea: PlayArea, over: Partial<StPetersburgPlayer> = {}): StPetersburgState {
     const players: StPetersburgPlayer[] = [{ ...newGame().players[0]!, playArea, ...over }, newGame().players[1]!];
-    return makeState({ players, phase: 'building', activePlayerIndex: 0, pendingDraw: { seat: 0, stack: 'building', card: drawn, observatoryId: 'obs-1' } });
+    return makeState({
+      players,
+      phase: 'building',
+      activePlayerIndex: 0,
+      pendingDraw: { seat: 0, stack: 'building', card: drawn, observatoryId: 'obs-1' },
+    });
   }
 
   it('discard: the card goes to the discard, the Observatory flips, the turn passes', () => {
@@ -64,7 +135,10 @@ describe('OBSERVATORY_RESOLVE (pg. 8)', () => {
     expect(after.pendingDraw).toBeUndefined();
     expect(after.activePlayerIndex).toBe(1); // turn advanced
     expect(after.consecutivePasses).toBe(0);
-    expect(after.log.at(-1)).toMatchObject({ type: 'OBSERVATORY_RESOLVE', payload: { choice: 'discard', cardName: 'Market' } });
+    expect(after.log.at(-1)).toMatchObject({
+      type: 'OBSERVATORY_RESOLVE',
+      payload: { choice: 'discard', cardName: 'Market' },
+    });
   });
 
   it('hand: the card joins the hand (free), the Observatory flips', () => {
@@ -75,7 +149,9 @@ describe('OBSERVATORY_RESOLVE (pg. 8)', () => {
   });
 
   it('hand: refused when the hand is already full', () => {
-    const full = pending(market('d'), area({ building: [observatory()] }), { hand: [card({ id: 'h1' }), card({ id: 'h2' }), card({ id: 'h3' })] });
+    const full = pending(market('d'), area({ building: [observatory()] }), {
+      hand: [card({ id: 'h1' }), card({ id: 'h2' }), card({ id: 'h3' })],
+    });
     expectError(() => observatoryResolve(full, 'p1', 'hand'), 'HAND_FULL');
   });
 
@@ -102,12 +178,29 @@ describe('OBSERVATORY_RESOLVE (pg. 8)', () => {
   });
 
   it('rejects a trading buy with no target, a non-trading buy carrying one, an unaffordable buy, and no pending', () => {
-    expectError(() => observatoryResolve(pending(carpenterWorkshop('d'), area({ worker: [worker('lj')], building: [observatory()] })), 'p1', 'buy'), 'DISPLACE_REQUIRED');
-    expectError(() => observatoryResolve(pending(market('d'), area({ building: [observatory()] })), 'p1', 'buy', 'lj'), 'DISPLACE_NOT_ALLOWED');
-    expectError(() => observatoryResolve(pending(market('d'), area({ building: [observatory()] }), { rubles: 1 }), 'p1', 'buy'), 'INSUFFICIENT_RUBLES');
+    expectError(
+      () =>
+        observatoryResolve(
+          pending(carpenterWorkshop('d'), area({ worker: [worker('lj')], building: [observatory()] })),
+          'p1',
+          'buy',
+        ),
+      'DISPLACE_REQUIRED',
+    );
+    expectError(
+      () => observatoryResolve(pending(market('d'), area({ building: [observatory()] })), 'p1', 'buy', 'lj'),
+      'DISPLACE_NOT_ALLOWED',
+    );
+    expectError(
+      () => observatoryResolve(pending(market('d'), area({ building: [observatory()] }), { rubles: 1 }), 'p1', 'buy'),
+      'INSUFFICIENT_RUBLES',
+    );
     expectError(() => observatoryResolve(makeState(), 'p1', 'discard'), 'NO_DRAW_PENDING');
     // An unrecognised choice (defensive — the parser guards this at the edge).
-    expectError(() => observatoryResolve(pending(market('d'), area({ building: [observatory()] })), 'p1', 'sell' as 'discard'), 'INVALID_RESOLVE_CHOICE');
+    expectError(
+      () => observatoryResolve(pending(market('d'), area({ building: [observatory()] })), 'p1', 'sell' as 'discard'),
+      'INVALID_RESOLVE_CHOICE',
+    );
   });
 });
 
@@ -128,7 +221,12 @@ describe('Observatory — applyAction routing + turn lock', () => {
 
 describe('Observatory — legalActions', () => {
   it('offers OBSERVATORY_DRAW for each ≥2-card stack in the building phase, for an owner of an unflipped one', () => {
-    const b = board({ worker: [worker('w1'), worker('w2')], building: [market('a'), market('b')], aristocrat: [market('c')], trading: [] });
+    const b = board({
+      worker: [worker('w1'), worker('w2')],
+      building: [market('a'), market('b')],
+      aristocrat: [market('c')],
+      trading: [],
+    });
     const g = buildingGame(area({ building: [observatory()] }), b);
     const draws = legalActions(g, 'p1').filter((a) => a.type === 'OBSERVATORY_DRAW');
     // worker (2) and building (2) qualify; aristocrat (1) and trading (0) do not.
@@ -141,14 +239,21 @@ describe('Observatory — legalActions', () => {
     const b = board({ building: [market('a'), market('b')] });
     const flipped = buildingGame(area({ building: [observatory('obs-1')] }), b, { observatoryUsed: ['obs-1'] });
     expect(legalActions(flipped, 'p1').some((a) => a.type === 'OBSERVATORY_DRAW')).toBe(false);
-    const worker0 = makeState({ players: [{ ...newGame().players[0]!, playArea: area({ building: [observatory()] }) }, newGame().players[1]!], phase: 'worker', board: b });
+    const worker0 = makeState({
+      players: [{ ...newGame().players[0]!, playArea: area({ building: [observatory()] }) }, newGame().players[1]!],
+      phase: 'worker',
+      board: b,
+    });
     expect(legalActions(worker0, 'p1').some((a) => a.type === 'OBSERVATORY_DRAW')).toBe(false);
   });
 
   it('while a draw is pending, enumerates only the resolve choices (discard, hand if room, buy if legal)', () => {
     const drawn = carpenterWorkshop('d');
     const g = makeState({
-      players: [{ ...newGame().players[0]!, playArea: area({ worker: [worker('lj')], building: [observatory()] }) }, newGame().players[1]!],
+      players: [
+        { ...newGame().players[0]!, playArea: area({ worker: [worker('lj')], building: [observatory()] }) },
+        newGame().players[1]!,
+      ],
       phase: 'building',
       activePlayerIndex: 0,
       pendingDraw: { seat: 0, stack: 'trading', card: drawn, observatoryId: 'obs-1' },
@@ -161,7 +266,14 @@ describe('Observatory — legalActions', () => {
 
     // A non-trading drawn card, affordable → a plain buy; hand omitted when full.
     const g2 = makeState({
-      players: [{ ...newGame().players[0]!, playArea: area({ building: [observatory()] }), hand: [card({ id: 'h1' }), card({ id: 'h2' }), card({ id: 'h3' })] }, newGame().players[1]!],
+      players: [
+        {
+          ...newGame().players[0]!,
+          playArea: area({ building: [observatory()] }),
+          hand: [card({ id: 'h1' }), card({ id: 'h2' }), card({ id: 'h3' })],
+        },
+        newGame().players[1]!,
+      ],
       phase: 'building',
       activePlayerIndex: 0,
       pendingDraw: { seat: 0, stack: 'building', card: market('d'), observatoryId: 'obs-1' },
@@ -175,9 +287,20 @@ describe('Observatory — legalActions', () => {
 describe('Observatory — flip interactions', () => {
   it('a flipped Observatory may not be upgraded (displaced) this round', () => {
     const player = { playArea: area({ building: [observatory('obs-1'), market('m')] }) };
-    const blueTrader = card({ id: 'bt', key: 'nikolaiChurch', kind: 'trading', name: 'St Nicholas Church', cost: 6, tradingGroup: 'building' });
+    const blueTrader = card({
+      id: 'bt',
+      key: 'nikolaiChurch',
+      kind: 'trading',
+      name: 'St Nicholas Church',
+      cost: 6,
+      tradingGroup: 'building',
+    });
     // Unflipped → the Observatory is a legal target; flipped → it drops out (only the market remains).
-    expect(legalDisplaceTargets(player, blueTrader, []).map((c) => c.id).sort()).toEqual(['m', 'obs-1']);
+    expect(
+      legalDisplaceTargets(player, blueTrader, [])
+        .map((c) => c.id)
+        .sort(),
+    ).toEqual(['m', 'obs-1']);
     expect(legalDisplaceTargets(player, blueTrader, ['obs-1']).map((c) => c.id)).toEqual(['m']);
   });
 

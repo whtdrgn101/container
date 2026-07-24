@@ -68,7 +68,8 @@ export function buildingPaymentError(building: Building, payment: Payment, playe
   switch (cost.kind) {
     case 'fixed':
       for (const r of RESOURCES) {
-        if ((payment[r] ?? 0) !== (cost.resources[r] ?? 0)) return 'This building must be paid with its exact resources';
+        if ((payment[r] ?? 0) !== (cost.resources[r] ?? 0))
+          return 'This building must be paid with its exact resources';
       }
       return null;
     case 'choice':

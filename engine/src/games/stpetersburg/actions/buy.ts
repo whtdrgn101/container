@@ -1,6 +1,15 @@
 import { GameError, MIN_CARD_COST } from '../core';
 import type { Card, PlayArea, StPetersburgState } from '../core';
-import { displaceValueOf, groupOf, nextSeatIndex, placeInPlayArea, record, seatOf, validateDisplacement, withPlayer } from '../internal';
+import {
+  displaceValueOf,
+  groupOf,
+  nextSeatIndex,
+  placeInPlayArea,
+  record,
+  seatOf,
+  validateDisplacement,
+  withPlayer,
+} from '../internal';
 
 /** Which board row a card is bought from — the `-1 ruble` lower row, or the upper row (pg. 6). */
 type Row = 'upper' | 'lower';
@@ -122,7 +131,10 @@ export function buy(
   let cost: number;
   if (card.kind === 'trading') {
     if (displace === undefined) {
-      throw new GameError('DISPLACE_REQUIRED', `${card.name} is a trading card — name a card of yours to displace (pg. 7)`);
+      throw new GameError(
+        'DISPLACE_REQUIRED',
+        `${card.name} is a trading card — name a card of yours to displace (pg. 7)`,
+      );
     }
     displaced = validateDisplacement(player, card, displace, state.observatoryUsed);
     cost = displacementCost(player, card, displaced, row);
@@ -147,11 +159,17 @@ export function buy(
     board: { ...state.board, [row]: newRow, discard: state.board.discard + discarded },
   };
   // A card left the board this phase → the pg. 8 refill for this phase will run (not be skipped).
-  return record(after, 'BUY', playerId, { consecutivePasses: 0, tookCardThisPhase: true, activePlayerIndex: nextSeatIndex(after) }, {
-    cardKey: card.key,
-    cardName: card.name,
-    cost,
-    row,
-    ...(displaced ? { displacedKey: displaced.key, displacedName: displaced.name } : {}),
-  });
+  return record(
+    after,
+    'BUY',
+    playerId,
+    { consecutivePasses: 0, tookCardThisPhase: true, activePlayerIndex: nextSeatIndex(after) },
+    {
+      cardKey: card.key,
+      cardName: card.name,
+      cost,
+      row,
+      ...(displaced ? { displacedKey: displaced.key, displacedName: displaced.name } : {}),
+    },
+  );
 }

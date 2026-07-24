@@ -292,11 +292,25 @@ export function Landing({
                       className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1.5"
                       data-testid={`abandon-confirm-${active.id}`}
                     >
-                      <span className="text-xs text-destructive">Abandon this game for everyone? It can’t be played again.</span>
-                      <Button size="sm" variant="outline" data-testid={`abandon-yes-${active.id}`} disabled={busy} onClick={() => onAbandon(active.id)}>
+                      <span className="text-xs text-destructive">
+                        Abandon this game for everyone? It can’t be played again.
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        data-testid={`abandon-yes-${active.id}`}
+                        disabled={busy}
+                        onClick={() => onAbandon(active.id)}
+                      >
                         Abandon
                       </Button>
-                      <Button size="sm" variant="ghost" data-testid={`abandon-no-${active.id}`} disabled={busy} onClick={() => onConfirmAbandon(null)}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        data-testid={`abandon-no-${active.id}`}
+                        disabled={busy}
+                        onClick={() => onConfirmAbandon(null)}
+                      >
                         Keep
                       </Button>
                     </div>
@@ -398,7 +412,12 @@ export function Landing({
               >
                 +
               </Button>
-              <Button className="ml-auto" data-testid="create-lobby" disabled={busy || !selected} onClick={onCreateLobby}>
+              <Button
+                className="ml-auto"
+                data-testid="create-lobby"
+                disabled={busy || !selected}
+                onClick={onCreateLobby}
+              >
                 Create game
               </Button>
             </div>
@@ -418,7 +437,6 @@ export function Landing({
                 seatColors.filter((color, j): color is string => j !== index && color !== undefined),
               );
               return (
-                // eslint-disable-next-line react/no-array-index-key -- rows are positional seats
                 <div key={index} className="space-y-1.5">
                   <div className="flex items-center gap-2">
                     <span className="w-14 shrink-0 text-xs text-muted-foreground">Seat {index + 1}</span>
@@ -427,7 +445,9 @@ export function Landing({
                       data-testid={`player-name-${index}`}
                       className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       value={name}
-                      onChange={(event) => onNamesChange(names.map((value, j) => (j === index ? event.target.value : value)))}
+                      onChange={(event) =>
+                        onNamesChange(names.map((value, j) => (j === index ? event.target.value : value)))
+                      }
                     />
                     <Button
                       variant={seatIsBot[index] ? 'default' : 'outline'}
@@ -487,7 +507,9 @@ export function Landing({
                             onClick={() =>
                               // Map over `names` (not `seatColors`) so the array always has one entry
                               // per seat, even though Add seat doesn't extend it (default is undefined).
-                              onSeatColorsChange(names.map((_, j) => (j === index ? (picked ? undefined : color) : seatColors[j])))
+                              onSeatColorsChange(
+                                names.map((_, j) => (j === index ? (picked ? undefined : color) : seatColors[j])),
+                              )
                             }
                             className={cn(
                               'h-5 w-5 rounded-full border transition-transform',
@@ -545,7 +567,12 @@ export function Landing({
               value={joinCode}
               onChange={(event) => onJoinCodeChange(event.target.value)}
             />
-            <Button variant="outline" data-testid="join-game" disabled={busy || joinCode.trim() === ''} onClick={onJoinByCode}>
+            <Button
+              variant="outline"
+              data-testid="join-game"
+              disabled={busy || joinCode.trim() === ''}
+              onClick={onJoinByCode}
+            >
               Join
             </Button>
           </div>

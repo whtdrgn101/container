@@ -46,12 +46,26 @@ export function MatHeader({ player, isBot, showControls, can, busy, act }: MatHe
           ${player.money}
         </span>
         {showControls && can('REQUEST_LOAN') && (
-          <Button size="sm" variant="outline" className="h-6 px-2 text-xs" data-testid="request-loan" disabled={busy} onClick={() => act(player.id, { type: 'REQUEST_LOAN' })}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2 text-xs"
+            data-testid="request-loan"
+            disabled={busy}
+            onClick={() => act(player.id, { type: 'REQUEST_LOAN' })}
+          >
             Take loan +$10
           </Button>
         )}
         {showControls && can('REPAY_LOAN') && (
-          <Button size="sm" variant="outline" className="h-6 px-2 text-xs" data-testid="repay-loan" disabled={busy} onClick={() => act(player.id, { type: 'REPAY_LOAN' })}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2 text-xs"
+            data-testid="repay-loan"
+            disabled={busy}
+            onClick={() => act(player.id, { type: 'REPAY_LOAN' })}
+          >
             Repay −$10
           </Button>
         )}

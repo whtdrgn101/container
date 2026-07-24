@@ -75,7 +75,15 @@ describe('SP6 — final scoring (pg. 5–6)', () => {
         building: [],
         aristocrat: [
           aristocrat('scribe'),
-          card({ id: 'abbot-1', key: 'abbot', kind: 'trading', name: 'Abbot', tradingGroup: 'aristocrat', income: 1, points: 1 }),
+          card({
+            id: 'abbot-1',
+            key: 'abbot',
+            kind: 'trading',
+            name: 'Abbot',
+            tradingGroup: 'aristocrat',
+            income: 1,
+            points: 1,
+          }),
         ],
       },
       hand: [],
@@ -86,7 +94,15 @@ describe('SP6 — final scoring (pg. 5–6)', () => {
   });
 
   it('scores money as 1 point per full 10 rubles, rounding down (pg. 6)', () => {
-    const mk = (rubles: number) => scorePlayer({ id: 'p', name: 'p', rubles, points: 0, playArea: { worker: [], building: [], aristocrat: [] }, hand: [] });
+    const mk = (rubles: number) =>
+      scorePlayer({
+        id: 'p',
+        name: 'p',
+        rubles,
+        points: 0,
+        playArea: { worker: [], building: [], aristocrat: [] },
+        hand: [],
+      });
     expect(mk(9).money).toBe(0);
     expect(mk(29).money).toBe(2);
     expect(mk(30).money).toBe(3);
@@ -134,7 +150,12 @@ describe('SP6 — winners + tiebreak (pg. 6)', () => {
     );
 
   it('the highest total wins outright', () => {
-    const end = finalScoring(withPlayers([{ rubles: 0, points: 30 }, { rubles: 0, points: 10 }]));
+    const end = finalScoring(
+      withPlayers([
+        { rubles: 0, points: 30 },
+        { rubles: 0, points: 10 },
+      ]),
+    );
     expect(end.status).toBe('ended');
     expect(end.winnerIds).toEqual(['p1']);
     expect(end.results.map((r) => r.total)).toEqual([30, 10]);
@@ -142,25 +163,45 @@ describe('SP6 — winners + tiebreak (pg. 6)', () => {
 
   it('a tie on total breaks by most rubles (pg. 6)', () => {
     // Both total 20, but p2 has more rubles left (rubles < 10 add no money points, so totals still tie).
-    const end = finalScoring(withPlayers([{ rubles: 3, points: 20 }, { rubles: 9, points: 20 }]));
+    const end = finalScoring(
+      withPlayers([
+        { rubles: 3, points: 20 },
+        { rubles: 9, points: 20 },
+      ]),
+    );
     expect(end.results.map((r) => r.total)).toEqual([20, 20]);
     expect(end.winnerIds).toEqual(['p2']);
   });
 
   it('a tie on total AND rubles is a shared win', () => {
-    const end = finalScoring(withPlayers([{ rubles: 5, points: 20 }, { rubles: 5, points: 20 }]));
+    const end = finalScoring(
+      withPlayers([
+        { rubles: 5, points: 20 },
+        { rubles: 5, points: 20 },
+      ]),
+    );
     expect(end.winnerIds).toEqual(['p1', 'p2']);
   });
 });
 
 describe('SP6 — the end trigger (pg. 5)', () => {
-  it('a phase-handoff refill that places a group\'s last card arms finalRound (advanceAfterScoring)', () => {
+  it("a phase-handoff refill that places a group's last card arms finalRound (advanceAfterScoring)", () => {
     // Worker phase closing; a card was taken; the building stack holds exactly the number needed to fill the
     // board — the deal places the building group\'s LAST card → the final round is armed.
     const g = makeState({
       phase: 'worker',
       tookCardThisPhase: true,
-      board: { upper: [card({ id: 'w', kind: 'worker' })], lower: [], stacks: { worker: [], building: [aristocrat('b', 'b1') as Card, aristocrat('b', 'b2') as Card], aristocrat: [], trading: [] }, discard: 0 },
+      board: {
+        upper: [card({ id: 'w', kind: 'worker' })],
+        lower: [],
+        stacks: {
+          worker: [],
+          building: [aristocrat('b', 'b1') as Card, aristocrat('b', 'b2') as Card],
+          aristocrat: [],
+          trading: [],
+        },
+        discard: 0,
+      },
     });
     // need = 8 − 1 on board = 7, but the building stack has 2 → deal both, empties it → placedLast.
     const changes = advanceAfterScoring(g);
@@ -172,7 +213,12 @@ describe('SP6 — the end trigger (pg. 5)', () => {
     const g = makeState({
       phase: 'worker',
       tookCardThisPhase: true,
-      board: { upper: [card({ id: 'w', kind: 'worker' })], lower: [], stacks: { worker: [], building: [], aristocrat: [], trading: [] }, discard: 0 },
+      board: {
+        upper: [card({ id: 'w', kind: 'worker' })],
+        lower: [],
+        stacks: { worker: [], building: [], aristocrat: [], trading: [] },
+        discard: 0,
+      },
     });
     const changes = advanceAfterScoring(g);
     expect(changes.finalRound).toBe(false); // no card placed → not the trigger
@@ -182,7 +228,17 @@ describe('SP6 — the end trigger (pg. 5)', () => {
     const g = makeState({
       phase: 'worker',
       tookCardThisPhase: true,
-      board: { upper: [], lower: [], stacks: { worker: [], building: Array.from({ length: 12 }, (_, i) => aristocrat('b', `b${i}`) as Card), aristocrat: [], trading: [] }, discard: 0 },
+      board: {
+        upper: [],
+        lower: [],
+        stacks: {
+          worker: [],
+          building: Array.from({ length: 12 }, (_, i) => aristocrat('b', `b${i}`) as Card),
+          aristocrat: [],
+          trading: [],
+        },
+        discard: 0,
+      },
     });
     const changes = advanceAfterScoring(g); // draws 8, 4 remain
     expect(changes.finalRound).toBe(false);
@@ -199,7 +255,17 @@ describe('SP6 — the end trigger (pg. 5)', () => {
     const g = makeState({
       phase: 'trading',
       finalRound: false,
-      board: { upper: [], lower: [], stacks: { worker: [card({ id: 'w1', kind: 'worker' }), card({ id: 'w2', kind: 'worker' })], building: [], aristocrat: [], trading: [] }, discard: 0 },
+      board: {
+        upper: [],
+        lower: [],
+        stacks: {
+          worker: [card({ id: 'w1', kind: 'worker' }), card({ id: 'w2', kind: 'worker' })],
+          building: [],
+          aristocrat: [],
+          trading: [],
+        },
+        discard: 0,
+      },
     });
     const changes = roundTransition(g);
     expect(changes.finalRound).toBe(true);
@@ -216,8 +282,26 @@ describe('SP6 — ending the game through pass (pg. 5)', () => {
       finalRound: true,
       consecutivePasses: 1, // 2 players → one more consecutive pass closes the phase
       players: [
-        { id: 'p1', name: 'Ann', rubles: 25, points: 40, playArea: { worker: [], building: [], aristocrat: [aristocrat('scribe', 'p1-a1'), aristocrat('clerk', 'p1-a2')] }, hand: [] },
-        { id: 'p2', name: 'Bob', rubles: 5, points: 10, playArea: { worker: [], building: [], aristocrat: [] }, hand: [aristocrat('judge', 'p2-h1')] },
+        {
+          id: 'p1',
+          name: 'Ann',
+          rubles: 25,
+          points: 40,
+          playArea: {
+            worker: [],
+            building: [],
+            aristocrat: [aristocrat('scribe', 'p1-a1'), aristocrat('clerk', 'p1-a2')],
+          },
+          hand: [],
+        },
+        {
+          id: 'p2',
+          name: 'Bob',
+          rubles: 5,
+          points: 10,
+          playArea: { worker: [], building: [], aristocrat: [] },
+          hand: [aristocrat('judge', 'p2-h1')],
+        },
       ],
       ...over,
     });
@@ -257,7 +341,7 @@ describe('SP6 — ending the game through pass (pg. 5)', () => {
     expectError(() => applyAction(g, 'p1', { type: 'PASS' }), 'GAME_OVER');
   });
 
-  it('viewFor reveals every seat\'s rubles and hand once the game has ended', () => {
+  it("viewFor reveals every seat's rubles and hand once the game has ended", () => {
     let g = atFinalTradingClose();
     // Before ending: an opponent\'s rubles + hand are redacted.
     const activeBefore = viewFor(g, 'p1');

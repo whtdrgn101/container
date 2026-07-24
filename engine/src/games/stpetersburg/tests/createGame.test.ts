@@ -48,9 +48,7 @@ describe('createGame', () => {
     const ordered = newGame();
     // The building/aristocrat/trading stacks are full (never seeded) — their order differs from the
     // deterministic deck, proving the rng was applied.
-    expect(shuffled.board.stacks.building.map((c) => c.id)).not.toEqual(
-      ordered.board.stacks.building.map((c) => c.id),
-    );
+    expect(shuffled.board.stacks.building.map((c) => c.id)).not.toEqual(ordered.board.stacks.building.map((c) => c.id));
     // Same multiset, though — a shuffle is a permutation, not a change of contents.
     expect(shuffled.board.stacks.building.map((c) => c.id).sort()).toEqual(
       ordered.board.stacks.building.map((c) => c.id).sort(),

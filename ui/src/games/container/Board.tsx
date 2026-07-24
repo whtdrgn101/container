@@ -109,8 +109,7 @@ export default function ContainerBoard({
     : [];
   const bidsOutstanding = auction ? auction.bidders.filter((b) => !b.hasBid).length : 0;
 
-  const run = (work: () => Promise<containerApi.ContainerPayload>) =>
-    guard(async () => onPayload(await work()));
+  const run = (work: () => Promise<containerApi.ContainerPayload>) => guard(async () => onPayload(await work()));
 
   function act(playerId: string, action: Action) {
     if (!canDrive) return; // only the client controlling the active seat may submit moves
@@ -125,9 +124,7 @@ export default function ContainerBoard({
       if (!prev || prev.district !== district || prev.sellerId !== sellerId) {
         return { district, sellerId, indices: [index] };
       }
-      const indices = prev.indices.includes(index)
-        ? prev.indices.filter((i) => i !== index)
-        : [...prev.indices, index];
+      const indices = prev.indices.includes(index) ? prev.indices.filter((i) => i !== index) : [...prev.indices, index];
       return indices.length ? { district, sellerId, indices } : null;
     });
   }
@@ -206,7 +203,9 @@ export default function ContainerBoard({
         setTieChoice={setTieChoice}
         submitBid={submitBid}
         resolveDelivery={resolveDelivery}
-        requestLoan={(seat) => void run(() => containerApi.act(gameId, seat, { type: 'REQUEST_LOAN' }, viewer, game.version))}
+        requestLoan={(seat) =>
+          void run(() => containerApi.act(gameId, seat, { type: 'REQUEST_LOAN' }, viewer, game.version))
+        }
       />
 
       <ResultsPanel game={game} resetToLanding={onLeave} />

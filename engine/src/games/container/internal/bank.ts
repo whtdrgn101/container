@@ -61,7 +61,11 @@ export function resolveBankWins(
       wonContainers.push(...containerLots[auction.lotIndex]!);
       containerLots[auction.lotIndex] = [];
     } else {
-      containerLots = payToBankContainers(containerLots, auction.reserved.map((c) => c.color), skip);
+      containerLots = payToBankContainers(
+        containerLots,
+        auction.reserved.map((c) => c.color),
+        skip,
+      );
       wonCash += cashLots[auction.lotIndex]!;
       cashLots[auction.lotIndex] = 0;
     }

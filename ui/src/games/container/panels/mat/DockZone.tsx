@@ -45,7 +45,9 @@ export function DockZone({ player, players, hull, showControls, sailActions, can
         <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide">
           <ShipIcon className="h-3.5 w-3.5" aria-hidden /> Dock
         </span>
-        <span className="tabular-nums">{player.ship.cargo.length} / {SHIP_CAPACITY} aboard</span>
+        <span className="tabular-nums">
+          {player.ship.cargo.length} / {SHIP_CAPACITY} aboard
+        </span>
       </div>
       <div className="relative mx-auto w-full max-w-52">
         <ShipSvg tint={hull} className="h-auto w-full" />
@@ -76,7 +78,13 @@ export function DockZone({ player, players, hull, showControls, sailActions, can
             );
           })}
           {can('LOAD_FROM_BANK') && (
-            <Button size="sm" variant="outline" data-testid="load-bank" disabled={busy} onClick={() => act(player.id, { type: 'LOAD_FROM_BANK' })}>
+            <Button
+              size="sm"
+              variant="outline"
+              data-testid="load-bank"
+              disabled={busy}
+              onClick={() => act(player.id, { type: 'LOAD_FROM_BANK' })}
+            >
               Load from Bank
             </Button>
           )}

@@ -37,7 +37,8 @@ export function parseStoneAgeAction(raw: unknown): ParseResult<Action> {
     }
     case 'BUILD': {
       const stack = record['stack'];
-      if (typeof stack !== 'number' || !Number.isInteger(stack) || stack < 0) return bad('BUILD requires a stack index');
+      if (typeof stack !== 'number' || !Number.isInteger(stack) || stack < 0)
+        return bad('BUILD requires a stack index');
       const rawResources = record['resources'];
       if (typeof rawResources !== 'object' || rawResources === null) return bad('BUILD requires a resources payment');
       const src = rawResources as Record<string, unknown>;
@@ -45,22 +46,26 @@ export function parseStoneAgeAction(raw: unknown): ParseResult<Action> {
       for (const r of RESOURCES) {
         const n = src[r];
         if (n === undefined) continue;
-        if (typeof n !== 'number' || !Number.isInteger(n) || n < 0) return bad(`BUILD ${r} must be a non-negative whole number`);
+        if (typeof n !== 'number' || !Number.isInteger(n) || n < 0)
+          return bad(`BUILD ${r} must be a non-negative whole number`);
         resources[r] = n;
       }
       return { ok: true, action: { type: 'BUILD', stack, resources } };
     }
     case 'ACQUIRE_CARD': {
       const slot = record['slot'];
-      if (typeof slot !== 'number' || !Number.isInteger(slot) || slot < 0) return bad('ACQUIRE_CARD requires a slot index');
+      if (typeof slot !== 'number' || !Number.isInteger(slot) || slot < 0)
+        return bad('ACQUIRE_CARD requires a slot index');
       const rawResources = record['resources'];
-      if (typeof rawResources !== 'object' || rawResources === null) return bad('ACQUIRE_CARD requires a resources payment');
+      if (typeof rawResources !== 'object' || rawResources === null)
+        return bad('ACQUIRE_CARD requires a resources payment');
       const src = rawResources as Record<string, unknown>;
       const resources: Partial<Record<Resource, number>> = {};
       for (const r of RESOURCES) {
         const n = src[r];
         if (n === undefined) continue;
-        if (typeof n !== 'number' || !Number.isInteger(n) || n < 0) return bad(`ACQUIRE_CARD ${r} must be a non-negative whole number`);
+        if (typeof n !== 'number' || !Number.isInteger(n) || n < 0)
+          return bad(`ACQUIRE_CARD ${r} must be a non-negative whole number`);
         resources[r] = n;
       }
       return { ok: true, action: { type: 'ACQUIRE_CARD', slot, resources } };
@@ -70,7 +75,8 @@ export function parseStoneAgeAction(raw: unknown): ParseResult<Action> {
       if (!Array.isArray(raw)) return bad('TAKE_GATHER requires a toolIndices array');
       const toolIndices: number[] = [];
       for (const i of raw) {
-        if (typeof i !== 'number' || !Number.isInteger(i) || i < 0) return bad('Each tool index must be a non-negative whole number');
+        if (typeof i !== 'number' || !Number.isInteger(i) || i < 0)
+          return bad('Each tool index must be a non-negative whole number');
         toolIndices.push(i);
       }
       return { ok: true, action: { type: 'TAKE_GATHER', toolIndices } };

@@ -1,12 +1,5 @@
 import { useState } from 'react';
-import {
-  availableToPlace,
-  isGatherPlace,
-  isUsePlace,
-  legalActions,
-  PLACE_CAPACITY,
-  PLACES,
-} from '@game-hub/engine/stoneage';
+import { isGatherPlace, isUsePlace, legalActions, PLACE_CAPACITY, PLACES } from '@game-hub/engine/stoneage';
 import type { FixedPlaceId, StoneAgeView } from '@game-hub/engine/stoneage';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -86,18 +79,24 @@ export function BoardMap({ game, canDrive, busy, onPlace, onGather, onUse, seatC
     VILLAGE.includes(place) &&
     occOf(place) === 0 &&
     VILLAGE.filter((p) => occOf(p) > 0).length >= 2;
-  const LOCK_HINT = 'Only 2 of the tool maker, hut, and field can be used each round (2–3 players); this one is locked for the rest of the round.';
+  const LOCK_HINT =
+    'Only 2 of the tool maker, hut, and field can be used each round (2–3 players); this one is locked for the rest of the round.';
 
-  const countFor = (place: FixedPlaceId, min: number, max: number) => Math.max(min, Math.min(max, counts[place] ?? max));
+  const countFor = (place: FixedPlaceId, min: number, max: number) =>
+    Math.max(min, Math.min(max, counts[place] ?? max));
   const bump = (place: FixedPlaceId, by: number, min: number, max: number) =>
     setCounts((c) => ({ ...c, [place]: Math.max(min, Math.min(max, (c[place] ?? max) + by)) }));
 
   const meeplesFor = (byPlayer: Readonly<Record<string, number>>) =>
     Object.entries(byPlayer).map(([id, n]) => (
       <span key={id} className="flex items-center" title={`${playerName(id)} ×${n}`}>
-        {Array.from({ length: Math.min(n, 6) }, (_, k) => <Meeple key={k} className={cn('h-3.5 w-3.5 drop-shadow-sm', seatColorOf(id).text)} />)}
+        {Array.from({ length: Math.min(n, 6) }, (_, k) => (
+          <Meeple key={k} className={cn('h-3.5 w-3.5 drop-shadow-sm', seatColorOf(id).text)} />
+        ))}
         {n > 6 && <span className={cn('text-[9px] font-bold', seatColorOf(id).text)}>+{n - 6}</span>}
-        <span className="sr-only">{playerName(id)} ×{n}</span>
+        <span className="sr-only">
+          {playerName(id)} ×{n}
+        </span>
       </span>
     ));
 
@@ -136,7 +135,13 @@ export function BoardMap({ game, canDrive, busy, onPlace, onGather, onUse, seatC
             style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
             role={opt ? 'button' : undefined}
             tabIndex={opt ? 0 : undefined}
-            aria-label={opt ? `Place ${count} on ${PLACE_LABEL[place]}` : locked ? `${PLACE_LABEL[place]} — locked this round` : PLACE_LABEL[place]}
+            aria-label={
+              opt
+                ? `Place ${count} on ${PLACE_LABEL[place]}`
+                : locked
+                  ? `${PLACE_LABEL[place]} — locked this round`
+                  : PLACE_LABEL[place]
+            }
             title={locked ? LOCK_HINT : undefined}
             onClick={opt ? () => onPlace(place, count) : undefined}
           >
@@ -149,29 +154,80 @@ export function BoardMap({ game, canDrive, busy, onPlace, onGather, onUse, seatC
                 locked
               </div>
             ) : (
-              <div className="text-[10px] tabular-nums text-[#7a6a4d]">{used}/{cap === null ? '∞' : cap}</div>
+              <div className="text-[10px] tabular-nums text-[#7a6a4d]">
+                {used}/{cap === null ? '∞' : cap}
+              </div>
             )}
-            {used > 0 && <div className="mt-0.5 flex flex-wrap items-center justify-center gap-0.5">{meeplesFor(here)}</div>}
+            {used > 0 && (
+              <div className="mt-0.5 flex flex-wrap items-center justify-center gap-0.5">{meeplesFor(here)}</div>
+            )}
 
             {opt && (
               <div className="mt-1 flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
                 {opt.min !== opt.max && (
                   <>
-                    <Button size="icon" variant="outline" className="h-5 w-5" aria-label="Fewer" data-testid={`place-${place}-dec`} disabled={busy} onClick={() => bump(place, -1, opt.min, opt.max)}>−</Button>
-                    <span className="w-4 text-center text-[10px] tabular-nums" data-testid={`place-${place}-count`}>{count}</span>
-                    <Button size="icon" variant="outline" className="h-5 w-5" aria-label="More" data-testid={`place-${place}-inc`} disabled={busy} onClick={() => bump(place, 1, opt.min, opt.max)}>+</Button>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="h-5 w-5"
+                      aria-label="Fewer"
+                      data-testid={`place-${place}-dec`}
+                      disabled={busy}
+                      onClick={() => bump(place, -1, opt.min, opt.max)}
+                    >
+                      −
+                    </Button>
+                    <span className="w-4 text-center text-[10px] tabular-nums" data-testid={`place-${place}-count`}>
+                      {count}
+                    </span>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="h-5 w-5"
+                      aria-label="More"
+                      data-testid={`place-${place}-inc`}
+                      disabled={busy}
+                      onClick={() => bump(place, 1, opt.min, opt.max)}
+                    >
+                      +
+                    </Button>
                   </>
                 )}
-                <Button size="sm" className="h-6 bg-[#a05a24] px-2 text-[11px] text-[#f9f2e3] hover:bg-[#8a4c1e]" data-testid={`place-${place}-go`} disabled={busy} onClick={(e) => { e.stopPropagation(); onPlace(place, count); }}>
+                <Button
+                  size="sm"
+                  className="h-6 bg-[#a05a24] px-2 text-[11px] text-[#f9f2e3] hover:bg-[#8a4c1e]"
+                  data-testid={`place-${place}-go`}
+                  disabled={busy}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPlace(place, count);
+                  }}
+                >
                   Place {count}
                 </Button>
               </div>
             )}
             {canGather && (
-              <Button size="sm" className="mt-1 h-6 bg-[#a05a24] px-2 text-[11px] text-[#f9f2e3] hover:bg-[#8a4c1e]" data-testid={`gather-${place}`} disabled={busy} onClick={() => onGather(place)}>Gather</Button>
+              <Button
+                size="sm"
+                className="mt-1 h-6 bg-[#a05a24] px-2 text-[11px] text-[#f9f2e3] hover:bg-[#8a4c1e]"
+                data-testid={`gather-${place}`}
+                disabled={busy}
+                onClick={() => onGather(place)}
+              >
+                Gather
+              </Button>
             )}
             {canUse && (
-              <Button size="sm" className="mt-1 h-6 bg-[#a05a24] px-2 text-[11px] text-[#f9f2e3] hover:bg-[#8a4c1e]" data-testid={`use-${place}`} disabled={busy} onClick={() => onUse(place)}>{USE_LABEL[place]}</Button>
+              <Button
+                size="sm"
+                className="mt-1 h-6 bg-[#a05a24] px-2 text-[11px] text-[#f9f2e3] hover:bg-[#8a4c1e]"
+                data-testid={`use-${place}`}
+                disabled={busy}
+                onClick={() => onUse(place)}
+              >
+                {USE_LABEL[place]}
+              </Button>
             )}
           </div>
         );

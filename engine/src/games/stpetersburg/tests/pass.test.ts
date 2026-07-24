@@ -17,7 +17,12 @@ describe('pass', () => {
   it('closes the aristocrat phase and hands off to trading (score + refill, pg. 4)', () => {
     // p2 has already passed (consecutivePasses 1); p1's pass closes the aristocrat phase's actions. A card
     // was taken this phase, so the trading refill runs.
-    const before = makeState({ phase: 'aristocrat', activePlayerIndex: 0, consecutivePasses: 1, tookCardThisPhase: true });
+    const before = makeState({
+      phase: 'aristocrat',
+      activePlayerIndex: 0,
+      consecutivePasses: 1,
+      tookCardThisPhase: true,
+    });
     const after = pass(before, 'p1');
     expect(after.phase).toBe('trading');
     expect(after.consecutivePasses).toBe(0);

@@ -92,8 +92,7 @@ export const outcomeOf = (auction: DeliveryAuction, state: GameState) =>
   deliveryOutcome(state, auction.delivererId, auction.bids, auction.runoffBids);
 
 /** The highest opening bid. A $0 bluff is a legal bid, so this floors at 0, never `-Infinity`. */
-export const winningBidOf = (auction: DeliveryAuction): number =>
-  Math.max(0, ...Object.values(auction.bids));
+export const winningBidOf = (auction: DeliveryAuction): number => Math.max(0, ...Object.values(auction.bids));
 
 /**
  * Should this game have an open auction right now? Delegates the rule to the engine rather than
@@ -122,11 +121,7 @@ export function openAuctionFor(state: GameState): DeliveryAuction {
  * hidden from — they choose whether to buy out *knowing* the bids. `viewer` may hold several seats
  * (hotseat drives them all), so `yourBid` resolves against the seat currently being asked.
  */
-export function auctionViewFor(
-  auction: DeliveryAuction,
-  state: GameState,
-  viewer: string | null,
-): DeliveryAuctionView {
+export function auctionViewFor(auction: DeliveryAuction, state: GameState, viewer: string | null): DeliveryAuctionView {
   // The opening bids are public from the moment they all land (pg. 15) and stay so through a
   // runoff — the tied players are meant to add cash *knowing* what they're level on.
   const openingRevealed = auction.phase !== 'bidding';
@@ -168,12 +163,7 @@ export type BidOutcome =
  *
  * Pure: returns the next auction rather than saving it, so the caller owns persistence.
  */
-export function applyBid(
-  auction: DeliveryAuction,
-  state: GameState,
-  playerId: string,
-  bid: number,
-): BidOutcome {
+export function applyBid(auction: DeliveryAuction, state: GameState, playerId: string, bid: number): BidOutcome {
   if (auction.phase === 'decision') {
     return { ok: false, code: 'BIDDING_CLOSED', message: 'Every bid is already in' };
   }
@@ -245,8 +235,7 @@ export class AuctionRepository {
 
   get(gameId: string): DeliveryAuction | undefined {
     const row = this.db.prepare(`SELECT data FROM delivery_auctions WHERE game_id = ?`).get(gameId) as
-      | AuctionRow
-      | undefined;
+      AuctionRow | undefined;
     return row ? (JSON.parse(row.data) as DeliveryAuction) : undefined;
   }
 

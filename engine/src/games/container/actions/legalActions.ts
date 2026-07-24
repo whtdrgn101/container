@@ -48,7 +48,11 @@ export function legalActions(state: GameState, playerId?: string): Action[] {
   if (player.loans > 0 && player.money >= LOAN_AMOUNT) {
     actions.push({ type: 'REPAY_LOAN' });
   }
-  if (player.ship.location.kind === 'bank' && player.holdingArea.length > 0 && player.ship.cargo.length < SHIP_CAPACITY) {
+  if (
+    player.ship.location.kind === 'bank' &&
+    player.holdingArea.length > 0 &&
+    player.ship.cargo.length < SHIP_CAPACITY
+  ) {
     actions.push({ type: 'LOAD_FROM_BANK' });
   }
 

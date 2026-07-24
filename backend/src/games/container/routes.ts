@@ -42,18 +42,15 @@ export function registerAuctionRoutes(app: FastifyInstance, ctx: ModuleContext):
     raw !== undefined ? raw.split(',').filter(Boolean) : (state.players[state.activePlayerIndex]?.id ?? null);
 
   /** The open auction for a game, projected for one seat. `{ auction: null }` when none is open. */
-  app.get<{ Params: { id: string }; Querystring: { viewer?: string } }>(
-    '/auction',
-    async (request, reply) => {
-      if (!gameOf(request.params.id)) return notFound(reply, request.params.id);
-      ctx.bots.tick(request.params.id); // same self-healing as GET /games/:id
-      const state = gameOf(request.params.id)!;
-      const auction = syncAuction(auctions, state);
-      if (!auction) return reply.send({ auction: null });
-      const viewer = request.query.viewer ? request.query.viewer : null;
-      return reply.send({ auction: auctionViewFor(auction, state, viewer) });
-    },
-  );
+  app.get<{ Params: { id: string }; Querystring: { viewer?: string } }>('/auction', async (request, reply) => {
+    if (!gameOf(request.params.id)) return notFound(reply, request.params.id);
+    ctx.bots.tick(request.params.id); // same self-healing as GET /games/:id
+    const state = gameOf(request.params.id)!;
+    const auction = syncAuction(auctions, state);
+    if (!auction) return reply.send({ auction: null });
+    const viewer = request.query.viewer ? request.query.viewer : null;
+    return reply.send({ auction: auctionViewFor(auction, state, viewer) });
+  });
 
   /** Place one seat's sealed bid. $0 is a legal bluff (pg. 15), so the floor is 0, not 1. */
   app.post<{ Params: { id: string }; Body: { playerId: string; bid: number } }>(

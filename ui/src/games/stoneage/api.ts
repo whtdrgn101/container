@@ -27,7 +27,12 @@ export const act = (
  * Gather resources from a place (SA2). The **server** rolls one die per worker there and returns the
  * new state — the client asks to gather; it can't choose the dice.
  */
-export async function gather(gameId: string, playerId: string, place: PlaceId, viewer?: string): Promise<StoneAgePayload> {
+export async function gather(
+  gameId: string,
+  playerId: string,
+  place: PlaceId,
+  viewer?: string,
+): Promise<StoneAgePayload> {
   const query = viewer !== undefined ? `?viewer=${encodeURIComponent(viewer)}` : '';
   return unwrap<StoneAgeView>(
     await fetch(`${BASE_URL}/games/${gameId}/stoneage/roll${query}`, {

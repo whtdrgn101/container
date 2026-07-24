@@ -31,10 +31,13 @@ export function describeMove(entry: StPetersburgView['log'][number]): string {
   }
   if (entry.type === 'OBSERVATORY_DRAW') {
     const p = entry.payload as { stack?: string; cardName?: string } | undefined;
-    return p?.cardName ? `drew the ${p.cardName} from the ${p.stack} stack (Observatory)` : 'drew from a stack (Observatory)';
+    return p?.cardName
+      ? `drew the ${p.cardName} from the ${p.stack} stack (Observatory)`
+      : 'drew from a stack (Observatory)';
   }
   if (entry.type === 'OBSERVATORY_RESOLVE') {
-    const p = entry.payload as { choice?: string; cardName?: string; cost?: number; displacedName?: string } | undefined;
+    const p = entry.payload as
+      { choice?: string; cardName?: string; cost?: number; displacedName?: string } | undefined;
     if (!p) return 'resolved the Observatory draw';
     if (p.choice === 'discard') return `discarded the ${p.cardName} (Observatory)`;
     if (p.choice === 'hand') return `took the ${p.cardName} into hand (Observatory)`;

@@ -59,7 +59,11 @@ export const BUILDING_PLACES: readonly BuildingPlaceId[] = ['building1', 'buildi
 export const CARD_PLACES: readonly CardPlaceId[] = ['card1', 'card2', 'card3', 'card4'];
 
 /** Every place people can be placed — fixed board places + building slots + card slots. */
-export const ALL_PLACES: readonly (FixedPlaceId | BuildingPlaceId | CardPlaceId)[] = [...PLACES, ...BUILDING_PLACES, ...CARD_PLACES];
+export const ALL_PLACES: readonly (FixedPlaceId | BuildingPlaceId | CardPlaceId)[] = [
+  ...PLACES,
+  ...BUILDING_PLACES,
+  ...CARD_PLACES,
+];
 
 /** What each card slot costs, by position (pg. 6): the leftmost is cheapest; a card gets cheaper as it ages left. */
 export const CARD_COST: readonly number[] = [1, 2, 3, 4];
@@ -132,7 +136,16 @@ export const BUILDING_DECK: readonly Building[] = [
 export const CIV_CARD_SLOTS = 4;
 
 /** The eight green "culture" symbols — final scoring counts a player's *distinct* symbols, squared (pg. 8). */
-export const CARD_SYMBOLS = ['writing', 'pottery', 'art', 'music', 'medicine', 'weaving', 'transport', 'timekeeping'] as const;
+export const CARD_SYMBOLS = [
+  'writing',
+  'pottery',
+  'art',
+  'music',
+  'medicine',
+  'weaving',
+  'transport',
+  'timekeeping',
+] as const;
 
 /**
  * The 36-card civilization deck (pg. 6 + info sheet). The rulebook points to a separate info sheet for
@@ -145,26 +158,54 @@ export const CIV_CARD_DECK: readonly CivCard[] = [
   // Green culture cards — { symbol, immediate effect }.
   { id: 'cv01', scoring: { kind: 'green', symbol: 'writing' }, effect: { kind: 'tool' } },
   { id: 'cv02', scoring: { kind: 'green', symbol: 'writing' }, effect: { kind: 'points', amount: 3 } },
-  { id: 'cv03', scoring: { kind: 'green', symbol: 'writing' }, effect: { kind: 'resource', resource: 'wood', amount: 2 } },
+  {
+    id: 'cv03',
+    scoring: { kind: 'green', symbol: 'writing' },
+    effect: { kind: 'resource', resource: 'wood', amount: 2 },
+  },
   { id: 'cv04', scoring: { kind: 'green', symbol: 'pottery' }, effect: { kind: 'food', amount: 2 } },
   { id: 'cv05', scoring: { kind: 'green', symbol: 'pottery' }, effect: { kind: 'foodTrack', amount: 1 } },
-  { id: 'cv06', scoring: { kind: 'green', symbol: 'pottery' }, effect: { kind: 'resource', resource: 'brick', amount: 2 } },
+  {
+    id: 'cv06',
+    scoring: { kind: 'green', symbol: 'pottery' },
+    effect: { kind: 'resource', resource: 'brick', amount: 2 },
+  },
   { id: 'cv07', scoring: { kind: 'green', symbol: 'art' }, effect: { kind: 'points', amount: 4 } },
   { id: 'cv08', scoring: { kind: 'green', symbol: 'art' }, effect: { kind: 'resource', resource: 'stone', amount: 1 } },
   { id: 'cv09', scoring: { kind: 'green', symbol: 'art' }, effect: { kind: 'tool' } },
   { id: 'cv10', scoring: { kind: 'green', symbol: 'music' }, effect: { kind: 'food', amount: 3 } },
-  { id: 'cv11', scoring: { kind: 'green', symbol: 'music' }, effect: { kind: 'resource', resource: 'gold', amount: 1 } },
+  {
+    id: 'cv11',
+    scoring: { kind: 'green', symbol: 'music' },
+    effect: { kind: 'resource', resource: 'gold', amount: 1 },
+  },
   { id: 'cv12', scoring: { kind: 'green', symbol: 'music' }, effect: { kind: 'foodTrack', amount: 1 } },
-  { id: 'cv13', scoring: { kind: 'green', symbol: 'medicine' }, effect: { kind: 'resource', resource: 'wood', amount: 1 } },
+  {
+    id: 'cv13',
+    scoring: { kind: 'green', symbol: 'medicine' },
+    effect: { kind: 'resource', resource: 'wood', amount: 1 },
+  },
   { id: 'cv14', scoring: { kind: 'green', symbol: 'medicine' }, effect: { kind: 'points', amount: 3 } },
   { id: 'cv15', scoring: { kind: 'green', symbol: 'medicine' }, effect: { kind: 'food', amount: 2 } },
   { id: 'cv16', scoring: { kind: 'green', symbol: 'weaving' }, effect: { kind: 'tool' } },
-  { id: 'cv17', scoring: { kind: 'green', symbol: 'weaving' }, effect: { kind: 'resource', resource: 'brick', amount: 1 } },
+  {
+    id: 'cv17',
+    scoring: { kind: 'green', symbol: 'weaving' },
+    effect: { kind: 'resource', resource: 'brick', amount: 1 },
+  },
   { id: 'cv18', scoring: { kind: 'green', symbol: 'weaving' }, effect: { kind: 'points', amount: 4 } },
   { id: 'cv19', scoring: { kind: 'green', symbol: 'transport' }, effect: { kind: 'foodTrack', amount: 1 } },
-  { id: 'cv20', scoring: { kind: 'green', symbol: 'transport' }, effect: { kind: 'resource', resource: 'stone', amount: 2 } },
+  {
+    id: 'cv20',
+    scoring: { kind: 'green', symbol: 'transport' },
+    effect: { kind: 'resource', resource: 'stone', amount: 2 },
+  },
   { id: 'cv21', scoring: { kind: 'green', symbol: 'transport' }, effect: { kind: 'food', amount: 2 } },
-  { id: 'cv22', scoring: { kind: 'green', symbol: 'timekeeping' }, effect: { kind: 'resource', resource: 'gold', amount: 1 } },
+  {
+    id: 'cv22',
+    scoring: { kind: 'green', symbol: 'timekeeping' },
+    effect: { kind: 'resource', resource: 'gold', amount: 1 },
+  },
   { id: 'cv23', scoring: { kind: 'green', symbol: 'timekeeping' }, effect: { kind: 'tool' } },
   { id: 'cv24', scoring: { kind: 'green', symbol: 'timekeeping' }, effect: { kind: 'points', amount: 3 } },
   // Sand-coloured multiplier cards — { multiplier, small immediate effect }.

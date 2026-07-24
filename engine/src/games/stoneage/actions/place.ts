@@ -10,10 +10,7 @@ import { countRange, enterActionPhase, nextPlacer, record } from '../internal';
 export function place(state: StoneAgeState, playerId: string, placeId: PlaceId, count: number): StoneAgeState {
   const range = countRange(state, placeId, playerId);
   if (!range || count < range.min || count > range.max) {
-    throw new GameError(
-      'INVALID_PLACEMENT',
-      `Player "${playerId}" cannot place ${count} people on "${placeId}"`,
-    );
+    throw new GameError('INVALID_PLACEMENT', `Player "${playerId}" cannot place ${count} people on "${placeId}"`);
   }
 
   const withPlacement: StoneAgeState = {

@@ -64,7 +64,11 @@ export function PanZoom({
   const onWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const rect = frameRef.current?.getBoundingClientRect();
-    zoomAbout(e.deltaY < 0 ? 1.12 : 1 / 1.12, rect ? e.clientX - rect.left : undefined, rect ? e.clientY - rect.top : undefined);
+    zoomAbout(
+      e.deltaY < 0 ? 1.12 : 1 / 1.12,
+      rect ? e.clientX - rect.left : undefined,
+      rect ? e.clientY - rect.top : undefined,
+    );
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -116,16 +120,31 @@ export function PanZoom({
         onPointerCancel={onPointerUp}
         style={{ cursor: scale > 1 ? 'grab' : 'default' }}
       >
-        <div className="h-full w-full origin-top-left" style={{ transform: `translate(${tx}px, ${ty}px) scale(${scale})` }}>
+        <div
+          className="h-full w-full origin-top-left"
+          style={{ transform: `translate(${tx}px, ${ty}px) scale(${scale})` }}
+        >
           {children}
         </div>
       </div>
       {/* Zoom controls. */}
       <div className="absolute right-1.5 top-1.5 z-10 flex flex-col gap-1" data-testid="board-zoom">
-        <Button size="icon" variant="secondary" className="h-7 w-7 shadow" aria-label="Zoom in" onClick={() => zoomAbout(1.25)}>
+        <Button
+          size="icon"
+          variant="secondary"
+          className="h-7 w-7 shadow"
+          aria-label="Zoom in"
+          onClick={() => zoomAbout(1.25)}
+        >
           <Plus className="h-4 w-4" />
         </Button>
-        <Button size="icon" variant="secondary" className="h-7 w-7 shadow" aria-label="Zoom out" onClick={() => zoomAbout(1 / 1.25)}>
+        <Button
+          size="icon"
+          variant="secondary"
+          className="h-7 w-7 shadow"
+          aria-label="Zoom out"
+          onClick={() => zoomAbout(1 / 1.25)}
+        >
           <Minus className="h-4 w-4" />
         </Button>
         <Button size="icon" variant="secondary" className="h-7 w-7 shadow" aria-label="Reset view" onClick={reset}>

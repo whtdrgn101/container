@@ -14,12 +14,12 @@ services:
       # The owner's Watchtower runs label-scoped (WATCHTOWER_LABEL_ENABLE) so it can't surprise
       # version-pinned services (Jellyfin, Gitea). Game Hub tracks :latest on purpose — CI owns the
       # tag and the /data volume carries the games — so it opts in explicitly.
-      com.centurylinklabs.watchtower.enable: "true"
+      com.centurylinklabs.watchtower.enable: 'true'
     ports:
-      - "8080:3001"
+      - '8080:3001'
     environment:
       HOST: 0.0.0.0
-      PORT: "3001"
+      PORT: '3001'
       DATABASE_PATH: /data/game-hub.sqlite
     volumes:
       - game-hub-game-data:/data

@@ -34,25 +34,25 @@ export function Header({ heading, gameId, canLeave, onLeave, status }: HeaderPro
             <Dices className="h-4 w-4" />
           </span>
           <h1 className="text-lg font-bold tracking-tight sm:text-xl" data-testid="page-title">
-          {canLeave ? (
-            // Only a link when there's somewhere to go back to. Leaving is safe and needs no
-            // confirmation: the game lives on the server, so it keeps running (bots included) and
-            // reappears under "Games in progress" to rejoin.
-            <button
-              type="button"
-              data-testid="home-link"
-              onClick={onLeave}
-              title="Back to the Game Hub — this game keeps going; rejoin it any time from the home screen"
-              // Underline + pointer, not a color shift: `text-primary` is nearly the same shade as
-              // the heading in both themes, so a color-only hover was invisible and the link
-              // undiscoverable.
-              className="cursor-pointer rounded underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <span aria-hidden>←</span> {heading}
-            </button>
-          ) : (
-            heading
-          )}
+            {canLeave ? (
+              // Only a link when there's somewhere to go back to. Leaving is safe and needs no
+              // confirmation: the game lives on the server, so it keeps running (bots included) and
+              // reappears under "Games in progress" to rejoin.
+              <button
+                type="button"
+                data-testid="home-link"
+                onClick={onLeave}
+                title="Back to the Game Hub — this game keeps going; rejoin it any time from the home screen"
+                // Underline + pointer, not a color shift: `text-primary` is nearly the same shade as
+                // the heading in both themes, so a color-only hover was invisible and the link
+                // undiscoverable.
+                className="cursor-pointer rounded underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span aria-hidden>←</span> {heading}
+              </button>
+            ) : (
+              heading
+            )}
           </h1>
         </div>
         {gameId && (

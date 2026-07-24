@@ -11,15 +11,30 @@ function game(seat0: Partial<StPetersburgPlayer> = {}, board: Partial<Board> = {
 }
 
 /** `n` lumberjacks in a play area (for the same-name reduction). */
-const lumberjacks = (n: number): Card[] => Array.from({ length: n }, (_, i) => card({ id: `lj-${i}`, key: 'lumberjack' }));
-const emptyArea = (worker: Card[] = [], building: Card[] = [], aristocrat: Card[] = []): PlayArea => ({ worker, building, aristocrat });
+const lumberjacks = (n: number): Card[] =>
+  Array.from({ length: n }, (_, i) => card({ id: `lj-${i}`, key: 'lumberjack' }));
+const emptyArea = (worker: Card[] = [], building: Card[] = [], aristocrat: Card[] = []): PlayArea => ({
+  worker,
+  building,
+  aristocrat,
+});
 const market = (id = 'mk-1'): Card =>
   card({ id, key: 'market', kind: 'building', name: 'Market', cost: 5, income: 0, points: 1 });
-const lumberjack = (id = 'lj-1'): Card => card({ id, key: 'lumberjack', kind: 'worker', name: 'Lumberjack', cost: 3, ware: 'lumber' });
-const scribe = (id = 'sc-1'): Card => card({ id, key: 'scribe', kind: 'aristocrat', name: 'Scribe', cost: 4, income: 1 });
+const lumberjack = (id = 'lj-1'): Card =>
+  card({ id, key: 'lumberjack', kind: 'worker', name: 'Lumberjack', cost: 3, ware: 'lumber' });
+const scribe = (id = 'sc-1'): Card =>
+  card({ id, key: 'scribe', kind: 'aristocrat', name: 'Scribe', cost: 4, income: 1 });
 /** Carpenter Workshop — green worker trading card (ware lumber, cost 4), displaces a lumberjack (pg. 7). */
 const carpenterWorkshop = (id = 'cw-1'): Card =>
-  card({ id, key: 'carpenterWorkshop', kind: 'trading', name: 'Carpenter Workshop', cost: 4, ware: 'lumber', tradingGroup: 'worker' });
+  card({
+    id,
+    key: 'carpenterWorkshop',
+    kind: 'trading',
+    name: 'Carpenter Workshop',
+    cost: 4,
+    ware: 'lumber',
+    tradingGroup: 'worker',
+  });
 
 describe('buy', () => {
   it('moves a card from the row to the play area, charges the cost, and passes the turn', () => {
@@ -32,7 +47,11 @@ describe('buy', () => {
     expect(after.activePlayerIndex).toBe(1); // turn passes clockwise
     expect(after.consecutivePasses).toBe(0); // a buy is not a pass
     expect(after.version).toBe(1);
-    expect(after.log.at(-1)).toMatchObject({ type: 'BUY', playerId: 'p1', payload: { cardKey: 'lumberjack', cost: 3, row: 'upper' } });
+    expect(after.log.at(-1)).toMatchObject({
+      type: 'BUY',
+      playerId: 'p1',
+      payload: { cardKey: 'lumberjack', cost: 3, row: 'upper' },
+    });
 
     // The input is never mutated (engine purity).
     expect(before.players[0]!.rubles).toBe(25);
@@ -67,7 +86,15 @@ describe('buy', () => {
   });
 
   it('applies the owned-card reductions: a carpenter workshop −1 on blue, a gold smelter −1 on orange (pg. 7–8)', () => {
-    const smelter = card({ id: 'gs', key: 'goldSmelter', kind: 'trading', name: 'Gold Smelter', cost: 6, ware: 'gold', tradingGroup: 'worker' });
+    const smelter = card({
+      id: 'gs',
+      key: 'goldSmelter',
+      kind: 'trading',
+      name: 'Gold Smelter',
+      cost: 6,
+      ware: 'gold',
+      tradingGroup: 'worker',
+    });
     const withWorkshop = { playArea: emptyArea([carpenterWorkshop()]) };
     const withSmelter = { playArea: emptyArea([smelter]) };
     // Carpenter workshop reduces a blue building buy (market 5 → 4); it does NOT touch an orange aristocrat.
@@ -97,15 +124,40 @@ describe('buy', () => {
   });
 
   it('pays the difference when the trading card is dearer (wharf 12 − ship builder 7 = 5, pg. 8 example)', () => {
-    const wharf = card({ id: 'wh', key: 'wharf', kind: 'trading', name: 'Wharf', cost: 12, income: 6, points: 1, ware: 'ship', tradingGroup: 'worker' });
-    const shipBuilder = card({ id: 'sb-mine', key: 'shipBuilder', kind: 'worker', name: 'Ship Builder', cost: 7, ware: 'ship' });
+    const wharf = card({
+      id: 'wh',
+      key: 'wharf',
+      kind: 'trading',
+      name: 'Wharf',
+      cost: 12,
+      income: 6,
+      points: 1,
+      ware: 'ship',
+      tradingGroup: 'worker',
+    });
+    const shipBuilder = card({
+      id: 'sb-mine',
+      key: 'shipBuilder',
+      kind: 'worker',
+      name: 'Ship Builder',
+      cost: 7,
+      ware: 'ship',
+    });
     expect(displacementCost({ playArea: emptyArea([shipBuilder]) }, wharf, shipBuilder, 'upper')).toBe(5);
   });
 
   it('stacks the difference with the lower-row and owned-card reductions (St Isaac 15−5, −1 row, −1 workshop = 8, pg. 7)', () => {
     // The rulebook's worked example: St Isaac's Cathedral (15) displaces a Market (5) from the lower row,
     // with a carpenter workshop owned. 15 − 5 = 10, then −1 (lower) −1 (workshop) = 8.
-    const stIsaac = card({ id: 'si', key: 'stIsaac', kind: 'trading', name: "St Isaac's Cathedral", cost: 15, points: 5, tradingGroup: 'building' });
+    const stIsaac = card({
+      id: 'si',
+      key: 'stIsaac',
+      kind: 'trading',
+      name: "St Isaac's Cathedral",
+      cost: 15,
+      points: 5,
+      tradingGroup: 'building',
+    });
     const player = { playArea: emptyArea([carpenterWorkshop()], [market('mk-mine')]) };
     expect(displacementCost(player, stIsaac, market(), 'lower')).toBe(8);
   });
@@ -114,7 +166,13 @@ describe('buy', () => {
     const czar = card({ id: 'cz', key: 'czarCarpenter', kind: 'worker', name: 'Czar the Carpenter', cost: 8 });
     // Carpenter Workshop (cost 4) displaces the Czar (cost 8) → 4 − 8 ≤ 0 → 1 ruble.
     expect(displacementCost({ playArea: emptyArea([czar]) }, carpenterWorkshop(), czar, 'upper')).toBe(1);
-    const after = buy(game({ playArea: emptyArea([czar]) }, { upper: [carpenterWorkshop('cw-buy')] }), 'p1', 'upper', 0, 'cz');
+    const after = buy(
+      game({ playArea: emptyArea([czar]) }, { upper: [carpenterWorkshop('cw-buy')] }),
+      'p1',
+      'upper',
+      0,
+      'cz',
+    );
     expect(after.players[0]!.playArea.worker.map((c) => c.key)).toEqual(['carpenterWorkshop']); // czar displaced
     expect(after.board.discard).toBe(1);
   });
@@ -129,7 +187,10 @@ describe('buy', () => {
 
   it('rejects a stale/illegal displacement target (INVALID_DISPLACE_TARGET)', () => {
     // No lumberjack owned to displace.
-    expectError(() => buy(game({}, { upper: [carpenterWorkshop()] }), 'p1', 'upper', 0, 'nope'), 'INVALID_DISPLACE_TARGET');
+    expectError(
+      () => buy(game({}, { upper: [carpenterWorkshop()] }), 'p1', 'upper', 0, 'nope'),
+      'INVALID_DISPLACE_TARGET',
+    );
     // A green trading card can't displace a ware-mismatched worker (gold miner ≠ lumber).
     const goldMiner = card({ id: 'gm', key: 'goldMiner', kind: 'worker', name: 'Gold Miner', cost: 4, ware: 'gold' });
     expectError(
@@ -143,8 +204,23 @@ describe('buy', () => {
   });
 
   it('refuses an unaffordable trading displacement too (INSUFFICIENT_RUBLES)', () => {
-    const wharf = card({ id: 'wh', key: 'wharf', kind: 'trading', name: 'Wharf', cost: 12, ware: 'ship', tradingGroup: 'worker' });
-    const shipBuilder = card({ id: 'sb', key: 'shipBuilder', kind: 'worker', name: 'Ship Builder', cost: 7, ware: 'ship' });
+    const wharf = card({
+      id: 'wh',
+      key: 'wharf',
+      kind: 'trading',
+      name: 'Wharf',
+      cost: 12,
+      ware: 'ship',
+      tradingGroup: 'worker',
+    });
+    const shipBuilder = card({
+      id: 'sb',
+      key: 'shipBuilder',
+      kind: 'worker',
+      name: 'Ship Builder',
+      cost: 7,
+      ware: 'ship',
+    });
     // 12 − 7 = 5 rubles; the seat has 2.
     expectError(
       () => buy(game({ rubles: 2, playArea: emptyArea([shipBuilder]) }, { upper: [wharf] }), 'p1', 'upper', 0, 'sb'),

@@ -108,7 +108,11 @@ describe('applyAction', () => {
     });
 
     it('still enforces the loan cap off-turn', () => {
-      const state = makeGame([makePlayer({ id: 'p1' }), makePlayer({ id: 'p2', loans: MAX_LOANS }), makePlayer({ id: 'p3' })]);
+      const state = makeGame([
+        makePlayer({ id: 'p1' }),
+        makePlayer({ id: 'p2', loans: MAX_LOANS }),
+        makePlayer({ id: 'p3' }),
+      ]);
       expectError(() => applyAction(state, 'p2', { type: 'REQUEST_LOAN' }), 'LOAN_LIMIT_REACHED');
     });
 
@@ -118,7 +122,11 @@ describe('applyAction', () => {
 
     it('does NOT extend the exception to repaying', () => {
       // "Unlike other free actions" — only requesting is off-turn. Repaying waits for your turn.
-      const state = makeGame([makePlayer({ id: 'p1' }), makePlayer({ id: 'p2', loans: 1, money: 20 }), makePlayer({ id: 'p3' })]);
+      const state = makeGame([
+        makePlayer({ id: 'p1' }),
+        makePlayer({ id: 'p2', loans: 1, money: 20 }),
+        makePlayer({ id: 'p3' }),
+      ]);
       expectError(() => applyAction(state, 'p2', { type: 'REPAY_LOAN' }), 'NOT_YOUR_TURN');
     });
 

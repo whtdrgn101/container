@@ -15,7 +15,9 @@ describe('reprice', () => {
 
   it('rearranges harbor containers using harbor lot prices', () => {
     const p1 = makePlayer({ id: 'p1', harborStore: [sc('blue', 2)], harborLimit: 3 });
-    const next = reprice(makeGame([p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]), 'p1', 'harbor', [sc('blue', 7)]);
+    const next = reprice(makeGame([p1, makePlayer({ id: 'p2' }), makePlayer({ id: 'p3' })]), 'p1', 'harbor', [
+      sc('blue', 7),
+    ]);
     expect(getPlayer(next, 'p1').harborStore).toEqual([sc('blue', 7)]);
   });
 

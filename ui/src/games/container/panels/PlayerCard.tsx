@@ -124,7 +124,14 @@ export function PlayerCard({
       className={cn('overflow-hidden border-l-4', isActive && cn('ring-2', seatColor.ring))}
       style={{ borderLeftColor: seatColor.hull }}
     >
-      <MatHeader player={player} isBot={botIds.includes(player.id)} showControls={showControls} can={can} busy={busy} act={act} />
+      <MatHeader
+        player={player}
+        isBot={botIds.includes(player.id)}
+        showControls={showControls}
+        can={can}
+        busy={busy}
+        act={act}
+      />
       <CardContent className="space-y-2">
         <div className="grid gap-2 min-[420px]:grid-cols-2">
           <FactoryZone
@@ -170,7 +177,10 @@ export function PlayerCard({
           act={act}
         />
 
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground" data-testid={`scoring-${player.id}`}>
+        <div
+          className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+          data-testid={`scoring-${player.id}`}
+        >
           <span>Island:</span>
           {player.scoringArea.length === 0 ? (
             <span>—</span>
@@ -203,7 +213,10 @@ export function PlayerCard({
         </div>
 
         {player.holdingArea.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground" data-testid={`holding-${player.id}`}>
+          <div
+            className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+            data-testid={`holding-${player.id}`}
+          >
             <span>Bank holding:</span>
             {player.holdingArea.map((color, holdIndex) => (
               <ContainerChip key={holdIndex} color={color} />
@@ -214,7 +227,13 @@ export function PlayerCard({
         {/* The turn console: end the turn from anywhere. (The other actions live in their zones.) */}
         {showControls && (
           <div className="flex items-center justify-end gap-2 border-t pt-2" data-testid="controls">
-            <Button size="sm" variant="secondary" data-testid="end-turn" disabled={busy} onClick={() => act(player.id, { type: 'END_TURN' })}>
+            <Button
+              size="sm"
+              variant="secondary"
+              data-testid="end-turn"
+              disabled={busy}
+              onClick={() => act(player.id, { type: 'END_TURN' })}
+            >
               End turn
             </Button>
           </div>

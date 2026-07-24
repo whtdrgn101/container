@@ -13,8 +13,9 @@ import type { GameView } from '@game-hub/engine/container';
 export function ContainerStatus({ game }: { game: GameView }) {
   return (
     <span data-testid="turn-info" className="text-sm text-muted-foreground">
-      Turn {game.turn} · <span className="font-medium text-foreground">{game.players[game.activePlayerIndex]?.name}</span>{' '}
-      · {game.actionsRemaining} action{game.actionsRemaining === 1 ? '' : 's'} left
+      Turn {game.turn} ·{' '}
+      <span className="font-medium text-foreground">{game.players[game.activePlayerIndex]?.name}</span> ·{' '}
+      {game.actionsRemaining} action{game.actionsRemaining === 1 ? '' : 's'} left
     </span>
   );
 }

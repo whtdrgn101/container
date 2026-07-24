@@ -70,7 +70,10 @@ export function PlayerPanel({ game, player, seat, detailed, seatColor }: PlayerP
     return (
       <div
         data-testid={`player-${player.id}`}
-        className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-card px-3 py-2 text-xs', isActive && cn('ring-2', seatColor.ring))}
+        className={cn(
+          'flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-card px-3 py-2 text-xs',
+          isActive && cn('ring-2', seatColor.ring),
+        )}
       >
         <span className={cn('flex items-center gap-1.5 font-medium', seatColor.text)}>
           <Meeple className={cn('h-3.5 w-3.5', seatColor.text)} />
@@ -78,7 +81,9 @@ export function PlayerPanel({ game, player, seat, detailed, seatColor }: PlayerP
         </span>
         <span className="flex items-center gap-1" title="People placed / total">
           <Meeple className="h-3 w-3 opacity-60" />
-          <span className="tabular-nums">{placedBy(game, player.id)}/{player.people}</span>
+          <span className="tabular-nums">
+            {placedBy(game, player.id)}/{player.people}
+          </span>
         </span>
         <span className="flex items-center gap-1" title={`Food track: ${player.foodTrack}`}>
           <FieldIcon className="h-3.5 w-3.5" />
@@ -93,14 +98,34 @@ export function PlayerPanel({ game, player, seat, detailed, seatColor }: PlayerP
           <span className="tabular-nums">{player.buildings}</span>
         </span>
         {engines.symbols.size > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-[#5d7c42]/20 px-2 py-0.5 font-medium" title={`${engines.symbols.size} distinct culture symbols → ${greenPts} points`}>
+          <span
+            className="inline-flex items-center gap-1 rounded-full bg-[#5d7c42]/20 px-2 py-0.5 font-medium"
+            title={`${engines.symbols.size} distinct culture symbols → ${greenPts} points`}
+          >
             <CardIcon className="h-3.5 w-3.5" />
-            <span className="tabular-nums">{engines.symbols.size} sym → {greenPts}</span>
+            <span className="tabular-nums">
+              {engines.symbols.size} sym → {greenPts}
+            </span>
           </span>
         )}
-        <MultChip icon={<FieldIcon className="h-3 w-3" />} count={engines.farmer} stat={player.foodTrack} label="farmer" />
-        <MultChip icon={<ToolIcon className="h-3 w-3" />} count={engines.toolMaker} stat={toolValue} label="tool maker" />
-        <MultChip icon={<Hut className="h-3 w-3" />} count={engines.builder} stat={player.buildings} label="hut builder" />
+        <MultChip
+          icon={<FieldIcon className="h-3 w-3" />}
+          count={engines.farmer}
+          stat={player.foodTrack}
+          label="farmer"
+        />
+        <MultChip
+          icon={<ToolIcon className="h-3 w-3" />}
+          count={engines.toolMaker}
+          stat={toolValue}
+          label="tool maker"
+        />
+        <MultChip
+          icon={<Hut className="h-3 w-3" />}
+          count={engines.builder}
+          stat={player.buildings}
+          label="hut builder"
+        />
         <MultChip icon={<Meeple className="h-3 w-3" />} count={engines.shaman} stat={player.people} label="shaman" />
         <span className="ml-auto font-semibold tabular-nums" data-testid={`score-${player.id}`} title="Points banked">
           {player.score} pts
@@ -119,21 +144,29 @@ export function PlayerPanel({ game, player, seat, detailed, seatColor }: PlayerP
           <span className={cn('inline-block h-3 w-3 rounded-full', seatColor.dot)} aria-hidden />
           {player.name}
         </span>
-        <span className="text-xs text-muted-foreground" data-testid={`score-${player.id}`}>{player.score} pts</span>
+        <span className="text-xs text-muted-foreground" data-testid={`score-${player.id}`}>
+          {player.score} pts
+        </span>
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
         <span className="flex items-center gap-1">
           <Meeple className={cn('h-3.5 w-3.5', seatColor.text)} />
-          People: <span className="font-medium tabular-nums">{placedBy(game, player.id)}/{player.people}</span> placed
+          People:{' '}
+          <span className="font-medium tabular-nums">
+            {placedBy(game, player.id)}/{player.people}
+          </span>{' '}
+          placed
         </span>
         <span className="flex items-center gap-1">
           <FoodIcon className="h-3.5 w-3.5" /> Food: <span className="font-medium tabular-nums">{player.food}</span>
         </span>
         <span className="flex items-center gap-1">
-          <FieldIcon className="h-3.5 w-3.5" /> Food track: <span className="font-medium tabular-nums">{player.foodTrack}</span>
+          <FieldIcon className="h-3.5 w-3.5" /> Food track:{' '}
+          <span className="font-medium tabular-nums">{player.foodTrack}</span>
         </span>
         <span className="flex items-center gap-1">
-          <ToolIcon className="h-3.5 w-3.5" /> Tools: <span className="font-medium tabular-nums">{player.tools.join(', ') || '—'}</span>
+          <ToolIcon className="h-3.5 w-3.5" /> Tools:{' '}
+          <span className="font-medium tabular-nums">{player.tools.join(', ') || '—'}</span>
         </span>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
@@ -154,9 +187,15 @@ export function PlayerPanel({ game, player, seat, detailed, seatColor }: PlayerP
           <span className="flex items-center gap-1">
             <CardIcon className="h-3.5 w-3.5" /> Cards ({player.civCards.length})
           </span>
-          {cardsTotal > 0 && <span className="normal-case tracking-normal tabular-nums">worth {cardsTotal} pts today</span>}
+          {cardsTotal > 0 && (
+            <span className="normal-case tracking-normal tabular-nums">worth {cardsTotal} pts today</span>
+          )}
         </div>
-        <div className="flex items-center gap-1" role="img" aria-label={`${engines.symbols.size} of ${CARD_SYMBOLS.length} distinct culture symbols, worth ${greenPts} points`}>
+        <div
+          className="flex items-center gap-1"
+          role="img"
+          aria-label={`${engines.symbols.size} of ${CARD_SYMBOLS.length} distinct culture symbols, worth ${greenPts} points`}
+        >
           {CARD_SYMBOLS.map((symbol) => {
             const held = engines.symbols.has(symbol);
             const Icon = SYMBOL_ICON[symbol]!;
@@ -166,7 +205,9 @@ export function PlayerPanel({ game, player, seat, detailed, seatColor }: PlayerP
                 title={`${symbol}${held ? '' : ' (not collected)'}`}
                 className={cn(
                   'grid h-6 w-6 place-items-center rounded-md',
-                  held ? 'bg-[#5d7c42] text-[#f3f0e2]' : 'border border-dashed border-muted-foreground/40 text-muted-foreground/50',
+                  held
+                    ? 'bg-[#5d7c42] text-[#f3f0e2]'
+                    : 'border border-dashed border-muted-foreground/40 text-muted-foreground/50',
                 )}
               >
                 <Icon className="h-4 w-4" />
@@ -174,16 +215,37 @@ export function PlayerPanel({ game, player, seat, detailed, seatColor }: PlayerP
             );
           })}
           <span className="ml-1 text-[11px] tabular-nums text-muted-foreground">
-            {engines.symbols.size}/{CARD_SYMBOLS.length} → <span className="font-semibold text-foreground">{greenPts}</span>
+            {engines.symbols.size}/{CARD_SYMBOLS.length} →{' '}
+            <span className="font-semibold text-foreground">{greenPts}</span>
             {engines.symbols.size < CARD_SYMBOLS.length && <span className="hidden sm:inline"> (all 8 = 64)</span>}
           </span>
         </div>
         {(engines.farmer > 0 || engines.toolMaker > 0 || engines.builder > 0 || engines.shaman > 0) && (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <MultChip icon={<FieldIcon className="h-3.5 w-3.5" />} count={engines.farmer} stat={player.foodTrack} label="farmer" />
-            <MultChip icon={<ToolIcon className="h-3.5 w-3.5" />} count={engines.toolMaker} stat={toolValue} label="tool maker" />
-            <MultChip icon={<Hut className="h-3.5 w-3.5" />} count={engines.builder} stat={player.buildings} label="hut builder" />
-            <MultChip icon={<Meeple className="h-3.5 w-3.5" />} count={engines.shaman} stat={player.people} label="shaman" />
+            <MultChip
+              icon={<FieldIcon className="h-3.5 w-3.5" />}
+              count={engines.farmer}
+              stat={player.foodTrack}
+              label="farmer"
+            />
+            <MultChip
+              icon={<ToolIcon className="h-3.5 w-3.5" />}
+              count={engines.toolMaker}
+              stat={toolValue}
+              label="tool maker"
+            />
+            <MultChip
+              icon={<Hut className="h-3.5 w-3.5" />}
+              count={engines.builder}
+              stat={player.buildings}
+              label="hut builder"
+            />
+            <MultChip
+              icon={<Meeple className="h-3.5 w-3.5" />}
+              count={engines.shaman}
+              stat={player.people}
+              label="shaman"
+            />
           </div>
         )}
       </div>

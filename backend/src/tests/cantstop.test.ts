@@ -24,7 +24,7 @@ function diceRng() {
   return { rng, enqueue };
 }
 
-describe('Can\'t Stop over REST', () => {
+describe("Can't Stop over REST", () => {
   let db: DB;
   let dice: ReturnType<typeof diceRng>;
   let app: FastifyInstance;
@@ -56,7 +56,11 @@ describe('Can\'t Stop over REST', () => {
     return app.inject({ method: 'POST', url: `/games/${id}/cantstop/roll`, payload: { playerId } });
   };
   const select = (id: string, playerId: string, columns: number[]) =>
-    app.inject({ method: 'POST', url: `/games/${id}/actions`, payload: { playerId, action: { type: 'SELECT', columns } } });
+    app.inject({
+      method: 'POST',
+      url: `/games/${id}/actions`,
+      payload: { playerId, action: { type: 'SELECT', columns } },
+    });
   const stop = (id: string, playerId: string) =>
     app.inject({ method: 'POST', url: `/games/${id}/actions`, payload: { playerId, action: { type: 'STOP' } } });
   const read = async (id: string) => (await app.inject({ method: 'GET', url: `/games/${id}` })).json();
@@ -108,7 +112,7 @@ describe('Can\'t Stop over REST', () => {
     expect(response.json().error.code).toBe('INVALID_SELECTION');
   });
 
-  it('enforces Can\'t Stop\'s own 2–4 seat range on lobbies', async () => {
+  it("enforces Can't Stop's own 2–4 seat range on lobbies", async () => {
     const tooMany = await app.inject({ method: 'POST', url: '/lobbies', payload: { seats: 5, gameType: 'cantstop' } });
     expect(tooMany.statusCode).toBe(400);
     expect(tooMany.json().error.code).toBe('INVALID_SEAT_COUNT');
@@ -117,7 +121,7 @@ describe('Can\'t Stop over REST', () => {
     expect(ok.statusCode).toBe(201);
   });
 
-  it('hosts Container and Can\'t Stop side by side, each with its own shape', async () => {
+  it("hosts Container and Can't Stop side by side, each with its own shape", async () => {
     const container = await app.inject({
       method: 'POST',
       url: '/games',
@@ -184,7 +188,7 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-describe('Can\'t Stop AI seats', () => {
+describe("Can't Stop AI seats", () => {
   let db: DB;
   let app: FastifyInstance;
 
@@ -206,7 +210,13 @@ describe('Can\'t Stop AI seats', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/games',
-      payload: { gameType: 'cantstop', players: [{ name: 'Ann', bot: true }, { name: 'Bob', bot: true }] },
+      payload: {
+        gameType: 'cantstop',
+        players: [
+          { name: 'Ann', bot: true },
+          { name: 'Bob', bot: true },
+        ],
+      },
     });
     expect(response.statusCode).toBe(201);
 

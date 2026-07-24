@@ -102,9 +102,7 @@ export function endGame(
   const clearedBank: BankState = {
     ...bank,
     auctions: [],
-    containerLots: bank.containerLots.map((lot, index) =>
-      bank.auctions.some((a) => a.lotIndex === index) ? [] : lot,
-    ),
+    containerLots: bank.containerLots.map((lot, index) => (bank.auctions.some((a) => a.lotIndex === index) ? [] : lot)),
   };
 
   return { players: resolvedPlayers, extra: { status: 'ended', results, winnerIds, bank: clearedBank } };

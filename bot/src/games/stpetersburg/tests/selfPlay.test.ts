@@ -19,7 +19,8 @@ function scanLog(log: readonly MoveRecord[], into: Behaviours): void {
     if (entry.type === 'BUY' && entry.payload?.row === 'lower') into.lowerBuy = true;
     if (entry.type === 'ADD_TO_HAND') into.addToHand = true;
     if (entry.type === 'PLAY_FROM_HAND') into.playFromHand = true;
-    if ((entry.type === 'BUY' || entry.type === 'PLAY_FROM_HAND') && entry.payload?.displacedKey !== undefined) into.displacement = true;
+    if ((entry.type === 'BUY' || entry.type === 'PLAY_FROM_HAND') && entry.payload?.displacedKey !== undefined)
+      into.displacement = true;
   }
 }
 
@@ -35,7 +36,13 @@ describe('Saint Petersburg bot — self-play', () => {
     { players: 4, seed: 20260722 },
   ];
 
-  const behaviours: Behaviours = { upperBuy: false, lowerBuy: false, addToHand: false, playFromHand: false, displacement: false };
+  const behaviours: Behaviours = {
+    upperBuy: false,
+    lowerBuy: false,
+    addToHand: false,
+    playFromHand: false,
+    displacement: false,
+  };
   let totalHandCards = 0;
   let totalSeats = 0;
 

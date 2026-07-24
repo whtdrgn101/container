@@ -36,7 +36,13 @@ const PHASE_ORDER: readonly Phase[] = ['worker', 'building', 'aristocrat', 'trad
  */
 export function MalachiteBoard({ className }: { className?: string }) {
   return (
-    <svg className={className ?? 'absolute inset-0 h-full w-full'} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden focusable="false">
+    <svg
+      className={className ?? 'absolute inset-0 h-full w-full'}
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      aria-hidden
+      focusable="false"
+    >
       <defs>
         <linearGradient id="spb-gilt" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#d9b45a" />
@@ -96,13 +102,30 @@ export function GiltRail({ label, className }: { label: string; className?: stri
 }
 
 /** The draw-stack cabinet — a gilt case of four mini stacks (per group) plus the discard tally. */
-export function StackCabinet({ counts, discards, className }: { counts: Record<Phase, number>; discards: number; className?: string }) {
+export function StackCabinet({
+  counts,
+  discards,
+  className,
+}: {
+  counts: Record<Phase, number>;
+  discards: number;
+  className?: string;
+}) {
   const label = `Draw stacks — ${PHASE_ORDER.map((p) => `${KIND_LETTER[p]} ${counts[p]}`).join(', ')}; discards ${discards}`;
   return (
     <svg viewBox="0 0 168 92" className={className} role="img" aria-label={label} focusable="false">
       {/* gilt case + title */}
       <rect x="2" y="2" width="164" height="88" rx="8" fill="#0d3a2e" stroke={GILT} strokeWidth="2" />
-      <text x="84" y="16" textAnchor="middle" fontFamily="Georgia, 'Times New Roman', serif" fontSize="11" fontWeight="bold" letterSpacing="3" fill={GILT_BRIGHT}>
+      <text
+        x="84"
+        y="16"
+        textAnchor="middle"
+        fontFamily="Georgia, 'Times New Roman', serif"
+        fontSize="11"
+        fontWeight="bold"
+        letterSpacing="3"
+        fill={GILT_BRIGHT}
+      >
         STACKS
       </text>
       {/* four mini stacks */}
@@ -110,19 +133,63 @@ export function StackCabinet({ counts, discards, className }: { counts: Record<P
         const x = 12 + i * 39;
         return (
           <g key={p}>
-            <rect x={x} y="24" width="30" height="42" rx="4" fill={CABINET_FILL[p]} stroke="#e8e2d4" strokeWidth="1.2" />
-            <rect x={x + 3} y="27" width="24" height="36" rx="3" fill="none" stroke="#e8e2d4" strokeWidth="0.6" opacity="0.5" />
-            <text x={x + 15} y="42" textAnchor="middle" fontFamily="Georgia, 'Times New Roman', serif" fontSize="10" fontWeight="bold" fill="#f4eeda" opacity="0.85">
+            <rect
+              x={x}
+              y="24"
+              width="30"
+              height="42"
+              rx="4"
+              fill={CABINET_FILL[p]}
+              stroke="#e8e2d4"
+              strokeWidth="1.2"
+            />
+            <rect
+              x={x + 3}
+              y="27"
+              width="24"
+              height="36"
+              rx="3"
+              fill="none"
+              stroke="#e8e2d4"
+              strokeWidth="0.6"
+              opacity="0.5"
+            />
+            <text
+              x={x + 15}
+              y="42"
+              textAnchor="middle"
+              fontFamily="Georgia, 'Times New Roman', serif"
+              fontSize="10"
+              fontWeight="bold"
+              fill="#f4eeda"
+              opacity="0.85"
+            >
               {KIND_LETTER[p]}
             </text>
-            <text x={x + 15} y="58" textAnchor="middle" fontFamily="Georgia, 'Times New Roman', serif" fontSize="15" fontWeight="bold" fill="#ffffff">
+            <text
+              x={x + 15}
+              y="58"
+              textAnchor="middle"
+              fontFamily="Georgia, 'Times New Roman', serif"
+              fontSize="15"
+              fontWeight="bold"
+              fill="#ffffff"
+            >
               {counts[p]}
             </text>
           </g>
         );
       })}
       {/* discard tally */}
-      <text x="84" y="83" textAnchor="middle" fontFamily="Georgia, 'Times New Roman', serif" fontSize="10" letterSpacing="1.5" fill="#9bb5a8">
+      <text
+        x="84"
+        y="83"
+        textAnchor="middle"
+        fontFamily="Georgia, 'Times New Roman', serif"
+        fontSize="10"
+        letterSpacing="1.5"
+        fill="#9bb5a8"
+      >
         DISCARDS · {discards}
       </text>
     </svg>
@@ -139,7 +206,13 @@ export function PhaseMedallion({ phase, round, className }: { phase: Phase; roun
     trading: { x: 16, y: 50 },
   };
   return (
-    <svg viewBox="0 0 100 100" className={className} role="img" aria-label={`Phase: ${phase}, round ${round}`} focusable="false">
+    <svg
+      viewBox="0 0 100 100"
+      className={className}
+      role="img"
+      aria-label={`Phase: ${phase}, round ${round}`}
+      focusable="false"
+    >
       <circle cx="50" cy="50" r="46" fill="#0f4232" stroke={GILT} strokeWidth="3" />
       <circle cx="50" cy="50" r="40" fill="none" stroke={GILT_BRIGHT} strokeWidth="0.8" opacity="0.5" />
       {PHASE_ORDER.map((p) => {
@@ -152,7 +225,16 @@ export function PhaseMedallion({ phase, round, className }: { phase: Phase; roun
           </g>
         );
       })}
-      <text x="50" y="50" textAnchor="middle" dominantBaseline="central" fontFamily="Georgia, 'Times New Roman', serif" fontSize="16" fontWeight="bold" fill={GILT_BRIGHT}>
+      <text
+        x="50"
+        y="50"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontFamily="Georgia, 'Times New Roman', serif"
+        fontSize="16"
+        fontWeight="bold"
+        fill={GILT_BRIGHT}
+      >
         R{round}
       </text>
     </svg>

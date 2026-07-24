@@ -1,5 +1,12 @@
 import { CARD_DEFS, createGame } from '@game-hub/engine/stpetersburg';
-import type { Card, CardKind, PlayArea, PlayerView, StPetersburgState, StPetersburgView } from '@game-hub/engine/stpetersburg';
+import type {
+  Card,
+  CardKind,
+  PlayArea,
+  PlayerView,
+  StPetersburgState,
+  StPetersburgView,
+} from '@game-hub/engine/stpetersburg';
 
 /** A deterministic pseudo-random generator (mulberry32) so a self-play game reproduces from its seed. */
 export function seededRng(seed: number): () => number {

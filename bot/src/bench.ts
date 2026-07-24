@@ -34,13 +34,21 @@ const suites: ReadonlyArray<{ readonly name: string; readonly run: Bench; readon
 const pct = (n: number): string => `${(n * 100).toFixed(1)}%`;
 
 function main(): void {
-  console.log(`Bot strength self-bench — ${GAMES} games/game, ${SEATS}p (Container 3p min); candidate === baseline, expect ~50%\n`);
+  console.log(
+    `Bot strength self-bench — ${GAMES} games/game, ${SEATS}p (Container 3p min); candidate === baseline, expect ~50%\n`,
+  );
   const header = ['game', 'seats', 'games', 'winRate', 'ci95 (Wilson)'];
   const rows = [header];
   for (const { name, run, minSeats } of suites) {
     const seats = Math.max(SEATS, minSeats);
     const result = run({ games: GAMES, seats });
-    rows.push([name, String(seats), String(result.games), pct(result.winRate), `[${pct(result.ci95[0])}, ${pct(result.ci95[1])}]`]);
+    rows.push([
+      name,
+      String(seats),
+      String(result.games),
+      pct(result.winRate),
+      `[${pct(result.ci95[0])}, ${pct(result.ci95[1])}]`,
+    ]);
   }
   const widths = header.map((_, col) => Math.max(...rows.map((row) => row[col]!.length)));
   for (const [i, row] of rows.entries()) {

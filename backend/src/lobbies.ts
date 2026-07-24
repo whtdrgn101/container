@@ -105,9 +105,7 @@ export class LobbyRepository {
     const rows = this.db
       .prepare(`SELECT data FROM lobbies WHERE status = 'open' ORDER BY created_at DESC LIMIT ?`)
       .all(limit) as LobbyRow[];
-    return rows
-      .map((row) => readLobby(row.data))
-      .filter((lobby) => lobby.members.some((member) => member === null));
+    return rows.map((row) => readLobby(row.data)).filter((lobby) => lobby.members.some((member) => member === null));
   }
 
   /**
@@ -117,9 +115,7 @@ export class LobbyRepository {
    * without bound on the persistent `/data` volume (REVIEW §4.3).
    */
   deleteExpiredOpen(before: string): number {
-    return this.db
-      .prepare(`DELETE FROM lobbies WHERE status = 'open' AND created_at < ?`)
-      .run(before).changes;
+    return this.db.prepare(`DELETE FROM lobbies WHERE status = 'open' AND created_at < ?`).run(before).changes;
   }
 
   update(lobby: Lobby): void {
