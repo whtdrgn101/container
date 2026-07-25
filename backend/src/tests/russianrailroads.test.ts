@@ -10,13 +10,27 @@ import type { DB } from '../db';
  * rather than a folder in the backend, so it exercises the package-shaped `GameModule` end-to-end. The
  * standing interest is the same as every game's: redaction (the end-bonus pile order) holds on the wire.
  */
+/** A deterministic mulberry32 rng so the engineer deal is reproducible over the wire (pg. 5). */
+function makeRng(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 describe('Russian Railroads (Track D package)', () => {
   let db: DB;
   let app: FastifyInstance;
 
   beforeEach(async () => {
     db = createDatabase();
-    app = buildApp({ db });
+    // Seed 1: the engineer deal is deterministic — the hiring space holds #10 (scoreLocomotives) and the
+    // left variable action space #4 (moveTrack), which the engineer tests below rely on.
+    app = buildApp({ db, rng: makeRng(1) });
     await app.ready();
   });
 
@@ -417,6 +431,87 @@ describe('Russian Railroads (Track D package)', () => {
     const resolved = await post(reuseSeat, { type: 'RESOLVE_REUSE', space: 'coins' });
     const after = resolved.json().game as { pendingReuse: number[] | null };
     expect(after.pendingReuse).toBeNull();
+  });
+
+  it('hires the round-1 engineer for a coin, then uses its action next round (pg. 15)', async () => {
+    const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    await clearSetup(game.id);
+    const post = (playerId: string, action: unknown) =>
+      app.inject({ method: 'POST', url: `/games/${game.id}/actions`, payload: { playerId, action } });
+    const viewOf = async () =>
+      (await app.inject({ method: 'GET', url: `/games/${game.id}?viewer=p1` })).json().game as {
+        round: number;
+        activePlayerIndex: number;
+        engineerStrip: ({ id: string; number: number } | null)[];
+        players: {
+          id: string;
+          coins: number;
+          score: number;
+          hiredEngineers: { id: string }[];
+          usedEngineers: string[];
+        }[];
+      };
+
+    const A = await activeOf(game.id);
+    const B = A === 'p1' ? 'p2' : 'p1';
+    const before = await viewOf();
+    const hiringEngineer = before.engineerStrip[before.engineerStrip.length - 1]!;
+    expect(hiringEngineer.number).toBe(10); // the seeded deal
+
+    // A hires the hiring-space engineer for 1 coin → it joins A's board and leaves the strip; turn passes.
+    const hired = await post(A, { type: 'HIRE_ENGINEER' });
+    expect(hired.statusCode).toBe(200);
+    const afterHire = hired.json().game as {
+      engineerStrip: (unknown | null)[];
+      players: { id: string; coins: number; hiredEngineers: { id: string }[] }[];
+    };
+    expect(afterHire.engineerStrip[afterHire.engineerStrip.length - 1]).toBeNull(); // slot emptied
+    const aHired = afterHire.players.find((p) => p.id === A)!;
+    expect(aHired.hiredEngineers.map((e) => e.id)).toEqual([hiringEngineer.id]);
+    expect(aHired.coins).toBe(before.players.find((p) => p.id === A)!.coins - 1);
+
+    // Close round 1 (B then A pass) → round 2 opens with A again; the engineer's per-round use flag reset.
+    await post(B, { type: 'PASS' });
+    await post(A, { type: 'PASS' });
+    const round2 = await viewOf();
+    expect(round2.round).toBe(2);
+    expect(round2.players[round2.activePlayerIndex]!.id).toBe(A);
+    const scoreBefore = round2.players.find((p) => p.id === A)!.score;
+
+    // A uses the hired engineer (an indirect action, once per round) — #10 scores the sum of A's 2 highest
+    // locomotives (just the starting #1 → +1) and marks it used this round.
+    const used = await post(A, { type: 'USE_ENGINEER', engineerId: hiringEngineer.id });
+    expect(used.statusCode).toBe(200);
+    const afterUse = used.json().game as { players: { id: string; score: number; usedEngineers: string[] }[] };
+    const aUse = afterUse.players.find((p) => p.id === A)!;
+    expect(aUse.usedEngineers).toContain(hiringEngineer.id);
+    expect(aUse.score).toBe(scoreBefore + 1);
+
+    // Using it again the same round is refused.
+    const again = await post(A, { type: 'USE_ENGINEER', engineerId: hiringEngineer.id });
+    expect(again.statusCode).toBe(409);
+  });
+
+  it('uses a public variable engineer action space over the wire (pg. 15–16)', async () => {
+    const game = (await create([{ name: 'Ann' }, { name: 'Bob' }])).json().game as { id: string };
+    await clearSetup(game.id);
+    const A = await activeOf(game.id);
+    // The left variable action space holds #4 (a track-move engineer, seeded): using it for 1 worker opens the
+    // pending-moves lock directly (a direct action, must resolve) and occupies the space for the round.
+    const used = await app.inject({
+      method: 'POST',
+      url: `/games/${game.id}/actions`,
+      payload: { playerId: A, action: { type: 'USE_VARIABLE_ENGINEER', slot: 0 } },
+    });
+    expect(used.statusCode).toBe(200);
+    const view = used.json().game as {
+      pendingMoves: { remaining: number; colors: string[] } | null;
+      actionSpaces: Record<string, unknown[]>;
+      players: { id: string; workersAvailable: number }[];
+    };
+    expect(view.pendingMoves).toEqual({ remaining: 2, colors: ['wood'] });
+    expect(view.actionSpaces['engineer-var-0']).toHaveLength(1);
+    expect(view.players.find((p) => p.id === A)!.workersAvailable).toBe(5); // 6 starting − 1
   });
 
   it("maps a wrong-turn move to 409, and reports the module's error code", async () => {

@@ -38,6 +38,8 @@ export interface PlayerView {
   readonly locomotives: readonly Locomotive[];
   readonly industry: Industry;
   readonly hiredEngineers: readonly Engineer[];
+  /** Hired engineers already used this round (pg. 15) — public; drives the "use" affordances. */
+  readonly usedEngineers: readonly string[];
   /** The per-turn action pool (pg. 13) — track-move credits from factories / industrialization; public. */
   readonly actionPool: readonly PoolEntry[];
   /** The held end-bonus card when the viewer owns this seat (or the game has ended); `null` otherwise. */
@@ -133,6 +135,7 @@ export function viewFor(state: RussianRailroadsState, viewer: Viewer): RussianRa
       locomotives: player.locomotives,
       industry: player.industry,
       hiredEngineers: player.hiredEngineers,
+      usedEngineers: player.usedEngineers,
       actionPool: player.actionPool,
       endBonus: mine ? player.endBonus : null,
       endBonusHeld: player.endBonus ? 1 : 0,

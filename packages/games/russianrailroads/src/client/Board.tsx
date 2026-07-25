@@ -7,7 +7,15 @@ import {
   locoResolutions,
   locosOnRoute,
 } from '../engine';
-import type { Action, PlayerView, RouteId, RussianRailroadsState, RussianRailroadsView, TrackColor } from '../engine';
+import type {
+  Action,
+  EngineerAction,
+  PlayerView,
+  RouteId,
+  RussianRailroadsState,
+  RussianRailroadsView,
+  TrackColor,
+} from '../engine';
 import { Button } from '@/components/ui/button';
 import { ActivityFeed } from '@/components/ActivityFeed';
 import { GameOver } from '@/components/GameOver';
@@ -158,6 +166,18 @@ export default function RussianRailroadsBoard({
     legal.some((a) => a.type === 'PLACE' && a.space === spaceId && a.build === build);
   const legalFirst = (spaceId: string, first: 'loco' | 'factory') =>
     legal.some((a) => a.type === 'PLACE' && a.space === spaceId && a.first === first);
+
+  // Engineer affordances (pg. 15–16) — the engine's own enumeration gates hire / use / variable-use.
+  const canHire = legal.some((a) => a.type === 'HIRE_ENGINEER');
+  const usableEngineers = new Set(legal.flatMap((a) => (a.type === 'USE_ENGINEER' ? [a.engineerId] : [])));
+  const usableVarSlots = new Set(legal.flatMap((a) => (a.type === 'USE_VARIABLE_ENGINEER' ? [a.slot] : [])));
+  const doEngineer = (action: Action) => {
+    if (!placing || !active) return;
+    void run(() => rrApi.act(gameId, active.id, action, viewer, game.version));
+  };
+  // Rounds remaining (pg. 22): an emptied strip slot shows this number.
+  const roundsRemaining = game.rounds - game.round + 1;
+  const stripLen = game.engineerStrip.length;
 
   return (
     <div data-testid="board" className="space-y-4">
@@ -454,6 +474,97 @@ export default function RussianRailroadsBoard({
         ))}
       </section>
 
+      {/* The engineer strip (pg. 15–16, 22): from the right, the hiring space (hire for 1 coin), the two
+          variable action spaces (public direct actions, 1 worker), then the left-hand future engineers. It
+          slides right each round; an emptied slot shows the rounds remaining (pg. 22). */}
+      <section aria-label="Engineers" data-testid="rr-engineer-strip">
+        <h2 className="mb-2 text-sm font-semibold">Engineers</h2>
+        <div className="flex flex-wrap gap-2">
+          {game.engineerStrip.map((engineer, i) => {
+            const isHiring = i === stripLen - 1;
+            const slot = i - (stripLen - 3); // 0 or 1 for the two variable spaces, else out of [0,1]
+            const isVariable = slot === 0 || slot === 1;
+            const region = isHiring ? 'Hiring' : isVariable ? `Variable ${slot + 1}` : 'Upcoming';
+            return (
+              <div
+                key={i}
+                data-testid={`rr-eng-slot-${i}`}
+                className={cn(
+                  'w-40 rounded-lg border p-2 text-xs',
+                  isHiring ? 'border-primary bg-primary/5' : isVariable ? 'bg-card' : 'bg-muted/40 border-dashed',
+                )}
+              >
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{region}</div>
+                {engineer ? (
+                  <>
+                    <div className="font-medium">
+                      Engineer #{engineer.number}
+                      <span className="ml-1 font-normal text-muted-foreground">— {engActionText(engineer.action)}</span>
+                    </div>
+                    {isHiring ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-1"
+                        data-testid="rr-hire"
+                        disabled={busy || !canHire}
+                        onClick={() => doEngineer({ type: 'HIRE_ENGINEER' })}
+                      >
+                        Hire (1 coin)
+                      </Button>
+                    ) : isVariable ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-1"
+                        data-testid={`rr-var-${slot}`}
+                        disabled={busy || !usableVarSlots.has(slot)}
+                        onClick={() => doEngineer({ type: 'USE_VARIABLE_ENGINEER', slot })}
+                      >
+                        Use (1 worker)
+                      </Button>
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="text-muted-foreground">
+                    {i === 0 ? `${roundsRemaining} round${roundsRemaining > 1 ? 's' : ''} left` : 'empty'}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Your hired engineers (pg. 15) — private indirect actions, each usable once per round. */}
+        {active && active.hiredEngineers.length > 0 ? (
+          <div className="mt-3" data-testid="rr-hired">
+            <h3 className="mb-1 text-xs font-semibold">
+              {active.name}'s engineers ({active.hiredEngineers.length})
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {active.hiredEngineers.map((engineer) => {
+                const used = active.usedEngineers.includes(engineer.id);
+                const inert = engineer.action.kind === 'inert';
+                return (
+                  <Button
+                    key={engineer.id}
+                    variant="outline"
+                    size="sm"
+                    data-testid={`rr-use-${engineer.id}`}
+                    disabled={busy || !usableEngineers.has(engineer.id)}
+                    title={inert ? 'No resolvable action yet' : used ? 'Already used this round' : undefined}
+                    onClick={() => doEngineer({ type: 'USE_ENGINEER', engineerId: engineer.id })}
+                  >
+                    #{engineer.number} {engActionText(engineer.action)}
+                    {used ? ' ✓' : ''}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+      </section>
+
       {/* Shared action spaces (pg. 7–9). Each shows its occupancy; the active driving seat may place on an
           unoccupied one (the bottom track space is never occupied — pg. 9). Locked out while resolving. */}
       <section aria-label="Action spaces">
@@ -611,6 +722,26 @@ export default function RussianRailroadsBoard({
   );
 }
 
+/** A short human label for an engineer's action (pg. 15–16, 48). */
+function engActionText(action: EngineerAction): string {
+  switch (action.kind) {
+    case 'moveTrack':
+      return `move ${action.count} track${action.count > 1 ? 's' : ''}`;
+    case 'coins':
+      return `+${action.count} coins`;
+    case 'doubler':
+      return `doubler +${action.points}`;
+    case 'score':
+      return `+${action.points} pts`;
+    case 'scoreEngineers':
+      return 'pts = Σ engineers';
+    case 'scoreLocomotives':
+      return 'pts = Σ 2 locos';
+    case 'inert':
+      return 'inert';
+  }
+}
+
 /** Tailwind fill for each track colour (pg. 8–9) — plus a dashed neutral for empty spaces. */
 const TRACK_FILL: Record<TrackColor, string> = {
   wood: 'bg-amber-700',
@@ -670,6 +801,11 @@ function PlayerCard({
         <span data-testid={`rr-coins-${player.id}`}>Coins: {player.coins}</span>
         <span data-testid={`rr-doublers-${player.id}`}>Doublers: {player.doublers}</span>
         {player.keysReceived > 0 ? <span data-testid={`rr-keys-${player.id}`}>🔑 {player.keysReceived}</span> : null}
+        {player.hiredEngineers.length > 0 ? (
+          <span data-testid={`rr-engineers-${player.id}`} title="Hired engineers (majority, pg. 22)">
+            👷 {player.hiredEngineers.length}
+          </span>
+        ) : null}
         {player.medal20 ? <span data-testid={`rr-medal-${player.id}`}>🏅 +20</span> : null}
         {player.revalued ? <span data-testid={`rr-revalued-${player.id}`}>tile↑</span> : null}
         <span data-testid={`rr-score-${player.id}`} className="font-medium">

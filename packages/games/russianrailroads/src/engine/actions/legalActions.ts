@@ -1,10 +1,12 @@
 import {
   ACTION_SPACES,
   DOUBLER_SPACES,
+  HIRE_COST,
   IDEA_CARDS,
   IDEA_TOKEN_TYPES,
   STARTING_BONUS_CARDS,
   turnOrderOrdinal,
+  VARIABLE_ENGINEER_WORKERS,
 } from '../core';
 import type { ActionSpaceDef, RussianRailroadsState } from '../core';
 import {
@@ -14,10 +16,12 @@ import {
   availableReturnedFactories,
   canBuildFactory,
   canBuildLocoAndFactory,
+  hiringEngineer,
   legalSteps,
   locoResolutions,
   lowestAvailableLoco,
   seatOf,
+  variableEngineer,
 } from '../internal';
 import type { Action } from './action';
 
@@ -217,6 +221,27 @@ export function legalActions(state: RussianRailroadsState, playerId?: string): A
     }
     // The coins / temp-workers spaces: pay-all-workers or pay-with-coins (pg. 14).
     emitPlace(space, [{}]);
+  }
+
+  // Engineers (pg. 15–16, RR7). Hiring the hiring-space engineer (1 coin); using a hired engineer's action
+  // (once per round, not inert); using a public variable engineer action space (1 worker, once per round).
+  if (hiringEngineer(state.engineerStrip) && player.coins >= HIRE_COST) actions.push({ type: 'HIRE_ENGINEER' });
+  for (const engineer of player.hiredEngineers) {
+    if (engineer.action.kind !== 'inert' && !player.usedEngineers.includes(engineer.id)) {
+      actions.push({ type: 'USE_ENGINEER', engineerId: engineer.id });
+    }
+  }
+  for (const slot of [0, 1]) {
+    const engineer = variableEngineer(state.engineerStrip, slot);
+    const occupied = (state.actionSpaces[`engineer-var-${slot}`]?.length ?? 0) > 0;
+    if (
+      engineer &&
+      engineer.action.kind !== 'inert' &&
+      !occupied &&
+      player.workersAvailable >= VARIABLE_ENGINEER_WORKERS
+    ) {
+      actions.push({ type: 'USE_VARIABLE_ENGINEER', slot });
+    }
   }
 
   return actions;

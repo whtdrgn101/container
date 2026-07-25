@@ -68,6 +68,18 @@ export function describeMove(entry: RussianRailroadsView['log'][number], nameOf?
     const p = entry.payload as { card?: string } | undefined;
     return `took the starting bonus ${p?.card ?? ''}`.trim();
   }
+  if (entry.type === 'HIRE_ENGINEER') {
+    const p = entry.payload as { number?: number } | undefined;
+    return `hired engineer #${p?.number ?? '?'} (1 coin)`;
+  }
+  if (entry.type === 'USE_ENGINEER') {
+    const p = entry.payload as { number?: number } | undefined;
+    return `used engineer #${p?.number ?? '?'}`;
+  }
+  if (entry.type === 'USE_VARIABLE_ENGINEER') {
+    const p = entry.payload as { number?: number } | undefined;
+    return `used variable engineer #${p?.number ?? '?'}`;
+  }
   if (entry.type === 'PLACE_FACTORY') {
     const p = entry.payload as { number?: number } | undefined;
     return `built a #${p?.number ?? '?'} factory on the industry track`;

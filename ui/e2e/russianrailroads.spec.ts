@@ -170,3 +170,34 @@ test('claim a turn-order space, then run the reuse mini-phase (pg. 16–17)', as
   await expect(page.getByTestId('rr-reuse')).toBeHidden();
   await expect(page.getByTestId('rr-log')).toContainText('reused a worker on coins');
 });
+
+/**
+ * RR7 — engineers. Hire the round's engineer for a coin (pg. 15), then have the next seat use one of the two
+ * public variable engineer action spaces (pg. 15–16). The deal is random in the real backend, so this drives
+ * whichever variable slot is usable — at least one of the strip's three engineers is always non-inert.
+ */
+test('hire the round engineer, then use a public variable engineer space (pg. 15–16)', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('pick-game-russianrailroads').click();
+  await page.getByTestId('start-game').click();
+  await expect(page.getByTestId('board')).toBeVisible();
+  await clearSetup(page);
+
+  // The engineer strip renders, with a hireable engineer in the hiring space.
+  await expect(page.getByTestId('rr-engineer-strip')).toBeVisible();
+  await page.getByTestId('rr-hire').click();
+  await expect(page.getByTestId('rr-log')).toContainText('hired engineer');
+
+  // The turn passed to the next seat; it uses whichever variable engineer action space is usable.
+  await expect(async () => {
+    for (const slot of [0, 1]) {
+      const btn = page.getByTestId(`rr-var-${slot}`);
+      if ((await btn.count()) > 0 && (await btn.isEnabled())) {
+        await btn.click();
+        return;
+      }
+    }
+    throw new Error('no usable variable engineer yet');
+  }).toPass({ timeout: 15000 });
+  await expect(page.getByTestId('rr-log')).toContainText('used variable engineer');
+});

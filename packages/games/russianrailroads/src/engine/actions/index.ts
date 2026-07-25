@@ -12,4 +12,5 @@ export { resolveIdeaToken } from './ideaToken';
 export { resolveIdeaCard } from './ideaCard';
 export { resolveReuse } from './reuse';
 export { resolveSetupBonus } from './setupBonus';
+export { hireEngineer, useEngineer, useVariableEngineer } from './engineer';
 export { pass } from './pass';

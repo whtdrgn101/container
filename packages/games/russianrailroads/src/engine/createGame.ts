@@ -89,6 +89,7 @@ export function createGame(options: CreateGameOptions): RussianRailroadsState {
     // The wrench starts on the START space (pg. 6, step 6); no gaps filled yet (pg. 12–13); no 2nd wrench.
     industry: { wrench: 0, factories: Array.from({ length: INDUSTRY_GAPS }, () => null), secondWrench: null },
     hiredEngineers: [],
+    usedEngineers: [],
     actionPool: [],
     endBonus: null,
     turnOrderCard: turnOrderCards[seat]!,

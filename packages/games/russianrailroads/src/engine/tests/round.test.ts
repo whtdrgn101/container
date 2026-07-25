@@ -25,7 +25,12 @@ describe('round helpers', () => {
   });
 
   it('slideEngineerStrip drops the right-most and empties the left-most', () => {
-    const e = (n: number): Engineer => ({ id: `eng-${n}`, number: n, stack: 'A', action: 'placeholder' });
+    const e = (n: number): Engineer => ({
+      id: `eng-${n}`,
+      number: n,
+      stack: 'A',
+      action: { kind: 'score', points: n },
+    });
     const strip = [e(1), e(2), e(3)];
     expect(slideEngineerStrip(strip)).toEqual([null, e(1), e(2)]);
   });

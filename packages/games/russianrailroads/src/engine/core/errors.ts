@@ -91,7 +91,20 @@ export type RussianRailroadsErrorCode =
   // A RESOLVE_SETUP_BONUS with no setup mini-phase active, or naming an unknown starting bonus card (pg. 6).
   | 'NO_PENDING_SETUP_BONUS'
   | 'SETUP_BONUS_PENDING'
-  | 'UNKNOWN_SETUP_BONUS';
+  | 'UNKNOWN_SETUP_BONUS'
+  // A HIRE_ENGINEER when the hiring space is empty — nobody to hire this round (pg. 15).
+  | 'NO_ENGINEER_TO_HIRE'
+  // A HIRE_ENGINEER without the 1 coin the hiring space costs (pg. 15).
+  | 'INSUFFICIENT_COINS'
+  // A USE_ENGINEER naming an engineer this player has not hired (pg. 15).
+  | 'ENGINEER_NOT_HIRED'
+  // A USE_ENGINEER on an engineer already used this round (pg. 15: once per round).
+  | 'ENGINEER_ALREADY_USED'
+  // A USE_ENGINEER / USE_VARIABLE_ENGINEER on an engineer whose action is inert — its printed action needs a
+  // mechanic RR7 does not build (pg. 48; see the engineer catalog ruling). Nothing to resolve.
+  | 'ENGINEER_INERT'
+  // A USE_VARIABLE_ENGINEER naming a slot with no engineer, or an out-of-range slot (pg. 15).
+  | 'NO_VARIABLE_ENGINEER';
 
 /**
  * Thrown when a Russian Railroads action is illegal. Subclasses the shared kernel `GameError` and pins

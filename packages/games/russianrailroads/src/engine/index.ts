@@ -52,6 +52,8 @@ export {
   END_BONUS_CARDS,
   ENGINEERS,
   FACTORY_ACTIONS,
+  HIRE_COST,
+  VARIABLE_ENGINEER_WORKERS,
   factoryAction,
   GAP_LANE_INDICES,
   IDEA_CARDS,
@@ -102,6 +104,16 @@ export { allGapsFilled, availableReturnedFactories, firstUnfilledGap, industrySc
 // Specials helpers the client shares (which specials are met, route doubling, bonus-star scoring) — DRY.
 export { bonusStarScore, frontierIndex, routeDoubled, specialMet } from './internal';
 
+// Engineer helpers the client + RR8 share (strip geometry + the majority data: count + highest number) — DRY.
+export {
+  engineerCount,
+  highestEngineerNumber,
+  hiringEngineer,
+  hiringIndex,
+  variableEngineer,
+  variableIndex,
+} from './internal';
+
 // Setup
 export { createGame } from './createGame';
 export type { CreateGameOptions, NewPlayer } from './createGame';
@@ -113,6 +125,7 @@ export type { PlayerView, RussianRailroadsView, Viewer } from './view';
 // Mechanics + turn-aware entry point.
 export {
   applyAction,
+  hireEngineer,
   legalActions,
   moveTrack,
   pass,
@@ -122,4 +135,6 @@ export {
   resolveKey,
   resolveReuse,
   resolveSetupBonus,
+  useEngineer,
+  useVariableEngineer,
 } from './actions';

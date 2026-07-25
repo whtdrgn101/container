@@ -423,10 +423,76 @@ vite/tsconfig/vitest edits), the RR2–5 pattern holding.
 turn-order re-claim *via reuse* are deferred; the second wrench's 2 industry steps advance the new wrench
 (no split-across-wrenches choice); the wood-worker card's passive +1 applies on wood-specific track spaces.
 
-### RR7 — Engineers
-Hire-for-a-coin (one per round), the two public variable-action spaces, the sliding strip +
-rounds-remaining display, private indirect actions via the pool, unclaimed-engineer removal
-(pg. 15–16, 22).
+### RR7 — Engineers ✅ *(shipped)*
+The engineer strip made real (pp. 7, 15–16, 22, 48). Shipped: **hiring** (`HIRE_ENGINEER` — pay 1 coin,
+take the right-most/hiring-space engineer beside your board; the slot empties, so a hired engineer never
+returns to the box and only one hire happens per round); **the private indirect action** (`USE_ENGINEER` —
+a hired engineer's action, usable **once per round** via the new `usedEngineers` per-round flag: a track-move
+feeds the **action pool** partially-resolvable/skippable, an immediate effect resolves at once — the pg. 7
+"indirect actions … go into your action pool" model); **the two public variable action spaces**
+(`USE_VARIABLE_ENGINEER` — the two horizontal engineers left of the hiring space are **direct** action
+spaces anyone may use for 1 worker, occupied once/round via `engineer-var-<slot>`; a track-move opens the
+pending-moves lock **directly**, must-resolve); the **14-engineer pg. 48 catalog typed as data**
+(`EngineerAction`, on each `Engineer`); **unclaimed-engineer removal** (pg. 22 — the round-end slide drops the
+right-most slot, which is `null` for a *hired* engineer and the unclaimed engineer otherwise); the
+**`engineer-coin` idea card's engineer half wired** (RR6 deferral — now grants a coin **and** a free
+hiring-space engineer); and **majority data exposed** (`engineerCount` / `highestEngineerNumber` for RR8, plus
+`hiredEngineers`/`usedEngineers` on the view). UI: the engineer strip with region labels + rounds-remaining
+display (pg. 22), a hire button, the two variable action-space buttons, a per-active-seat hired-engineers use
+panel, a per-player 👷 hired count, and feed narration. Engine **100% (238 tests**, +30 across new
+`actions/engineer` / `internal/engineers`); backend REST tests drive hire→use-next-round + a variable space
+over the wire (**16** RR REST tests); `e2e/russianrailroads.spec.ts` gained a hire + variable-use spec (**5**
+specs, desktop + mobile). Rulings below. **Track D findings: none new** — the whole slice landed inside the
+package (engine, module `parseAction`, client), touching **zero** host files (no `games.config.ts`, no
+registry regen, no vite/tsconfig/vitest edits), the RR2–6 pattern holding.
+
+**The usable-when model (pg. 7, 15) — RULING.** pg. 7 is authoritative: a turn is "exactly 1 direct action or
+pass," and "actions that become available … (by choosing an action space **or otherwise**) go into your action
+pool … you can partially resolve" indirect ones. Modelled as three turn actions: `HIRE_ENGINEER` and
+`USE_VARIABLE_ENGINEER` are ordinary turns (coin / worker); `USE_ENGINEER` is a **standalone turn** that spends
+one hired engineer's once-per-round use (the `usedEngineers` flag) and resolves its action indirectly (pool for
+a track-move, immediate otherwise). **Documented simplification:** `USE_ENGINEER` is its own turn rather than a
+rider on another direct action — cleaner for the turn spine and faithful to pg. 15 ("each round, during your
+turn … you can resolve your engineers' actions"). The variable spaces resolve **directly** (must-resolve),
+matching pg. 15–16.
+
+**Strip art readings (pp. 15–16, 22) — LANDED.** The strip is 7 slots at 3/4p (6 at 2p — pg. 23), read
+**from the right end** so the geometry holds for both: right-most = the **hiring space** (1), the two before it
+= the **variable action spaces** (2), the rest = the **left-hand / upcoming** engineers (4 at 4p). This matches
+the pg. 15 diagram (4 left + 2 variable + 1 hiring) and the pg. 16 "4 left-hand spaces." The slide is one space
+right per round (the existing `slideEngineerStrip`), an emptied left slot showing rounds-remaining (pg. 22).
+Costs read off the art: hiring = **1 coin** (pg. 15 "place a coin onto the space"), variable = **1 worker**
+(the pg. 15 example "place 1 worker on the left-hand engineer's action space").
+
+**The pg. 48 engineer catalog — ART / FAITHFULNESS RULING (the RR5 `FACTORY_ACTIONS` precedent).** pg. 48 is
+the engineer *reference*, but its portrait tiles are **not legibly tied to specific printed numbers** at this
+DPI (the numbers 2–15 exist for the pg. 22 majority tiebreak; the tiles describe *actions*). So, exactly the
+RR5/RR6 convention: the **actions are read off pg. 48 (+ the pg. 15 variable example) and cited**, while the
+**number → action assignment is a documented ADAPTED read** (reconcile physical tiles in RR9). Actions mapping
+to existing machinery are **LIVE**; three that need a mechanic RR7 does not build are typed **inert** (hireable
++ majority-counting, non-resolvable). The catalog (# → action, one line each):
+
+| # | action | pg. 48 tile / note |
+|---|--------|--------------------|
+| 2 | `moveTrack` 1 green (letterless — set aside on its idea card, pg. 5) | "move a green track behind the bronze" |
+| 3 | `moveTrack` 3 (any accessible) | "move 3 different tracks 1 space each" |
+| 4 | `moveTrack` 2 (any accessible) | a stronger track-extension engineer |
+| 5 | `coins` 3 | pg. 15 "similar to the board actions, a bit stronger" |
+| 6 | `coins` 2 | pg. 15 |
+| 7 | `doubler` + score 5 | the pg. 15 variable-engineer example ("take a doubler … score 5") |
+| 8 | `score` 5 | pg. 48 star (immediate VP) |
+| 9 | `score` 8 | pg. 48 star |
+| 10 | `scoreLocomotives` (Σ your 2 highest locos) | pg. 48 "sum of your 2 highest-number locomotives" |
+| 11 | `scoreEngineers` (Σ your engineer numbers) | pg. 48 "sum of the numbers of all your engineers" |
+| 12 | `moveTrack` 2 (any accessible) | (reuse) pg. 48 track engineer |
+| 13 | **inert** | "repeat a previously-occupied single-worker action" — needs occupancy replay, RR9 |
+| 14 | **inert** | "use another player's engineer action space" (2-player) — cross-player, RR9 |
+| 15 | **inert** | "choose another end bonus card / score 10" — end-bonus scoring, RR8 |
+
+**Scope notes / documented simplifications (reconcile later):** the number ↔ action assignment above is ADAPTED
+(the pg. 48 tiles are not legibly numbered — RR9 art polish); the three inert engineers land with their real
+mechanics (RR8 end-bonus scoring; RR9 the occupancy-replay + cross-player-interaction engineers). The
+engineer-majority **scoring** (40/20, pg. 22) is RR8 — RR7 only exposes the count + highest-number data.
 
 ### RR8 — Game end + final scoring + hardening
 Last-round tile (pg. 22), end-bonus reveal + scoring (pg. 47; **ambiguity ruling #3 lands here**),

@@ -6,6 +6,7 @@ import { placeFactory, replaceFactory } from './factory';
 import { resolveIdeaCard } from './ideaCard';
 import { resolveIdeaToken } from './ideaToken';
 import { resolveKey } from './key';
+import { hireEngineer, useEngineer, useVariableEngineer } from './engineer';
 import { flipLoco, placeLoco, replaceLoco } from './locomotive';
 import { moveTrack } from './moveTrack';
 import { pass } from './pass';
@@ -119,6 +120,12 @@ export function applyAction(state: RussianRailroadsState, playerId: string, acti
       return resolveReuse(state, playerId, action.space);
     case 'RESOLVE_SETUP_BONUS':
       return resolveSetupBonus(state, playerId, action.card);
+    case 'HIRE_ENGINEER':
+      return hireEngineer(state, playerId);
+    case 'USE_ENGINEER':
+      return useEngineer(state, playerId, action.engineerId);
+    case 'USE_VARIABLE_ENGINEER':
+      return useVariableEngineer(state, playerId, action.slot);
     case 'PASS':
       return pass(state, playerId);
   }

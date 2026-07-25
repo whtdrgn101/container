@@ -28,8 +28,10 @@ export function allPassed(state: RussianRailroadsState): boolean {
 /**
  * Slide the engineer strip one space to the right (pg. 21–22): every engineer moves right by one, the
  * right-most (the hiring space) falls off — "if the engineer on the hiring space was not claimed, return
- * them to the box" (RR1 never claims one, so it is always dropped) — and the left-most slot becomes empty
- * (it "will show a number … the rounds remaining"). Same length; returns the new slots.
+ * them to the box" — and the left-most slot becomes empty (it "will show a number … the rounds remaining").
+ * A **hired** engineer already left the strip (RR7's `takeHiring` emptied the hiring slot when it was
+ * claimed), so the falling-off slot is a `null` and only genuinely *unclaimed* engineers reach the box.
+ * Same length; returns the new slots.
  */
 export function slideEngineerStrip(strip: readonly (Engineer | null)[]): (Engineer | null)[] {
   return [null, ...strip.slice(0, -1)];
@@ -53,6 +55,8 @@ function resetPlayers(players: readonly RussianRailroadsPlayer[]): RussianRailro
     tempWorkers: 0,
     passed: false,
     actionPool: [],
+    // Hired engineers are usable once per round (pg. 15), so the per-round use flags reset here.
+    usedEngineers: [],
   }));
 }
 

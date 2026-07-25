@@ -104,8 +104,15 @@ export interface RussianRailroadsPlayer {
   readonly locomotives: readonly Locomotive[];
   /** The industry track (pg. 11–13). RR1: wrench at start. */
   readonly industry: Industry;
-  /** Engineers this player has hired (pg. 15–16). RR1: none — hiring lands RR7. */
+  /** Engineers this player has hired (pg. 15–16, 22). Grows via `HIRE_ENGINEER`; drives the RR8 majority. */
   readonly hiredEngineers: readonly Engineer[];
+  /**
+   * The ids of hired engineers this player has **already used this round** (pg. 15: an engineer's private
+   * indirect action is usable once per round). Reset to `[]` at round close (`resetPlayers`). Only hired
+   * engineers appear here; the two public *variable* action spaces track their once-per-round use via ordinary
+   * action-space occupancy (`engineer-var-<slot>`), not this list.
+   */
+  readonly usedEngineers: readonly string[];
   /**
    * The per-turn **action pool** (pg. 7, 13): track-move credits that became available this turn (RR5:
    * factory triggers + the bottom industrialization space; engineer actions join in RR7), resolvable in any

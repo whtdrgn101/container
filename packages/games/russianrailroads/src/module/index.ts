@@ -28,10 +28,30 @@ function parseAction(raw: unknown): ParseResult<Action> {
     option?: unknown;
     token?: unknown;
     card?: unknown;
+    engineerId?: unknown;
   };
 
   if (action.type === 'PASS') {
     return { ok: true, action: { type: 'PASS' } };
+  }
+
+  // Engineers (pg. 15–16, RR7). The engine validates hireability / ownership / once-per-round / inert; this
+  // only shapes the JSON.
+  if (action.type === 'HIRE_ENGINEER') {
+    return { ok: true, action: { type: 'HIRE_ENGINEER' } };
+  }
+
+  if (action.type === 'USE_ENGINEER') {
+    if (typeof action.engineerId !== 'string')
+      return { ok: false, message: 'USE_ENGINEER.engineerId must be a string' };
+    return { ok: true, action: { type: 'USE_ENGINEER', engineerId: action.engineerId } };
+  }
+
+  if (action.type === 'USE_VARIABLE_ENGINEER') {
+    if (typeof action.slot !== 'number' || !Number.isInteger(action.slot)) {
+      return { ok: false, message: 'USE_VARIABLE_ENGINEER.slot must be an integer' };
+    }
+    return { ok: true, action: { type: 'USE_VARIABLE_ENGINEER', slot: action.slot } };
   }
 
   // RR6 choice / phase resolutions. The engine does the domain validation (a used token, an unknown card,

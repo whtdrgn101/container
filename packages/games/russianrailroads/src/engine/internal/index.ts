@@ -10,3 +10,4 @@ export * from './specials';
 export * from './turnorder';
 export * from './turn';
 export * from './scoring';
+export * from './engineers';

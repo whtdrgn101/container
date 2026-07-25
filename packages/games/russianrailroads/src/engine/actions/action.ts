@@ -145,6 +145,34 @@ export type Action =
       readonly type: 'RESOLVE_SETUP_BONUS';
       readonly card: string;
     }
+  | {
+      /**
+       * Hire the hiring-space engineer (pg. 15, RR7): pay 1 coin, take the right-most strip engineer beside
+       * your board. A normal turn (passes the clock). Its action then becomes a private, once-per-round
+       * indirect action via `USE_ENGINEER`.
+       */
+      readonly type: 'HIRE_ENGINEER';
+    }
+  | {
+      /**
+       * Use one of your **hired** engineers' actions (pg. 7, 15, RR7): an **indirect** action, usable once
+       * per round. A track-move feeds the action pool (partially resolvable); an immediate effect resolves at
+       * once. A standalone turn.
+       */
+      readonly type: 'USE_ENGINEER';
+      /** The id of your hired engineer to use (must be hired, unused this round, and not inert). */
+      readonly engineerId: string;
+    }
+  | {
+      /**
+       * Use a public **variable** engineer action space (pg. 15–16, RR7): the two horizontal engineers left of
+       * the hiring space are **direct** action spaces anyone may use for 1 worker, fully resolved, once per
+       * round. A track-move opens the pending-moves lock directly (must resolve, not skippable).
+       */
+      readonly type: 'USE_VARIABLE_ENGINEER';
+      /** Which variable action space (0 = left, 1 = right, nearer the hiring space). */
+      readonly slot: number;
+    }
   | { readonly type: 'PASS' };
 
 export type ActionType = Action['type'];
