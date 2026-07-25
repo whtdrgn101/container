@@ -1,4 +1,5 @@
 import type { Engineer, RussianRailroadsPlayer, RussianRailroadsResult, RussianRailroadsState } from '../core';
+import { finalScoring } from './finalScoring';
 import { scorePlayer } from './scoring';
 import type { RoundScore } from './scoring';
 import { rearrangeTurnOrder, reuseQueue } from './turnorder';
@@ -99,11 +100,24 @@ export function closeRound(state: RussianRailroadsState): RoundClose {
   } as const;
 
   if (state.round >= state.rounds) {
-    const results: RussianRailroadsResult[] = players.map((p) => ({ playerId: p.id, total: p.score }));
-    const top = Math.max(...players.map((p) => p.score));
-    const winnerIds = players.filter((p) => p.score === top).map((p) => p.id);
+    // Final scoring (pg. 22): after the last round's scoring phase, add the end-bonus cards (pg. 47) and the
+    // engineer majority (40/20) onto each player's cumulative total. `scored` already carries the round's
+    // points, so `base` is `p.score`; the player's own `score` is bumped to the final total so the ended
+    // board reads it directly. Winners are the highest totals; ties share (pg. 23).
+    const results: RussianRailroadsResult[] = finalScoring(scored);
+    const finalPlayers = scored.map((p, i) => ({ ...p, score: results[i]!.total }));
+    const top = Math.max(...results.map((r) => r.total));
+    const winnerIds = results.filter((r) => r.total === top).map((r) => r.playerId);
     return {
-      changes: { players, actionSpaces: {}, engineerStrip, ...clearedLocks, status: 'ended', results, winnerIds },
+      changes: {
+        players: finalPlayers,
+        actionSpaces: {},
+        engineerStrip,
+        ...clearedLocks,
+        status: 'ended',
+        results,
+        winnerIds,
+      },
       scores,
     };
   }

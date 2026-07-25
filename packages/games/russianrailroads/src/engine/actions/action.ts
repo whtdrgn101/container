@@ -162,6 +162,11 @@ export type Action =
       readonly type: 'USE_ENGINEER';
       /** The id of your hired engineer to use (must be hired, unused this round, and not inert). */
       readonly engineerId: string;
+      /**
+       * For engineer #15's "choose another end bonus card, or score 10" (pg. 48, RR8): `'draw'` draws the
+       * top end-bonus card, `'score'` (the default) takes the points. Ignored by every other engineer.
+       */
+      readonly option?: 'draw' | 'score';
     }
   | {
       /**
@@ -172,6 +177,8 @@ export type Action =
       readonly type: 'USE_VARIABLE_ENGINEER';
       /** Which variable action space (0 = left, 1 = right, nearer the hiring space). */
       readonly slot: number;
+      /** Engineer #15's end-bonus choice (pg. 48, RR8): `'draw'` or `'score'` (default). Ignored otherwise. */
+      readonly option?: 'draw' | 'score';
     }
   | { readonly type: 'PASS' };
 

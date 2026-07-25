@@ -20,9 +20,9 @@ import type {
 export type { Viewer } from '@game-hub/kernel';
 
 /**
- * A player projected for a viewer (pg. 22). The game's **one secret** is the held end-bonus card: an
- * opponent sees `endBonus: null` and only `endBonusHeld` (how many they hold — 0 or 1). Everything else
- * on a player board is public (pg. 7 — the whole game is open information but for this card).
+ * A player projected for a viewer (pg. 22). The game's **one secret** is the held end-bonus cards: an
+ * opponent sees `endBonusCards: null` and only `endBonusHeld` (how many they hold). Everything else on a
+ * player board is public (pg. 7 — the whole game is open information but for these cards).
  */
 export interface PlayerView {
   readonly id: string;
@@ -42,9 +42,9 @@ export interface PlayerView {
   readonly usedEngineers: readonly string[];
   /** The per-turn action pool (pg. 13) — track-move credits from factories / industrialization; public. */
   readonly actionPool: readonly PoolEntry[];
-  /** The held end-bonus card when the viewer owns this seat (or the game has ended); `null` otherwise. */
-  readonly endBonus: EndBonusCard | null;
-  /** How many end-bonus cards this player holds — always visible (0 or 1 in the base game). */
+  /** The held end-bonus cards when the viewer owns this seat (or the game has ended); `null` otherwise. */
+  readonly endBonusCards: readonly EndBonusCard[] | null;
+  /** How many end-bonus cards this player holds — always visible (usually 0 or 1; more is possible, pg. 22). */
   readonly endBonusHeld: number;
   readonly turnOrderCard: number;
   readonly passed: boolean;
@@ -137,8 +137,8 @@ export function viewFor(state: RussianRailroadsState, viewer: Viewer): RussianRa
       hiredEngineers: player.hiredEngineers,
       usedEngineers: player.usedEngineers,
       actionPool: player.actionPool,
-      endBonus: mine ? player.endBonus : null,
-      endBonusHeld: player.endBonus ? 1 : 0,
+      endBonusCards: mine ? player.endBonusCards : null,
+      endBonusHeld: player.endBonusCards.length,
       turnOrderCard: player.turnOrderCard,
       passed: player.passed,
       consumedSpecials: player.consumedSpecials,

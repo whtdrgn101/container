@@ -1,5 +1,6 @@
 import type { GameEndState, MoveRecord } from '@game-hub/kernel';
-import type { EndBonusCard, RouteId, TrackColor } from './constants';
+import type { EndBonusCard } from './endBonus';
+import type { RouteId, TrackColor } from './constants';
 import type { IdeaTokenType } from './ideas';
 import type { Engineer } from './engineers';
 
@@ -70,9 +71,10 @@ export interface PoolEntry {
 }
 
 /**
- * One player (pg. 6). `endBonus` (the single held end-bonus card) is the game's **one per-player secret**
- * — redacted by `viewFor` to a held-count for opponents (nobody holds one in RR1, but the shape redacts
- * from day one — the SP/SA convention).
+ * One player (pg. 6). `endBonusCards` (the held end-bonus cards) is the game's **one per-player secret**
+ * — redacted by `viewFor` to a held-count for opponents (the SP/SA convention). Usually a player holds
+ * exactly one (from setup or an idea token), but "there are ways of getting more" (pg. 22 — the end-bonus
+ * idea token and engineer #15 both draw a card), so it is a list, revealed to all at final scoring.
  */
 export interface RussianRailroadsPlayer {
   readonly id: string;
@@ -121,10 +123,11 @@ export interface RussianRailroadsPlayer {
    */
   readonly actionPool: readonly PoolEntry[];
   /**
-   * This player's held end-bonus card (pg. 22), or `null`. **The game's one secret** — `viewFor` redacts
-   * an opponent's to a count. Always `null` in RR1 (drawing end-bonus cards is RR8).
+   * This player's held end-bonus cards (pg. 22). **The game's one secret** — `viewFor` redacts an
+   * opponent's to a count until the game ends. Empty until a card is drawn (the end-bonus idea token, pg.
+   * 46, or engineer #15, pg. 48 — RR8); each scores at final scoring by its `rule` (pg. 47).
    */
-  readonly endBonus: EndBonusCard | null;
+  readonly endBonusCards: readonly EndBonusCard[];
   /** The turn-order card dealt to this player (pg. 5): 1–4, lower goes earlier in round 1. */
   readonly turnOrderCard: number;
   /** Whether this player has passed this round (pg. 7). A pass is terminal for the round. */
@@ -364,13 +367,19 @@ export type RussianRailroadsState = {
 } & GameEndState<RussianRailroadsResult>;
 
 /**
- * One player's end-of-game result. RR2 fills `total` with the player's **cumulative per-round score**
- * (pg. 20–21) — the real route + industry points summed over every round, so the winner is genuine (highest
- * total; ties share). **Final** scoring (the end-bonus card + engineer majority, pg. 22) is added in RR8,
- * which extends this same field without a state migration.
+ * One player's end-of-game result — the full final-scoring breakdown (pg. 22, RR8). `base` is the
+ * cumulative per-round score (pg. 20–21, the route + industry + specials points summed over every round);
+ * `endBonus` is the revealed end-bonus cards (pg. 47); `majority` is the engineer-majority award (40/20,
+ * pg. 22); `total` is their sum, the number the winner is decided on (highest total; ties share, pg. 23).
  */
 export interface RussianRailroadsResult {
   readonly playerId: string;
-  /** Final score — the cumulative per-round total (RR2); RR8 adds the end-of-game bonuses. */
+  /** Cumulative per-round scoring total (pg. 20–21), before the end-of-game bonuses. */
+  readonly base: number;
+  /** Points from the player's revealed end-bonus cards (pg. 47). */
+  readonly endBonus: number;
+  /** Engineer-majority award (pg. 22): 40 (most), 20 (second-most), or 0. */
+  readonly majority: number;
+  /** Final score — `base + endBonus + majority`. Highest wins; ties share (pg. 23). */
   readonly total: number;
 }

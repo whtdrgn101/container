@@ -91,7 +91,7 @@ export function createGame(options: CreateGameOptions): RussianRailroadsState {
     hiredEngineers: [],
     usedEngineers: [],
     actionPool: [],
-    endBonus: null,
+    endBonusCards: [],
     turnOrderCard: turnOrderCards[seat]!,
     passed: false,
     consumedSpecials: [],

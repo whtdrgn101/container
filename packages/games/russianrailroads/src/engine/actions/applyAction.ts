@@ -123,9 +123,9 @@ export function applyAction(state: RussianRailroadsState, playerId: string, acti
     case 'HIRE_ENGINEER':
       return hireEngineer(state, playerId);
     case 'USE_ENGINEER':
-      return useEngineer(state, playerId, action.engineerId);
+      return useEngineer(state, playerId, action.engineerId, action.option ?? 'score');
     case 'USE_VARIABLE_ENGINEER':
-      return useVariableEngineer(state, playerId, action.slot);
+      return useVariableEngineer(state, playerId, action.slot, action.option ?? 'score');
     case 'PASS':
       return pass(state, playerId);
   }

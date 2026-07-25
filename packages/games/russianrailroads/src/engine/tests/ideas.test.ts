@@ -54,7 +54,7 @@ describe('idea tokens (pg. 46–47)', () => {
     const s = owingIdeaToken();
     const pileBefore = s.endBonusPile.length;
     const after = applyAction(s, me(s).id, { type: 'RESOLVE_IDEA_TOKEN', token: 'end-bonus' });
-    expect(after.players[seat(s)]!.endBonus).toEqual(s.endBonusPile[0]);
+    expect(after.players[seat(s)]!.endBonusCards).toEqual([s.endBonusPile[0]]);
     expect(after.endBonusPile).toHaveLength(pileBefore - 1);
     expect(after.pendingIdeaCard).toEqual({ owed: true });
   });
@@ -62,7 +62,7 @@ describe('idea tokens (pg. 46–47)', () => {
   it('end-bonus with an empty pile draws nothing but still owes the idea card', () => {
     const s = { ...owingIdeaToken(), endBonusPile: [] };
     const after = applyAction(s, me(s).id, { type: 'RESOLVE_IDEA_TOKEN', token: 'end-bonus' });
-    expect(after.players[seat(s)]!.endBonus).toBeNull();
+    expect(after.players[seat(s)]!.endBonusCards).toEqual([]);
     expect(after.pendingIdeaCard).toEqual({ owed: true });
   });
 });

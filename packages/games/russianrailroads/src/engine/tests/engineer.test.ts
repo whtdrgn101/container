@@ -188,6 +188,35 @@ describe('USE_ENGINEER — a hired engineer as an indirect action (pg. 7, 15)', 
     );
   });
 
+  it('an endBonus engineer (#15) scores its points by default (option omitted / score)', () => {
+    const state = setup({ kind: 'endBonus', points: 10 });
+    const seat = state.activePlayerIndex;
+    const pileBefore = state.endBonusPile.length;
+    const after = applyAction(state, activeId(state), { type: 'USE_ENGINEER', engineerId: 'e' });
+    expect(after.players[seat]!.score).toBe(10); // took the points (pg. 48 "or score 10")
+    expect(after.players[seat]!.endBonusCards).toEqual([]); // drew nothing
+    expect(after.endBonusPile).toHaveLength(pileBefore); // pile untouched
+  });
+
+  it('an endBonus engineer (#15) with option "draw" takes the top pile card (draw-top ruling)', () => {
+    const state = setup({ kind: 'endBonus', points: 10 });
+    const seat = state.activePlayerIndex;
+    const top = state.endBonusPile[0]!;
+    const after = applyAction(state, activeId(state), { type: 'USE_ENGINEER', engineerId: 'e', option: 'draw' });
+    expect(after.players[seat]!.endBonusCards).toEqual([top]); // drew the top card face-down
+    expect(after.players[seat]!.score).toBe(0); // no points when drawing
+    expect(after.endBonusPile).toHaveLength(state.endBonusPile.length - 1);
+  });
+
+  it('an endBonus engineer (#15) with option "draw" on an empty pile falls back to the points', () => {
+    let state = setup({ kind: 'endBonus', points: 10 });
+    state = { ...state, endBonusPile: [] };
+    const seat = state.activePlayerIndex;
+    const after = applyAction(state, activeId(state), { type: 'USE_ENGINEER', engineerId: 'e', option: 'draw' });
+    expect(after.players[seat]!.endBonusCards).toEqual([]);
+    expect(after.players[seat]!.score).toBe(10); // fell back to the points, so it always resolves
+  });
+
   it('rejects an engineer you have not hired', () => {
     const state = newGame(2);
     expect(() => applyAction(state, activeId(state), { type: 'USE_ENGINEER', engineerId: 'nope' })).toThrowError(
@@ -262,6 +291,15 @@ describe('USE_VARIABLE_ENGINEER — a public direct action space (pg. 15–16)',
     expect(after.players[seat]!.doublers).toBe(1);
     expect(after.players[seat]!.score).toBe(5);
     expect(after.supplies.doublers).toBe(29);
+  });
+
+  it('an endBonus variable engineer draws the top pile card with option "draw"', () => {
+    const state = withVar({ kind: 'endBonus', points: 10 });
+    const seat = state.activePlayerIndex;
+    const top = state.endBonusPile[0]!;
+    const after = applyAction(state, activeId(state), { type: 'USE_VARIABLE_ENGINEER', slot: 0, option: 'draw' });
+    expect(after.players[seat]!.endBonusCards).toEqual([top]);
+    expect(after.endBonusPile).toHaveLength(state.endBonusPile.length - 1);
   });
 
   it('rejects an empty variable slot and an out-of-range slot', () => {

@@ -1,5 +1,6 @@
 import { DOUBLER_SPACES, GameError, HIRE_COST, VARIABLE_ENGINEER_WORKERS } from '../core';
 import type {
+  EndBonusCard,
   EngineerAction,
   RussianRailroadsPlayer,
   RussianRailroadsState,
@@ -30,12 +31,17 @@ import {
  * The turn / lock checks live in `applyAction`; this owns the engineer rules. Never mutates; throws typed.
  */
 
-/** The immediate (non-track) resolution of an engineer action — coins / doubler / points. */
+/** The immediate (non-track) resolution of an engineer action — coins / doubler / points / end-bonus. */
 function immediateEffect(
   state: RussianRailroadsState,
   player: RussianRailroadsPlayer,
   action: Exclude<EngineerAction, { kind: 'moveTrack' } | { kind: 'inert' }>,
-): { readonly player: RussianRailroadsPlayer; readonly supplies?: RussianRailroadsSupplies } {
+  option: 'draw' | 'score',
+): {
+  readonly player: RussianRailroadsPlayer;
+  readonly supplies?: RussianRailroadsSupplies;
+  readonly endBonusPile?: readonly EndBonusCard[];
+} {
   if (action.kind === 'coins') {
     return { player: { ...player, coins: player.coins + action.count } };
   }
@@ -47,6 +53,16 @@ function immediateEffect(
       player: { ...player, doublers: player.doublers + (canDouble ? 1 : 0), score: player.score + action.points },
       supplies: canDouble ? { ...state.supplies, doublers: state.supplies.doublers - 1 } : undefined,
     };
+  }
+  if (action.kind === 'endBonus') {
+    // Engineer #15 (pg. 48): "choose another end bonus card, or score 10". `option: 'draw'` draws the top of
+    // the face-down pile (the pg. 46 draw-top ruling); if the pile is empty it falls back to the points, so
+    // the action always resolves. `option: 'score'` (the default) takes the points immediately.
+    if (option === 'draw' && state.endBonusPile.length > 0) {
+      const [top, ...rest] = state.endBonusPile;
+      return { player: { ...player, endBonusCards: [...player.endBonusCards, top!] }, endBonusPile: rest };
+    }
+    return { player: { ...player, score: player.score + action.points } };
   }
   // The scoring engineers (pg. 48): a fixed value, the sum of engineer numbers, or the 2 highest locomotives.
   const points =
@@ -98,7 +114,12 @@ export function hireEngineer(state: RussianRailroadsState, playerId: string): Ru
  * resolves immediately, then the turn hands off. Throws `ENGINEER_NOT_HIRED`, `ENGINEER_ALREADY_USED`, or
  * `ENGINEER_INERT`.
  */
-export function useEngineer(state: RussianRailroadsState, playerId: string, engineerId: string): RussianRailroadsState {
+export function useEngineer(
+  state: RussianRailroadsState,
+  playerId: string,
+  engineerId: string,
+  option: 'draw' | 'score' = 'score',
+): RussianRailroadsState {
   const seat = seatOf(state, playerId);
   const player = state.players[seat]!;
   const engineer = player.hiredEngineers.find((e) => e.id === engineerId);
@@ -123,15 +144,10 @@ export function useEngineer(state: RussianRailroadsState, playerId: string, engi
     return record(state, 'USE_ENGINEER', playerId, continueTurn(next, seat), payload);
   }
 
-  const { player: resolved, supplies } = immediateEffect(state, used, action);
-  const next = { ...state, players: withPlayer(state, seat, resolved), ...(supplies ? { supplies } : {}) };
-  return record(
-    state,
-    'USE_ENGINEER',
-    playerId,
-    { ...(supplies ? { supplies } : {}), ...continueTurn(next, seat) },
-    payload,
-  );
+  const { player: resolved, supplies, endBonusPile } = immediateEffect(state, used, action, option);
+  const extra = { ...(supplies ? { supplies } : {}), ...(endBonusPile ? { endBonusPile } : {}) };
+  const next = { ...state, players: withPlayer(state, seat, resolved), ...extra };
+  return record(state, 'USE_ENGINEER', playerId, { ...extra, ...continueTurn(next, seat) }, payload);
 }
 
 /**
@@ -145,6 +161,7 @@ export function useVariableEngineer(
   state: RussianRailroadsState,
   playerId: string,
   slot: number,
+  option: 'draw' | 'score' = 'score',
 ): RussianRailroadsState {
   const seat = seatOf(state, playerId);
   const player = state.players[seat]!;
@@ -198,18 +215,14 @@ export function useVariableEngineer(
     );
   }
 
-  const { player: resolved, supplies } = immediateEffect(state, paid, action);
-  const next = {
-    ...state,
-    players: withPlayer(state, seat, resolved),
-    actionSpaces,
-    ...(supplies ? { supplies } : {}),
-  };
+  const { player: resolved, supplies, endBonusPile } = immediateEffect(state, paid, action, option);
+  const extra = { ...(supplies ? { supplies } : {}), ...(endBonusPile ? { endBonusPile } : {}) };
+  const next = { ...state, players: withPlayer(state, seat, resolved), actionSpaces, ...extra };
   return record(
     state,
     'USE_VARIABLE_ENGINEER',
     playerId,
-    { actionSpaces, ...(supplies ? { supplies } : {}), ...continueTurn(next, seat) },
+    { actionSpaces, ...extra, ...continueTurn(next, seat) },
     payload,
   );
 }

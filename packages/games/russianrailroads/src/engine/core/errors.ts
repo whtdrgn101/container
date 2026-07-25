@@ -14,6 +14,9 @@ export type RussianRailroadsErrorCode =
   // A PLACE on an already-occupied space — a space with any worker OR coin on it (pg. 7). The one
   // never-occupied space (the bottom track-extension space, pg. 9) is exempt.
   | 'SPACE_OCCUPIED'
+  // A PLACE on a space not available this round (pg. 22): a turn-order claim space in the final round
+  // (covered by the last-round tile), or the last-round industrialization space outside the final round.
+  | 'SPACE_UNAVAILABLE'
   // A PLACE the seat can't pay for: not enough workers, not enough coins to substitute, or more coins
   // than the space requires (pg. 7, 14).
   | 'INSUFFICIENT_WORKERS'

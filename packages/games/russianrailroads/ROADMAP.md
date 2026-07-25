@@ -64,8 +64,8 @@ including empty spaces behind a track — plus industry, pg. 20–21); final sco
   documented here: (1) silver/gold valuation-tile values — **LANDED in RR2**: the pg. 20 tile art reads
   wood 0 / green 1 / bronze 2 / **silver 4 / gold 7**; (2) scoring-track overflow via point tiles —
   **LANDED in RR2**: track is a 1–100 loop, 100/300/500 point tiles (pg. 4), modelled as an unbounded
-  integer score; (3) "choose an end bonus card" (pg. 46) — **AMBIGUOUS** draw-top vs pick; interacts with
-  redaction; ruling due in RR8.
+  integer score; (3) "choose an end bonus card" (pg. 46, 48) — **LANDED in RR8**: the deck is face-down, so
+  "choose" = **draw the top card** (pick-with-knowledge would leak the redacted pile). See the RR8 ruling.
 - **Solo "Emil" (pg. 44–45) is out of scope** — the platform's own bots are the solo story.
 
 ## The build plan — vertical slices
@@ -494,12 +494,56 @@ to existing machinery are **LIVE**; three that need a mechanic RR7 does not buil
 mechanics (RR8 end-bonus scoring; RR9 the occupancy-replay + cross-player-interaction engineers). The
 engineer-majority **scoring** (40/20, pg. 22) is RR8 — RR7 only exposes the count + highest-number data.
 
-### RR8 — Game end + final scoring + hardening
-Last-round tile (pg. 22), end-bonus reveal + scoring (pg. 47; **ambiguity ruling #3 lands here**),
-engineer majority 40/20 with highest-number tiebreak, shared ties (pg. 23). Then the SP7-style
-hardening pass: full seeded 2/3/4p games over REST touching every mechanic, five-games-coexist,
-`legalActions⊆applyAction` fuzz (the pending-lock design earns its keep here), version/log audits.
-**Base game complete.**
+### RR8 — Game end + final scoring + hardening ✅ *(shipped)* — **BASE GAME COMPLETE**
+The base game closed out (pg. 22–23, 46–47). Shipped: the **last-round tile** (pg. 22 — at the final
+round, `spaceAvailable` covers the two turn-order claim spaces and swaps in a 1-worker "advance 3 industry
+steps" space; no claims, so no rearrange/reuse after the last round); the **end-bonus card catalog as data**
+(the 11 pg. 47 designs typed as an `EndBonusRule` union in `core/endBonus.ts`, evaluated by pure functions
+in `internal/finalScoring.ts`); **engineer #15 goes live** (RR7's inert "choose an end bonus card / score
+10" is now an `endBonus` engineer action, resolved by the `USE_ENGINEER`/`USE_VARIABLE_ENGINEER` `option`);
+**final scoring** (after the last round's scoring phase, `closeRound` adds each player's end-bonus cards +
+the **engineer majority** 40/20 onto their `base` total, into the kernel `GameEndState` `ended` arm with a
+full `{ base, endBonus, majority, total }` breakdown per player; winners are the highest totals, ties share,
+pg. 23); `viewFor` reveals everything at `ended`. The one per-player secret became a **list** (`endBonusCards`,
+redacted to a count) since a player can now hold more than one (pg. 22 "ways of getting more" — the end-bonus
+idea token + engineer #15). Engine **100% (278 tests**, +40 across new `finalScoring`/`endBonus`/`lastRound`
+files, the engineer-#15 tests, and the `legalActions⊆applyAction` fuzz). UI: the shared `GameOver` frame now renders a per-player breakdown
+table (`rr-results`), the last-round banner (`rr-last-round`) + tile, and the feed narrates final scoring.
+**Hardening (the SP7 pattern):** an engine `legalActions⊆applyAction` **fuzz** (2/3/4p × 5 seeds, every
+offered action applies, every game ends), and **full seeded games over REST** at 2/3/4p driven by an
+acquisitive driver that (across the three games) exercises the whole locked surface — a track lock, a colour
+unlock, a doubler, a loco upgrade chain, a factory build + wrench trigger + pool resolve, a key choice, an
+idea token (the industry idea space), a turn-order claim + reuse, an engineer hire + use, and a pass-score —
+**asserted as a coverage union** so a future change that strands a path fails loudly; each game also asserts
+a coherent breakdown (`total = base + endBonus + majority`), the tie rule, version monotonicity, and a
+contiguous typed move log. The games-coexist (`module-seam`: five real games + the counter stub) check stays
+green. **Track D findings: none new** — the whole slice landed inside the package (engine, module `parseAction`, client), touching **zero**
+host files, the RR2–7 pattern holding.
+
+**RR8 rulings (with evidence):**
+- **Ruling #3 (AMBIGUITY #3) — LANDED (pg. 46, 48).** Both the end-bonus idea token (pg. 46 "choose an end
+  bonus card from the deck") and engineer #15 (pg. 48 "choose another end bonus card") say **choose**, but
+  the deck is **face-down** (pg. 5: shuffled, 2 removed unseen, placed face-down). With a face-down pile,
+  "choose" cannot be pick-with-knowledge — that would leak the pile, contradicting the hidden-information
+  design (`viewFor` redacts the pile to a *count*). The faithful reading is therefore **draw the top card**:
+  deterministic, and it preserves the one secret. This matches RR6's already-shipped draw-top for the idea
+  token; RR8 makes it the standing rule (also engineer #15's draw). See `core/endBonus.ts`.
+- **End-bonus card catalog — COMPONENT READ (pg. 47 @ 300 DPI).** The pg. 47 art shows **11 distinct** card
+  designs (the RR8 scope brief said "12" — documented ADAPTED count; 11 is what the rulebook depicts). Each
+  is encoded with its condition cited; the tier values are a component read (keys 2–3/15, 4–5/25, 6+/40;
+  doublers 4–6/20, 7+/30 — confirmed on the card art). "Score points equal to the sum of your 4 highest
+  locomotives" and "1 pt per space moved with your green/bronze (and wood) track" are read verbatim. See
+  `core/endBonus.ts` for the `EndBonusRule` union; the deck ships these 11 designs (2 removed unseen, pg. 5).
+- **Engineer majority (pg. 22) — LANDED.** Eligible players (≥1 engineer, where the "extra engineer" end-bonus
+  card counts as one) are ordered by `(count desc, highest-number desc)` and the first two ranks take 40 / 20.
+  Because engineer numbers are **unique**, the highest-number tiebreak is always decisive, so a first-place
+  tie cleanly awards 40 to the higher-number holder and 20 to the other (matching the pg. 22 example: three
+  engineers → 40; of two tied on two, the #13 holder → 20; a no-engineer player scores nothing).
+
+**Scope notes / documented simplifications (reconcile later):** the end-bonus deck ships the 11 distinct
+designs rather than the physical deck's duplicate copies (irrelevant to a pile of `count` at 2–4 players);
+the `per-factory` card counts only base-game factories (steelworks / the industry board are expansions);
+`per-extra-worker` caps at 3 (the base-game maximum). RR9 (art) reconciles the card art.
 
 ### RR9 — Art & board polish
 The comps-on-artifact flow (Morning Valley / malachite precedent): the player board's three routes +

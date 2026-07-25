@@ -39,7 +39,7 @@
 //   • "Score the sum of your 2 highest-number locomotives"                  → `scoreLocomotives` (LIVE)
 //   • "Repeat a previously-occupied single-worker action" (pg. 48)          → inert (occupancy replay, RR9)
 //   • "Use another player's engineer action space" (pg. 48, 2-player)       → inert (cross-player, RR9)
-//   • "Choose another end bonus card, or score 10" (pg. 48)                 → inert (end-bonus scoring, RR8)
+//   • "Choose another end bonus card, or score 10" (pg. 48)                 → `endBonus` (LIVE, RR8)
 
 import { TRACK_COLORS } from './constants';
 import type { TrackColor } from './constants';
@@ -57,6 +57,10 @@ export type EngineerAction =
   | { readonly kind: 'score'; readonly points: number }
   | { readonly kind: 'scoreEngineers' }
   | { readonly kind: 'scoreLocomotives' }
+  // Engineer #15 (pg. 48, LIVE in RR8): "choose another end bonus card, or score 10." The choice rides on
+  // the `USE_ENGINEER` / `USE_VARIABLE_ENGINEER` action's `option`: `'draw'` draws the top end-bonus card
+  // (the pg. 46 draw-top ruling), `'score'` (the default) takes `points` immediately.
+  | { readonly kind: 'endBonus'; readonly points: number }
   | { readonly kind: 'inert'; readonly note: string };
 
 /** Which shuffled stack an engineer belongs to. `idea` is the single letterless engineer (pg. 5). */
@@ -111,12 +115,8 @@ export const ENGINEERS: readonly Engineer[] = [
       note: "use another player's engineer action space (pg. 48, 2-player) — cross-player, RR9",
     },
   },
-  {
-    id: 'eng-15',
-    number: 15,
-    stack: 'B',
-    action: { kind: 'inert', note: 'choose another end bonus card / score 10 (pg. 48) — end-bonus scoring, RR8' },
-  },
+  // #15 goes LIVE in RR8: "choose another end bonus card, or score 10" (pg. 48). See `EngineerAction`.
+  { id: 'eng-15', number: 15, stack: 'B', action: { kind: 'endBonus', points: 10 } },
 ];
 
 /** How much a hire costs (pg. 15: "place a coin onto the space"). */

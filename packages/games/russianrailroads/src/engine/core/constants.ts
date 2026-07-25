@@ -239,6 +239,16 @@ export const COLOR_MOVES: Readonly<Record<TrackColor, { readonly one: number; re
   gold: { one: 1, two: 2 },
 };
 
+/**
+ * The **last-round tile** action space id (pg. 22). At the start of the final round (the 7th @4p / 6th @2–3p)
+ * the tile covers the two turn-order claim spaces — "because these turn order spaces have no effect during
+ * the last round, they are replaced with a new action space that allows you to advance 3 steps on your
+ * industry track." Modelled (in `ACTION_SPACES`) as one 1-worker industrialization space (`advance: 3`),
+ * available **only** in the last round (and, conversely, the turn-order claim spaces are unavailable then).
+ * See `spaceAvailable`.
+ */
+export const LAST_ROUND_INDUSTRY_ID = 'lastround-industry';
+
 /** A dedicated single-colour track-extension space (pg. 8–9): `n` workers → `moves` moves of `color`. */
 function colorSpace(color: TrackColor, workers: 1 | 2, moves: number): ActionSpaceDef {
   return {
@@ -360,34 +370,34 @@ export const ACTION_SPACES: readonly ActionSpaceDef[] = [
   // Placing here has **no immediate effect** — the rearrangement happens at round end (`rearrangeTurnOrder`).
   { id: 'turnorder-1', label: 'Claim first place (next round)', kind: 'turn-order', workers: 1, neverOccupies: false },
   { id: 'turnorder-2', label: 'Claim second place (next round)', kind: 'turn-order', workers: 1, neverOccupies: false },
+  // The last-round tile (pg. 22): a 1-worker "advance 3 industry steps" space that replaces the two
+  // turn-order claim spaces in the final round. `spaceAvailable` gates it to the last round (and the
+  // turn-order spaces out of it), so the two are never both offered.
+  {
+    id: LAST_ROUND_INDUSTRY_ID,
+    label: 'Advance 3 industry steps (last round)',
+    kind: 'industry',
+    workers: 1,
+    industry: { advance: 3 },
+    neverOccupies: false,
+  },
 ];
 
 /** Look up an action-space definition by id, or `undefined` if none. */
 export const actionSpace = (id: string): ActionSpaceDef | undefined => ACTION_SPACES.find((s) => s.id === id);
 
-/**
- * The end-bonus cards (pg. 5, 22, 47). The real per-card scoring lands in RR8 (and resolves the pg. 46
- * draw-vs-pick ambiguity); RR1 needs only a shuffled pile with 2 removed unseen, redacted to a count.
- * ADAPTED count/ids (a documented placeholder set — see the ROADMAP art-ruling convention); each carries
- * a stub scoring id filled in at RR8.
- */
-export interface EndBonusCard {
-  readonly id: string;
-  /** The scoring rule this card applies at game end — a stub until RR8. */
-  readonly rule: 'placeholder';
-}
-
-/** A modest end-bonus deck (ADAPTED, pg. 5) — enough to shuffle, remove 2, and hold a pile. Real set: RR8. */
-export const END_BONUS_CARDS: readonly EndBonusCard[] = [
-  { id: 'bonus-1', rule: 'placeholder' },
-  { id: 'bonus-2', rule: 'placeholder' },
-  { id: 'bonus-3', rule: 'placeholder' },
-  { id: 'bonus-4', rule: 'placeholder' },
-  { id: 'bonus-5', rule: 'placeholder' },
-  { id: 'bonus-6', rule: 'placeholder' },
-  { id: 'bonus-7', rule: 'placeholder' },
-  { id: 'bonus-8', rule: 'placeholder' },
-];
-
 /** The starting locomotive every player has placed at setup (pg. 6, step 3). */
 export const STARTING_LOCOMOTIVE = 1;
+
+/**
+ * Which action spaces the board exposes **this round** (pg. 22 last-round tile). Every space is available
+ * except: the last-round industrialization space, available **only** in the final round; and the two
+ * turn-order claim spaces, unavailable in the final round (covered by the tile). Everything else is always
+ * available. `place` refuses an unavailable space; `legalActions` and the client skip it.
+ */
+export function spaceAvailable(def: ActionSpaceDef, round: number, rounds: number): boolean {
+  const lastRound = round >= rounds;
+  if (def.id === LAST_ROUND_INDUSTRY_ID) return lastRound;
+  if (def.kind === 'turn-order') return !lastRound;
+  return true;
+}

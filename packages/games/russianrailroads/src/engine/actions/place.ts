@@ -3,6 +3,7 @@ import {
   COINS_PER_ACTION,
   DOUBLER_SPACES,
   GameError,
+  spaceAvailable,
   TEMP_WORKERS,
   TRACK_COLORS,
   turnOrderOrdinal,
@@ -61,6 +62,11 @@ export function place(
 ): RussianRailroadsState {
   const def = actionSpace(space);
   if (!def) throw new GameError('UNKNOWN_SPACE', `No action space "${space}"`);
+  // The last-round tile (pg. 22): the turn-order claim spaces are covered in the final round (and replaced
+  // by the "advance 3 industry" space), so each is unavailable in the other rounds.
+  if (!spaceAvailable(def, state.round, state.rounds)) {
+    throw new GameError('SPACE_UNAVAILABLE', `Action space "${space}" is not available this round (pg. 22)`);
+  }
 
   const existing = state.actionSpaces[space] ?? [];
   if (!def.neverOccupies && existing.length > 0) {

@@ -7,6 +7,8 @@ export type {
   ActionSpaceDef,
   ActionSpaceKind,
   EndBonusCard,
+  EndBonusRule,
+  EndBonusTier,
   Engineer,
   EngineerAction,
   EngineerStack,
@@ -50,6 +52,8 @@ export {
   DOUBLER_SPACES,
   DOUBLER_SUPPLY,
   END_BONUS_CARDS,
+  ENGINEER_MAJORITY_FIRST,
+  ENGINEER_MAJORITY_SECOND,
   ENGINEERS,
   FACTORY_ACTIONS,
   HIRE_COST,
@@ -65,6 +69,7 @@ export {
   industryPointsAt,
   isTurnOrderSpace,
   KEY_POINTS,
+  LAST_ROUND_INDUSTRY_ID,
   LOCO_CAPACITY,
   LOCO_STACK_NUMBERS,
   LOCO_TEN,
@@ -74,6 +79,7 @@ export {
   ROUNDS,
   ROUTES,
   routeColors,
+  spaceAvailable,
   SPECIALS,
   STARTING_BONUS_CARDS,
   STARTING_COINS,
@@ -113,6 +119,9 @@ export {
   variableEngineer,
   variableIndex,
 } from './internal';
+
+// Final-scoring helpers (pg. 22, 47, RR8): end-bonus card evaluation + engineer majority — shared with tests.
+export { endBonusScore, engineerMajority, finalScoring, scoreEndBonusCard } from './internal';
 
 // Setup
 export { createGame } from './createGame';

@@ -21,12 +21,15 @@ export function pass(state: RussianRailroadsState, playerId: string): RussianRai
   if (allPassed(passedState)) {
     const { changes, scores } = closeRound(passedState);
     const ended = changes.status === 'ended';
+    // On the final round's close, the per-player final-scoring breakdown (pg. 22) is public — the feed
+    // narrates it. `changes.results` is present exactly on the ended arm of the end-state union.
+    const finalScores = changes.status === 'ended' ? changes.results : undefined;
     return record(state, 'PASS', playerId, changes, {
       closedRound: state.round,
       passScore: gainedPass,
       // The round's scoring is public (pg. 20–21 is open information) — the feed narrates it from here.
       scores,
-      ...(ended ? { gameEnded: true } : { nextRound: state.round + 1 }),
+      ...(ended ? { gameEnded: true, finalScores } : { nextRound: state.round + 1 }),
     });
   }
 

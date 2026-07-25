@@ -31,6 +31,10 @@ function parseAction(raw: unknown): ParseResult<Action> {
     engineerId?: unknown;
   };
 
+  /** The engineer #15 end-bonus choice (pg. 48), when present: `'draw'` | `'score'`. */
+  const engineerOption: { readonly option?: 'draw' | 'score' } =
+    action.option === 'draw' || action.option === 'score' ? { option: action.option } : {};
+
   if (action.type === 'PASS') {
     return { ok: true, action: { type: 'PASS' } };
   }
@@ -44,14 +48,20 @@ function parseAction(raw: unknown): ParseResult<Action> {
   if (action.type === 'USE_ENGINEER') {
     if (typeof action.engineerId !== 'string')
       return { ok: false, message: 'USE_ENGINEER.engineerId must be a string' };
-    return { ok: true, action: { type: 'USE_ENGINEER', engineerId: action.engineerId } };
+    if (action.option !== undefined && action.option !== 'draw' && action.option !== 'score') {
+      return { ok: false, message: "USE_ENGINEER.option must be 'draw' or 'score' when present" };
+    }
+    return { ok: true, action: { type: 'USE_ENGINEER', engineerId: action.engineerId, ...engineerOption } };
   }
 
   if (action.type === 'USE_VARIABLE_ENGINEER') {
     if (typeof action.slot !== 'number' || !Number.isInteger(action.slot)) {
       return { ok: false, message: 'USE_VARIABLE_ENGINEER.slot must be an integer' };
     }
-    return { ok: true, action: { type: 'USE_VARIABLE_ENGINEER', slot: action.slot } };
+    if (action.option !== undefined && action.option !== 'draw' && action.option !== 'score') {
+      return { ok: false, message: "USE_VARIABLE_ENGINEER.option must be 'draw' or 'score' when present" };
+    }
+    return { ok: true, action: { type: 'USE_VARIABLE_ENGINEER', slot: action.slot, ...engineerOption } };
   }
 
   // RR6 choice / phase resolutions. The engine does the domain validation (a used token, an unknown card,

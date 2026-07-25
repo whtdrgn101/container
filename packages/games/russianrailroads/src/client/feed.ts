@@ -16,6 +16,15 @@ interface RoundScore {
   readonly gained: number;
 }
 
+/** One player's final-scoring breakdown, logged on the game-ending PASS (pg. 22). */
+interface FinalScore {
+  readonly playerId: string;
+  readonly base: number;
+  readonly endBonus: number;
+  readonly majority: number;
+  readonly total: number;
+}
+
 /**
  * Russian Railroads' move-to-text for the shared `ActivityFeed` — the action wording only (the feed
  * renders the actor's name + bot badge). Everything RR logs is public, so nothing here is redacted.
@@ -112,7 +121,14 @@ export function describeMove(entry: RussianRailroadsView['log'][number], nameOf?
   }
   if (entry.type === 'PASS') {
     const p = entry.payload as
-      { gameEnded?: boolean; nextRound?: number; scores?: readonly RoundScore[]; passScore?: number } | undefined;
+      | {
+          gameEnded?: boolean;
+          nextRound?: number;
+          scores?: readonly RoundScore[];
+          passScore?: number;
+          finalScores?: readonly FinalScore[];
+        }
+      | undefined;
     const passBit = p?.passScore ? ` (+${p.passScore} from the turn-order card)` : '';
     const tally = p?.scores?.length
       ? '; scored ' +
@@ -120,7 +136,19 @@ export function describeMove(entry: RussianRailroadsView['log'][number], nameOf?
           .map((s) => `${nameOf?.(s.playerId) ?? s.playerId} ${s.gained} (routes ${s.routes}, industry ${s.industry})`)
           .join(', ')
       : '';
-    if (p?.gameEnded) return `passed${passBit} — final round scored${tally}`;
+    if (p?.gameEnded) {
+      // Final scoring (pg. 22): end-bonus cards + engineer majority added onto the base round total.
+      const final = p.finalScores?.length
+        ? '; final scoring — ' +
+          p.finalScores
+            .map(
+              (f) =>
+                `${nameOf?.(f.playerId) ?? f.playerId} ${f.total} (base ${f.base}, end-bonus ${f.endBonus}, majority ${f.majority})`,
+            )
+            .join(', ')
+        : '';
+      return `passed${passBit} — final round scored${tally}${final}`;
+    }
     if (p?.nextRound) return `passed${passBit} — round over, on to round ${p.nextRound}${tally}`;
     return `passed${passBit}`;
   }

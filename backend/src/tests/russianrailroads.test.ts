@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
+import { LAST_ROUND_INDUSTRY_ID, legalActions } from '@game-hub/game-russianrailroads/engine';
+import type { Action, RussianRailroadsResult, RussianRailroadsState } from '@game-hub/game-russianrailroads/engine';
 import { buildApp } from '../app';
 import { createDatabase } from '../db';
 import type { DB } from '../db';
@@ -120,9 +122,11 @@ describe('Russian Railroads (Track D package)', () => {
     >;
     expect(view['endBonusPile']).toBeUndefined();
     expect(typeof view['endBonusPileCount']).toBe('number');
-    // Opponents' held end-bonus cards are counts only (nobody holds one in RR1, but the shape redacts).
-    const players = view['players'] as { id: string; endBonus: unknown; endBonusHeld: number }[];
-    expect(players.every((p) => p.endBonus === null)).toBe(true);
+    // Opponents' held end-bonus cards are counts only (redacted to null; the owner sees its own list).
+    const players = view['players'] as { id: string; endBonusCards: unknown; endBonusHeld: number }[];
+    expect(players.find((p) => p.id === 'p1')!.endBonusCards).toEqual([]); // owner sees its own (empty) list
+    expect(players.find((p) => p.id === 'p2')!.endBonusCards).toBeNull(); // opponent redacted
+    expect(players.every((p) => p.endBonusHeld === 0)).toBe(true);
   });
 
   it('resolves a track-extension lock one MOVE_TRACK at a time over /actions', async () => {
@@ -526,5 +530,363 @@ describe('Russian Railroads (Track D package)', () => {
     });
     expect(res.statusCode).toBe(409);
     expect(res.json().error.code).toBe('NOT_YOUR_TURN');
+  });
+});
+
+/**
+ * RR8 — **full seeded games over REST**, at 2, 3 and 4 players, each driven to a real end (the SP7
+ * hardening pattern, adapted). A single deterministic, *acquisitive* driver plays every game move-by-move
+ * over HTTP (create → read the active seat's own view → POST an action → repeat). One seat (the round-1
+ * opener) is the "focus" seat pursuing goals; the others pass, so the focus seat keeps the clock and drives
+ * the whole board. Across the three games the driver reproducibly exercises the entire mechanic surface, and
+ * the run **asserts** that coverage so a future change that makes a path unreachable fails loudly.
+ *
+ * Each game asserts: it (a) **ends** into final scoring, (b) has a **coherent breakdown** — every result's
+ * `total === base + endBonus + majority`, and `winnerIds` are exactly the highest totals (ties share, pg.
+ * 23) — (c) **version strictly increases** by one per applied action, and (d) the **move log** is a
+ * contiguous `seq` 1..N of known action types, one per version.
+ */
+describe('Russian Railroads — full seeded games to a real end (RR8)', () => {
+  /** Every action type Russian Railroads logs — used to prove no log entry is an unknown move. */
+  const KNOWN_TYPES = new Set([
+    'PLACE',
+    'MOVE_TRACK',
+    'PLACE_LOCO',
+    'REPLACE_LOCO',
+    'FLIP_LOCO',
+    'PLACE_FACTORY',
+    'REPLACE_FACTORY',
+    'RESOLVE_POOL',
+    'SKIP_POOL',
+    'RESOLVE_KEY',
+    'RESOLVE_IDEA_TOKEN',
+    'RESOLVE_IDEA_CARD',
+    'RESOLVE_REUSE',
+    'RESOLVE_SETUP_BONUS',
+    'HIRE_ENGINEER',
+    'USE_ENGINEER',
+    'USE_VARIABLE_ENGINEER',
+    'PASS',
+  ]);
+
+  type Route = { id: string; spaces: (string | null)[] };
+  type Player = {
+    id: string;
+    workersAvailable: number;
+    coins: number;
+    doublers: number;
+    keysReceived: number;
+    usedIdeaTokens: string[];
+    hiredEngineers: { id: string; number: number; action: { kind: string } }[];
+    usedEngineers: string[];
+    industry: { wrench: number; factories: (number | null)[] };
+    routes: Route[];
+    actionPool: { id: string }[];
+    score: number;
+  };
+  type View = {
+    status: string;
+    round: number;
+    rounds: number;
+    activePlayerIndex: number;
+    players: Player[];
+    engineerStrip: ({ number: number; action: { kind: string } } | null)[];
+    pendingMoves: { remaining: number; colors: string[] } | null;
+    pendingLoco: { number: number } | null;
+    pendingFactory: { owed: true } | null;
+    pendingKey: { remaining: number } | null;
+    pendingIdeaToken: { spaceId: string } | null;
+    pendingIdeaCard: { owed: true } | null;
+    pendingReuse: number[] | null;
+    pendingSetupBonus: number[] | null;
+    version: number;
+    results?: RussianRailroadsResult[];
+    winnerIds?: string[];
+    log: { type: string; seq: number; payload?: { passScore?: number } }[];
+  };
+  type Coverage = {
+    trackLock: boolean;
+    colorUnlock: boolean;
+    doubler: boolean;
+    locoChain: boolean;
+    factoryPool: boolean;
+    keyChoice: boolean;
+    ideaToken: boolean;
+    turnClaim: boolean;
+    reuse: boolean;
+    engineerHire: boolean;
+    engineerUse: boolean;
+    passScore: boolean;
+  };
+
+  /** The highest 0-based index of a non-null tile on a route (its frontier), or −1 if empty. */
+  const frontier = (route: Route): number => {
+    for (let i = route.spaces.length - 1; i >= 0; i -= 1) if (route.spaces[i] != null) return i;
+    return -1;
+  };
+  const seatOf = (view: View, id: string): Player => view.players.find((p) => p.id === id)!;
+
+  async function playToEnd(
+    app: FastifyInstance,
+    playerCount: number,
+  ): Promise<{ ended: View; cover: Coverage; steps: number }> {
+    const names = [{ name: 'Ann' }, { name: 'Bob' }, { name: 'Cid' }, { name: 'Dee' }].slice(0, playerCount);
+    const id = (
+      await app.inject({ method: 'POST', url: '/games', payload: { gameType: 'russianrailroads', players: names } })
+    ).json().game.id as string;
+    const readAs = async (seat: string) =>
+      (await app.inject({ method: 'GET', url: `/games/${id}?viewer=${seat}` })).json().game as View;
+    const post = async (seat: string, action: Action) => {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/games/${id}/actions?viewer=${seat}`,
+        payload: { playerId: seat, action },
+      });
+      if (res.statusCode !== 200) {
+        throw new Error(`illegal action ${JSON.stringify(action)} by ${seat}: ${res.statusCode} ${res.payload}`);
+      }
+      return res.json().game as View;
+    };
+    const legalOf = (view: View, seat: string): Action[] =>
+      legalActions(view as unknown as RussianRailroadsState, seat);
+
+    const cover: Coverage = {
+      trackLock: false,
+      colorUnlock: false,
+      doubler: false,
+      locoChain: false,
+      factoryPool: false,
+      keyChoice: false,
+      ideaToken: false,
+      turnClaim: false,
+      reuse: false,
+      engineerHire: false,
+      engineerUse: false,
+      passScore: false,
+    };
+
+    let focus: string | null = null;
+    let lastVersion = -1;
+    let view = await readAs('p1');
+    let steps = 0;
+    for (; steps < 6000 && view.status === 'active'; steps += 1) {
+      const seat = view.players[view.activePlayerIndex]!.id;
+      view = await readAs(seat);
+      if (steps > 0) expect(view.version).toBeGreaterThan(lastVersion);
+      lastVersion = view.version;
+      const me = seatOf(view, seat);
+      const legal = legalOf(view, seat);
+      const has = (t: Action['type']) => legal.some((a) => a.type === t);
+      // Return the actual legal PLACE for `space` (with `build`) — it already carries the right coins/worker
+      // payment (legalActions offers the worker variant when affordable, else the coin-substitute variant), so
+      // posting the found action verbatim is always legal.
+      const place = (space: string, build?: 'loco' | 'factory'): Action | undefined =>
+        legal.find((a) => a.type === 'PLACE' && a.space === space && a.build === build);
+
+      // ── Locks / mini-phases: the seat on the clock may only resolve what is owed ──
+      if (view.pendingSetupBonus) {
+        view = await post(seat, { type: 'RESOLVE_SETUP_BONUS', card: 'start-coins-2' });
+        if (focus === null) focus = view.players[view.activePlayerIndex]!.id; // round-1 opener once setup ends
+        continue;
+      }
+      if (focus === null) focus = seat;
+      if (view.pendingReuse) {
+        const reuse = legal.find((a) => a.type === 'RESOLVE_REUSE');
+        cover.reuse = true;
+        view = await post(seat, reuse ?? { type: 'PASS' });
+        continue;
+      }
+      if (view.pendingMoves) {
+        const steps2 = legal.filter((a): a is Extract<Action, { type: 'MOVE_TRACK' }> => a.type === 'MOVE_TRACK');
+        const nonWood = steps2.find((s) => s.color && s.color !== 'wood');
+        let pick = nonWood;
+        if (!pick) {
+          const ts = steps2.find((s) => s.route === 'transsiberian');
+          const ky = steps2.find((s) => s.route === 'kyiv');
+          // Push the Trans-Siberian wood to space 2 first (unlocks green); then feed Kyiv toward its end (key).
+          if (ts && frontier(me.routes.find((r) => r.id === 'transsiberian')!) < 1) pick = ts;
+          else pick = ky ?? steps2[0];
+        }
+        cover.trackLock = true;
+        if (pick!.color && pick!.color !== 'wood') cover.colorUnlock = true;
+        view = await post(seat, pick!);
+        continue;
+      }
+      if (view.pendingLoco) {
+        const replace = legal.find((a) => a.type === 'REPLACE_LOCO');
+        const placeLoco = legal.find((a) => a.type === 'PLACE_LOCO');
+        const flip = legal.find((a) => a.type === 'FLIP_LOCO');
+        if (replace && !cover.locoChain) {
+          cover.locoChain = true; // an upgrade cascades the displaced loco (the pg. 11 chain)
+          view = await post(seat, replace);
+        } else {
+          view = await post(seat, placeLoco ?? flip!);
+        }
+        continue;
+      }
+      if (view.pendingFactory) {
+        const pf = legal.find((a) => a.type === 'PLACE_FACTORY') ?? legal.find((a) => a.type === 'REPLACE_FACTORY');
+        view = await post(seat, pf!);
+        continue;
+      }
+      if (view.pendingKey) {
+        cover.keyChoice = true;
+        view = await post(seat, { type: 'RESOLVE_KEY', option: 'points' });
+        continue;
+      }
+      if (view.pendingIdeaToken) {
+        const tok = legal.find((a) => a.type === 'RESOLVE_IDEA_TOKEN');
+        cover.ideaToken = true;
+        view = await post(seat, tok ?? { type: 'PASS' });
+        continue;
+      }
+      if (view.pendingIdeaCard) {
+        const c = legal.find((a) => a.type === 'RESOLVE_IDEA_CARD');
+        view = await post(seat, c ?? { type: 'PASS' });
+        continue;
+      }
+      if (me.actionPool.length > 0) {
+        const resolve = legal.find((a) => a.type === 'RESOLVE_POOL');
+        if (resolve) {
+          cover.factoryPool = true;
+          view = await post(seat, resolve);
+        } else {
+          view = await post(seat, { type: 'SKIP_POOL' });
+        }
+        continue;
+      }
+
+      // ── Placement. Non-focus seats pass; the focus seat pursues uncovered goals. ──
+      if (seat !== focus) {
+        cover.passScore = true;
+        view = await post(seat, { type: 'PASS' });
+        continue;
+      }
+
+      const useEng = legal.find((a) => a.type === 'USE_ENGINEER');
+      const gapsFilled = me.industry.factories.filter((f) => f != null).length;
+      const wantFactory = (!cover.ideaToken && gapsFilled < 3) || (!cover.factoryPool && gapsFilled < 1);
+      const hireable = view.engineerStrip[view.engineerStrip.length - 1];
+
+      // Focus-seat goal priority. Cheap one-off goals (doubler, turn-order claim → reuse next round, engineer
+      // hire/use) come first so they land in an early round; the multi-round industry grind (factoryPool +
+      // the industry idea space) and the track-building goals (key, colour unlock) fill the rest.
+      let action: Action | undefined;
+      if (useEng && !cover.engineerUse) {
+        cover.engineerUse = true;
+        action = useEng;
+      } else if (!cover.engineerHire && has('HIRE_ENGINEER') && hireable && hireable.action.kind !== 'inert') {
+        cover.engineerHire = true;
+        action = { type: 'HIRE_ENGINEER' };
+      } else if (!cover.turnClaim && place('turnorder-2')) {
+        cover.turnClaim = true;
+        action = place('turnorder-2');
+      } else if (!cover.doubler && place('doubler')) {
+        cover.doubler = true;
+        action = place('doubler');
+      } else if (!cover.locoChain && place('loco-1', 'loco')) {
+        action = place('loco-1', 'loco');
+      } else if (wantFactory && (place('loco-2', 'factory') ?? place('loco-1', 'factory'))) {
+        action = place('loco-2', 'factory') ?? place('loco-1', 'factory');
+      } else if (
+        (!cover.factoryPool || !cover.ideaToken) &&
+        (place('industry-2') ?? place('industry-1') ?? place('industry-3') ?? place(LAST_ROUND_INDUSTRY_ID))
+      ) {
+        action = place('industry-2') ?? place('industry-1') ?? place('industry-3') ?? place(LAST_ROUND_INDUSTRY_ID);
+      } else if (!cover.colorUnlock && place('track-green-1')) {
+        action = place('track-green-1');
+      } else if (!cover.keyChoice && (place('track-wood-2') ?? place('track-wood-1') ?? place('track-bottom'))) {
+        action = place('track-wood-2') ?? place('track-wood-1') ?? place('track-bottom');
+      } else if (!cover.colorUnlock && (place('track-wood-1') ?? place('track-wood-2') ?? place('track-bottom'))) {
+        action = place('track-wood-1') ?? place('track-wood-2') ?? place('track-bottom');
+      }
+
+      if (!action) {
+        cover.passScore = true;
+        action = { type: 'PASS' };
+      }
+      view = await post(seat, action);
+    }
+
+    return { ended: view, cover, steps };
+  }
+
+  /** Assert the ended game's breakdown is internally consistent and the winners obey the tie rule (pg. 23). */
+  function assertCoherentEnd(ended: View): void {
+    expect(ended.status).toBe('ended');
+    const results = ended.results!;
+    expect(results.map((r) => r.playerId).sort()).toEqual(ended.players.map((p) => p.id).sort());
+    for (const r of results) expect(r.total).toBe(r.base + r.endBonus + r.majority);
+    const maxTotal = Math.max(...results.map((r) => r.total));
+    const expectedWinners = results.filter((r) => r.total === maxTotal).map((r) => r.playerId);
+    expect([...ended.winnerIds!].sort()).toEqual([...expectedWinners].sort());
+    // The final board's per-player score equals the final total (final scoring folded onto the track).
+    for (const r of results) expect(ended.players.find((p) => p.id === r.playerId)!.score).toBe(r.total);
+  }
+
+  /** Assert the move log is a gap-free, typed audit trail whose length matches the final version. */
+  function assertLogReplaysSanely(ended: View): void {
+    expect(ended.log.length).toBe(ended.version); // record() bumps version + appends exactly one entry
+    ended.log.forEach((entry, i) => {
+      expect(entry.seq).toBe(i + 1);
+      expect(KNOWN_TYPES.has(entry.type)).toBe(true);
+    });
+  }
+
+  // The union of the coverage across the three games must touch every behaviour — asserted so a future
+  // change that makes a path unreachable fails loudly.
+  const union: Coverage = {
+    trackLock: false,
+    colorUnlock: false,
+    doubler: false,
+    locoChain: false,
+    factoryPool: false,
+    keyChoice: false,
+    ideaToken: false,
+    turnClaim: false,
+    reuse: false,
+    engineerHire: false,
+    engineerUse: false,
+    passScore: false,
+  };
+
+  for (const { players, seed } of [
+    { players: 2, seed: 101 },
+    { players: 3, seed: 202 },
+    { players: 4, seed: 303 },
+  ]) {
+    it(`plays a complete ${players}-player game over REST — coherent end, sane log (seed ${seed})`, async () => {
+      const db = createDatabase();
+      const app = buildApp({ db, rng: makeRng(seed) });
+      await app.ready();
+      try {
+        const { ended, cover, steps } = await playToEnd(app, players);
+        expect(steps).toBeLessThan(6000);
+        assertCoherentEnd(ended);
+        assertLogReplaysSanely(ended);
+        for (const key of Object.keys(union) as (keyof Coverage)[]) union[key] ||= cover[key];
+      } finally {
+        await app.close();
+        db.close();
+      }
+    }, 60000);
+  }
+
+  it('the three games together exercised the whole behavioural surface (coverage assertion)', () => {
+    // Run after the three games above; `union` accumulates their coverage.
+    expect(union).toEqual({
+      trackLock: true,
+      colorUnlock: true,
+      doubler: true,
+      locoChain: true,
+      factoryPool: true,
+      keyChoice: true,
+      ideaToken: true,
+      turnClaim: true,
+      reuse: true,
+      engineerHire: true,
+      engineerUse: true,
+      passScore: true,
+    });
   });
 });

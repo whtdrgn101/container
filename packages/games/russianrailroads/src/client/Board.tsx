@@ -6,6 +6,7 @@ import {
   legalSteps,
   locoResolutions,
   locosOnRoute,
+  spaceAvailable,
 } from '../engine';
 import type {
   Action,
@@ -183,10 +184,44 @@ export default function RussianRailroadsBoard({
     <div data-testid="board" className="space-y-4">
       {game.status === 'ended' && (
         <GameOver winnerNames={winnerNames} onNewGame={onLeave}>
-          <p className="text-sm text-muted-foreground" data-testid="rr-result-note">
-            Scored by each round's routes + industry (pg. 20–21). Final scoring — end-bonus cards + engineer majority —
-            lands in a later slice.
-          </p>
+          <div className="text-sm" data-testid="rr-results">
+            <p className="mb-2 text-muted-foreground">
+              Final scoring (pg. 22): each round's routes + industry (base), plus end-bonus cards and the engineer
+              majority (40 / 20).
+            </p>
+            <table className="w-full text-left text-xs">
+              <thead className="text-muted-foreground">
+                <tr>
+                  <th className="py-1 pr-2 font-medium">Player</th>
+                  <th className="py-1 px-2 text-right font-medium">Base</th>
+                  <th className="py-1 px-2 text-right font-medium">End bonus</th>
+                  <th className="py-1 px-2 text-right font-medium">Majority</th>
+                  <th className="py-1 pl-2 text-right font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {game.results.map((r) => {
+                  const won = game.winnerIds.includes(r.playerId);
+                  return (
+                    <tr
+                      key={r.playerId}
+                      data-testid={`rr-result-${r.playerId}`}
+                      className={cn('border-t', won && 'font-semibold text-primary')}
+                    >
+                      <td className="py-1 pr-2">
+                        {nameOf(r.playerId)}
+                        {won ? ' 🏆' : ''}
+                      </td>
+                      <td className="py-1 px-2 text-right">{r.base}</td>
+                      <td className="py-1 px-2 text-right">{r.endBonus}</td>
+                      <td className="py-1 px-2 text-right">{r.majority}</td>
+                      <td className="py-1 pl-2 text-right">{r.total}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </GameOver>
       )}
 
@@ -569,8 +604,17 @@ export default function RussianRailroadsBoard({
           unoccupied one (the bottom track space is never occupied — pg. 9). Locked out while resolving. */}
       <section aria-label="Action spaces">
         <h2 className="mb-2 text-sm font-semibold">Action spaces</h2>
+        {game.round === game.rounds ? (
+          <div
+            data-testid="rr-last-round"
+            className="mb-2 rounded-lg border border-amber-500/60 bg-amber-500/10 p-2 text-xs font-medium"
+          >
+            Last round (pg. 22): the last-round tile covers the turn-order claim spaces — instead, advance 3 industry
+            steps.
+          </div>
+        ) : null}
         <div className="grid gap-2 sm:grid-cols-2">
-          {ACTION_SPACES.map((space) => {
+          {ACTION_SPACES.filter((space) => spaceAvailable(space, game.round, game.rounds)).map((space) => {
             const placements = game.actionSpaces[space.id] ?? [];
             const occupied = !space.neverOccupies && placements.length > 0;
             const coinCost = space.coinCost ?? 0;
@@ -737,6 +781,8 @@ function engActionText(action: EngineerAction): string {
       return 'pts = Σ engineers';
     case 'scoreLocomotives':
       return 'pts = Σ 2 locos';
+    case 'endBonus':
+      return `end bonus / +${action.points} pts`;
     case 'inert':
       return 'inert';
   }

@@ -4,6 +4,7 @@ import {
   HIRE_COST,
   IDEA_CARDS,
   IDEA_TOKEN_TYPES,
+  spaceAvailable,
   STARTING_BONUS_CARDS,
   turnOrderOrdinal,
   VARIABLE_ENGINEER_WORKERS,
@@ -27,6 +28,7 @@ import type { Action } from './action';
 
 /** Is `space` a legal reuse target for the seat right now (pg. 17) — the resolveReuse-accepting subset? */
 function reusableSpace(state: RussianRailroadsState, space: ActionSpaceDef): boolean {
+  if (!spaceAvailable(space, state.round, state.rounds)) return false;
   if (space.workers !== 1 || space.coinCost) return false;
   if (!space.neverOccupies && (state.actionSpaces[space.id]?.length ?? 0) > 0) return false;
   const player = state.players[state.activePlayerIndex]!;
@@ -173,6 +175,8 @@ export function legalActions(state: RussianRailroadsState, playerId?: string): A
   };
 
   for (const space of ACTION_SPACES) {
+    // Skip spaces not available this round — the last-round tile swap (pg. 22).
+    if (!spaceAvailable(space, state.round, state.rounds)) continue;
     const occupied = !space.neverOccupies && (state.actionSpaces[space.id]?.length ?? 0) > 0;
     if (occupied) continue;
 

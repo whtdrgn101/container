@@ -105,10 +105,10 @@ describe('pass', () => {
 
     expect(state.status).toBe('ended');
     if (state.status !== 'ended') throw new Error('unreachable');
-    // p1 scores 5/round over 6 rounds = 30; p2 stays at 0.
+    // p1 scores 5/round over 6 rounds = 30 base; no end-bonus cards or engineers → no final bonuses. p2: 0.
     expect(state.results).toEqual([
-      { playerId: 'p1', total: 30 },
-      { playerId: 'p2', total: 0 },
+      { playerId: 'p1', base: 30, endBonus: 0, majority: 0, total: 30 },
+      { playerId: 'p2', base: 0, endBonus: 0, majority: 0, total: 0 },
     ]);
     expect(state.winnerIds).toEqual(['p1']);
     expect(state.log.at(-1)).toMatchObject({ type: 'PASS', payload: { closedRound: 6, gameEnded: true } });
@@ -121,8 +121,8 @@ describe('pass', () => {
     if (state.status !== 'ended') throw new Error('unreachable');
     expect([...state.winnerIds].sort()).toEqual(['p1', 'p2']);
     expect(state.results).toEqual([
-      { playerId: 'p1', total: 0 },
-      { playerId: 'p2', total: 0 },
+      { playerId: 'p1', base: 0, endBonus: 0, majority: 0, total: 0 },
+      { playerId: 'p2', base: 0, endBonus: 0, majority: 0, total: 0 },
     ]);
     // No further moves once ended.
     expect(() => applyAction(state, 'p1', { type: 'PASS' })).toThrowError();

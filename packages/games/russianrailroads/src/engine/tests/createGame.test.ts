@@ -33,7 +33,7 @@ describe('createGame', () => {
     expect(p.locomotives).toEqual([{ number: 1, route: 'transsiberian' }]);
     // Wrench at START, all 5 gaps empty (pg. 12–13).
     expect(p.industry).toEqual({ wrench: 0, factories: [null, null, null, null, null], secondWrench: null });
-    expect(p.endBonus).toBeNull();
+    expect(p.endBonusCards).toEqual([]);
     expect(p.hiredEngineers).toEqual([]);
     expect(p.actionPool).toEqual([]);
     expect(p.score).toBe(0);

@@ -76,10 +76,10 @@ export function resolveIdeaToken(
       { token, keys: KEYS_FROM_TOKEN },
     );
   }
-  // `end-bonus`: draw the top end-bonus card (draw-top ruling, RR8 owns the final call), then owe an
-  // idea-card choice — both hold the turn.
+  // `end-bonus`: draw the top end-bonus card (draw-top ruling, pg. 46 — see `core/endBonus`), then owe an
+  // idea-card choice — both hold the turn. The card joins the player's held set (they may hold more than one).
   const [top, ...restPile] = state.endBonusPile;
-  const drawn = { ...used, endBonus: top ?? null };
+  const drawn = { ...used, endBonusCards: top ? [...used.endBonusCards, top] : used.endBonusCards };
   return record(
     state,
     'RESOLVE_IDEA_TOKEN',
