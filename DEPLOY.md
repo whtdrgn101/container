@@ -138,3 +138,15 @@ stale `game-hub.sqlite-wal` / `-shm` alongside it), and starting again.
   compose file also declares one (identical command) for `depends_on` ordering and clarity.
 - **Graceful shutdown.** The server handles `SIGTERM`/`SIGINT` (what `docker stop` and Ctrl-C send):
   it drains in-flight requests and closes the database cleanly before exiting.
+
+## Upgrading across the non-root image change (v4.5+)
+
+Images since the §4.5 slimming run the server as the unprivileged `node` user. A data volume created
+by an **older root-running image** mounts in root-owned — the entrypoint now repairs this
+automatically at boot (chown `/data`, then drop privileges via `setpriv`), so upgrades need no manual
+step. If you ever run with `--user node` directly (skipping the root entrypoint phase) against an old
+volume, fix ownership once with:
+
+```bash
+docker run --rm -u root -v game-hub-game-data:/data whtdrgn101/game-hub:latest chown -R node:node /data
+```

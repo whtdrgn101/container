@@ -42,9 +42,15 @@ WORKDIR /app
 COPY --from=build /app/backend/dist /app/backend/dist
 COPY --from=build /prod/node_modules /app/backend/node_modules
 COPY --from=build /app/ui/dist /app/ui/dist
-# Run unprivileged. The `node` user ships in the base image (uid 1000); make the data volume its own.
+# Run unprivileged — but via the entrypoint, NOT a `USER node` directive. A pre-existing data volume
+# from an older root-running image mounts in root-owned (the build-time chown below never applies to
+# it), which made the first non-root image die with SQLITE_READONLY on deployed servers. The
+# entrypoint starts as root, repairs /data's ownership, then setpriv-drops to `node` before exec'ing
+# the server. Fresh volumes still inherit the ownership set here.
 RUN mkdir -p /data && chown -R node:node /data
-USER node
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+ENTRYPOINT ["docker-entrypoint.sh"]
 ENV HOST=0.0.0.0 \
     PORT=3001 \
     DATABASE_PATH=/data/game-hub.sqlite \
