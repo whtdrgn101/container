@@ -545,9 +545,48 @@ designs rather than the physical deck's duplicate copies (irrelevant to a pile o
 the `per-factory` card counts only base-game factories (steelworks / the industry board are expansions);
 `per-extra-worker` caps at 3 (the base-game maximum). RR9 (art) reconciles the card art.
 
-### RR9 — Art & board polish
+### RR9 — Art & board polish ✅ *(shipped)*
 The comps-on-artifact flow (Morning Valley / malachite precedent): the player board's three routes +
-track colors are the identity; original art only.
+track colors are the identity; original art only. Landed in two work packages.
+
+**① Art primitives (`src/client/art/`).** The owner-approved comps (rev 2, 2026-07-26) as self-contained
+SVG components: the three route landscapes (`RouteBand` — muted taiga / granite capital / wheat steppe),
+the workshop-wall `IronPanel`, the `RailLine` with station ticks; the rules objects (`TrackChip` in the
+five materials, the `SteamLoco` silhouette, the `FactoryTile`, the worker `Meeple`); and the glyph set
+(`KeyIcon` / `WrenchIcon` / `DoublerClock` / `BonusStar` / `SignalLamp` / `IdeaBulb` / `CoinIcon`). All
+**diegetic hardcoded colours** — the board art does not re-theme in dark mode (the Stone Age Scene rule);
+every band is stretch-safe (`preserveAspectRatio="none"`).
+
+**② Board integration (`src/client/`).** The 997-line functional `Board.tsx` re-skinned as **"The
+Permanent Way"** (player boards) and **"The Dispatch Hall"** (shared board), rev-4 owner layout, split into
+SRP files each well under 400 lines: `Board.tsx` (orchestrator, 284) + `Prompts` / `DispatchHall` /
+`DepartureBoard` / `ActionPlate` / `EngineerStrip` / `PlayerBoard` / `RouteRow` / `IndustryStrip` /
+`Results` / `seat`. Each route renders on its `RouteBand` with `TrackChip`s on the `RailLine`, `SteamLoco`s
+at the head, reached specials as lit/unlit `SignalLamp`s, `DoublerClock`s over Trans-Siberian; the industry
+track on the `IronPanel` with `FactoryTile`s + the wrench. The shared board's action spaces are cream
+enamel plates (`#e8e2d4` + `#17181c` rim) grouped under iron-chrome headers (Track Gangs / Roundhouse / The
+Works / Stores) with label-TOP / worker-sockets-BOTTOM (dashed ring = open, seat-`Meeple`s + coins = taken);
+turn order is the departure board with the two claim sockets (covered by the `rr-last-round` tile in the
+final round); the engineer strip is the crew roster. Workers are `Meeple`s in seat colours everywhere
+(turquoise temps). Tableaus follow the **standing SP8 ruling** — all players listed, own/active seat(s) full,
+opponents compact rows expanding read-only (`rr-expand-<id>`). **Client-only** — engine/module untouched,
+zero host edits (the RR Track-D pattern held). **Every existing testid + e2e-asserted string preserved**;
+all action affordances stay gated on `canDrive` / locks / `ended`.
+
+**Proof:** `pnpm lint` / `format:check` / `typecheck` green; the RR package's **278 engine tests at 100%**
+still pass (engine untouched); `e2e/russianrailroads.spec.ts` green on **both** desktop + mobile (10/10);
+one full `pnpm test:e2e` = 155 passed, the lone failure the known-ignorable Stone-Age mobile visual on this
+box. **No visual-regression baseline for RR** — the engineer strip / setup deal is rng-dependent at start
+(the SP precedent), so a start-state snapshot would be nondeterministic. **Track D findings: none new** —
+the whole re-skin landed inside the package.
+
+**What remains open (the ADAPTED reconciliations still need legible *physical* components, not just art —
+the comps settled the visual identity, not the unreadable rulebook values):** the turn-order pass-score
+values (`TURN_ORDER_PASS_POINTS`), the revaluation-tile values (`VALUATION_REVALUED`), the exact idea-token
+multiset, the four starting-bonus cards, and the factory icons #1/#5/#7/#8/#10 (still `inert`); plus the
+mechanics of engineers **#13** (occupancy-replay "repeat a previously-occupied single-worker action") and
+**#14** (cross-player "use another player's engineer action space", 2-player), which are art-era placeholders
+awaiting those mechanics. RR9 is board *art*, not a component re-read, so these stay open.
 
 ### RR10 — Bot
 Greedy baseline from the (barely-)redacted view; the pending-lock design means it ranks single
