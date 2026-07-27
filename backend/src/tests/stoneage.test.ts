@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { createGame } from '@game-hub/engine/stoneage';
+import { createGame } from '@game-hub/game-stoneage/engine';
 import { buildApp } from '../app';
 import { createDatabase } from '../db';
 import type { DB } from '../db';

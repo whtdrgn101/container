@@ -11,11 +11,11 @@
   "packageManager": "pnpm@11.13.0",
   "scripts": {
     "test": "pnpm -r test",
-    "test:engine": "pnpm --filter @game-hub/engine test",
-    "test:bot": "pnpm --filter @game-hub/bot test",
+    "test:games": "pnpm --filter \"@game-hub/game-*\" test",
     "test:backend": "pnpm --filter @game-hub/backend test",
     "test:e2e": "pnpm --filter @game-hub/ui test:e2e",
     "typecheck": "pnpm -r typecheck",
+    "bench": "pnpm --filter @game-hub/bench bench",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

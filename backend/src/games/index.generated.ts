@@ -2,10 +2,10 @@
 // Run `pnpm generate` to regenerate. The registration invariants (config order, duplicate-id boot
 // crash, seat-bound validation) live in the hand-written registry this feeds.
 import { GameRegistry } from './registry';
-import containerModule from './container';
-import cantstopModule from './cantstop';
-import stoneageModule from './stoneage';
-import stpetersburgModule from './stpetersburg';
+import containerModule from '@game-hub/game-container/module';
+import cantstopModule from '@game-hub/game-cantstop/module';
+import stoneageModule from '@game-hub/game-stoneage/module';
+import stpetersburgModule from '@game-hub/game-stpetersburg/module';
 import russianrailroadsModule from '@game-hub/game-russianrailroads/module';
 
 /**

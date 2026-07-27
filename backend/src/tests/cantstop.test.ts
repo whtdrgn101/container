@@ -1,5 +1,5 @@
-import { legalSelections } from '@game-hub/engine/cantstop';
-import type { CantStopState } from '@game-hub/engine/cantstop';
+import { legalSelections } from '@game-hub/game-cantstop/engine';
+import type { CantStopState } from '@game-hub/game-cantstop/engine';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../app';

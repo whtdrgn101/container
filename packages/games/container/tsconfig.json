@@ -1,0 +1,13 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["react", "better-sqlite3"]
+  },
+  // The engine/module/bot subpaths depend only on `@game-hub/kernel` (+ React types for shared client
+  // types the module never touches, Fastify types for the auction routes, and better-sqlite3 types for the
+  // `Db` generic the delivery-auctions table binds), so the package typechecks them itself. The `./client`
+  // subpath reaches into the UI shell (`@/lib/api`, the shared board components) and React, so it is
+  // typechecked by the UI host instead — see the Track D findings log in ROADMAP.md (the RR precedent: a
+  // TS-source game package can't fully typecheck its own client without pulling in the UI's path aliases).
+  "include": ["src/engine", "src/module", "src/bot", "vitest.config.ts"]
+}

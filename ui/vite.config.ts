@@ -13,14 +13,13 @@ export default defineConfig({
       // bare entry so the more specific alias wins.
       '@game-hub/kernel/client': fileURLToPath(new URL('../packages/kernel/src/contracts/client.ts', import.meta.url)),
       '@game-hub/kernel': fileURLToPath(new URL('../packages/kernel/src/index.ts', import.meta.url)),
-      // Consume the engine as source so Vite transpiles it (shared types + logic). One alias per
-      // subpath — the engine is a per-game platform now, with no bare `@game-hub/engine` entry.
-      '@game-hub/engine/kernel': fileURLToPath(new URL('../engine/src/kernel/index.ts', import.meta.url)),
-      '@game-hub/engine/container': fileURLToPath(new URL('../engine/src/games/container/index.ts', import.meta.url)),
-      '@game-hub/engine/cantstop': fileURLToPath(new URL('../engine/src/games/cantstop/index.ts', import.meta.url)),
-      '@game-hub/engine/stoneage': fileURLToPath(new URL('../engine/src/games/stoneage/index.ts', import.meta.url)),
-      '@game-hub/engine/stpetersburg': fileURLToPath(
-        new URL('../engine/src/games/stpetersburg/index.ts', import.meta.url),
+      // Track D legacy-migration (phase 5): Container moved from `ui/src/games/container/` into its own
+      // in-workspace package over TS source, so its client entry is aliased to source (the RR pattern).
+      // Only `/client` is needed — the client imports its own engine via a relative path within the
+      // package. (Track D phase 6 retired the `@game-hub/engine` package entirely; no `@game-hub/engine/*`
+      // aliases remain, and the UI depends only on `@game-hub/kernel` + the game packages.)
+      '@game-hub/game-container/client': fileURLToPath(
+        new URL('../packages/games/container/src/client/index.ts', import.meta.url),
       ),
       // Track D pilot: Russian Railroads ships as an in-workspace package over TS source, so — exactly
       // like the engine subpaths above — its client entry is aliased to source rather than resolved as a
@@ -28,6 +27,27 @@ export default defineConfig({
       // a relative path within the package). This alias is a Track D finding — see the package ROADMAP.
       '@game-hub/game-russianrailroads/client': fileURLToPath(
         new URL('../packages/games/russianrailroads/src/client/index.ts', import.meta.url),
+      ),
+      // Track D pilot retrofit (phase 2): Can't Stop moved from `ui/src/games/cantstop/` into its own
+      // in-workspace package over TS source, so its client entry is aliased to source (the RR pattern).
+      // Only `/client` is needed — the client imports its own engine via a relative path within the
+      // package. The old `@game-hub/engine/cantstop` alias is gone (the client uses `../engine` now).
+      '@game-hub/game-cantstop/client': fileURLToPath(
+        new URL('../packages/games/cantstop/src/client/index.ts', import.meta.url),
+      ),
+      // Track D legacy-migration (phase 3): Stone Age moved from `ui/src/games/stoneage/` into its own
+      // in-workspace package over TS source, so its client entry is aliased to source (the RR pattern).
+      // Only `/client` is needed — the client imports its own engine via a relative path within the
+      // package. The old `@game-hub/engine/stoneage` alias is gone (the client uses `../engine` now).
+      '@game-hub/game-stoneage/client': fileURLToPath(
+        new URL('../packages/games/stoneage/src/client/index.ts', import.meta.url),
+      ),
+      // Track D legacy-migration (phase 4): Saint Petersburg moved from `ui/src/games/stpetersburg/` into
+      // its own in-workspace package over TS source, so its client entry is aliased to source (the RR
+      // pattern). Only `/client` is needed — the client imports its own engine via a relative path within
+      // the package. The old `@game-hub/engine/stpetersburg` alias is gone (the client uses `../engine`).
+      '@game-hub/game-stpetersburg/client': fileURLToPath(
+        new URL('../packages/games/stpetersburg/src/client/index.ts', import.meta.url),
       ),
     },
   },

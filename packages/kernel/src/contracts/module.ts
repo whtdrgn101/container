@@ -191,6 +191,36 @@ export interface ModuleGames {
   update(state: unknown): void;
 }
 
+/**
+ * The slice of the host's real-time broadcast hub a game module actually touches (contract gap #2,
+ * design doc §D1). A module that pushes a side-channel of its own — Container's `push.ts` is the only
+ * one — calls exactly `broadcastEach`; nothing in a module reaches for `subscribe`/`send`/counts. This
+ * structural interface exists so a **game package** can bind `ModuleContext`'s `Hub` generic without
+ * importing the backend's concrete `GameHub` (which would be a workspace cycle). The backend proves its
+ * `GameHub` satisfies this (compile-time assertion in `backend/src/games/module.ts`).
+ */
+export interface ModuleHub {
+  /**
+   * Broadcast to every client subscribed to `gameId`, each frame built for that subscriber's own
+   * viewer so redaction stays an explicit per-viewer decision. Return value is ignored by callers.
+   */
+  broadcastEach(gameId: string, build: (viewer: Viewer) => unknown): void;
+}
+
+/**
+ * The slice of the host's bot-seat store a game module actually reads (contract gap #2, design doc §D1).
+ * Modules read which seats an AI holds (`listForGame`, used by every bot runner and the routes that
+ * report bots) and — Can't Stop's runner alone — each seat's difficulty tier (`difficultiesForGame`,
+ * CS4). This structural interface lets a game package bind `ModuleContext`'s `BotSeats` generic without
+ * importing the backend's concrete `BotRepository`. The backend proves its `BotRepository` satisfies it.
+ */
+export interface ModuleBotSeats {
+  /** The bot-held seat ids for a game (empty ⇒ an all-human game). */
+  listForGame(gameId: string): readonly string[];
+  /** Each bot seat's difficulty tier for a game (playerId → tier). Empty for an all-human game. */
+  difficultiesForGame(gameId: string): Record<string, string>;
+}
+
 /** Plays a game's AI seats forward. The core only ever needs to say "something changed, catch up". */
 export interface BotDriver {
   /**

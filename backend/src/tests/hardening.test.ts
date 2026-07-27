@@ -1,7 +1,7 @@
 import { once } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import type { GameState } from '@game-hub/engine/container';
+import type { GameState } from '@game-hub/game-container/engine';
 import { buildApp } from '../app';
 import { createDatabase } from '../db';
 import type { DB } from '../db';

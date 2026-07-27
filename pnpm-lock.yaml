@@ -47,15 +47,21 @@ importers:
       '@fastify/websocket':
         specifier: ^11.3.0
         version: 11.3.0
-      '@game-hub/bot':
+      '@game-hub/game-cantstop':
         specifier: workspace:*
-        version: link:../bot
-      '@game-hub/engine':
+        version: link:../packages/games/cantstop
+      '@game-hub/game-container':
         specifier: workspace:*
-        version: link:../engine
+        version: link:../packages/games/container
       '@game-hub/game-russianrailroads':
         specifier: workspace:*
         version: link:../packages/games/russianrailroads
+      '@game-hub/game-stoneage':
+        specifier: workspace:*
+        version: link:../packages/games/stoneage
+      '@game-hub/game-stpetersburg':
+        specifier: workspace:*
+        version: link:../packages/games/stpetersburg
       '@game-hub/kernel':
         specifier: workspace:*
         version: link:../packages/kernel
@@ -88,15 +94,49 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)
 
-  bot:
+  packages/bench:
     dependencies:
-      '@game-hub/engine':
+      '@game-hub/game-cantstop':
         specifier: workspace:*
-        version: link:../engine
+        version: link:../games/cantstop
+      '@game-hub/game-container':
+        specifier: workspace:*
+        version: link:../games/container
+      '@game-hub/game-stoneage':
+        specifier: workspace:*
+        version: link:../games/stoneage
+      '@game-hub/game-stpetersburg':
+        specifier: workspace:*
+        version: link:../games/stpetersburg
+      '@game-hub/kernel':
+        specifier: workspace:*
+        version: link:../kernel
     devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+
+  packages/games/cantstop:
+    dependencies:
+      '@game-hub/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      react:
+        specifier: ^19.0.0
+        version: 19.2.7
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.17
       '@vitest/coverage-v8':
         specifier: ^3.2.4
         version: 3.2.7(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1))
+      fastify:
+        specifier: ^5.2.0
+        version: 5.10.0
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
@@ -104,15 +144,33 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)
 
-  engine:
+  packages/games/container:
     dependencies:
       '@game-hub/kernel':
         specifier: workspace:*
-        version: link:../packages/kernel
+        version: link:../../kernel
+      lucide-react:
+        specifier: ^0.469.0
+        version: 0.469.0(react@19.2.7)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.7
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.12
+        version: 7.6.13
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.17
       '@vitest/coverage-v8':
         specifier: ^3.2.4
         version: 3.2.7(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1))
+      better-sqlite3:
+        specifier: ^11.8.0
+        version: 11.10.0
+      fastify:
+        specifier: ^5.2.0
+        version: 5.10.0
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
@@ -121,6 +179,53 @@ importers:
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)
 
   packages/games/russianrailroads:
+    dependencies:
+      '@game-hub/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      react:
+        specifier: ^19.0.0
+        version: 19.2.7
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.17
+      '@vitest/coverage-v8':
+        specifier: ^3.2.4
+        version: 3.2.7(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1))
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)
+
+  packages/games/stoneage:
+    dependencies:
+      '@game-hub/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      react:
+        specifier: ^19.0.0
+        version: 19.2.7
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.17
+      '@vitest/coverage-v8':
+        specifier: ^3.2.4
+        version: 3.2.7(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1))
+      fastify:
+        specifier: ^5.2.0
+        version: 5.10.0
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)
+
+  packages/games/stpetersburg:
     dependencies:
       '@game-hub/kernel':
         specifier: workspace:*
@@ -159,12 +264,21 @@ importers:
 
   ui:
     dependencies:
-      '@game-hub/engine':
+      '@game-hub/game-cantstop':
         specifier: workspace:*
-        version: link:../engine
+        version: link:../packages/games/cantstop
+      '@game-hub/game-container':
+        specifier: workspace:*
+        version: link:../packages/games/container
       '@game-hub/game-russianrailroads':
         specifier: workspace:*
         version: link:../packages/games/russianrailroads
+      '@game-hub/game-stoneage':
+        specifier: workspace:*
+        version: link:../packages/games/stoneage
+      '@game-hub/game-stpetersburg':
+        specifier: workspace:*
+        version: link:../packages/games/stpetersburg
       '@game-hub/kernel':
         specifier: workspace:*
         version: link:../packages/kernel

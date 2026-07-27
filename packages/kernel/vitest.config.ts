@@ -10,6 +10,7 @@ export default defineConfig({
       exclude: [
         'src/**/tests/**', // test files + shared helpers
         'src/index.ts', // the public barrel (re-exports only)
+        'src/bot/index.ts', // the @game-hub/kernel/bot barrel (re-exports only)
         'src/moveRecord.ts', // compile-time only (MoveRecord interface)
         'src/viewer.ts', // compile-time only (Viewer type alias)
         'src/endState.ts', // compile-time only (GameEndState / WinnersEndState unions)

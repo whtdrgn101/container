@@ -14,9 +14,22 @@
     "e2e",
     "vite.config.ts",
     "playwright.config.ts",
+    // Track D legacy-migration (phase 5): Container's UI client moved into its own package (outside
+    // `ui/src`) but reaches the shell's `@/` alias, so the UI host typechecks it — a Track D finding (a
+    // TS-source game package can't fully typecheck its own client without the shell's path aliases).
+    "../packages/games/container/src/client",
     // Track D pilot: Russian Railroads' UI client lives in its own package (outside `ui/src`) but reaches
     // the shell's `@/` alias, so the UI host typechecks it — a Track D finding (a TS-source game package
     // can't fully typecheck its own client without the shell's path aliases). See the package ROADMAP.
-    "../packages/games/russianrailroads/src/client"
+    "../packages/games/russianrailroads/src/client",
+    // Track D pilot retrofit (phase 2): Can't Stop's UI client moved into its own package (outside
+    // `ui/src`) but reaches the shell's `@/` alias, so the UI host typechecks it — the same finding.
+    "../packages/games/cantstop/src/client",
+    // Track D legacy-migration (phase 3): Stone Age's UI client moved into its own package (outside
+    // `ui/src`) but reaches the shell's `@/` alias, so the UI host typechecks it — the same finding.
+    "../packages/games/stoneage/src/client",
+    // Track D legacy-migration (phase 4): Saint Petersburg's UI client moved into its own package (outside
+    // `ui/src`) but reaches the shell's `@/` alias, so the UI host typechecks it — the same finding.
+    "../packages/games/stpetersburg/src/client"
   ]
 }

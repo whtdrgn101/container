@@ -56,7 +56,7 @@ jobs:
       - run: pnpm generate
       - run: git diff --exit-code -- backend/src/games/index.generated.ts ui/src/games/registry.generated.ts
 
-      - run: pnpm test # engine + bot + backend; `ui` has no unit `test` script so it's skipped
+      - run: pnpm test # kernel + the game packages + backend; `ui` has no unit `test` script so it's skipped
 
   e2e:
     name: Playwright e2e

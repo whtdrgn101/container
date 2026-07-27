@@ -22,11 +22,19 @@ export { makeSeating } from './seating';
 export type { SeatedState, SeatHelpers } from './seating';
 export type { GameEndState, WinnersEndState } from './endState';
 
+// The game-agnostic bot drive-loop, shared by every game's backend runner (REVIEW §3.4). It imports no
+// host and reads only a structural slice of state, so it is kernel code (Track D — legacy-migration
+// decision 5). Each game package's bot runner imports `runBotLoop` from here directly.
+export { runBotLoop } from './botLoop';
+export type { BotLoopState, PreStepResult, BotLoopOptions } from './botLoop';
+
 // The backend `GameModule` contract (host bindings are generic parameters — see `contracts/module.ts`).
 export type {
   GameModule,
   ModuleContext,
   ModuleGames,
+  ModuleHub,
+  ModuleBotSeats,
   BotDriver,
   ParseResult,
   ErrorResponse,

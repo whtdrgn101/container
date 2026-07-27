@@ -39,18 +39,24 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-test('the shell imports no game engine', () => {
+test('the shell imports no game engine or game package', () => {
   const offenders = sourceFiles(SRC)
     .filter((path) => !path.startsWith(GAME_DIR))
     .filter((path) => {
       const source = readFileSync(path, 'utf8');
       // Match real imports only — these files *talk about* the rule in their comments. Catches every
-      // engine subpath (`@game-hub/engine/container`, `/cantstop`, `/kernel`), not just the old bare id.
-      return /^\s*import\s[^;]*from\s+'@game-hub\/engine(\/[^']*)?'/m.test(source);
+      // engine subpath (`@game-hub/engine/container`, `/stoneage`, `/kernel`) AND every Track D game
+      // **package** (`@game-hub/game-cantstop/client`, `@game-hub/game-russianrailroads/client`) — once
+      // a game lives in its own package, a shell file reaching for it is the same seam breach as the old
+      // bare-engine import. Only the generated registry (under `src/games/`, excluded above) may name one.
+      return /^\s*import\s[^;]*from\s+'@game-hub\/(engine(\/[^']*)?|game-[^']*)'/m.test(source);
     })
     .map((path) => path.slice(SRC.length + 1));
 
-  expect(offenders, 'shell files must not import @game-hub/engine — move the need into games/<game>/').toEqual([]);
+  expect(
+    offenders,
+    'shell files must not import @game-hub/engine or a @game-hub/game-* package — move the need into games/<game>/',
+  ).toEqual([]);
 });
 
 test('only the registry reaches into a game', () => {

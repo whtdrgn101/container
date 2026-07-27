@@ -326,9 +326,9 @@ The shared `components/GameOver.tsx` — used correctly by all three — is the 
 > `'stepped' | 'waiting' | 'idle'`); observable behaviour is byte-identical (183 backend tests green,
 > cantstop/stoneage `botRunner.ts` now 100% covered). §1.1 (containment stays in `app.ts`'s `tick`) and
 > §1.4 (the loud runaway throw) now live in one place. **`decide`/`rank` were NOT hoisted** (as ruled).
-> The two safe bot-package extractions also shipped: `bot/src/kernel/turn.ts`'s `assertBotTurn` (the
+> The two safe bot-package extractions also shipped: `packages/kernel/src/bot/turn.ts`'s `assertBotTurn` (the
 > byte-identical `decide` preamble, wired into all three games; Container keeps its `selfOf` check
-> ahead of it) and `bot/src/kernel/progress.ts`'s `makeProgressGuard` (the self-play cycling guard) —
+> ahead of it) and `packages/kernel/src/bot/progress.ts`'s `makeProgressGuard` (the self-play cycling guard) —
 > **Stone Age switched from its flat 100k-action cap to per-round detection** (`MAX_ACTIONS_PER_ROUND`
 > = 500), so a cycle now fails in ~one round. Its self-play error message unified to the shared
 > `Bot seat … took N actions in round R …` shape (no test asserted the old wording). Bot 157 tests /
@@ -487,7 +487,7 @@ breaks the container at startup. Slimming it properly means compiling the backen
 
 ### 4.6 Stone Age's `viewFor` sends the face-down card deck to every client
 
-`engine/src/games/stoneage/view.ts` is a pass-through (`{ ...state, viewerId }`), and its own comment
+`packages/games/stoneage/src/engine/view.ts` is a pass-through (`{ ...state, viewerId }`), and its own comment
 calls the undrawn decks "the only secret … redact them here then if it matters." It now matters, mildly:
 `cardDeck` (the full shuffled draw order) and each stack's unrevealed buildings ride every REST response
 and WS push, so a client with dev tools open can read the future. Not cheating-relevant for bots (the
@@ -497,7 +497,7 @@ info). **Decision 2026-07-21: deferred** — redacting means splitting server st
 shape for a game whose view is otherwise the whole state, a larger refactor than the leak warrants for
 trusted-LAN play. If it's ever done, redact in `viewFor` (deck → count), never in the UI.
 
-> **Done (SA15, 2026-07-24) — the card deck.** `engine/src/games/stoneage/view.ts` no longer passes the
+> **Done (SA15, 2026-07-24) — the card deck.** `packages/games/stoneage/src/engine/view.ts` no longer passes the
 > undrawn `cardDeck` through: `StoneAgeView` drops the array and carries `cardDeckCount: number`, computed
 > in `viewFor`, so the full draw order never crosses the engine boundary onto any REST reply or WS push.
 > The persisted **state** is unchanged (views aren't persisted — no `schemaVersion` bump). Mirrors Saint
@@ -579,7 +579,7 @@ parameterized. Real gaps:
   under 1000" rule. A second header block sits mid-file, so a second suite is already living inside
   it. The backend never adopted the engine's `tests/helpers.ts` convention; `mulberry32` is duplicated
   verbatim across three test files.
-- ~~**Bot strength is entirely unmeasured.**~~ ✅ **Fixed** (2026-07-24): `bot/src/kernel/benchmark.ts`
+- ~~**Bot strength is entirely unmeasured.**~~ ✅ **Fixed** (2026-07-24): `packages/kernel/src/bot/benchmark.ts`
   — seat-rotated candidate-vs-baseline with the same board replayed per seat, Wilson 95% CI, per-seat
   policy support in every game's self-play (Container's sealed bids per-seat too), and a `pnpm bench`
   driver. Convention: freeze a baseline, tune, commit when the CI lower bound clears 50%. *(Original

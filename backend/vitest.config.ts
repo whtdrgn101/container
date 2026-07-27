@@ -3,14 +3,12 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
-    // The engine is consumed as TypeScript source via workspace symlink;
-    // tell Vitest to transform it rather than treat it as an external dep.
-    // The engine, kernel and in-workspace game packages are consumed as TypeScript source via workspace
+    // The kernel and the in-workspace game packages are consumed as TypeScript source via workspace
     // symlink; tell Vitest to transform them rather than treat them as external deps. `game-` covers
-    // Track D game packages like `@game-hub/game-russianrailroads`.
+    // every game package (`@game-hub/game-container`, `@game-hub/game-russianrailroads`, …).
     server: {
       deps: {
-        inline: [/@game-hub\/(engine|bot|kernel|game-)/],
+        inline: [/@game-hub\/(kernel|game-)/],
       },
     },
     coverage: {

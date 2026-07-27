@@ -1,17 +1,35 @@
 # Track D — Externalize games (design doc)
 
-**Status: D0 in progress — the compressed path (owner decision, 2026-07-24).** Game 5 (Russian
-Railroads, from the Ultimate Railroads rulebook) arrives *as* the Track D pilot: **RR0 = D0** (the
-in-repo restructure below), then Russian Railroads is built as the first **in-workspace game
-package** (`packages/games/russianrailroads`, the §3 four-subpath shape) — taking over D1's role
-from Can't Stop, since a heavyweight built against the contract from day one is a more honest test
-than retrofitting the smallest game. Out-of-repo graduation (D2) stays a later option. The §8
-questions resolve provisionally by staying in-workspace: bot inside the package; PDFs stay in
-`reference_materials/`; e2e stays in the platform harness; naming stays workspace-scoped.
+**Status: ✅ in-workspace phase complete (2026-07-27). D2 (out-of-repo) still open.** Game 5 (Russian
+Railroads) arrived *as* the Track D pilot — built as the first **in-workspace game package**
+(`packages/games/russianrailroads`, the §3 four-subpath shape) — and then **all four legacy games were
+migrated onto the same shape** and `@game-hub/engine`/`@game-hub/bot` retired (the working plan +
+findings: [`track-d-legacy-migration.md`](./track-d-legacy-migration.md)). So **every game now lives in
+its own `@game-hub/game-<id>` package** over a peer `@game-hub/kernel`; the kernel, the two hosts, and the
+build-time registry codegen off `games.config.ts` all shipped as designed. The current shape is documented
+for builders in [`design-patterns.md`](./design-patterns.md) and [`game-creation.md`](./game-creation.md).
 
-Original goal statement: four games have tested the engine and the seams; the long-term goal is
-making games easier to add, and eventually addable from *outside* this repo. Pilot: Russian
-Railroads (a heavyweight is the right stress test).
+What the migration resolved from the two gaps below (§D1 findings):
+
+- **Contract gap #2 (the bound `ModuleContext`) — closed structurally.** The kernel gained minimal
+  *structural* host interfaces (`ModuleHub`, `ModuleBotSeats`) next to `ModuleContext`; a game package
+  binds `ModuleContext<Db, ModuleHub, ModuleBotSeats>` and the backend proves its concrete
+  `GameHub`/`BotRepository` satisfy them with a compile-time assertion. The kernel still imports no host.
+  `runBotLoop` and the bot helpers (`@game-hub/kernel/bot`) moved to the kernel too. A `createBotDriver`
+  can now be written entirely from the neutral kernel side.
+- **Contract gap #1 (the client transport layer) — accepted and documented for in-workspace.** Package
+  clients still reach the shell's transport DTOs (`GamePayload`/`GameMessage`) and shared chrome
+  (`TurnBanner`/`ActivityFeed`/`GameOver`) via the UI's `@` alias, which is why the UI host typechecks each
+  package's `./client`. Publishing the transport DTOs into `@game-hub/kernel/client` and a `@game-hub/ui-kit`
+  is deferred to **D2** — the point at which an out-of-repo client actually can't reach `ui/src`.
+
+What **D2** (out-of-repo) still forces that the in-workspace phase did not: a real `dist` (TS-source
+consumption + Vite aliases don't survive `node_modules`), the Tailwind content-glob problem (§2),
+enforced kernel-contract versioning (§4), and gap #1's `@game-hub/ui-kit` extraction.
+
+Original goal statement: four games had tested the engine and the seams; the long-term goal is making
+games easier to add, and eventually addable from *outside* this repo. Pilot: Russian Railroads (a
+heavyweight is the right stress test).
 
 ## D1 findings from RR1 (2026-07-24 — the pilot's first contact)
 

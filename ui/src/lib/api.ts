@@ -2,9 +2,9 @@
  * The games-platform API client — **game-agnostic** (roadmap C2).
  *
  * Mirrors the backend's split exactly: this file is the core (games, lobbies, the live stream), and a
- * game's own endpoints live in its own client (`games/container/api.ts`, serving
- * `/games/:id/container/…`). Nothing here may import `@game-hub/engine` or know what a container,
- * a bid or a scoring card is.
+ * game's own endpoints live in its own client (`@game-hub/game-container`'s `src/client/api.ts`, serving
+ * `/games/:id/container/…`). Nothing here may import a game package (`@game-hub/game-*`) or know what a
+ * container, a bid or a scoring card is.
  *
  * **A game's state is `unknown` here on purpose.** Only the game's own board can read it, so every
  * function that returns one is generic in `S`: the shell calls them bare and passes the opaque state

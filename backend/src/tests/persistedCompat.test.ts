@@ -1,8 +1,8 @@
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { createGame as createContainer } from '@game-hub/engine/container';
-import { createGame as createCantStop } from '@game-hub/engine/cantstop';
-import { createGame as createStoneAge } from '@game-hub/engine/stoneage';
+import { createGame as createContainer } from '@game-hub/game-container/engine';
+import { createGame as createCantStop } from '@game-hub/game-cantstop/engine';
+import { createGame as createStoneAge } from '@game-hub/game-stoneage/engine';
 import { buildApp } from '../app';
 import { createDatabase } from '../db';
 import type { DB } from '../db';

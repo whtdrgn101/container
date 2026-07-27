@@ -6,14 +6,16 @@ game, and the higher-level "which games, and what's left of them" view. Game-spe
 
 | Game | Status | Roadmap |
 |------|--------|---------|
-| **Container** | core game complete; AI A0–A2 shipped, A3–A5 remain | [`engine/src/games/container/ROADMAP.md`](engine/src/games/container/ROADMAP.md) |
-| **Can't Stop** | complete: playable, AI (CS1) + art/a11y polish (CS2) shipped; only optional variants (CS3) remain | [`engine/src/games/cantstop/ROADMAP.md`](engine/src/games/cantstop/ROADMAP.md) |
-| **Stone Age** | **complete** (SA0–SA14): full worker-placement game — placement, gather+tools, buildings, civ cards, feeding, game end + scoring, an illustrated zoomable board, an AI bot, and the pg. 8 2–3-player restrictions (SA14) | [`engine/src/games/stoneage/ROADMAP.md`](engine/src/games/stoneage/ROADMAP.md) |
-| **Russian Railroads** | **in build** (game 5, Ultimate Railroads edition — and the Track D pilot: the first *package-shaped* game). RR0 (= Track D0 platform prep) in progress; RR1–RR8 base game → RR9 art → RR10 bot → expansion modules by invasiveness. Rules digest done (48 pp. read; hidden info = one secret end-bonus card/player; all base randomness setup-only; the legalActions hazard = split-move combinatorics, resolved by the pending-lock ruling) | [`packages/games/russianrailroads/ROADMAP.md`](packages/games/russianrailroads/ROADMAP.md) |
-| **Saint Petersburg** | **complete** (SP0–SP9, game 4, 1st edition) — including the "Malachite & Gilt" board art (SP8, comps-approved) and the platform's first redacted-view bot (SP9, greedy baseline): **SP0–SP7 shipped** — registered, viewable fourth game with redacting `viewFor` (hands *and* rubles secret) + the 116-card deck data (SP0), the playable **phase spine** — `BUY`/`PASS`, turn order, cumulative cost reductions (min 1 ruble), all-pass phase close with scoring + refill, interactive board (SP1), the **full round loop** — trading-phase frame (no scoring), round transition (discard lower, slide upper→lower, deal workers, rotate all four markers left) with the pg. 8 "no cards taken → skip the *mid-round* refill" special case (round-end worker deal unconditional — a drain-spiral bug corrected in SP3), marker chips + rollover feed (SP2), the **hidden hand** — `ADD_TO_HAND` (free, limit 3) / `PLAY_FROM_HAND` (cost with reductions, no lower-row discount), non-empty-hand redaction proof, playable-hand UI + face-down opponent counts (SP3), **trading-card displacement** — `BUY`/`PLAY_FROM_HAND` take a `displace` card-id (green ware-pairs incl. Czar-by-any-green, blue→any building, orange→any aristocrat, never trading-on-trading), cost = difference-or-1 with all reductions, carpenter-workshop/gold-smelter owned-card reductions live, UI displacement picker + upgrade feed (SP4), and the **six special cards** — Warehouse (hand limit 4), Mariinskij (+1₽/aristocrat at building scoring), Tax man (+1₽/worker at aristocrat scoring), Potjomkin (buy 2, worth 6 when displaced), the **Pub** interlude (after building scoring, buy ≤5 pts @ 2₽) and the **Observatory** (skip its point to draw a stack top → forced buy/hand/discard), both as engine-level turn locks (`pendingPubBuy`/`pendingDraw`, no backend routes; the draw is a pure engine action, `pendingDraw` publicly revealed like an SP3 take), engine 476 @ 100% + seeded backend REST proof (SP5), and **game end + final scoring** — a `finalRound` flag armed when a board refill places a group's last card (pg. 5; dealing short of a *pre-empty* stack is not the trigger; the round-end worker deal arming it makes the fresh round "this round"), ending at the final round's trading close into `finalScoring` (distinct-aristocrat table 1/3/6/10/15/21/28/36/45/55 by card identity incl. orange trading cards, +1/full 10₽, −5/hand card, **unclamped**; ties by money then shared), `viewFor` revealing all at `ended`, and the shared `GameOver` results table (SP6), and **playable-game hardening** — full seeded games driven to a real end over REST at 2/3/4 players (whole surface: both rows, add+play hand, a trading displacement, a paying Pub buy, an Observatory draw+resolve; coherent breakdowns, monotonic version, sane move log), the honest **four-games-coexist** check (all four real games + the counter stub in one app; the routeless `stpetersburg` namespace 404s cleanly while cross-game calls stay guarded), lobby+colours / resume / abandon proven in e2e, the **seat palette** on the board, a `describe(move)` audit, and a `legalActions⊆applyAction` fuzz (SP7); then the approved **art** (SP8) and the redacted-view **bot** (SP9) — see the per-game roadmap for both | [`engine/src/games/stpetersburg/ROADMAP.md`](engine/src/games/stpetersburg/ROADMAP.md) |
+| **Container** | core game complete; AI A0–A2 shipped, A3–A5 remain | [`packages/games/container/ROADMAP.md`](packages/games/container/ROADMAP.md) |
+| **Can't Stop** | complete: playable, AI (CS1) + art/a11y polish (CS2) shipped; only optional variants (CS3) remain | [`packages/games/cantstop/ROADMAP.md`](packages/games/cantstop/ROADMAP.md) |
+| **Stone Age** | **complete** (SA0–SA14): full worker-placement game — placement, gather+tools, buildings, civ cards, feeding, game end + scoring, an illustrated zoomable board, an AI bot, and the pg. 8 2–3-player restrictions (SA14) | [`packages/games/stoneage/ROADMAP.md`](packages/games/stoneage/ROADMAP.md) |
+| **Russian Railroads** | **in build** (game 5, Ultimate Railroads edition — and the Track D pilot: the first *package-shaped* game, `@game-hub/game-russianrailroads`). RR0–RR8 **base game complete** (worker placement, track advancement, locomotives, engineers, game end + final scoring); RR9 art in progress; RR10 bot pending; expansion modules after. Rules digest done (48 pp. read; hidden info = one secret end-bonus card/player; all base randomness setup-only; the legalActions hazard = split-move combinatorics, resolved by the pending-lock ruling) | [`packages/games/russianrailroads/ROADMAP.md`](packages/games/russianrailroads/ROADMAP.md) |
+| **Saint Petersburg** | **complete** (SP0–SP9, game 4, 1st edition) — including the "Malachite & Gilt" board art (SP8, comps-approved) and the platform's first redacted-view bot (SP9, greedy baseline): **SP0–SP7 shipped** — registered, viewable fourth game with redacting `viewFor` (hands *and* rubles secret) + the 116-card deck data (SP0), the playable **phase spine** — `BUY`/`PASS`, turn order, cumulative cost reductions (min 1 ruble), all-pass phase close with scoring + refill, interactive board (SP1), the **full round loop** — trading-phase frame (no scoring), round transition (discard lower, slide upper→lower, deal workers, rotate all four markers left) with the pg. 8 "no cards taken → skip the *mid-round* refill" special case (round-end worker deal unconditional — a drain-spiral bug corrected in SP3), marker chips + rollover feed (SP2), the **hidden hand** — `ADD_TO_HAND` (free, limit 3) / `PLAY_FROM_HAND` (cost with reductions, no lower-row discount), non-empty-hand redaction proof, playable-hand UI + face-down opponent counts (SP3), **trading-card displacement** — `BUY`/`PLAY_FROM_HAND` take a `displace` card-id (green ware-pairs incl. Czar-by-any-green, blue→any building, orange→any aristocrat, never trading-on-trading), cost = difference-or-1 with all reductions, carpenter-workshop/gold-smelter owned-card reductions live, UI displacement picker + upgrade feed (SP4), and the **six special cards** — Warehouse (hand limit 4), Mariinskij (+1₽/aristocrat at building scoring), Tax man (+1₽/worker at aristocrat scoring), Potjomkin (buy 2, worth 6 when displaced), the **Pub** interlude (after building scoring, buy ≤5 pts @ 2₽) and the **Observatory** (skip its point to draw a stack top → forced buy/hand/discard), both as engine-level turn locks (`pendingPubBuy`/`pendingDraw`, no backend routes; the draw is a pure engine action, `pendingDraw` publicly revealed like an SP3 take), engine 476 @ 100% + seeded backend REST proof (SP5), and **game end + final scoring** — a `finalRound` flag armed when a board refill places a group's last card (pg. 5; dealing short of a *pre-empty* stack is not the trigger; the round-end worker deal arming it makes the fresh round "this round"), ending at the final round's trading close into `finalScoring` (distinct-aristocrat table 1/3/6/10/15/21/28/36/45/55 by card identity incl. orange trading cards, +1/full 10₽, −5/hand card, **unclamped**; ties by money then shared), `viewFor` revealing all at `ended`, and the shared `GameOver` results table (SP6), and **playable-game hardening** — full seeded games driven to a real end over REST at 2/3/4 players (whole surface: both rows, add+play hand, a trading displacement, a paying Pub buy, an Observatory draw+resolve; coherent breakdowns, monotonic version, sane move log), the honest **four-games-coexist** check (all four real games + the counter stub in one app; the routeless `stpetersburg` namespace 404s cleanly while cross-game calls stay guarded), lobby+colours / resume / abandon proven in e2e, the **seat palette** on the board, a `describe(move)` audit, and a `legalActions⊆applyAction` fuzz (SP7); then the approved **art** (SP8) and the redacted-view **bot** (SP9) — see the per-game roadmap for both | [`packages/games/stpetersburg/ROADMAP.md`](packages/games/stpetersburg/ROADMAP.md) |
 
-Adding a game is **additive** — implement the seams, register, done (proven three times now — Container,
-Can't Stop, Stone Age). See CLAUDE.md → "Building a new game" for the recipe.
+Adding a game is **additive** — implement the seams, register, done (proven five times now — Container,
+Can't Stop, Stone Age, Saint Petersburg, and the package-shaped Russian Railroads). See
+[`docs/game-creation.md`](docs/game-creation.md) for the recipe and [`docs/design-patterns.md`](docs/design-patterns.md)
+for how the seams work.
 
 ## Direction (owner, 2026-07-22)
 
@@ -29,16 +31,19 @@ The near-term order, decided while play-testing:
 3. **Schema versioning for state transitions** ✅ (REVIEW §4.1) — `schemaVersion` + `migrate` on
    `GameModule`, a `games.schema_version` column, and write-on-read upgrades in `GameRepository`, so
    iterating on shipped engines can't strand in-flight games (downgrade rows 409, all four games are v1).
-4. **Track D (new, core) — externalize games.** Four games have tested the engine and the seams; the
-   long-term goal is making games easier to add — and eventually addable from *outside* this repo.
-   **Design doc written** (2026-07-24): **[`docs/track-d-externalize-games.md`](docs/track-d-externalize-games.md)**
-   — the game-package contract (four subpath exports over a peer `@game-hub/kernel`), build-time
-   registry codegen off a `games.config.ts`, kernel-major-as-contract-version, the workspace
-   assumptions that must dissolve (TS-source consumption → real `dist`, Vite aliases, Tailwind
-   content globs), and a three-phase migration. **Owner decision 2026-07-24 — the compressed path:**
-   game 5 (Russian Railroads / Ultimate Railroads) *is* the pilot. **RR0 = D0** (in progress), then
-   RR is built as the first in-workspace game package, taking over D1's role from Can't Stop;
-   out-of-repo (D2) stays a later option. See the design doc's updated status header.
+4. **Track D (new, core) — externalize games. ✅ in-workspace phase complete (2026-07-27).** Four games
+   had tested the engine and the seams; the long-term goal is making games easier to add — and eventually
+   addable from *outside* this repo. **Design doc:**
+   **[`docs/track-d-externalize-games.md`](docs/track-d-externalize-games.md)** — the game-package
+   contract (four subpath exports over a peer `@game-hub/kernel`), build-time registry codegen off a
+   `games.config.ts`, kernel-major-as-contract-version, and the workspace assumptions that dissolve on the
+   way out of the repo. **Delivered:** Russian Railroads was built as the first in-workspace game
+   **package** (`packages/games/russianrailroads/`), then **all four legacy games were migrated onto the
+   same shape** and `@game-hub/engine`/`@game-hub/bot` retired — so every game now lives in its own
+   `@game-hub/game-<id>` package (migration plan + findings:
+   **[`docs/track-d-legacy-migration.md`](docs/track-d-legacy-migration.md)**). **Still open:** D2 — an
+   *out-of-repo* game against published `@game-hub/kernel` (forces a real `dist`, kernel-contract
+   versioning enforcement, and a `@game-hub/ui-kit`). See the design doc's status header.
 
 ## Principles
 
@@ -137,13 +142,14 @@ refactor: all e2e passed unchanged.
 
 The only honest test of the abstraction — a real second game beside Container on one server, deliberately
 unlike it (**no hidden information**, **per-turn randomness**). Full write-up in
-[Can't Stop's roadmap](engine/src/games/cantstop/ROADMAP.md); the platform-shaped outcomes:
+[Can't Stop's roadmap](packages/games/cantstop/ROADMAP.md); the platform-shaped outcomes:
 
 - **The engine became a per-game platform.** `engine/src/` is now `kernel/` (GameError, MoveRecord,
   Viewer) + `games/{container,cantstop}/`, exported by **subpath** (`@game-hub/engine/<game>`, no `.`
   default — no privileged game). Pure refactor of Container (its 204 tests moved untouched); the package is
-  **250 tests at 100% across both games**. See CLAUDE.md → "How the shared engine is consumed" and
-  "Building a new game".
+  **250 tests at 100% across both games**. *(Track D later moved every game into its own
+  `@game-hub/game-<id>` package and retired `@game-hub/engine`; see [`docs/design-patterns.md`](docs/design-patterns.md)
+  and [`docs/game-creation.md`](docs/game-creation.md) for the current shape.)*
 - **One seam change: `ModuleContext.rng`.** Per-action randomness for Can't Stop's dice, injected so the
   engine stays pure — the roll is a server-only action built by a module route, refused from clients.
 - **The kernel stayed tiny on purpose** — only the three cross-game primitives; each game keeps its own
@@ -186,10 +192,10 @@ it was reorganized the same way to let a second game have a bot, and Can't Stop'
 - ✅ **Each game registers its own `createBotDriver`** on its backend module (Container and now Can't Stop).
   The bot-seat coordination state (`game_bots`, the hotseat 🤖 toggles, the lobby "assign to AI") is
   game-agnostic, so Can't Stop's bot lit up those affordances for free. Full CS1 write-up in
-  [Can't Stop's roadmap](engine/src/games/cantstop/ROADMAP.md).
+  [Can't Stop's roadmap](packages/games/cantstop/ROADMAP.md).
 
 Container's own AI ladder (A3 difficulty tiers, A4 ISMCTS, A5 tuning) lives in
-[Container's roadmap](engine/src/games/container/ROADMAP.md).
+[Container's roadmap](packages/games/container/ROADMAP.md).
 
 ---
 
@@ -204,7 +210,7 @@ The v1 hotseat engine is already authoritative and serializable, so online is **
 | B3 | Accounts & persistence | Auth, spectators *(open-games browser + resumable games done, no accounts)* | M–L |
 
 - ✅ **B1 — Server-authoritative views:** a pure `viewFor(state, viewer): GameView` (now
-  `engine/src/games/container/view.ts`) redacts non-viewer secrets; the backend applies it at **every**
+  `packages/games/container/src/engine/view.ts`) redacts non-viewer secrets; the backend applies it at **every**
   response boundary. Generalized by C0 into `GameModule.viewFor` (Can't Stop's is a no-op — nothing to
   hide). **Never send an unredacted state to a client.**
 - ✅ **B2 — Real-time transport:** `GameHub` (`backend/src/hub.ts`) fans state out over WebSockets — one
@@ -229,7 +235,7 @@ Built in the core, so **every game gets them free** — the real payoff of the C
   readable, but it's out of play (`409 GAME_ABANDONED`) and its bots stop. **Not scored** — an unfinished
   game has no winner. Needs **no `GameModule` hook**; the ⚠️ gate is a `preHandler` above every route (so
   it also covers modules' own mutating endpoints), and adding the column needed a real `ALTER TABLE`
-  migration. See CLAUDE.md → "Abandon a game".
+  migration. See [`docs/design-patterns.md`](docs/design-patterns.md) §5 (Persistence).
 - ✅ **Rematch (play again, same players):** a **Rematch** button on the shared `GameOver` screen. One
   player proposes, **another accepts**, and a fresh game of the same type starts with the same seats and
   bot assignments; everyone watching is pushed the new game's id and navigates to it. Coordination state

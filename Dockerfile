@@ -5,9 +5,9 @@
 # home-server / Portainer deploy.
 #
 # The runtime image ships neither the dev toolchain nor a package manager. The backend is bundled with
-# esbuild into one file (`backend/dist/server.js`) that INLINES the workspace TS deps (@game-hub/engine,
-# @game-hub/bot, and @game-hub/kernel — whose `exports` point at .ts source, so they can't be
-# `node`-run directly) and leaves only the native `better-sqlite3` external. So the runtime carries just Node + that bundle + a
+# esbuild into one file (`backend/dist/server.js`) that INLINES the workspace TS deps (@game-hub/kernel
+# and the five game packages under packages/games/ — whose `exports` point at .ts source, so they can't
+# be `node`-run directly) and leaves only the native `better-sqlite3` external. So the runtime carries just Node + that bundle + a
 # production-only node_modules holding the compiled SQLite binding + the static UI. No tsx, no vitest,
 # no vite/tailwind, no typescript — and it runs as the unprivileged `node` user.
 

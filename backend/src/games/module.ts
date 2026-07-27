@@ -1,5 +1,10 @@
 import type { FastifyInstance } from 'fastify';
-import type { GameModule as KernelGameModule, ModuleContext as KernelModuleContext } from '@game-hub/kernel';
+import type {
+  GameModule as KernelGameModule,
+  ModuleContext as KernelModuleContext,
+  ModuleHub,
+  ModuleBotSeats,
+} from '@game-hub/kernel';
 import type { BotRepository } from '../bots';
 import type { DB } from '../db';
 import type { GameHub } from '../hub';
@@ -38,9 +43,23 @@ export type GameModule<S, A> = KernelGameModule<S, A, ModuleContext, FastifyInst
 export type {
   BotDriver,
   ModuleGames,
+  ModuleHub,
+  ModuleBotSeats,
   ParseResult,
   ErrorResponse,
   GameSummary,
   MoveRecord,
   Viewer,
 } from '@game-hub/kernel';
+
+/**
+ * Compile-time proof that the backend's concrete host classes satisfy the kernel's *structural* host
+ * contracts (contract gap #2, decision 3). A game package binds `ModuleContext`'s `Hub`/`BotSeats`
+ * generics to `ModuleHub`/`ModuleBotSeats` — it can't name `GameHub`/`BotRepository` without importing
+ * the backend (a workspace cycle). These two aliases make any drift between a structural surface and
+ * its concrete class a **type error here, in the host**: each defaults its type parameter to the
+ * concrete class under the structural constraint, so if the class ever stops satisfying the contract
+ * the default violates the constraint and this file fails to typecheck. Purely type-level, no runtime.
+ */
+type _AssertGameHubSatisfiesModuleHub<_T extends ModuleHub = GameHub> = void;
+type _AssertBotRepositorySatisfiesModuleBotSeats<_T extends ModuleBotSeats = BotRepository> = void;

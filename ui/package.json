@@ -14,8 +14,11 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@game-hub/engine": "workspace:*",
+    "@game-hub/game-cantstop": "workspace:*",
+    "@game-hub/game-container": "workspace:*",
     "@game-hub/game-russianrailroads": "workspace:*",
+    "@game-hub/game-stoneage": "workspace:*",
+    "@game-hub/game-stpetersburg": "workspace:*",
     "@game-hub/kernel": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

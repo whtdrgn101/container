@@ -1,6 +1,6 @@
 // Honest boot-proof for the esbuild bundle (backend/dist/server.js).
 //
-// The bundle inlines the workspace TS deps (@game-hub/engine, @game-hub/bot) and leaves the native
+// The bundle inlines the workspace TS deps (@game-hub/kernel + the game packages) and leaves the native
 // better-sqlite3 external, so the only way to know it actually runs is to run it: spawn the real
 // `node dist/server.js`, hit `/health` (which does a real `SELECT 1`), and create a game over REST.
 // Runs in the Dockerfile build stage — if the bundle is broken (a missing external, a require() that

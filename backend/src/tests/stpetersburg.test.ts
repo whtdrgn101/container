@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { createGame, GameError, legalActions } from '@game-hub/engine/stpetersburg';
-import type { Action, Card, StPetersburgResult, StPetersburgState } from '@game-hub/engine/stpetersburg';
+import { createGame, GameError, legalActions } from '@game-hub/game-stpetersburg/engine';
+import type { Action, Card, StPetersburgResult, StPetersburgState } from '@game-hub/game-stpetersburg/engine';
 import { buildApp } from '../app';
 import { createDatabase } from '../db';
 import type { DB } from '../db';
 import { stPetersburgModule } from '../games';
-import { mapStPetersburgError } from '../games/stpetersburg/errors';
+import { mapStPetersburgError } from '@game-hub/game-stpetersburg/module';
 import { GameRepository } from '../repository';
 
 type WsClient = Awaited<ReturnType<FastifyInstance['injectWS']>>;
