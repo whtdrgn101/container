@@ -17,6 +17,11 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['src/engine/**/*.test.ts', 'src/bot/**/*.test.ts'],
+    // The bot's bench/self-play tests run whole seeded games (CPU-bound), and since the game-package
+    // split `pnpm -r test` runs several packages' vitest processes CONCURRENTLY — on a 4-core CI runner
+    // the default 5s timeout starves them (observed: 14s under contention, fine alone). Headroom, not a
+    // hang-mask: a genuinely wedged test still dies here.
+    testTimeout: 30_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
