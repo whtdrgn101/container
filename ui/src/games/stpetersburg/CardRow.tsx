@@ -3,6 +3,7 @@ import type { Card, CardKind, PlayerView, StPetersburgView } from '@game-hub/eng
 import { CardFace, GiltRail, MalachiteBoard, PhaseMedallion, StackCabinet } from './art';
 import { tradeOptions } from './PlayerPanel';
 import type { TradeOption } from './PlayerPanel';
+import { SP_TIPS } from './tips';
 
 /**
  * Saint Petersburg's board surface — the "Malachite & Gilt" salon (SP8, comps rev 2). The two face-up card
@@ -73,6 +74,9 @@ function RowCard({
         <button
           type="button"
           data-testid={`sp-buy-${card.id}`}
+          // The card table is `overflow-hidden`, which would clip a floating ActionTip; a descriptive
+          // native title is used here (the hand/pub/observatory affordances outside it use ActionTip).
+          title={trading ? SP_TIPS.buyTrading : SP_TIPS.buy}
           className="rounded-lg ring-offset-1 transition hover:ring-2 hover:ring-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
           disabled={busy}
           onClick={onClick}
@@ -182,7 +186,7 @@ export function CardRow({ game, active, acting, canAddToHand, busy, onBuy, onAdd
           </div>
           <div className="flex flex-col items-center gap-1">
             <PhaseMedallion phase={game.phase} round={game.round} className="h-24 w-24" />
-            <span className="text-xs font-semibold capitalize" style={{ color: ON_MALACHITE }}>
+            <span className="text-xs font-semibold capitalize" style={{ color: ON_MALACHITE }} title={SP_TIPS.phase}>
               {game.phase} phase
             </span>
           </div>

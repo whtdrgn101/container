@@ -7,6 +7,7 @@ import {
 } from '@game-hub/engine/stpetersburg';
 import type { Card, CardKind, Phase, PlayerView } from '@game-hub/engine/stpetersburg';
 import { cn } from '@/lib/utils';
+import { ActionTip } from '@/components/ActionTip';
 import { CardFace } from './art';
 
 /**
@@ -186,22 +187,22 @@ function HandFan({
                 : `${card.name} — no card of yours to displace, or you can't afford it (pg. 7)`
               : `${card.name} — play for ${cost}${cost !== card.cost ? ` (was ${card.cost})` : ''}`;
             return (
-              <button
-                key={card.id}
-                type="button"
-                data-testid={`sp-play-${index}`}
-                className={cn(
-                  'rounded-lg ring-offset-1 transition',
-                  canPlay
-                    ? 'cursor-pointer hover:ring-2 hover:ring-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
-                    : 'opacity-55',
-                )}
-                title={title}
-                disabled={!canPlay || busy}
-                onClick={() => (trading ? onTrade(card, index, options) : onPlay(index))}
-              >
-                <CardFace card={card} effectiveCost={cost} width={64} />
-              </button>
+              <ActionTip key={card.id} tip={title}>
+                <button
+                  type="button"
+                  data-testid={`sp-play-${index}`}
+                  className={cn(
+                    'rounded-lg ring-offset-1 transition',
+                    canPlay
+                      ? 'cursor-pointer hover:ring-2 hover:ring-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+                      : 'opacity-55',
+                  )}
+                  disabled={!canPlay || busy}
+                  onClick={() => (trading ? onTrade(card, index, options) : onPlay(index))}
+                >
+                  <CardFace card={card} effectiveCost={cost} width={64} />
+                </button>
+              </ActionTip>
             );
           })}
         </div>

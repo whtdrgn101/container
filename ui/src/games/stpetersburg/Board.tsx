@@ -10,6 +10,7 @@ import {
 } from '@game-hub/engine/stpetersburg';
 import type { Card, CardKind, Phase, PlayerView, StPetersburgView } from '@game-hub/engine/stpetersburg';
 import { Button } from '@/components/ui/button';
+import { ActionTip } from '@/components/ActionTip';
 import { ActivityFeed } from '@/components/ActivityFeed';
 import { TurnBanner } from '@/components/TurnBanner';
 import { seatIdentity } from '@/components/seatIdentity';
@@ -22,6 +23,7 @@ import { PlayerPanel, SEAT_CLASS, SEAT_PALETTE, tradeOptions } from './PlayerPan
 import type { TradeOption } from './PlayerPanel';
 import { Results } from './Results';
 import { describeMove } from './feed';
+import { pubTip, SP_TIPS } from './tips';
 
 /**
  * Saint Petersburg's board — the "Malachite & Gilt" salon (SP8, comps rev 2). The whole game as one plugin
@@ -212,17 +214,17 @@ export default function StPetersburgBoard({
           <div className="mb-2 text-sm font-medium">{picker.title}</div>
           <div className="flex flex-wrap gap-2">
             {picker.options.map(({ target, cost }) => (
-              <button
-                key={target.id}
-                type="button"
-                data-testid={`sp-displace-${target.id}`}
-                className="rounded border bg-card px-2 py-1 text-xs transition hover:ring-2 hover:ring-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                title={`Displace ${target.name} — pay ${cost}₽`}
-                disabled={busy}
-                onClick={() => picker.act(target.id)}
-              >
-                <span className="font-medium">{target.name}</span> · <span className="tabular-nums">{cost}₽</span>
-              </button>
+              <ActionTip key={target.id} tip={`Displace ${target.name} — pay ${cost}₽ to complete the upgrade.`}>
+                <button
+                  type="button"
+                  data-testid={`sp-displace-${target.id}`}
+                  className="rounded border bg-card px-2 py-1 text-xs transition hover:ring-2 hover:ring-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  disabled={busy}
+                  onClick={() => picker.act(target.id)}
+                >
+                  <span className="font-medium">{target.name}</span> · <span className="tabular-nums">{cost}₽</span>
+                </button>
+              </ActionTip>
             ))}
             <button
               type="button"
@@ -279,17 +281,17 @@ export default function StPetersburgBoard({
                   const cost = points * PUB_POINT_COST;
                   const affordable = active.rubles !== null && active.rubles >= cost;
                   return (
-                    <Button
-                      key={points}
-                      variant={points === 0 ? 'ghost' : 'outline'}
-                      size="sm"
-                      data-testid={`sp-pub-buy-${points}`}
-                      disabled={busy || !affordable}
-                      title={points === 0 ? 'Decline' : `Buy ${points} point(s) for ${cost}₽`}
-                      onClick={() => doPubBuy(points)}
-                    >
-                      {points === 0 ? 'Decline' : `+${points}★ · ${cost}₽`}
-                    </Button>
+                    <ActionTip key={points} tip={pubTip(points, cost)}>
+                      <Button
+                        variant={points === 0 ? 'ghost' : 'outline'}
+                        size="sm"
+                        data-testid={`sp-pub-buy-${points}`}
+                        disabled={busy || !affordable}
+                        onClick={() => doPubBuy(points)}
+                      >
+                        {points === 0 ? 'Decline' : `+${points}★ · ${cost}₽`}
+                      </Button>
+                    </ActionTip>
                   );
                 })}
               </div>
@@ -324,45 +326,45 @@ export default function StPetersburgBoard({
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <CardFace card={card} effectiveCost={buyCost} width={80} />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      data-testid="sp-observatory-buy"
-                      disabled={busy || !canBuy}
-                      title={
-                        canBuy
-                          ? `Buy and place${buyCost !== undefined ? ` for ${buyCost}₽` : ''}`
-                          : 'Cannot afford / nothing to displace'
-                      }
-                      onClick={() =>
-                        trading
-                          ? startTrade(`Buy ${card.name} — choose a card to displace`, opts, (targetId) =>
-                              doResolve('buy', targetId),
-                            )
-                          : doResolve('buy')
-                      }
-                    >
-                      Buy{buyCost !== undefined ? ` · ${buyCost}₽` : ''}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      data-testid="sp-observatory-hand"
-                      disabled={busy || !canHand}
-                      title={canHand ? 'Add to hand (free)' : 'Hand full'}
-                      onClick={() => doResolve('hand')}
-                    >
-                      Add to hand
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      data-testid="sp-observatory-discard"
-                      disabled={busy}
-                      onClick={() => doResolve('discard')}
-                    >
-                      Discard
-                    </Button>
+                    <ActionTip tip={SP_TIPS.observatoryBuy}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        data-testid="sp-observatory-buy"
+                        disabled={busy || !canBuy}
+                        onClick={() =>
+                          trading
+                            ? startTrade(`Buy ${card.name} — choose a card to displace`, opts, (targetId) =>
+                                doResolve('buy', targetId),
+                              )
+                            : doResolve('buy')
+                        }
+                      >
+                        Buy{buyCost !== undefined ? ` · ${buyCost}₽` : ''}
+                      </Button>
+                    </ActionTip>
+                    <ActionTip tip={SP_TIPS.observatoryHand}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        data-testid="sp-observatory-hand"
+                        disabled={busy || !canHand}
+                        onClick={() => doResolve('hand')}
+                      >
+                        Add to hand
+                      </Button>
+                    </ActionTip>
+                    <ActionTip tip={SP_TIPS.observatoryDiscard}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        data-testid="sp-observatory-discard"
+                        disabled={busy}
+                        onClick={() => doResolve('discard')}
+                      >
+                        Discard
+                      </Button>
+                    </ActionTip>
                   </div>
                 </>
               );
@@ -387,27 +389,32 @@ export default function StPetersburgBoard({
                 <span className="flex items-center gap-1" data-testid="sp-observatory-draw">
                   <span className="text-sm text-muted-foreground">Observatory — draw:</span>
                   {(CARD_KINDS as readonly CardKind[]).map((kind) => (
-                    <Button
+                    <ActionTip
                       key={kind}
-                      variant="outline"
-                      size="sm"
-                      data-testid={`sp-observatory-draw-${kind}`}
-                      disabled={busy || game.board.stacks[kind] < 2}
-                      title={
+                      tip={
                         game.board.stacks[kind] < 2
-                          ? `The ${kind} stack has too few cards`
-                          : `Draw the top ${kind} card`
+                          ? `The ${kind} stack has too few cards to draw from.`
+                          : SP_TIPS.observatoryDraw
                       }
-                      onClick={() => doObservatoryDraw(kind)}
                     >
-                      {kind[0]!.toUpperCase()}
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        data-testid={`sp-observatory-draw-${kind}`}
+                        disabled={busy || game.board.stacks[kind] < 2}
+                        onClick={() => doObservatoryDraw(kind)}
+                      >
+                        {kind[0]!.toUpperCase()}
+                      </Button>
+                    </ActionTip>
                   ))}
                 </span>
               ) : null}
-              <Button variant="outline" size="sm" data-testid="sp-pass" disabled={busy} onClick={doPass}>
-                Pass
-              </Button>
+              <ActionTip tip={SP_TIPS.pass}>
+                <Button variant="outline" size="sm" data-testid="sp-pass" disabled={busy} onClick={doPass}>
+                  Pass
+                </Button>
+              </ActionTip>
             </>
           )}
         </div>

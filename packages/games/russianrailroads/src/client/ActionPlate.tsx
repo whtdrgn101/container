@@ -1,6 +1,8 @@
 import type { ActionSpaceDef, SpacePlacement } from '../engine';
 import { Button } from '@/components/ui/button';
+import { ActionTip } from '@/components/ActionTip';
 import { CoinIcon, Meeple } from './art';
+import { spaceTip, USE_COIN_TIP } from './tips';
 
 /**
  * One shared **action space** as a cream enamel plate on "The Dispatch Hall" board (RR9, rev-4 layout):
@@ -99,6 +101,7 @@ export function ActionPlate({
 }) {
   const { busy, doPlace } = aff;
   const coinCost = space.coinCost ?? 0;
+  const tip = spaceTip(space);
   return (
     <div
       data-testid={`rr-space-${space.id}`}
@@ -123,69 +126,80 @@ export function ActionPlate({
         {space.kind === 'locomotive' ? (
           space.loco === 'and' ? (
             <>
-              <Button
-                variant="outline"
-                size="sm"
-                data-testid={`rr-place-${space.id}`}
-                disabled={busy || !aff.legalFirst(space.id, 'loco')}
-                onClick={() => doPlace(space.id, { first: 'loco' })}
-              >
-                Loco first
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                data-testid={`rr-build-factory-${space.id}`}
-                disabled={busy || !aff.legalFirst(space.id, 'factory')}
-                onClick={() => doPlace(space.id, { first: 'factory' })}
-              >
-                Factory first
-              </Button>
+              <ActionTip tip={tip}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid={`rr-place-${space.id}`}
+                  disabled={busy || !aff.legalFirst(space.id, 'loco')}
+                  onClick={() => doPlace(space.id, { first: 'loco' })}
+                >
+                  Loco first
+                </Button>
+              </ActionTip>
+              <ActionTip tip={tip}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid={`rr-build-factory-${space.id}`}
+                  disabled={busy || !aff.legalFirst(space.id, 'factory')}
+                  onClick={() => doPlace(space.id, { first: 'factory' })}
+                >
+                  Factory first
+                </Button>
+              </ActionTip>
             </>
           ) : (
             <>
-              <Button
-                variant="outline"
-                size="sm"
-                data-testid={`rr-place-${space.id}`}
-                disabled={busy || !aff.legalBuild(space.id, 'loco')}
-                onClick={() => doPlace(space.id, { build: 'loco' })}
-              >
-                Build loco
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                data-testid={`rr-build-factory-${space.id}`}
-                disabled={busy || !aff.legalBuild(space.id, 'factory')}
-                onClick={() => doPlace(space.id, { build: 'factory' })}
-              >
-                Build factory
-              </Button>
+              <ActionTip tip={tip}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid={`rr-place-${space.id}`}
+                  disabled={busy || !aff.legalBuild(space.id, 'loco')}
+                  onClick={() => doPlace(space.id, { build: 'loco' })}
+                >
+                  Build loco
+                </Button>
+              </ActionTip>
+              <ActionTip tip={tip}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid={`rr-build-factory-${space.id}`}
+                  disabled={busy || !aff.legalBuild(space.id, 'factory')}
+                  onClick={() => doPlace(space.id, { build: 'factory' })}
+                >
+                  Build factory
+                </Button>
+              </ActionTip>
             </>
           )
         ) : (
           <>
-            <Button
-              variant="outline"
-              size="sm"
-              data-testid={`rr-place-${space.id}`}
-              disabled={busy || !aff.workerSpaces.has(space.id)}
-              onClick={() => doPlace(space.id)}
-            >
-              {coinCost ? 'Place worker + coin' : 'Place worker'}
-            </Button>
-            {coinCost === 0 ? (
+            <ActionTip tip={tip}>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                data-testid={`rr-place-coin-${space.id}`}
-                disabled={busy || !aff.coinSpaces.has(space.id)}
-                title="Use a coin instead of a worker (pg. 14)"
-                onClick={() => doPlace(space.id, { coins: space.workers })}
+                data-testid={`rr-place-${space.id}`}
+                disabled={busy || !aff.workerSpaces.has(space.id)}
+                onClick={() => doPlace(space.id)}
               >
-                Use coin
+                {coinCost ? 'Place worker + coin' : 'Place worker'}
               </Button>
+            </ActionTip>
+            {coinCost === 0 ? (
+              <ActionTip tip={USE_COIN_TIP}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  data-testid={`rr-place-coin-${space.id}`}
+                  disabled={busy || !aff.coinSpaces.has(space.id)}
+                  onClick={() => doPlace(space.id, { coins: space.workers })}
+                >
+                  Use coin
+                </Button>
+              </ActionTip>
             ) : null}
           </>
         )}

@@ -2,7 +2,9 @@ import { Factory as FactoryIcon, Warehouse as WarehouseIcon } from 'lucide-react
 import type { Action, Color, GameView, PlayerView } from '@game-hub/engine/container';
 import { COLORS } from '@game-hub/engine/container';
 import { ContainerChip } from '../chips';
+import { CONTAINER_TIPS } from '../tips';
 import { Button } from '@/components/ui/button';
+import { ActionTip } from '@/components/ActionTip';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -97,15 +99,16 @@ export function SupplyPanel({
             buildColor &&
             buildableColors.includes(buildColor) &&
             nextFactoryCost !== undefined && (
-              <Button
-                size="sm"
-                className="sm:ml-auto"
-                data-testid="build-factory"
-                disabled={busy}
-                onClick={() => act(activePlayer.id, { type: 'BUILD_FACTORY', color: buildColor })}
-              >
-                <FactoryIcon className="h-4 w-4" aria-hidden /> Build {buildColor} factory (${nextFactoryCost})
-              </Button>
+              <ActionTip tip={CONTAINER_TIPS.buildFactory} className="sm:ml-auto">
+                <Button
+                  size="sm"
+                  data-testid="build-factory"
+                  disabled={busy}
+                  onClick={() => act(activePlayer.id, { type: 'BUILD_FACTORY', color: buildColor })}
+                >
+                  <FactoryIcon className="h-4 w-4" aria-hidden /> Build {buildColor} factory (${nextFactoryCost})
+                </Button>
+              </ActionTip>
             )}
         </div>
       </CardContent>

@@ -2,6 +2,7 @@ import type { Action, GameView, PlayerView, ShipLocation } from '@game-hub/engin
 import { ShipSvg } from './art/Ship';
 import { Chart, CompassRose } from './art/Chart';
 import { seatColorOf } from './seatColors';
+import { nodeTip } from './tips';
 import { cn } from '@/lib/utils';
 
 type SailAction = Extract<Action, { type: 'SAIL' }>;
@@ -92,12 +93,18 @@ export function BoardMap({
         const sail = sailFor(node.key);
         const clickable = !!sail;
         const isOcean = node.key === 'ocean';
+        // The board-map is `overflow-hidden`, which would clip a floating ActionTip; the node keeps a
+        // descriptive native title (the sail *buttons* on each mat carry the ActionTip instead).
+        const kind: ShipLocation['kind'] = node.key.startsWith('harbor:')
+          ? 'harbor'
+          : (node.key as ShipLocation['kind']);
+        const help = nodeTip(kind);
         return (
           <button
             key={node.key}
             type="button"
             data-testid={node.testid}
-            title={clickable ? `Sail to ${node.label}` : node.label}
+            title={clickable ? `Sail to ${node.label}. ${help}` : help}
             aria-label={clickable ? `Sail to ${node.label}` : node.label}
             disabled={!clickable}
             onClick={() => sail && onSail(sail)}

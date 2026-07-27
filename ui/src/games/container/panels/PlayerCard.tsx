@@ -1,9 +1,11 @@
 import type { Action, GameView, PlayerView } from '@game-hub/engine/container';
 import { COLORS, SHIP_CAPACITY, WAREHOUSE_BUILD_COSTS } from '@game-hub/engine/container';
 import { Button } from '@/components/ui/button';
+import { ActionTip } from '@/components/ActionTip';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { cardRank, ContainerChip } from '../chips';
+import { CONTAINER_TIPS } from '../tips';
 import { seatColorOf } from '../seatColors';
 import { MatHeader } from './mat/MatHeader';
 import { FactoryZone } from './mat/FactoryZone';
@@ -227,15 +229,17 @@ export function PlayerCard({
         {/* The turn console: end the turn from anywhere. (The other actions live in their zones.) */}
         {showControls && (
           <div className="flex items-center justify-end gap-2 border-t pt-2" data-testid="controls">
-            <Button
-              size="sm"
-              variant="secondary"
-              data-testid="end-turn"
-              disabled={busy}
-              onClick={() => act(player.id, { type: 'END_TURN' })}
-            >
-              End turn
-            </Button>
+            <ActionTip tip={CONTAINER_TIPS.endTurn}>
+              <Button
+                size="sm"
+                variant="secondary"
+                data-testid="end-turn"
+                disabled={busy}
+                onClick={() => act(player.id, { type: 'END_TURN' })}
+              >
+                End turn
+              </Button>
+            </ActionTip>
           </div>
         )}
       </CardContent>

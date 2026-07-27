@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { legalActions, legalSteps, locoResolutions } from '../engine';
 import type { Action, RouteId, RussianRailroadsState, RussianRailroadsView, TrackColor } from '../engine';
 import { Button } from '@/components/ui/button';
+import { ActionTip } from '@/components/ActionTip';
 import { ActivityFeed } from '@/components/ActivityFeed';
 import { TurnBanner } from '@/components/TurnBanner';
 import { seatIdentity } from '@/components/seatIdentity';
@@ -16,6 +17,7 @@ import { DispatchHall } from './DispatchHall';
 import { EngineerStrip } from './EngineerStrip';
 import { PlayerBoard } from './PlayerBoard';
 import type { PlateAffordances } from './ActionPlate';
+import { PASS_TIP } from './tips';
 
 /**
  * Russian Railroads' board (RR9) — the whole game re-skinned as **"The Permanent Way"** and **"The Dispatch
@@ -253,9 +255,11 @@ export default function RussianRailroadsBoard({
       />
 
       {placing ? (
-        <Button variant="default" size="sm" data-testid="rr-pass" disabled={busy} onClick={doPass}>
-          Pass
-        </Button>
+        <ActionTip tip={PASS_TIP}>
+          <Button variant="default" size="sm" data-testid="rr-pass" disabled={busy} onClick={doPass}>
+            Pass
+          </Button>
+        </ActionTip>
       ) : !ended && !resolving ? (
         <p className="text-sm text-muted-foreground">Waiting for {active?.name ?? 'the other player'}…</p>
       ) : null}

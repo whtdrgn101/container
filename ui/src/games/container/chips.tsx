@@ -1,6 +1,7 @@
 import type { Color, PlayerView, ScoringCard, ShipLocation, StoredContainer } from '@game-hub/engine/container';
 import { FACTORY_LOT_PRICES } from '@game-hub/engine/container';
 import { ContainerSvg } from './art/Container';
+import { ActionTip } from '@/components/ActionTip';
 import { cn } from '@/lib/utils';
 
 /**
@@ -77,12 +78,15 @@ export function StoredChip({
   onClick,
   disabled,
   selected,
+  tip,
 }: {
   container: StoredContainer;
   testid: string;
   onClick?: () => void;
   disabled?: boolean;
   selected?: boolean;
+  /** A hover/focus tooltip (replaces the default reprice title when the chip is interactive). */
+  tip?: string;
 }) {
   // A priced dockside lot pad (visual overhaul, 2026-07): container on a small bordered pad with its
   // price tag. Same DOM contract as ever — button/span split, testid, reprice title, "$N" text.
@@ -98,11 +102,11 @@ export function StoredChip({
   );
   const pad = 'flex flex-col items-center gap-0.5 rounded-md border border-border/70 bg-background/60 px-1 py-0.5';
   if (onClick) {
-    return (
+    const button = (
       <button
         type="button"
         data-testid={testid}
-        title={`Reprice ${container.color} (1 action)`}
+        title={tip ? undefined : `Reprice ${container.color} (1 action)`}
         disabled={disabled}
         onClick={onClick}
         className={cn(pad, 'transition-transform hover:scale-110 hover:border-ring disabled:opacity-50')}
@@ -111,6 +115,7 @@ export function StoredChip({
         {label}
       </button>
     );
+    return tip ? <ActionTip tip={tip}>{button}</ActionTip> : button;
   }
   return (
     <span data-testid={testid} className={pad}>

@@ -43,6 +43,10 @@ test('pick Russian Railroads and play track extension: place, lock, two clicks, 
   await expect(page.getByTestId('rr-space-track-bottom')).toBeVisible();
   await expect(page.getByTestId('rr-space-coins')).toContainText('Empty');
 
+  // Action-spot tooltip: focusing the coins plate's place button reveals its ActionTip help.
+  await page.getByTestId('rr-place-coins').focus();
+  await expect(page.getByRole('tooltip')).toContainText('take 2 coins');
+
   // The active seat takes coins, gaining 2 (feed narrates it), then the next seat is on the clock.
   await page.getByTestId('rr-place-coins').click();
   await expect(page.getByTestId('rr-occupied-coins')).toBeVisible();

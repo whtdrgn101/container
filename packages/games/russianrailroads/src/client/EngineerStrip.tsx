@@ -1,7 +1,9 @@
 import type { Action, EngineerAction, PlayerView, RussianRailroadsView } from '../engine';
 import { Button } from '@/components/ui/button';
+import { ActionTip } from '@/components/ActionTip';
 import { cn } from '@/lib/utils';
 import { CoinIcon } from './art';
+import { hireTip, hiredEngineerTip, variableTip } from './tips';
 
 /**
  * Russian Railroads' engineer strip as **the crew roster** (RR9, pp. 15–16, 22): read from the right, the
@@ -104,27 +106,30 @@ export function EngineerStrip({
                     </span>
                   </div>
                   {isHiring ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-1 gap-1"
-                      data-testid="rr-hire"
-                      disabled={busy || !canHire}
-                      onClick={() => onEngineer({ type: 'HIRE_ENGINEER' })}
-                    >
-                      Hire <CoinIcon value={1} size={14} />
-                    </Button>
+                    <ActionTip tip={hireTip(engineer)} className="mt-1 block">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1"
+                        data-testid="rr-hire"
+                        disabled={busy || !canHire}
+                        onClick={() => onEngineer({ type: 'HIRE_ENGINEER' })}
+                      >
+                        Hire <CoinIcon value={1} size={14} />
+                      </Button>
+                    </ActionTip>
                   ) : isVariable ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-1"
-                      data-testid={`rr-var-${slot}`}
-                      disabled={busy || !usableVarSlots.has(slot)}
-                      onClick={() => onEngineer({ type: 'USE_VARIABLE_ENGINEER', slot })}
-                    >
-                      Use (1 worker)
-                    </Button>
+                    <ActionTip tip={variableTip(engineer)} className="mt-1 block">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        data-testid={`rr-var-${slot}`}
+                        disabled={busy || !usableVarSlots.has(slot)}
+                        onClick={() => onEngineer({ type: 'USE_VARIABLE_ENGINEER', slot })}
+                      >
+                        Use (1 worker)
+                      </Button>
+                    </ActionTip>
                   ) : null}
                 </>
               ) : (
@@ -147,19 +152,22 @@ export function EngineerStrip({
             {active.hiredEngineers.map((engineer) => {
               const used = active.usedEngineers.includes(engineer.id);
               const inert = engineer.action.kind === 'inert';
+              const tip = inert
+                ? 'No resolvable action in this edition yet.'
+                : `${hiredEngineerTip(engineer)}${used ? ' Already used this round.' : ''}`;
               return (
-                <Button
-                  key={engineer.id}
-                  variant="outline"
-                  size="sm"
-                  data-testid={`rr-use-${engineer.id}`}
-                  disabled={busy || !usableEngineers.has(engineer.id)}
-                  title={inert ? 'No resolvable action yet' : used ? 'Already used this round' : undefined}
-                  onClick={() => onEngineer({ type: 'USE_ENGINEER', engineerId: engineer.id })}
-                >
-                  #{engineer.number} {engActionText(engineer.action)}
-                  {used ? ' ✓' : ''}
-                </Button>
+                <ActionTip key={engineer.id} tip={tip}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid={`rr-use-${engineer.id}`}
+                    disabled={busy || !usableEngineers.has(engineer.id)}
+                    onClick={() => onEngineer({ type: 'USE_ENGINEER', engineerId: engineer.id })}
+                  >
+                    #{engineer.number} {engActionText(engineer.action)}
+                    {used ? ' ✓' : ''}
+                  </Button>
+                </ActionTip>
               );
             })}
           </div>

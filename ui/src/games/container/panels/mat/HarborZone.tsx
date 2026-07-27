@@ -1,7 +1,9 @@
 import { Warehouse as WarehouseIcon } from 'lucide-react';
 import type { Action, PlayerView } from '@game-hub/engine/container';
 import { Button } from '@/components/ui/button';
+import { ActionTip } from '@/components/ActionTip';
 import { StoredChip } from '../../chips';
+import { CONTAINER_TIPS } from '../../tips';
 
 export interface HarborZoneProps {
   readonly player: PlayerView;
@@ -63,34 +65,39 @@ export function HarborZone({
             testid={`harbor-chip-${player.id}-${chipIndex}`}
             disabled={busy}
             selected={harborPick.includes(chipIndex)}
+            tip={canHarborBuy ? CONTAINER_TIPS.buyHarbor : undefined}
             onClick={canHarborBuy ? () => toggleBuy('harbor', player.id, chipIndex) : undefined}
           />
         ))}
       </div>
       {canHarborBuy && harborPick.length > 0 && (
-        <Button
-          size="sm"
-          className="mt-2 w-full"
-          data-testid={`buy-harbor-${player.id}`}
-          disabled={busy || !harborPickOk}
-          onClick={commitBuy}
-        >
-          Load {harborPick.length} for ${harborPickCost}
-        </Button>
+        <ActionTip tip={CONTAINER_TIPS.buyHarbor} className="mt-2 block">
+          <Button
+            size="sm"
+            className="w-full"
+            data-testid={`buy-harbor-${player.id}`}
+            disabled={busy || !harborPickOk}
+            onClick={commitBuy}
+          >
+            Load {harborPick.length} for ${harborPickCost}
+          </Button>
+        </ActionTip>
       )}
       {showControls && (
         <div className="mt-2 border-t border-border/60 pt-2">
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full"
-            data-testid="build-warehouse"
-            disabled={busy || !can('BUILD_WAREHOUSE')}
-            onClick={() => act(player.id, { type: 'BUILD_WAREHOUSE' })}
-          >
-            <WarehouseIcon className="h-4 w-4" aria-hidden /> Build warehouse
-            {nextWarehouseCost !== undefined ? ` ($${nextWarehouseCost})` : ''}
-          </Button>
+          <ActionTip tip={CONTAINER_TIPS.buildWarehouse} className="block">
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full"
+              data-testid="build-warehouse"
+              disabled={busy || !can('BUILD_WAREHOUSE')}
+              onClick={() => act(player.id, { type: 'BUILD_WAREHOUSE' })}
+            >
+              <WarehouseIcon className="h-4 w-4" aria-hidden /> Build warehouse
+              {nextWarehouseCost !== undefined ? ` ($${nextWarehouseCost})` : ''}
+            </Button>
+          </ActionTip>
         </div>
       )}
     </div>

@@ -1,7 +1,9 @@
 import { SPECIALS, specialMet } from '../engine';
 import type { Locomotive, PlayerView, Route, RouteId, RussianRailroadsPlayer, TrackColor } from '../engine';
+import { ActionTip } from '@/components/ActionTip';
 import { DoublerClock, RailLine, RouteBand, SignalLamp, TrackChip } from './art';
 import type { SignalState } from './art';
+import { specialTip } from './tips';
 
 /**
  * One player route on "The Permanent Way" (RR9): its `RouteBand` landscape with a `RailLine` and station
@@ -67,11 +69,14 @@ function Band({ player, route, doublers }: { player: PlayerView; route: Route; d
       {specials.map((s) => (
         <span
           key={s.id}
-          title={`${s.type.replace('-', ' ')} · space ${s.space}`}
           className="absolute bottom-0 -translate-x-1/2"
           style={{ left: `${((s.space - 0.5) / len) * 100}%` }}
         >
-          <SignalLamp state={signalStateFor(player, s)} className="h-4 w-4" />
+          <ActionTip tip={specialTip(s)}>
+            <span className="inline-flex">
+              <SignalLamp state={signalStateFor(player, s)} className="h-4 w-4" />
+            </span>
+          </ActionTip>
         </span>
       ))}
     </div>

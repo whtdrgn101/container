@@ -19,6 +19,11 @@ test('pick Stone Age and see the board scaffold', async ({ page }) => {
   // SA1: place workers on the forest and see the turn pass. The count defaults to the most you can
   // place (all 5 here), so a single click fills the forest to 5/7.
   await expect(page.getByTestId('sa-banner')).toContainText('Your turn');
+
+  // Action-spot tooltip: focusing a building slot's place-worker button reveals its ActionTip help.
+  await page.getByTestId('place-building1-go').focus();
+  await expect(page.getByRole('tooltip')).toContainText('claim this building tile');
+
   await page.getByTestId('place-forest-go').click();
   await expect(page.getByTestId('place-forest')).toContainText('5/7');
 });

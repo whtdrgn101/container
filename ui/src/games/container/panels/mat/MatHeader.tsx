@@ -1,7 +1,9 @@
 import { Bot, Landmark } from 'lucide-react';
 import type { Action, PlayerView } from '@game-hub/engine/container';
 import { Button } from '@/components/ui/button';
+import { ActionTip } from '@/components/ActionTip';
 import { CardHeader, CardTitle } from '@/components/ui/card';
+import { CONTAINER_TIPS } from '../../tips';
 
 export interface MatHeaderProps {
   readonly player: PlayerView;
@@ -46,28 +48,32 @@ export function MatHeader({ player, isBot, showControls, can, busy, act }: MatHe
           ${player.money}
         </span>
         {showControls && can('REQUEST_LOAN') && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-6 px-2 text-xs"
-            data-testid="request-loan"
-            disabled={busy}
-            onClick={() => act(player.id, { type: 'REQUEST_LOAN' })}
-          >
-            Take loan +$10
-          </Button>
+          <ActionTip tip={CONTAINER_TIPS.requestLoan}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-xs"
+              data-testid="request-loan"
+              disabled={busy}
+              onClick={() => act(player.id, { type: 'REQUEST_LOAN' })}
+            >
+              Take loan +$10
+            </Button>
+          </ActionTip>
         )}
         {showControls && can('REPAY_LOAN') && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-6 px-2 text-xs"
-            data-testid="repay-loan"
-            disabled={busy}
-            onClick={() => act(player.id, { type: 'REPAY_LOAN' })}
-          >
-            Repay −$10
-          </Button>
+          <ActionTip tip={CONTAINER_TIPS.repayLoan}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-xs"
+              data-testid="repay-loan"
+              disabled={busy}
+              onClick={() => act(player.id, { type: 'REPAY_LOAN' })}
+            >
+              Repay −$10
+            </Button>
+          </ActionTip>
         )}
       </div>
     </CardHeader>

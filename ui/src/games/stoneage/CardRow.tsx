@@ -18,9 +18,11 @@ import type {
   StoneAgeView,
 } from '@game-hub/engine/stoneage';
 import { Button } from '@/components/ui/button';
+import { ActionTip } from '@/components/ActionTip';
 import { cn } from '@/lib/utils';
 import { FieldIcon, FoodIcon, Hut, Meeple, ResourceIcon, SYMBOL_ICON, ToolIcon } from './art';
 import { AnyPips } from './pieces';
+import { ACQUIRE_CARD_TIP, DECLINE_TIP, PLACE_CARD_TIP } from './tips';
 
 const RESOURCE_LABEL: Record<Resource, string> = { wood: 'Wood', brick: 'Brick', stone: 'Stone', gold: 'Gold' };
 
@@ -213,15 +215,16 @@ export function CardRow({
                   </div>
                 )}
                 {canPlaceHere && (
-                  <Button
-                    size="sm"
-                    className="mt-2 self-end"
-                    data-testid={`place-${placeId}-go`}
-                    disabled={busy}
-                    onClick={() => onPlace(placeId)}
-                  >
-                    Place worker
-                  </Button>
+                  <ActionTip tip={PLACE_CARD_TIP} className="mt-2 self-end">
+                    <Button
+                      size="sm"
+                      data-testid={`place-${placeId}-go`}
+                      disabled={busy}
+                      onClick={() => onPlace(placeId)}
+                    >
+                      Place worker
+                    </Button>
+                  </ActionTip>
                 )}
                 {acting && canDrive && mineHere && card && active && !pending && (
                   <div className="mt-2 space-y-1.5 border-t pt-2">
@@ -255,23 +258,27 @@ export function CardRow({
                       </div>
                     ))}
                     <div className="flex items-center justify-end gap-1 pt-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        data-testid={`card-pass-${slot}`}
-                        disabled={busy}
-                        onClick={() => onAcquire(slot, {})}
-                      >
-                        Pass
-                      </Button>
-                      <Button
-                        size="sm"
-                        data-testid={`acquire-${slot}`}
-                        disabled={busy || !canAcquire}
-                        onClick={() => onAcquire(slot, draft)}
-                      >
-                        Take
-                      </Button>
+                      <ActionTip tip={DECLINE_TIP}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          data-testid={`card-pass-${slot}`}
+                          disabled={busy}
+                          onClick={() => onAcquire(slot, {})}
+                        >
+                          Pass
+                        </Button>
+                      </ActionTip>
+                      <ActionTip tip={ACQUIRE_CARD_TIP}>
+                        <Button
+                          size="sm"
+                          data-testid={`acquire-${slot}`}
+                          disabled={busy || !canAcquire}
+                          onClick={() => onAcquire(slot, draft)}
+                        >
+                          Take
+                        </Button>
+                      </ActionTip>
                     </div>
                   </div>
                 )}

@@ -14,6 +14,10 @@ test('create a game and produce a container', async ({ page }) => {
   await expect(page.getByTestId('money-p1')).toHaveText('$20');
   await expect(page.getByTestId('supply-container-white')).toContainText('×9');
 
+  // Action-spot tooltip: focusing Produce reveals its ActionTip help (keyboard/touch-reachable).
+  await page.getByTestId('produce-p1').focus();
+  await expect(page.getByRole('tooltip')).toContainText('one container per factory');
+
   await page.getByTestId('produce-p1').click();
 
   // Producing a white container draws one from the supply.

@@ -2,8 +2,10 @@ import { Ship as ShipIcon } from 'lucide-react';
 import type { Action, PlayerView } from '@game-hub/engine/container';
 import { SHIP_CAPACITY } from '@game-hub/engine/container';
 import { Button } from '@/components/ui/button';
+import { ActionTip } from '@/components/ActionTip';
 import { ShipSvg } from '../../art/Ship';
 import { ContainerChip, sailTarget, shipLabel } from '../../chips';
+import { CONTAINER_TIPS, sailTip } from '../../tips';
 
 type SailAction = Extract<Action, { type: 'SAIL' }>;
 
@@ -65,28 +67,31 @@ export function DockZone({ player, players, hull, showControls, sailActions, can
           {sailActions.map((sailAction) => {
             const target = sailTarget(sailAction.to, players);
             return (
-              <Button
-                key={target.testid}
-                size="sm"
-                variant="outline"
-                data-testid={target.testid}
-                disabled={busy}
-                onClick={() => act(player.id, sailAction)}
-              >
-                <ShipIcon className="h-4 w-4" aria-hidden /> {target.label}
-              </Button>
+              <ActionTip key={target.testid} tip={sailTip(sailAction.to.kind)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  data-testid={target.testid}
+                  disabled={busy}
+                  onClick={() => act(player.id, sailAction)}
+                >
+                  <ShipIcon className="h-4 w-4" aria-hidden /> {target.label}
+                </Button>
+              </ActionTip>
             );
           })}
           {can('LOAD_FROM_BANK') && (
-            <Button
-              size="sm"
-              variant="outline"
-              data-testid="load-bank"
-              disabled={busy}
-              onClick={() => act(player.id, { type: 'LOAD_FROM_BANK' })}
-            >
-              Load from Bank
-            </Button>
+            <ActionTip tip={CONTAINER_TIPS.loadBank}>
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="load-bank"
+                disabled={busy}
+                onClick={() => act(player.id, { type: 'LOAD_FROM_BANK' })}
+              >
+                Load from Bank
+              </Button>
+            </ActionTip>
           )}
         </div>
       )}

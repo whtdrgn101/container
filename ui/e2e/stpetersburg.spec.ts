@@ -49,6 +49,10 @@ test('SP1: buy a worker, pass around, and the worker phase scores and refills', 
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board')).toBeVisible();
 
+  // Action-spot tooltip: focusing Pass reveals its ActionTip help (phase-close consequence).
+  await page.getByTestId('sp-pass').focus();
+  await expect(page.getByRole('tooltip')).toContainText('this phase scores');
+
   // The upper row seeds 4 affordable workers (2-player seed); the active seat buys one.
   const upperBuys = page.getByTestId('sp-upper-row').locator('[data-testid^="sp-buy-"]');
   await expect(upperBuys).toHaveCount(4);

@@ -1,7 +1,9 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { Action, GameView, PlayerView } from '@game-hub/engine/container';
 import { ContainerChip, LOT_LABELS, nameOf } from '../chips';
+import { CONTAINER_TIPS } from '../tips';
 import { Button } from '@/components/ui/button';
+import { ActionTip } from '@/components/ActionTip';
 import { Card, CardContent } from '@/components/ui/card';
 
 interface BankPanelProps {
@@ -68,15 +70,17 @@ function ContainerLots({
                     }))
                   }
                 />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  data-testid={`bank-call-${i}`}
-                  disabled={busy}
-                  onClick={() => act(activePlayer.id, { type: 'CALL_BANK', lotKind: 'container', lotIndex: i, bid })}
-                >
-                  {auction ? 'Outbid' : 'Call'}
-                </Button>
+                <ActionTip tip={auction ? CONTAINER_TIPS.bankContainerOutbid : CONTAINER_TIPS.bankContainerLot}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    data-testid={`bank-call-${i}`}
+                    disabled={busy}
+                    onClick={() => act(activePlayer.id, { type: 'CALL_BANK', lotKind: 'container', lotIndex: i, bid })}
+                  >
+                    {auction ? 'Outbid' : 'Call'}
+                  </Button>
+                </ActionTip>
               </div>
             )}
           </div>
@@ -138,22 +142,24 @@ function CashLots({
                     }))
                   }
                 />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  data-testid={`bank-cash-call-${i}`}
-                  disabled={busy || count > board.length}
-                  onClick={() =>
-                    act(activePlayer.id, {
-                      type: 'CALL_BANK',
-                      lotKind: 'cash',
-                      lotIndex: i,
-                      containerBid: board.slice(0, count),
-                    })
-                  }
-                >
-                  {auction ? 'Outbid' : 'Bid'}
-                </Button>
+                <ActionTip tip={auction ? CONTAINER_TIPS.bankCashOutbid : CONTAINER_TIPS.bankCashLot}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    data-testid={`bank-cash-call-${i}`}
+                    disabled={busy || count > board.length}
+                    onClick={() =>
+                      act(activePlayer.id, {
+                        type: 'CALL_BANK',
+                        lotKind: 'cash',
+                        lotIndex: i,
+                        containerBid: board.slice(0, count),
+                      })
+                    }
+                  >
+                    {auction ? 'Outbid' : 'Bid'}
+                  </Button>
+                </ActionTip>
               </div>
             )}
           </div>

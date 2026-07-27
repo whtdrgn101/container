@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Meeple, PLACE_ICON } from './art';
 import { Scene } from './art/Scene';
+import { GATHER_TIP, placeTip } from './tips';
 
 const PLACE_LABEL: Record<FixedPlaceId, string> = {
   toolMaker: 'Tool maker',
@@ -143,7 +144,7 @@ export function BoardMap({ game, canDrive, busy, onPlace, onGather, onUse, seatC
                   ? `${PLACE_LABEL[place]} — locked this round`
                   : PLACE_LABEL[place]
             }
-            title={locked ? LOCK_HINT : undefined}
+            title={locked ? LOCK_HINT : placeTip(place)}
             onClick={opt ? () => onPlace(place, count) : undefined}
           >
             <div className="flex items-center justify-center gap-1">
@@ -213,6 +214,7 @@ export function BoardMap({ game, canDrive, busy, onPlace, onGather, onUse, seatC
                 size="sm"
                 className="mt-1 h-6 bg-[#a05a24] px-2 text-[11px] text-[#f9f2e3] hover:bg-[#8a4c1e]"
                 data-testid={`gather-${place}`}
+                title={GATHER_TIP}
                 disabled={busy}
                 onClick={() => onGather(place)}
               >
@@ -224,6 +226,7 @@ export function BoardMap({ game, canDrive, busy, onPlace, onGather, onUse, seatC
                 size="sm"
                 className="mt-1 h-6 bg-[#a05a24] px-2 text-[11px] text-[#f9f2e3] hover:bg-[#8a4c1e]"
                 data-testid={`use-${place}`}
+                title={placeTip(place)}
                 disabled={busy}
                 onClick={() => onUse(place)}
               >

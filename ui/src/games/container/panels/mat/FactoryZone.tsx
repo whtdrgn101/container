@@ -2,8 +2,10 @@ import { Factory as FactoryIcon, Plus } from 'lucide-react';
 import type { Action, PlayerView } from '@game-hub/engine/container';
 import { FACTORY_LOT_PRICES } from '@game-hub/engine/container';
 import { Button } from '@/components/ui/button';
+import { ActionTip } from '@/components/ActionTip';
 import { cn } from '@/lib/utils';
 import { ContainerChip, nextFactoryLot, StoredChip } from '../../chips';
+import { CONTAINER_TIPS } from '../../tips';
 
 export interface FactoryZoneProps {
   readonly player: PlayerView;
@@ -73,6 +75,7 @@ export function FactoryZone({
             testid={`store-chip-${player.id}-${chipIndex}`}
             disabled={busy}
             selected={factoryPick.includes(chipIndex)}
+            tip={canReprice ? CONTAINER_TIPS.reprice : canFactoryBuy ? CONTAINER_TIPS.buyFactory : undefined}
             onClick={
               canReprice
                 ? () =>
@@ -91,15 +94,17 @@ export function FactoryZone({
         ))}
       </div>
       {canFactoryBuy && factoryPick.length > 0 && (
-        <Button
-          size="sm"
-          className="mt-2 w-full"
-          data-testid={`buy-factory-${player.id}`}
-          disabled={busy || !factoryPickOk}
-          onClick={commitBuy}
-        >
-          Buy {factoryPick.length} for ${factoryPickCost}
-        </Button>
+        <ActionTip tip={CONTAINER_TIPS.buyFactory} className="mt-2 block">
+          <Button
+            size="sm"
+            className="w-full"
+            data-testid={`buy-factory-${player.id}`}
+            disabled={busy || !factoryPickOk}
+            onClick={commitBuy}
+          >
+            Buy {factoryPick.length} for ${factoryPickCost}
+          </Button>
+        </ActionTip>
       )}
       {showControls && (
         <div className="mt-2 space-y-1.5 border-t border-border/60 pt-2">
@@ -119,20 +124,22 @@ export function FactoryZone({
               </button>
             ))}
           </div>
-          <Button
-            size="sm"
-            className="w-full"
-            data-testid={`produce-${player.id}`}
-            disabled={busy || !can('PRODUCE')}
-            onClick={() =>
-              act(player.id, {
-                type: 'PRODUCE',
-                placements: player.factories.slice(0, capacity).map((f) => ({ color: f.color, price: produceLot })),
-              })
-            }
-          >
-            <Plus className="h-4 w-4" aria-hidden /> Produce into ${produceLot}
-          </Button>
+          <ActionTip tip={CONTAINER_TIPS.produce} className="block">
+            <Button
+              size="sm"
+              className="w-full"
+              data-testid={`produce-${player.id}`}
+              disabled={busy || !can('PRODUCE')}
+              onClick={() =>
+                act(player.id, {
+                  type: 'PRODUCE',
+                  placements: player.factories.slice(0, capacity).map((f) => ({ color: f.color, price: produceLot })),
+                })
+              }
+            >
+              <Plus className="h-4 w-4" aria-hidden /> Produce into ${produceLot}
+            </Button>
+          </ActionTip>
         </div>
       )}
     </div>

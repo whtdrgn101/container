@@ -28,6 +28,16 @@ import { ActivityFeed } from '@/components/ActivityFeed';
 import { TurnBanner } from '@/components/TurnBanner';
 import { seatIdentity } from '@/components/seatIdentity';
 import { PanZoom } from '@/components/PanZoom';
+import { ActionTip } from '@/components/ActionTip';
+import {
+  buildTip,
+  DECLINE_TIP,
+  FEED_PENALTY_TIP,
+  FEED_TIP,
+  PLACE_BUILDING_TIP,
+  TAKE_GATHER_TIP,
+  TOOL_TIP,
+} from './tips';
 import type { BoardProps } from '../types';
 import * as stoneageApi from './api';
 import { CardRow } from './CardRow';
@@ -303,26 +313,32 @@ export default function StoneAgeBoard({
             )}
           </span>
           {feed.shortfall === 0 ? (
-            <Button size="sm" className="ml-auto" data-testid="feed-go" disabled={busy} onClick={() => doFeed(true)}>
-              Feed people
-            </Button>
+            <ActionTip tip={FEED_TIP} className="ml-auto">
+              <Button size="sm" data-testid="feed-go" disabled={busy} onClick={() => doFeed(true)}>
+                Feed people
+              </Button>
+            </ActionTip>
           ) : (
             <span className="ml-auto flex items-center gap-2">
               <span className="text-destructive">short {feed.shortfall}</span>
               {feed.canPay && (
-                <Button size="sm" data-testid="feed-go" disabled={busy} onClick={() => doFeed(true)}>
-                  Pay {feed.shortfall} resources
-                </Button>
+                <ActionTip tip={FEED_TIP}>
+                  <Button size="sm" data-testid="feed-go" disabled={busy} onClick={() => doFeed(true)}>
+                    Pay {feed.shortfall} resources
+                  </Button>
+                </ActionTip>
               )}
-              <Button
-                size="sm"
-                variant="outline"
-                data-testid="feed-penalty"
-                disabled={busy}
-                onClick={() => doFeed(false)}
-              >
-                Take −10
-              </Button>
+              <ActionTip tip={FEED_PENALTY_TIP}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  data-testid="feed-penalty"
+                  disabled={busy}
+                  onClick={() => doFeed(false)}
+                >
+                  Take −10
+                </Button>
+              </ActionTip>
             </span>
           )}
         </div>
@@ -381,19 +397,19 @@ export default function StoneAgeBoard({
                     const toolUsed = active.toolsUsed[i];
                     const selected = selectedTools.includes(i);
                     return (
-                      <Button
-                        key={i}
-                        size="sm"
-                        variant={selected ? 'default' : 'outline'}
-                        data-testid={`tool-${i}`}
-                        aria-pressed={selected}
-                        disabled={busy || toolUsed}
-                        title={toolUsed ? 'Already used this round' : `Tool +${value}`}
-                        onClick={() => toggleTool(i)}
-                      >
-                        +{value}
-                        {toolUsed ? ' ·used' : ''}
-                      </Button>
+                      <ActionTip key={i} tip={toolUsed ? 'Already used this round.' : TOOL_TIP}>
+                        <Button
+                          size="sm"
+                          variant={selected ? 'default' : 'outline'}
+                          data-testid={`tool-${i}`}
+                          aria-pressed={selected}
+                          disabled={busy || toolUsed}
+                          onClick={() => toggleTool(i)}
+                        >
+                          +{value}
+                          {toolUsed ? ' ·used' : ''}
+                        </Button>
+                      </ActionTip>
                     );
                   })}
                 </div>
@@ -405,9 +421,11 @@ export default function StoneAgeBoard({
                     {gatherPreview.amount} {gatherPreview.kind}
                   </span>
                 </span>
-                <Button size="sm" data-testid="take-gather" disabled={busy} onClick={() => doTake(selectedTools)}>
-                  Take
-                </Button>
+                <ActionTip tip={TAKE_GATHER_TIP}>
+                  <Button size="sm" data-testid="take-gather" disabled={busy} onClick={() => doTake(selectedTools)}>
+                    Take
+                  </Button>
+                </ActionTip>
               </div>
             </div>
           </div>
@@ -476,15 +494,16 @@ export default function StoneAgeBoard({
                     </div>
                   )}
                   {canPlaceHere && (
-                    <Button
-                      size="sm"
-                      className="mt-2 self-end"
-                      data-testid={`place-${placeId}-go`}
-                      disabled={busy}
-                      onClick={() => doPlace(placeId, 1)}
-                    >
-                      Place worker
-                    </Button>
+                    <ActionTip tip={PLACE_BUILDING_TIP} className="mt-2 self-end">
+                      <Button
+                        size="sm"
+                        data-testid={`place-${placeId}-go`}
+                        disabled={busy}
+                        onClick={() => doPlace(placeId, 1)}
+                      >
+                        Place worker
+                      </Button>
+                    </ActionTip>
                   )}
                   {acting && canDrive && mineHere && top && active && !pending && (
                     <div className="mt-2 space-y-1.5 border-t pt-2">
@@ -522,23 +541,27 @@ export default function StoneAgeBoard({
                           +{paymentValue(draft)} pts
                         </span>
                         <span className="flex gap-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            data-testid={`decline-${i}`}
-                            disabled={busy}
-                            onClick={() => doBuild(i, {})}
-                          >
-                            Pass
-                          </Button>
-                          <Button
-                            size="sm"
-                            data-testid={`build-${i}`}
-                            disabled={busy || !canBuild}
-                            onClick={() => doBuild(i, draft)}
-                          >
-                            Build
-                          </Button>
+                          <ActionTip tip={DECLINE_TIP}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              data-testid={`decline-${i}`}
+                              disabled={busy}
+                              onClick={() => doBuild(i, {})}
+                            >
+                              Pass
+                            </Button>
+                          </ActionTip>
+                          <ActionTip tip={buildTip(top.cost)}>
+                            <Button
+                              size="sm"
+                              data-testid={`build-${i}`}
+                              disabled={busy || !canBuild}
+                              onClick={() => doBuild(i, draft)}
+                            >
+                              Build
+                            </Button>
+                          </ActionTip>
                         </span>
                       </div>
                     </div>
