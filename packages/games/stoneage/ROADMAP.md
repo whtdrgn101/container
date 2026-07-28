@@ -304,7 +304,7 @@ artifact before the port. Also in this pass:
   against its **live** stat — while opponents collapse to one-line summaries so 4-player games stay
   scannable (hotseat follows the active seat). Held-card faces come from the public `CIV_CARD_DECK`
   (drafting is open information; face-down stacking in the physical game is a memory aid).
-- **Seat identity banner** (REVIEW 3.3 interim): `sa-banner` gains "You are X — " when seat-bound,
+- **Seat identity banner** (architecture-review §3.3 interim): `sa-banner` gains "You are X — " when seat-bound,
   `role="status"` + `aria-live="polite"`.
 - **Visual baseline:** `e2e/visual.spec.ts` now snapshots the Stone Age board too
   (`stoneage-board-map.png`, both projects, darwin + linux) — deterministic at game start since the
@@ -333,7 +333,7 @@ hint (with a title/aria explanation) in place of the `n/m` line. **Bot**: no str
 symmetrically; the bar was re-committed to 25/32 per the calibrate-then-commit rule. 100% engine
 coverage held; a new e2e (`stoneage.spec.ts`) demonstrates the lock.
 
-### ✅ SA15 — Redact the undrawn card deck from the view (shipped 2026-07, REVIEW.md §4.6)
+### ✅ SA15 — Redact the undrawn card deck from the view (shipped 2026-07, architecture review §4.6)
 
 `viewFor` no longer ships the face-down civilization-card draw pile. `StoneAgeView` drops `cardDeck` and
 carries `cardDeckCount: number` instead (computed in `viewFor`), so the shuffled draw order never leaves
@@ -342,7 +342,16 @@ counts convention (always present, **no reveal at `ended`**: the undrawn deck is
 secret). The persisted state is unchanged (no `schemaVersion` bump). The view is now a strict projection,
 so board/bot cast it to `StoneAgeState` at the pure engine read-helpers (which never read the deck); a
 backend wire test proves no undrawn card id reaches a client while the count stays correct. *(The building
-stacks' unrevealed tiles are the same class of leak, left for a follow-up — see §4.6.)*
+stacks' unrevealed tiles are the same class of leak, left for a follow-up — see the backlog note below.)*
+
+## Backlog
+
+- **Building-stack redaction** (architecture review §4.6, the half SA15 didn't cover): each building
+  stack's unrevealed tiles beneath the face-up top still ride every REST reply and WS push — the same
+  future-information leak SA15 closed for the card deck. Harmless for trusted-LAN play, which is why it
+  was deferred. When it matters, do it the same way: redact in `viewFor` (top tile + count), never in
+  the UI — it reshapes how the board renders the stacks and how the bot reads them, so it's a real
+  slice, not a patch.
 
 ## Notes / scope
 

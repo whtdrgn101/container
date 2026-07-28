@@ -158,3 +158,15 @@ game package — a platform item in the top-level roadmap.
   since a `GameView` isn't feedable back into the engine.
 - **A5 — Self-play tuning.** Calibrate difficulty & heuristics (and the deferred `RESALE_PER_CONTAINER`
   and the 5-player seat bias) from batch self-play.
+
+## Backlog — known issues (from the 2026-07 architecture review, retired into the platform ROADMAP)
+
+- **The auction side-channel has a fetch race.** The board's auction effect refires on `auctionKey`
+  changes with no cancellation, and three paths write the same setter, so responses can land out of
+  order. `App.tsx`'s rematch fetch (a `live` flag) is the correct template. This matters beyond
+  Container: the auction side-channel is the pattern the next out-of-turn game flow (e.g. American
+  Railroads' general-payout interrupt) will copy, so fix the template before it's copied.
+- **`Action` markers force runtime re-checks.** `legalActions` returns five of twelve actions as bare
+  markers of the same type `applyAction` throws on, so fields must be optional and every consumer
+  re-proves they're present (four re-check sites). Stone Age's convention — markers as *valid empty
+  values* — is the better model; Container is the outlier, and the game most likely to be copied from.

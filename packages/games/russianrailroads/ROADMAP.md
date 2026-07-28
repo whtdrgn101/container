@@ -588,7 +588,41 @@ mechanics of engineers **#13** (occupancy-replay "repeat a previously-occupied s
 **#14** (cross-player "use another player's engineer action space", 2-player), which are art-era placeholders
 awaiting those mechanics. RR9 is board *art*, not a component re-read, so these stay open.
 
-### RR10 — Bot
+### RR9b — Board-UI revamp 🔜 **next up** *(owner call, 2026-07-28)*
+
+**The problem (from play-testing): the board is too crowded — the game is almost unplayable.**
+Russian Railroads has the platform's largest visible state (per player: three routes × up to five
+track colours, locomotives, the industry track + wrench, doublers, specials, engineers, end-bonus
+cards; shared: ~20 action spaces in four groups, the engineer strip, the turn-order track), and the
+current layout is fighting two masters — a responsive single-flow UI that works down to 320px mobile
+**and** a game that genuinely needs table-top board density. The RR9 compromise (everything stacked,
+everything always visible) serves neither: on desktop the eye can't find the current decision, and on
+mobile the scroll distance buries it. Something structural has to change — this is a layout/interaction
+redesign, not an art pass (RR9's `src/client/art/` primitives are the keepers).
+
+**Direction — design-first, comps on the artifact before porting (the SP8/RR9 flow).** Candidate
+shapes to comp, not mutually exclusive:
+
+- **Focus + overview:** show ONE region at real table-top density at a time (my player board / the
+  Dispatch Hall / an opponent), with a thin always-visible summary strip for everything else and
+  explicit navigation between regions. The active prompt (a pending lock, a pool, a reuse phase)
+  **auto-pulls its region forward** — the game already knows exactly what decision is open
+  (`pendingMoves`/`pendingLoco`/pool/reuse/…), which is a luxury most boards don't have.
+- **A spatial board on zoom + pan** (the Stone Age `PanZoom` precedent): the whole table as one
+  navigable canvas at fixed density instead of a reflowing stack — mobile pans and pinches rather
+  than squeezing; the escape hatch that made Stone Age's dense board work on a phone.
+- **Decouple mobile from desktop** rather than one responsive compromise — same components, but a
+  phone gets a deliberately different arrangement (e.g. tabbed regions + a bottom prompt sheet)
+  instead of the desktop layout squeezed.
+
+**Constraints:** client-only (engine/module untouched — the RR2–RR9 zero-host-edits pattern);
+affordances stay gated on `canDrive`/locks/`ended`; the responsive e2e bar stays (no 320px document
+overflow); testids/e2e-asserted strings preserved where possible — renames are allowed if
+`e2e/russianrailroads.spec.ts` moves with them in the same slice. Success test: a first-time player
+can find the open decision at a glance on desktop, and a full turn (place → resolve a lock → pass) is
+comfortable on a phone.
+
+### RR10 — Bot *(after RR9b)*
 Greedy baseline from the (barely-)redacted view; the pending-lock design means it ranks single
 steps. pg.-7 strategy notes as seed heuristics; benchmark-harness calibration (the CS4 convention).
 

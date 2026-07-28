@@ -7,9 +7,9 @@ game, and the higher-level "which games, and what's left of them" view. Game-spe
 | Game | Status | Roadmap |
 |------|--------|---------|
 | **Container** | core game complete; AI A0–A2 shipped, A3–A5 remain | [`packages/games/container/ROADMAP.md`](packages/games/container/ROADMAP.md) |
-| **Can't Stop** | complete: playable, AI (CS1) + art/a11y polish (CS2) shipped; only optional variants (CS3) remain | [`packages/games/cantstop/ROADMAP.md`](packages/games/cantstop/ROADMAP.md) |
-| **Stone Age** | **complete** (SA0–SA14): full worker-placement game — placement, gather+tools, buildings, civ cards, feeding, game end + scoring, an illustrated zoomable board, an AI bot, and the pg. 8 2–3-player restrictions (SA14) | [`packages/games/stoneage/ROADMAP.md`](packages/games/stoneage/ROADMAP.md) |
-| **Russian Railroads** | **in build** (game 5, Ultimate Railroads edition — and the Track D pilot: the first *package-shaped* game, `@game-hub/game-russianrailroads`). RR0–RR8 **base game complete** (worker placement, track advancement, locomotives, engineers, game end + final scoring); RR9 art in progress; RR10 bot pending; expansion modules after. Rules digest done (48 pp. read; hidden info = one secret end-bonus card/player; all base randomness setup-only; the legalActions hazard = split-move combinatorics, resolved by the pending-lock ruling) | [`packages/games/russianrailroads/ROADMAP.md`](packages/games/russianrailroads/ROADMAP.md) |
+| **Can't Stop** | complete: playable, AI (CS1) + art/a11y polish (CS2) + difficulty tiers (CS4) shipped; only optional variants (CS3) remain | [`packages/games/cantstop/ROADMAP.md`](packages/games/cantstop/ROADMAP.md) |
+| **Stone Age** | **complete** (SA0–SA15): full worker-placement game — placement, gather+tools, buildings, civ cards, feeding, game end + scoring, an illustrated zoomable board, an AI bot, the pg. 8 2–3-player restrictions (SA14), and card-deck redaction (SA15) | [`packages/games/stoneage/ROADMAP.md`](packages/games/stoneage/ROADMAP.md) |
+| **Russian Railroads** | **in build** (game 5, Ultimate Railroads edition — and the Track D pilot: the first *package-shaped* game, `@game-hub/game-russianrailroads`). RR0–RR8 **base game complete** (worker placement, track advancement, locomotives, engineers, game end + final scoring); RR9 art **shipped**; **next up: RR9b — board-UI revamp** (the shipped board is too crowded to play well — owner call 2026-07-28); RR10 bot after; expansion modules after that. Rules digest done (48 pp. read; hidden info = one secret end-bonus card/player; all base randomness setup-only; the legalActions hazard = split-move combinatorics, resolved by the pending-lock ruling) | [`packages/games/russianrailroads/ROADMAP.md`](packages/games/russianrailroads/ROADMAP.md) |
 | **Saint Petersburg** | **complete** (SP0–SP9, game 4, 1st edition) — including the "Malachite & Gilt" board art (SP8, comps-approved) and the platform's first redacted-view bot (SP9, greedy baseline): **SP0–SP7 shipped** — registered, viewable fourth game with redacting `viewFor` (hands *and* rubles secret) + the 116-card deck data (SP0), the playable **phase spine** — `BUY`/`PASS`, turn order, cumulative cost reductions (min 1 ruble), all-pass phase close with scoring + refill, interactive board (SP1), the **full round loop** — trading-phase frame (no scoring), round transition (discard lower, slide upper→lower, deal workers, rotate all four markers left) with the pg. 8 "no cards taken → skip the *mid-round* refill" special case (round-end worker deal unconditional — a drain-spiral bug corrected in SP3), marker chips + rollover feed (SP2), the **hidden hand** — `ADD_TO_HAND` (free, limit 3) / `PLAY_FROM_HAND` (cost with reductions, no lower-row discount), non-empty-hand redaction proof, playable-hand UI + face-down opponent counts (SP3), **trading-card displacement** — `BUY`/`PLAY_FROM_HAND` take a `displace` card-id (green ware-pairs incl. Czar-by-any-green, blue→any building, orange→any aristocrat, never trading-on-trading), cost = difference-or-1 with all reductions, carpenter-workshop/gold-smelter owned-card reductions live, UI displacement picker + upgrade feed (SP4), and the **six special cards** — Warehouse (hand limit 4), Mariinskij (+1₽/aristocrat at building scoring), Tax man (+1₽/worker at aristocrat scoring), Potjomkin (buy 2, worth 6 when displaced), the **Pub** interlude (after building scoring, buy ≤5 pts @ 2₽) and the **Observatory** (skip its point to draw a stack top → forced buy/hand/discard), both as engine-level turn locks (`pendingPubBuy`/`pendingDraw`, no backend routes; the draw is a pure engine action, `pendingDraw` publicly revealed like an SP3 take), engine 476 @ 100% + seeded backend REST proof (SP5), and **game end + final scoring** — a `finalRound` flag armed when a board refill places a group's last card (pg. 5; dealing short of a *pre-empty* stack is not the trigger; the round-end worker deal arming it makes the fresh round "this round"), ending at the final round's trading close into `finalScoring` (distinct-aristocrat table 1/3/6/10/15/21/28/36/45/55 by card identity incl. orange trading cards, +1/full 10₽, −5/hand card, **unclamped**; ties by money then shared), `viewFor` revealing all at `ended`, and the shared `GameOver` results table (SP6), and **playable-game hardening** — full seeded games driven to a real end over REST at 2/3/4 players (whole surface: both rows, add+play hand, a trading displacement, a paying Pub buy, an Observatory draw+resolve; coherent breakdowns, monotonic version, sane move log), the honest **four-games-coexist** check (all four real games + the counter stub in one app; the routeless `stpetersburg` namespace 404s cleanly while cross-game calls stay guarded), lobby+colours / resume / abandon proven in e2e, the **seat palette** on the board, a `describe(move)` audit, and a `legalActions⊆applyAction` fuzz (SP7); then the approved **art** (SP8) and the redacted-view **bot** (SP9) — see the per-game roadmap for both | [`packages/games/stpetersburg/ROADMAP.md`](packages/games/stpetersburg/ROADMAP.md) |
 
 Adding a game is **additive** — implement the seams, register, done (proven five times now — Container,
@@ -22,13 +22,13 @@ for how the seams work.
 The near-term order, decided while play-testing:
 
 1. ✅ **Stone Age polish** — the pg. 8 two/three-player rules (the one knowing rules deviation left in
-   a shipped game). *(Shipped as SA14; bot recalibration under the harder 2p game waits on the
-   benchmark harness.)*
+   a shipped game). *(Shipped as SA14; the 2p bot benchmark was re-measured and its bar re-committed
+   with it — 29/32, bar 25/32.)*
 2. ✅ **Game 4 — Saint Petersburg (1st ed.)** — chosen 2026-07-22 over Russian Railroads (which is queued
    as the Track D pilot: a heavyweight is the right stress test once adding games is smoother). Sliced
    SP0–SP9 in its roadmap; the first game exercising real `viewFor` redaction (hidden hands + hidden
    rubles) and continuous deck randomness.
-3. **Schema versioning for state transitions** ✅ (REVIEW §4.1) — `schemaVersion` + `migrate` on
+3. **Schema versioning for state transitions** ✅ (architecture review §4.1) — `schemaVersion` + `migrate` on
    `GameModule`, a `games.schema_version` column, and write-on-read upgrades in `GameRepository`, so
    iterating on shipped engines can't strand in-flight games (downgrade rows 409, all four games are v1).
 4. **Track D (new, core) — externalize games. ✅ in-workspace phase complete (2026-07-27).** Four games
@@ -44,6 +44,11 @@ The near-term order, decided while play-testing:
    **[`docs/track-d-legacy-migration.md`](docs/track-d-legacy-migration.md)**). **Still open:** D2 — an
    *out-of-repo* game against published `@game-hub/kernel` (forces a real `dist`, kernel-contract
    versioning enforcement, and a `@game-hub/ui-kit`). See the design doc's status header.
+5. **Russian Railroads board-UI revamp (RR9b) — next up** (owner, 2026-07-28, while play-testing):
+   the RR board fights itself — a responsive layout that works on mobile vs a game that genuinely
+   needs table-top board density — and the compromise makes the game nearly unplayable. Redesign the
+   board UI before the bot (RR10). Sliced in
+   [the RR roadmap](packages/games/russianrailroads/ROADMAP.md).
 
 ## Principles
 
@@ -252,13 +257,55 @@ Built in the core, so **every game gets them free** — the real payoff of the C
 
 ---
 
+## Review backlog — what remains from the 2026-07 architecture review
+
+`REVIEW.md` (the three-games-in deep review) was **retired 2026-07-28**: Tiers 1–4 all shipped, so the
+live remainder moved here and the file was deleted. The full text is in git history (last at commit
+`cc02293`); code comments citing "REVIEW §x.y" refer to it. Struck as stale on retirement (verified
+fixed since the review): the Stone Age bot heuristic cliffs (fixed by SA12a's value-based policy), the
+Stone Age card-deck leak (fixed by SA15), "bot strength unmeasured" (`pnpm bench` + the
+calibrate-then-commit convention), the hardcoded e2e game list, and "no linter" (ESLint 9 + Prettier in
+CI).
+
+**Platform items (independent, any order — none blocks play):**
+
+- **`app.ts` is the file that grew back** — 926+ lines holding games, abandon, rematch, lobbies, WS and
+  static serving; the same monolith shape C2 fixed in `App.tsx` (1895 → 364). Split it the next time a
+  feature lands there, not as a big-bang refactor.
+- **Backend test hygiene** — `app.test.ts` is 1237+ lines with a second suite already living mid-file
+  (violates the repo's own "well under 1000" rule); the backend never adopted the engine's
+  `tests/helpers.ts` convention; `mulberry32` is duplicated verbatim across three test files.
+- **Engine immutability is asserted only in Container** — CLAUDE.md states the invariant as tested, but
+  none of the four newer games has such a test. All are in fact clean; Stone Age and Saint Petersburg do
+  the most nested-record rebuilding, so they're the ones most worth pinning.
+- **`expectError` typing regressed in the newer games** — Container's helper is compile-checked against
+  its error union; the others take a bare `string`, so a test asserting an error code that no longer
+  exists stays green.
+- **`MoveRecord.type` is stringly-typed** — it discards each game's precise `ActionType` union, and the
+  UI's log filters match on string literals with no compile-time link to the engine.
+- **WS heartbeat** (deferred from §4.7) — no ping/pong to reap half-open sockets. The per-IP cap +
+  close-on-unsubscribe bound the `rooms` map; add a ping sweep if idle sockets ever pile up.
+- **Dependencies are clean but stale** (re-measured 2026-07-28): vite 6 → 8 (2 majors), vitest 3 → 4
+  (must move in lockstep across packages), better-sqlite3 11 → 13 (the one bump that can break the
+  Docker build). `pnpm audit` still clean.
+- **`reference_materials/` needs a README note** — the PDFs are gitignored (copyright) while 9 committed
+  files cite them, including `TODO(verify)` items a fresh clone can't resolve. One README line saying so.
+
+**Game-scoped remainders** moved to their game's roadmap: Container's auction-fetch race and
+`Action`-marker shape → [`packages/games/container/ROADMAP.md`](packages/games/container/ROADMAP.md);
+Stone Age's building-stack redaction (§4.6's second half) →
+[`packages/games/stoneage/ROADMAP.md`](packages/games/stoneage/ROADMAP.md).
+
+---
+
 ## Pacing & credits
 
 - **One slice per session** is a good default — each ends green and demoable, a clean checkpoint to commit
   and pause.
 - **Before starting a slice,** check remaining plan usage so you don't land mid-slice; if tight, pick an
   **M/S** item.
-- **Suggested next order:** the bot reorg, **Can't Stop CS1/CS2** (AI + polish) and **C4** (cross-game
-  polish) are **done** — Can't Stop is complete bar optional variants, and the platform's Track C is fully
-  shipped. Open work is independent and can go in any order: Container's **A3–A5** (difficulty/search),
-  **Can't Stop CS3** (variants), and **B3** (accounts) — none essential for home/LAN play.
+- **Suggested next order (owner call 2026-07-28): RR9b — the Russian Railroads board-UI revamp** — the
+  game is nearly unplayable as laid out, so playability beats everything else — then **RR10** (its bot).
+  After that, open work is independent and can go in any order: Container's **A3–A5** (difficulty/search),
+  **Can't Stop CS3** (variants), **B3** (accounts), **Track D D2** (an out-of-repo game), and the review
+  backlog above — none essential for home/LAN play.

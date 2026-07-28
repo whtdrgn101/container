@@ -247,7 +247,7 @@ serializable, so the log enables replay/audit.
     table, so a new column needs a real `ALTER TABLE`: put it in `db.ts`'s `ADDED_COLUMNS` +
     `addMissingColumns()` (guarded by `PRAGMA table_info`), not just the schema string — or an
     already-deployed database (the point of the `/data` volume) never gets it.
-  - The **state blob's** schema is the *module's* (REVIEW §4.1). The state is one opaque `TEXT` column, so
+  - The **state blob's** schema is the *module's* (architecture review §4.1). The state is one opaque `TEXT` column, so
     reshaping a shipped engine's serialized state is **not** a column migration: bump the module's
     `schemaVersion` and write `migrate(state, from)`. `GameRepository.get(module, id)` upgrades a stale row
     write-on-read (migrate → persist + re-stamp `schema_version`, **not** a move: no `version` bump, no
@@ -361,7 +361,7 @@ What we **refused** to extract off one/two examples, and still refuse:
 - **A shared `record`/state/`viewFor`** off two games. Each game keeps its own state type, constants and
   `viewFor` — redaction must be an explicit per-game decision, not a shared no-op.
 
-What the rule said to extract **once the third example arrived** (REVIEW §3), and did:
+What the rule said to extract **once the third example arrived** (architecture review §3), and did:
 
 - **`record()` and the seat helpers** (`seatOf`/`withPlayer`/`activePlayer`) were byte-identical across
   three games → the kernel's `record` + `makeSeating`.

@@ -12,9 +12,9 @@ platform is game-agnostic. The games:
 |------|---------|------|--------|
 | **Container** (10th Anniv.) | 3–5 | economic supply-chain — you can never buy/ship *your own* containers | core game complete; AI A0–A2 shipped (A3–A5 optional) |
 | **Can't Stop** | 2–4 | push-your-luck dice | complete + bot (CS1) + difficulty tiers (CS4); only variants (CS3) remain |
-| **Stone Age** | 2–4 | worker-placement Euro | **complete** (SA0–SA14): full game, illustrated board, bot, 2–3-player rules |
+| **Stone Age** | 2–4 | worker-placement Euro | **complete** (SA0–SA15): full game, illustrated board, bot, 2–3-player rules, deck redaction |
 | **Saint Petersburg** (1st ed.) | 2–4 | card-buying engine | **complete** (SP0–SP9): first game with real hidden info (hand + rubles secret) |
-| **Russian Railroads** (Ultimate ed.) | 2–4 | worker-placement | **in build** — base game complete, art (RR9) in progress, bot (RR10) pending; the Track D **package pilot** |
+| **Russian Railroads** (Ultimate ed.) | 2–4 | worker-placement | **in build** — base game + art (RR9) complete; **next up: board-UI revamp (RR9b)** — the shipped board is too crowded to play well; bot (RR10) after; the Track D **package pilot** |
 
 Per-game rules and slice history live in each game's `packages/games/<id>/ROADMAP.md`; the authoritative
 rules are the rulebook PDFs in `reference_materials/` (gitignored — copyrighted). ⚠️ **Read the spec
@@ -85,8 +85,10 @@ The platform explanation now lives in two docs. Read them before touching platfo
 History and rationale: **[`docs/track-d-externalize-games.md`](./docs/track-d-externalize-games.md)** (the
 game-package design) and **[`docs/track-d-legacy-migration.md`](./docs/track-d-legacy-migration.md)** (the
 migration that made all five games package-shaped). Platform roadmap:
-**[`ROADMAP.md`](./ROADMAP.md)**; per-game roadmaps at `packages/games/<id>/ROADMAP.md`. Architecture
-review + hardening follow-ups: **[`REVIEW.md`](./REVIEW.md)**. Deployment: **[`DEPLOY.md`](./DEPLOY.md)**.
+**[`ROADMAP.md`](./ROADMAP.md)**; per-game roadmaps at `packages/games/<id>/ROADMAP.md`. The 2026-07
+architecture review (`REVIEW.md`) is **retired** — its remaining items live in ROADMAP.md's
+"Review backlog" section (full text in git history; code comments citing "REVIEW §x.y" refer to it).
+Deployment: **[`DEPLOY.md`](./DEPLOY.md)**.
 
 ## Commands
 

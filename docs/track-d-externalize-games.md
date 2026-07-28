@@ -145,7 +145,7 @@ manifest declares `kernelContract: N`; the registries refuse (loudly, at registr
 - The platform promises `ModuleContext` stability within a major: injected rng, `games`, `hub`,
   `pushGame`, bot seats — the things every module already leans on.
 - A game's own state-shape evolution stays *its own* business via `schemaVersion`/`migrate`
-  (REVIEW §4.1) — deliberately orthogonal to the kernel contract version.
+  (architecture review §4.1) — deliberately orthogonal to the kernel contract version.
 
 ## 5. Registration & discovery
 
