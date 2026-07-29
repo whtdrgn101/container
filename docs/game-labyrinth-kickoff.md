@@ -64,9 +64,24 @@ it lives here until then so the plan isn't tribal knowledge.
 
 ## D2 slice plan (platform first — each green, shippable, in the hub repo until D2c)
 
-- **D2a — kernel `dist` + publish**: a real build for `@game-hub/kernel` (exports maps, types, no
-  TS-source consumption), kernel-major-as-contract-version enforcement, publish `1.0.0`. Owner manual
-  steps: create the npm `game-hub` org + provide a publish token (or `npm login`).
+- **D2a — kernel `dist` + publish readiness** ✅ (2026-07-29): a real build for `@game-hub/kernel`,
+  publish-ready at `1.0.0`, and kernel-major-as-contract-version enforced at registration. Findings and
+  the full shipped list live in the design doc's §4 "Delivered in D2a".
+  - **Deviation from the slice sketch — "no TS-source consumption" was deliberately *not* done.** The
+    hub's backend (esbuild bundle), UI (Vite aliases) and every vitest run keep consuming the kernel's
+    **TS source** in-workspace; pnpm's `publishConfig.exports` rewrites the same three subpaths to
+    `dist/` in the tarball only. Switching the hosts onto `dist` would have been a large, risky change
+    with no D2 benefit — the out-of-repo consumer is the one that needs `dist`, and D2c proves it.
+  - **Deviation — `npm publish` did not run.** The `game-hub` npm org still doesn't exist. Everything up
+    to a proven-good tarball shipped instead: `pnpm --filter @game-hub/kernel pack:smoke` packs, installs
+    outside the workspace, and drives all three subpaths with plain `node` + a `nodenext` `tsc` consumer.
+    It runs in CI after the unit tests.
+  - **Biggest finding:** the pre-existing `tsconfig.build.json` emitted extensionless relative imports,
+    so the built package was unloadable by Node — green in every repo suite, broken on install. Shipped
+    kernel sources now carry explicit `.js` extensions. Any game package that later ships a `dist`
+    inherits this rule.
+  - Owner manual steps still outstanding: create the npm `game-hub` org, provide a publish token (or
+    `npm login`), then `pnpm --filter @game-hub/kernel publish`.
 - **D2b — `@game-hub/ui-kit`**: transport DTOs (`GamePayload`/`GameMessage`) move into
   `@game-hub/kernel/client`; shared chrome (`TurnBanner`/`ActivityFeed`/`GameOver`) extracts to a
   published `@game-hub/ui-kit`, answering the Tailwind content-glob problem (design doc §2). Closes

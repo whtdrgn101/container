@@ -67,6 +67,13 @@ jobs:
           VITEST_MAX_FORKS: '1'
           VITEST_MAX_THREADS: '1' # same cap if a config ever opts into the threads pool
 
+      # `@game-hub/kernel` is published (Track D / D2a) — every suite above runs it as workspace-linked
+      # TypeScript *source*, which says nothing about the tarball an out-of-repo game installs. This packs
+      # it, installs it into a throwaway project outside the workspace, and drives all three subpaths with
+      # plain node + a `nodenext` tsc consumer. See packages/kernel/scripts/pack-smoke.mjs for the two
+      # failure modes it exists to catch.
+      - run: pnpm --filter @game-hub/kernel pack:smoke
+
   e2e:
     name: Playwright e2e
     runs-on: ubuntu-latest

@@ -1,20 +1,66 @@
 {
   "name": "@game-hub/kernel",
-  "version": "0.0.0",
-  "private": true,
+  "version": "1.0.0",
   "type": "module",
-  "description": "The Game Hub kernel: the tiny set of primitives every game and both hosts share — GameError, MoveRecord, Viewer, record(), makeSeating, the end-state union, and the GameModule/GameClient contracts. Consumed as TypeScript source by subpath (the engine convention). This package MAY have a `.` entry — it's the kernel, not a per-game platform, so there is no ambiguity about a default.",
+  "description": "The Game Hub kernel: the tiny set of primitives every game and both hosts share — GameError, MoveRecord, Viewer, record(), makeSeating, the end-state union, runBotLoop, and the GameModule/GameClient contracts. Its major version IS the host↔game contract version (KERNEL_CONTRACT_VERSION). In-workspace it is consumed as TypeScript source by subpath (the engine convention); the published tarball resolves the same subpaths to dist/ via publishConfig. This package MAY have a `.` entry — it's the kernel, not a per-game platform, so there is no ambiguity about a default.",
   "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/whtdrgn101/container.git",
+    "directory": "packages/kernel"
+  },
+  "keywords": [
+    "board-game",
+    "game-engine",
+    "game-hub",
+    "game-module",
+    "contract",
+    "typescript"
+  ],
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./bot": "./src/bot/index.ts",
-    "./client": "./src/contracts/client.ts"
+    "./client": "./src/contracts/client.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./bot": {
+        "types": "./dist/bot/index.d.ts",
+        "default": "./dist/bot/index.js"
+      },
+      "./client": {
+        "types": "./dist/contracts/client.d.ts",
+        "default": "./dist/contracts/client.js"
+      },
+      "./package.json": "./package.json"
+    }
   },
   "scripts": {
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "pnpm build",
+    "pack:smoke": "node scripts/pack-smoke.mjs"
+  },
+  "peerDependencies": {
+    "@types/react": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@types/react": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

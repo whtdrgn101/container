@@ -11,22 +11,34 @@
 // The `.` barrel is framework-free (no React, no Fastify) so the engine and backend can import it
 // without dragging either in. The UI's React-dependent `GameClient`/`BoardProps` contract lives behind
 // the `@game-hub/kernel/client` subpath instead (see `contracts/client.ts`).
+//
+// ⚠️ **Relative imports in shipped kernel files carry an explicit `.js` extension** (Track D / D2a).
+// Unlike every other package here, the kernel is *published* and consumed from `dist/` — plain Node ESM
+// does not do extension resolution, so an extensionless `from './errors'` emits verbatim and the
+// installed package throws `ERR_MODULE_NOT_FOUND` on the first import. `.js` specifiers resolve to the
+// `.ts` source in-workspace (TS, Vite, Vitest and esbuild all do the `.js`→`.ts` mapping) *and* to the
+// emitted `.js` in the tarball, so one spelling serves both. Test files are excluded from the build and
+// keep the extensionless style. `scripts/pack-smoke.mjs` is what catches a regression here.
+
+// The host↔game contract version (design doc §4). Its own module so a game can import the number
+// without pulling anything else in.
+export { KERNEL_CONTRACT_VERSION } from './contract.js';
 
 // Engine primitives.
-export { GameError } from './errors';
-export type { MoveRecord } from './moveRecord';
-export type { Viewer } from './viewer';
-export { record } from './record';
-export type { VersionedState } from './record';
-export { makeSeating } from './seating';
-export type { SeatedState, SeatHelpers } from './seating';
-export type { GameEndState, WinnersEndState } from './endState';
+export { GameError } from './errors.js';
+export type { MoveRecord } from './moveRecord.js';
+export type { Viewer } from './viewer.js';
+export { record } from './record.js';
+export type { VersionedState } from './record.js';
+export { makeSeating } from './seating.js';
+export type { SeatedState, SeatHelpers } from './seating.js';
+export type { GameEndState, WinnersEndState } from './endState.js';
 
 // The game-agnostic bot drive-loop, shared by every game's backend runner (REVIEW §3.4). It imports no
 // host and reads only a structural slice of state, so it is kernel code (Track D — legacy-migration
 // decision 5). Each game package's bot runner imports `runBotLoop` from here directly.
-export { runBotLoop } from './botLoop';
-export type { BotLoopState, PreStepResult, BotLoopOptions } from './botLoop';
+export { runBotLoop } from './botLoop.js';
+export type { BotLoopState, PreStepResult, BotLoopOptions } from './botLoop.js';
 
 // The backend `GameModule` contract (host bindings are generic parameters — see `contracts/module.ts`).
 export type {
@@ -39,4 +51,4 @@ export type {
   ParseResult,
   ErrorResponse,
   GameSummary,
-} from './contracts/module';
+} from './contracts/module.js';

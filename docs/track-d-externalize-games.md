@@ -30,6 +30,10 @@ What **D2** (out-of-repo) still forces that the in-workspace phase did not: a re
 consumption + Vite aliases don't survive `node_modules`), the Tailwind content-glob problem (§2),
 enforced kernel-contract versioning (§4), and gap #1's `@game-hub/ui-kit` extraction.
 
+**D2a is done (2026-07-29):** the kernel builds a real `dist`, is publish-ready as `1.0.0` (unpublished —
+the npm org is the owner's manual step), and the kernel-contract check is live in the backend registry
+with all five games declaring it. Details and findings in §4 "Delivered in D2a".
+
 Original goal statement: four games had tested the engine and the seams; the long-term goal is making
 games easier to add, and eventually addable from *outside* this repo. Pilot: Russian Railroads (a
 heavyweight is the right stress test).
@@ -149,6 +153,69 @@ manifest declares `kernelContract: N`; the registries refuse (loudly, at registr
   `pushGame`, bot seats — the things every module already leans on.
 - A game's own state-shape evolution stays *its own* business via `schemaVersion`/`migrate`
   (architecture review §4.1) — deliberately orthogonal to the kernel contract version.
+
+### ✅ Delivered in D2a (2026-07-29) — the kernel is publishable, and the contract is enforced
+
+**Publish shape.** `@game-hub/kernel` is `1.0.0`, no longer `private`, `files: ["dist"]`, BSD-3-Clause,
+`repository` + `keywords`, `publishConfig.access: "public"`, `prepack` → `tsc -p tsconfig.build.json`.
+The workspace is untouched: the top-level `exports` still point at **TS source** (`./src/index.ts` …),
+because the backend's esbuild bundle, the UI's Vite aliases and every vitest run consume source — and
+`publishConfig.exports` (a pnpm feature applied at pack/publish time) rewrites the same three subpaths
+to `dist/`, `types` condition first, with `main`/`types` fallbacks for older resolvers. `./package.json`
+is exported too, so tooling can read the manifest. So **one package, two resolutions**, and no host
+change in this slice.
+
+**⚠️ Finding — the pre-D2a build emitted a package Node could not load.** `tsconfig.build.json` already
+produced JS + `.d.ts` + source maps for all three subpaths, but under `moduleResolution: Bundler` `tsc`
+emits relative specifiers **verbatim**: `export { GameError } from './errors'`. Node ESM does no
+extension resolution, so the installed package threw `ERR_MODULE_NOT_FOUND` on the very first import —
+invisible to every suite in this repo, all of which read the TS source. Fix: shipped kernel files now
+write relative imports with an explicit **`.js` extension**, which resolves to the `.ts` source
+in-workspace (TS, Vite, Vitest and esbuild all do the `.js`→`.ts` mapping) *and* to the emitted `.js` in
+the tarball. Test files are excluded from the build and keep the extensionless style. **Any game package
+that later ships a `dist` inherits this rule.**
+
+**React stays type-only.** `./client` imports `ComponentType`/`LazyExoticComponent` as `import type`, so
+the emitted `client.js` is `export {}` and the kernel ships with **zero runtime dependencies**;
+`@types/react` is an **optional peer** (`peerDependenciesMeta`), needed only by a consumer that actually
+typechecks the client contract. The pack smoke asserts both (no `react` resolvable, `dependencies` empty).
+
+**Contract enforcement.** The kernel exports `KERNEL_CONTRACT_VERSION` (= 1) from `src/contract.ts`,
+which carries the additive-minor / breaking-major rule in full. `GameModule` gained an optional
+`kernelContract?: number`; `GameRegistry.register` refuses a mismatch with the existing throw pattern,
+next to the duplicate-id and seat-bound checks. All five games declare
+`kernelContract: KERNEL_CONTRACT_VERSION` — imported from the kernel they compiled against, never a
+literal, so a game resolving a *different* kernel copy carries that copy's number and gets caught.
+
+- **Where it lives:** on the **module**, not a separate manifest — a game's static identity (`id`,
+  `name`, seat bounds, `colors`) already lives there and the registry already validates it, so this is
+  the smallest honest change. The UI's client list has no registration step, and a game's module and
+  client ship in one package against one kernel, so one check per package is enough.
+- **A game that omits the declaration is treated as contract 1** and registers normally. Decision: every
+  hosted game predates the field, and defaulting keeps the transition additive rather than a flag day.
+  ⚠️ **When a contract 2 lands, that default becomes a lie — make `kernelContract` required then.**
+
+**Pack smoke — the out-of-workspace proof.** `packages/kernel/scripts/pack-smoke.mjs`
+(`pnpm --filter @game-hub/kernel pack:smoke`, wired into CI's test job after `pnpm test`) packs the
+kernel, `npm install`s the tarball into a throwaway project under the OS temp root, then drives it twice:
+plain `node` over all three subpaths asserting `record()`/`GameError`/`makeSeating`/the bot primitives
+behave, and `tsc --noEmit` on a game-shaped consumer under **`nodenext`** resolution with
+`skipLibCheck: false` — the strictest mode, which honours the `exports` map exactly as Node does and
+rejects extensionless specifiers inside the shipped `.d.ts`. Green there ⇒ a `bundler`-resolution
+consumer is safe by construction.
+
+**⚠️ Latent trap for the Docker deploy.** `pnpm --filter @game-hub/backend --legacy deploy --prod` honours
+`files: ["dist"]` when it clones a workspace package but does **not** apply `publishConfig`. The image never
+builds the kernel, so the deployed `node_modules/@game-hub/kernel` is now **just a `package.json`** — an
+empty package whose `exports` still point at `./src/…`. Harmless today: the backend ships as a
+self-contained esbuild bundle with every workspace TS dep inlined, so nothing resolves that package at
+runtime — and pre-D2a it shipped `src/*.ts`, which Node could not have loaded either, so this is not a
+regression. **Measured, not assumed:** with `dist/` deleted, `pnpm deploy --prod` + the bundle + those
+`node_modules` boot and serve REST (`backend/scripts/smoke.mjs` → `SMOKE OK`). If the backend ever stops
+bundling its workspace deps, this becomes a real break — build the kernel in the image then.
+
+**Not in this slice:** the actual `npm publish` (the `game-hub` npm org does not exist yet) and a
+package `README.md` (npm shows "no readme" without one).
 
 ## 5. Registration & discovery
 

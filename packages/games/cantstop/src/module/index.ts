@@ -1,5 +1,6 @@
 import { applyAction, legalActions, MAX_PLAYERS, MIN_PLAYERS, viewFor } from '../engine';
 import type { Action, CantStopState, Viewer } from '../engine';
+import { KERNEL_CONTRACT_VERSION } from '@game-hub/kernel';
 import type { BotDriver, GameSummary } from '@game-hub/kernel';
 import type { GameModule, ModuleContext } from './context';
 import { CantStopBotRunner } from './botRunner';
@@ -16,6 +17,9 @@ import { registerCantStopRoutes } from './routes';
  */
 export const cantStopModule: GameModule<CantStopState, Action> = {
   id: 'cantstop',
+  // The kernel contract this game is built against (design doc §4) — taken from the kernel it compiled
+  // against, so it can't drift. The host's registry refuses a mismatch at registration.
+  kernelContract: KERNEL_CONTRACT_VERSION,
   name: "Can't Stop",
   minPlayers: MIN_PLAYERS,
   maxPlayers: MAX_PLAYERS,

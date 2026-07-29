@@ -1,3 +1,4 @@
+import { KERNEL_CONTRACT_VERSION } from '@game-hub/kernel';
 import type { ErrorResponse, GameModule, GameSummary, ParseResult, Viewer } from '@game-hub/kernel';
 import { applyAction, createGame, GameError, legalActions, MAX_PLAYERS, MIN_PLAYERS, viewFor } from '../engine';
 import type { Action, IdeaCardId, IdeaTokenType, RouteId, RussianRailroadsState, TrackColor } from '../engine';
@@ -224,6 +225,9 @@ function mapError(error: unknown): ErrorResponse | null {
  */
 const russianRailroadsModule: GameModule<RussianRailroadsState, Action> = {
   id: 'russianrailroads',
+  // The kernel contract this game is built against (design doc §4) — taken from the kernel it compiled
+  // against, so it can't drift. The host's registry refuses a mismatch at registration.
+  kernelContract: KERNEL_CONTRACT_VERSION,
   name: 'Russian Railroads',
   minPlayers: MIN_PLAYERS,
   maxPlayers: MAX_PLAYERS,

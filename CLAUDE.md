@@ -111,6 +111,10 @@ pnpm format:check           # the CI gate (*.md is Prettier-ignored — hand-wra
 
 pnpm generate               # games.config.ts → the two checked-in registries (CI freshness-checks the diff)
 
+# The published kernel (Track D / D2a — @game-hub/kernel is the one package that leaves this repo)
+pnpm --filter @game-hub/kernel build       # tsc → dist/ (JS + .d.ts + maps); also runs as `prepack`
+pnpm --filter @game-hub/kernel pack:smoke  # pack → install outside the workspace → node + tsc drive it (CI runs this)
+
 # Dev (two terminals)
 pnpm dev:backend            # API on :3001
 pnpm dev:ui                 # UI on :5173 (proxies /api → :3001)
@@ -152,6 +156,15 @@ in `app.ts` (`/^\/(games|lobbies|health)\b/`).
 - **v1 was hotseat / pass-and-play.** Online multiplayer (lobbies, live sync, seat identity, resume) and
   AI both shipped; hotseat still works and its testids are intact.
 - All five games are persisted-state **shape-v1** (no `schemaVersion` declared).
+- **`@game-hub/kernel`'s major version IS the host↔game contract version** (Track D / D2a). It exports
+  `KERNEL_CONTRACT_VERSION` (= 1); every module declares `kernelContract: KERNEL_CONTRACT_VERSION` and
+  `GameRegistry.register` boot-crashes on a mismatch. Additive optional hooks = minor; a changed required
+  member = major. An undeclared `kernelContract` means 1 **only during this transition** — make it
+  required when a contract 2 lands. Full rule: `packages/kernel/src/contract.ts` + design doc §4.
+- ⚠️ **Shipped kernel files write relative imports with an explicit `.js` extension.** The kernel is the
+  one package that leaves this repo, and `tsc` emits relative specifiers verbatim — extensionless ones
+  make the installed tarball unloadable by Node while every in-repo suite stays green. `pack:smoke` is
+  what catches it. Same rule applies to any game package that later ships a `dist`.
 
 Older decision detail (Track A/B/C/D slice history) lives in `ROADMAP.md` and the per-game roadmaps.
 

@@ -1,3 +1,4 @@
+import { KERNEL_CONTRACT_VERSION } from '@game-hub/kernel';
 import type { GameModule } from './module';
 
 /**
@@ -42,6 +43,20 @@ export class GameRegistry {
     }
     if (module.minPlayers > module.maxPlayers) {
       throw new Error(`Game "${module.id}" has minPlayers > maxPlayers`);
+    }
+    // The kernel-contract check (Track D design doc §4, slice D2a). Registration is the one moment the
+    // host holds both numbers — the game's declared contract and its own — so a game built against an
+    // incompatible kernel major boot-crashes here rather than failing somewhere unrecognisable mid-game
+    // (a missing hook, a member that changed meaning). Absent ⇒ 1 for the transition: every game
+    // predates the field. ⚠️ When a contract 2 lands, that default becomes a lie — make the declaration
+    // required then.
+    const declared = module.kernelContract ?? KERNEL_CONTRACT_VERSION;
+    if (declared !== KERNEL_CONTRACT_VERSION) {
+      throw new Error(
+        `Game "${module.id}" was built against kernel contract ${declared}, but this host provides ` +
+          `contract ${KERNEL_CONTRACT_VERSION}. Upgrade the game to @game-hub/kernel@${KERNEL_CONTRACT_VERSION}.x ` +
+          `(or the host to the game's kernel major).`,
+      );
     }
     this.modules.set(module.id, module);
     return this;

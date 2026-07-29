@@ -1,5 +1,6 @@
 import { applyAction, legalActions, MAX_PLAYERS, MIN_PLAYERS, viewFor } from '../engine';
 import type { Action, GameState, Viewer } from '../engine';
+import { KERNEL_CONTRACT_VERSION } from '@game-hub/kernel';
 import type { BotDriver, GameSummary } from '@game-hub/kernel';
 import type { GameModule, ModuleContext } from './context';
 import { AuctionRepository, auctionIsDue } from './auctions';
@@ -17,6 +18,9 @@ import { registerAuctionRoutes } from './routes';
  */
 export const containerModule: GameModule<GameState, Action> = {
   id: 'container',
+  // The kernel contract this game is built against (design doc §4) — taken from the kernel it compiled
+  // against, so it can't drift. The host's registry refuses a mismatch at registration.
+  kernelContract: KERNEL_CONTRACT_VERSION,
   name: 'Container',
   minPlayers: MIN_PLAYERS,
   maxPlayers: MAX_PLAYERS,

@@ -1,4 +1,4 @@
-import { BotError } from './errors';
+import { BotError } from './errors.js';
 
 /**
  * The slice of a game view `assertBotTurn` reads. Every game's `GameView` satisfies it structurally,

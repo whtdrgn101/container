@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import pkg from '../../package.json';
+import { KERNEL_CONTRACT_VERSION } from '../contract';
 import { GameError } from '../errors';
 import { record } from '../record';
 import type { VersionedState } from '../record';
@@ -90,5 +92,21 @@ describe('makeSeating', () => {
 
   it('activePlayer reads the seat at activePlayerIndex', () => {
     expect(seating.activePlayer(state)).toEqual({ id: 'p2', score: 5 });
+  });
+});
+
+describe('KERNEL_CONTRACT_VERSION', () => {
+  // The number is a *promise*, not a detail: games declare it and the host's registry refuses a
+  // mismatch (design doc §4). Pinning it here means bumping it can never be an accident — a breaking
+  // change to the GameModule/GameClient contracts has to come with a deliberate edit to this test, and
+  // (per the rule in `contract.ts`) a major version bump of the package.
+  it('is 1 — the contract every hosted game declares', () => {
+    expect(KERNEL_CONTRACT_VERSION).toBe(1);
+  });
+
+  // It must match the package's own major: "the kernel's major version IS the contract version" is the
+  // whole rule, and a `1.x` package exporting contract 2 would silently break every installed game.
+  it('matches the major version of the published package', () => {
+    expect(Number(pkg.version.split('.')[0])).toBe(KERNEL_CONTRACT_VERSION);
   });
 });

@@ -1,4 +1,4 @@
-import type { MoveRecord } from './moveRecord';
+import type { MoveRecord } from './moveRecord.js';
 
 /** The minimal state shape `record()` maintains: a version counter and an append-only move log. */
 export interface VersionedState {

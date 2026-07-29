@@ -213,6 +213,11 @@ Implement the required members — `id`/`name`/`minPlayers`/`maxPlayers`, `color
 `applyAction`, `legalActions`, `viewFor`, `parseAction`, `summarize`, `versionOf`, `movesOf`, `mapError` —
 each delegating to the engine. Then the optional hooks **only if the game needs them**:
 
+- **`kernelContract`** — declare it: `import { KERNEL_CONTRACT_VERSION } from '@game-hub/kernel'` and set
+  `kernelContract: KERNEL_CONTRACT_VERSION`. Never a literal — taken from the kernel the game compiled
+  against, the number can't drift, and a game that ends up resolving a *different* kernel copy is caught by
+  `GameRegistry.register` at boot instead of failing mid-game (Track D design doc §4). Technically optional
+  (absent ⇒ contract 1) only while every game predates the field; write it in every new game.
 - **`colors`** — an ordered palette of lowercase colour ids that is *the board's current seat tints in seat
   order* (palette-order default reproduces the existing look). Cover `maxPlayers`. Player colours, not any
   game-piece colour. The platform does all the picking/uniqueness/persistence/wiring; you just name ids.

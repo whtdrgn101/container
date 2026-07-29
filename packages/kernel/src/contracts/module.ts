@@ -1,5 +1,5 @@
-import type { MoveRecord } from '../moveRecord';
-import type { Viewer } from '../viewer';
+import type { MoveRecord } from '../moveRecord.js';
+import type { Viewer } from '../viewer.js';
 
 /**
  * The `GameModule` seam (roadmap C0), now a **shared kernel contract** (Track D / D0).
@@ -38,6 +38,16 @@ import type { Viewer } from '../viewer';
 export interface GameModule<S, A, Ctx = unknown, App = unknown> {
   /** Stable id, used as the `game_type` discriminator and in URLs. */
   readonly id: string;
+
+  /**
+   * The **kernel contract version** this game was built against (design doc §4) — declare it as
+   * `kernelContract: KERNEL_CONTRACT_VERSION`, imported from the kernel the game compiled against, so
+   * the number can never drift from the code. The host's registry refuses a mismatch at registration.
+   *
+   * Optional **during the D2a transition only**: absent ⇒ contract 1, because every existing game
+   * predates the field. See `KERNEL_CONTRACT_VERSION` for the additive-minor / breaking-major rule.
+   */
+  readonly kernelContract?: number;
   /** Human-readable name for the game picker. */
   readonly name: string;
   readonly minPlayers: number;

@@ -1,0 +1,217 @@
+#!/usr/bin/env node
+/**
+ * Pack smoke test for `@game-hub/kernel` (Track D / D2a).
+ *
+ * The honest "works outside the workspace" evidence. Every other check in this repo runs against the
+ * kernel's **TypeScript source** through the workspace link — which proves nothing about the artefact an
+ * out-of-repo game (Labyrinth, D2c) will actually install. That artefact is a tarball whose `exports`
+ * resolve to `dist/`, and its two failure modes are invisible in-workspace:
+ *
+ *   1. **Extensionless relative imports.** `tsc` emits `from './errors'` verbatim; Node ESM does no
+ *      extension resolution, so the installed package throws `ERR_MODULE_NOT_FOUND` on first import even
+ *      though every workspace suite was green. This is exactly what the pre-D2a build produced — see the
+ *      `.js`-extension note in `src/index.ts`.
+ *   2. **A leaked runtime dependency.** `./client` imports React *types*; if that ever stops being a
+ *      type-only import, the published package silently requires React at runtime for consumers who only
+ *      wanted the module contract.
+ *
+ * So: pack it, install the tarball into a throwaway project **outside** the workspace, and drive it two
+ * ways — plain `node` for the runtime surface, and `tsc --noEmit` under `nodenext` resolution (the
+ * strictest mode: it honours the `exports` map exactly as Node does and refuses extensionless relative
+ * specifiers inside the shipped `.d.ts`) for the type surface.
+ *
+ * Run: `pnpm --filter @game-hub/kernel pack:smoke`   (CI runs it after the unit tests.)
+ * Set `KEEP_SMOKE_DIR=1` to leave the temp project behind for inspection.
+ */
+import { execFileSync } from 'node:child_process';
+import { cpSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * What plain Node must be able to do with the installed package: reach every subpath through the
+ * `exports` map and get *working* primitives, not merely importable ones.
+ */
+const RUNTIME_SMOKE = `import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { GameError, KERNEL_CONTRACT_VERSION, makeSeating, record, runBotLoop } from '@game-hub/kernel';
+import { BotError, mulberry32, wilsonInterval } from '@game-hub/kernel/bot';
+import * as clientContract from '@game-hub/kernel/client';
+
+const require = createRequire(import.meta.url);
+
+// '.' — the framework-free barrel.
+assert.equal(typeof runBotLoop, 'function');
+assert.equal(KERNEL_CONTRACT_VERSION, 1);
+
+const error = new GameError('OUT_OF_SUPPLY', 'no containers left');
+assert.ok(error instanceof Error);
+assert.equal(error.code, 'OUT_OF_SUPPLY');
+assert.equal(error.name, 'GameError');
+
+const next = record({ version: 3, log: [], seats: 2 }, 'PRODUCE', 'p1', { seats: 3 }, { colour: 'red' });
+assert.deepEqual(next, {
+  version: 4,
+  seats: 3,
+  log: [{ seq: 4, type: 'PRODUCE', playerId: 'p1', payload: { colour: 'red' } }],
+});
+
+const seating = makeSeating(() => {
+  throw new GameError('PLAYER_NOT_FOUND', 'no such seat');
+});
+const state = { players: [{ id: 'p1' }, { id: 'p2' }], activePlayerIndex: 1 };
+assert.equal(seating.seatOf(state, 'p2'), 1);
+assert.equal(seating.activePlayer(state).id, 'p2');
+assert.deepEqual(seating.withPlayer(state, 0, { id: 'p9' }), [{ id: 'p9' }, { id: 'p2' }]);
+assert.throws(() => seating.seatOf(state, 'nobody'), /no such seat/);
+
+// './bot' — the bot primitives.
+assert.ok(new BotError('nope') instanceof Error);
+assert.equal(typeof mulberry32(1)(), 'number');
+assert.equal(wilsonInterval(0, 0).length, 2);
+
+// './client' — types only, so the module is empty at runtime. What matters is that it *resolves*, and
+// that reaching it pulls in no React: the kernel must never make React a runtime dependency.
+assert.deepEqual(Object.keys(clientContract), []);
+assert.throws(() => require.resolve('react'), /Cannot find module/);
+assert.deepEqual(
+  require('@game-hub/kernel/package.json').dependencies ?? {},
+  {},
+  'the kernel must ship with no runtime dependencies',
+);
+
+console.log('runtime smoke ok — . / ./bot / ./client all resolve and behave');
+`;
+
+/** What a consumer's compiler must see: the whole exported type surface, through the published `exports`. */
+const TYPE_CONSUMER = `import { GameError, KERNEL_CONTRACT_VERSION, makeSeating, record } from '@game-hub/kernel';
+import type { GameModule, GameSummary, ModuleContext, MoveRecord, Viewer } from '@game-hub/kernel';
+import { BotError, mulberry32 } from '@game-hub/kernel/bot';
+import type { BoardProps, GameClient } from '@game-hub/kernel/client';
+
+// A game-shaped declaration: the exact surface an out-of-repo package implements.
+type State = { readonly version: number; readonly log: readonly MoveRecord[]; readonly seat: number };
+
+const smokeModule: GameModule<State, { readonly type: 'NOOP' }> = {
+  id: 'smoke',
+  kernelContract: KERNEL_CONTRACT_VERSION,
+  name: 'Smoke',
+  minPlayers: 2,
+  maxPlayers: 4,
+  colors: ['red', 'blue'],
+  createGame: () => ({ version: 0, log: [], seat: 0 }),
+  applyAction: (state) => record(state, 'NOOP', 'p1'),
+  legalActions: () => [{ type: 'NOOP' }],
+  viewFor: (state, viewer: Viewer) => ({ ...state, viewer }),
+  parseAction: (raw) => (raw === null ? { ok: false, message: 'null' } : { ok: true, action: { type: 'NOOP' } }),
+  summarize: (state): GameSummary => ({
+    id: 'smoke',
+    turn: state.version,
+    status: 'active',
+    activePlayerId: null,
+    players: [],
+  }),
+  versionOf: (state) => state.version,
+  movesOf: (state) => state.log,
+  mapError: (error) => (error instanceof GameError ? { status: 400, code: error.code, message: error.message } : null),
+  createBotDriver: (ctx: ModuleContext) => ({ tick: () => void ctx.rng() }),
+};
+
+const seating = makeSeating<{ readonly id: string }>(() => {
+  throw new BotError('unreachable');
+});
+
+// Referenced so the React-typed './client' subpath is genuinely resolved and checked, not just imported.
+export const surface = {
+  module: smokeModule.id,
+  seat: seating.activePlayer({ players: [{ id: 'p1' }], activePlayerIndex: 0 }).id,
+  rng: mulberry32(1)(),
+  client: null as GameClient<State> | null,
+  boardTitle: null as BoardProps<State>['gameId'] | null,
+};
+`;
+
+const CONSUMER_TSCONFIG = {
+  compilerOptions: {
+    target: 'ES2022',
+    lib: ['ES2022', 'DOM'],
+    // The strictest resolution mode on purpose: `nodenext` honours the `exports` map exactly as Node
+    // does and rejects extensionless relative specifiers inside the shipped `.d.ts` files. If this
+    // passes, a consumer on `bundler` resolution is safe by construction.
+    module: 'nodenext',
+    moduleResolution: 'nodenext',
+    strict: true,
+    noEmit: true,
+    // The kernel's own shipped declarations are what we're checking, so don't skip them. (`@types/react`
+    // is skipped implicitly — it is only reachable through the kernel's `./client` declaration, and
+    // DefinitelyTyped's own health is not this script's business.)
+    skipLibCheck: false,
+    types: [],
+  },
+  include: ['consumer.ts'],
+};
+
+const kernelDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const require = createRequire(join(kernelDir, 'package.json'));
+
+/** Run a command, streaming its output; a non-zero exit throws and fails the script. */
+const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, stdio: 'inherit' });
+const step = (message) => console.log(`\n▶ ${message}`);
+
+// A temp dir under the OS temp root, deliberately **outside** the pnpm workspace: inside it, pnpm/npm
+// would resolve `@game-hub/kernel` back to the linked source and prove nothing.
+const projectDir = mkdtempSync(join(tmpdir(), 'game-hub-kernel-pack-smoke-'));
+let ok = false;
+try {
+  step(`packing @game-hub/kernel → ${projectDir}`);
+  // `prepack` runs the tsc build, so this also proves the build is wired to the publish path.
+  run('pnpm', ['pack', '--pack-destination', projectDir], kernelDir);
+  const tarball = readdirSync(projectDir).find((name) => name.endsWith('.tgz'));
+  if (!tarball) throw new Error('pnpm pack produced no .tgz');
+
+  step(`installing ${tarball} into a throwaway project`);
+  writeFileSync(
+    join(projectDir, 'package.json'),
+    `${JSON.stringify({ name: 'kernel-pack-smoke', version: '0.0.0', private: true, type: 'module' }, null, 2)}\n`,
+  );
+  // npm rather than pnpm: no workspace inference, and a local tarball with no runtime dependencies
+  // installs offline. `--ignore-scripts` because nothing in the tarball should need to run.
+  run(
+    'npm',
+    ['install', `./${tarball}`, '--no-audit', '--no-fund', '--no-package-lock', '--ignore-scripts'],
+    projectDir,
+  );
+
+  step('runtime: importing all three subpaths with plain node');
+  writeFileSync(join(projectDir, 'smoke.mjs'), RUNTIME_SMOKE);
+  run(process.execPath, ['smoke.mjs'], projectDir);
+
+  step('types: tsc --noEmit against the installed package (nodenext resolution)');
+  // `./client`'s `.d.ts` imports React types, so the type check needs `@types/react` present — the
+  // optional peer. Copy it (and its one dependency) out of the workspace store rather than hitting the
+  // network, so this stays runnable offline and in CI without a registry round-trip.
+  // `csstype` is `@types/react`'s one dependency, and pnpm's strict store only exposes it *from* that
+  // package — so resolve it through a require rooted there rather than from the kernel.
+  const typesReactDir = dirname(require.resolve('@types/react/package.json'));
+  const fromTypesReact = createRequire(join(typesReactDir, 'package.json'));
+  for (const [pkg, sourceDir] of [
+    ['@types/react', typesReactDir],
+    ['csstype', dirname(fromTypesReact.resolve('csstype/package.json'))],
+  ]) {
+    cpSync(sourceDir, join(projectDir, 'node_modules', pkg), { recursive: true });
+  }
+  writeFileSync(join(projectDir, 'consumer.ts'), TYPE_CONSUMER);
+  writeFileSync(join(projectDir, 'tsconfig.json'), `${JSON.stringify(CONSUMER_TSCONFIG, null, 2)}\n`);
+  run(process.execPath, [require.resolve('typescript/bin/tsc'), '-p', 'tsconfig.json'], projectDir);
+
+  ok = true;
+  console.log('\n✅ pack smoke passed — the published tarball imports and typechecks outside the workspace.');
+} finally {
+  if (process.env['KEEP_SMOKE_DIR'] === '1') {
+    console.log(`\n(kept ${projectDir}${ok ? '' : ' — the failure is reproducible there'})`);
+  } else {
+    rmSync(projectDir, { recursive: true, force: true });
+  }
+}

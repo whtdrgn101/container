@@ -1,3 +1,4 @@
+import { KERNEL_CONTRACT_VERSION } from '@game-hub/kernel';
 import { describe, expect, it } from 'vitest';
 import { containerModule, createDefaultRegistry, GameRegistry } from '../games';
 import type { GameModule } from '../games';
@@ -47,6 +48,39 @@ describe('GameRegistry', () => {
     expect(() => new GameRegistry().register(stub('bad', { minPlayers: 5, maxPlayers: 3 }))).toThrow(
       /minPlayers > maxPlayers/,
     );
+  });
+
+  // The kernel-contract check (Track D design doc §4, slice D2a). Registration is where the host and
+  // the game's declared contract meet, so a game built against an incompatible kernel major must crash
+  // the boot here rather than fail unrecognisably mid-game.
+  it('accepts a game declaring the contract this host provides', () => {
+    const registry = new GameRegistry().register(stub('chess', { kernelContract: KERNEL_CONTRACT_VERSION }));
+    expect(registry.get('chess')).toBeDefined();
+  });
+
+  it('refuses a game built against a newer kernel contract', () => {
+    expect(() => new GameRegistry().register(stub('future', { kernelContract: KERNEL_CONTRACT_VERSION + 1 }))).toThrow(
+      /built against kernel contract 2, but this host provides contract 1/,
+    );
+  });
+
+  it('refuses a game built against an older kernel contract', () => {
+    expect(() => new GameRegistry().register(stub('ancient', { kernelContract: 0 }))).toThrow(
+      /built against kernel contract 0/,
+    );
+  });
+
+  // The transition default: every game predates the field, so an undeclared contract means 1 rather
+  // than a flag day. ⚠️ When a contract 2 lands, this default becomes a lie — see registry.ts.
+  it('treats a game that declares no contract as contract 1', () => {
+    const registry = new GameRegistry().register(stub('legacy'));
+    expect(registry.get('legacy')).toBeDefined();
+  });
+
+  it('every hosted game declares the contract, so the default is never actually relied on', () => {
+    const registry = createDefaultRegistry();
+    const declared = registry.list().map(({ id }) => [id, registry.require(id).kernelContract] as const);
+    expect(declared).toEqual(declared.map(([id]) => [id, KERNEL_CONTRACT_VERSION]));
   });
 
   it('lists games for the picker, in registration order', () => {

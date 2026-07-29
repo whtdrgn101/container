@@ -1,4 +1,4 @@
-import { BotError } from './errors';
+import { BotError } from './errors.js';
 
 /**
  * The self-play runaway guard, shared by every game (REVIEW §3.4).
