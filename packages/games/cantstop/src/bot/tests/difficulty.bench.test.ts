@@ -20,6 +20,9 @@ import { benchmark, decideAt } from '../bench';
 
 // Small enough that both pairings finish fast (aim ≤ ~15s), large enough to be directional. At this
 // fixed, deterministic count normal beats easy 0.550 and hard beats normal 0.525 — both clear of 50%.
+// The 60s per-test timeouts are sized to CI, not local: a free-runner vCPU under coverage runs the
+// slower pairing in ~22s (vs ~3s locally, measured with CI's one-fork-per-package cap), so 60s is
+// real headroom over a stable number — a wedged test still dies well before vitest's file-level cap.
 const GAMES = 40;
 const SEATS = 2;
 
@@ -30,19 +33,19 @@ describe('cantstop difficulty ordering (harness-proven)', () => {
     const result = benchmark({ games: GAMES, seats: SEATS, candidate: decideAt('normal'), baseline: decideAt('easy') });
     expect(result.games).toBe(GAMES);
     expect(result.winRate).toBeGreaterThan(0.5);
-  }, 30000);
+  }, 60000);
 
   it('hard beats normal — endgame urgency out-races the frozen baseline', () => {
     const result = benchmark({ games: GAMES, seats: SEATS, candidate: decideAt('hard'), baseline: decideAt('normal') });
     expect(result.winRate).toBeGreaterThan(0.5);
-  }, 30000);
+  }, 60000);
 
   it('is deterministic (a fixed win rate at a fixed game count)', () => {
     // A handful of games is plenty to prove reproducibility — the full run's cost isn't needed here.
     const a = benchmark({ games: 8, seats: SEATS, candidate: decideAt('hard'), baseline: decideAt('normal') });
     const b = benchmark({ games: 8, seats: SEATS, candidate: decideAt('hard'), baseline: decideAt('normal') });
     expect(a).toEqual(b);
-  }, 30000);
+  }, 60000);
 
   // Env-gated significance run — slow (minutes), so it only runs when CANTSTOP_BENCH_GAMES is set. At a
   // large N the Wilson CI lower bound clears 50% for *both* pairings, which is the real proof of order.
