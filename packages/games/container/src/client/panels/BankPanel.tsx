@@ -2,9 +2,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { Action, GameView, PlayerView } from '../../engine';
 import { ContainerChip, LOT_LABELS, nameOf } from '../chips';
 import { CONTAINER_TIPS } from '../tips';
-import { Button } from '@/components/ui/button';
-import { ActionTip } from '@/components/ActionTip';
-import { Card, CardContent } from '@/components/ui/card';
+import { ActionTip, Button, Card, CardContent } from '@game-hub/ui-kit';
 
 interface BankPanelProps {
   readonly game: GameView;

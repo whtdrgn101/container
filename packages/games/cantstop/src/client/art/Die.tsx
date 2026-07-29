@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils';
+import { cn } from '@game-hub/ui-kit';
 
 /** Pip layout per face, on a 3×3 grid (columns/rows 1–3). Original — a plain dotted die, not any
  * published game's art. */

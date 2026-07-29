@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["react"]
+  },
+  // Unlike a game package, the whole of this one is UI: it depends on React + `@game-hub/kernel/client`
+  // and nothing else, so it typechecks itself standalone (no host path aliases needed) — which is the
+  // point of D2b.
+  "include": ["src"]
+}

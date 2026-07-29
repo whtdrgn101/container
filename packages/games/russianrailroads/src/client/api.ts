@@ -1,6 +1,6 @@
 import type { Action, RussianRailroadsView } from '../engine';
-import { applyAction, getGame } from '@/lib/api';
-import type { GamePayload } from '@/lib/api';
+import { applyAction, getGame } from '@game-hub/ui-kit';
+import type { GamePayload } from '@game-hub/kernel/client';
 
 /**
  * Russian Railroads' own API client. RR1 has **no server-only actions** (base-game randomness is

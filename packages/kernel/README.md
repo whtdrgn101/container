@@ -11,8 +11,13 @@ against, and nothing else.
   host), and `KERNEL_CONTRACT_VERSION`.
 - **`./bot`** — `runBotLoop` and the bot-driver helpers, written entirely against the generic
   contract surface.
-- **`./client`** — the `GameClient` contract the UI shell loads a game's board through
-  (type-only React usage; React is not a runtime dependency).
+- **`./client`** — the `GameClient`/`BoardProps` contract the UI shell loads a game's board through,
+  plus the **transport DTOs** a client names (`GamePayload`, `GameIdentity`, `GameMessage`). Type-only
+  React usage; React is not a runtime dependency.
+
+The shared *chrome* a board renders inside (turn banner, activity feed, end screen, buttons) is a
+separate package, [`@game-hub/ui-kit`](https://www.npmjs.com/package/@game-hub/ui-kit) — it needs React
+at runtime, which this package deliberately never does.
 
 ## The contract version
 

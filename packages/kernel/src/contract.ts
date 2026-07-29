@@ -33,5 +33,15 @@
  * against (`kernelContract: KERNEL_CONTRACT_VERSION`) rather than hard-coding a literal: if a game ends
  * up resolving its own, different, `@game-hub/kernel` copy, its constant carries that copy's number and
  * the mismatch is caught instead of silently passing.
+ *
+ * ## Version history (why the package version is where it is)
+ *
+ * - **1.0.0** (D2a) — first publishable kernel: primitives, `./bot`, the `GameModule`/`GameClient`
+ *   contracts, and this constant.
+ * - **1.1.0** (D2b) — *additive*: `@game-hub/kernel/client` gained the transport DTOs
+ *   (`GamePayload`/`GameIdentity`/`GameMessage`, `contracts/transport.ts`), which previously lived in the
+ *   hub's `ui/src`. Nothing existing changed shape or meaning and no member became required, so by the
+ *   rule above this is a **minor** bump and the contract stays **1** — a game built against 1.0.0 still
+ *   compiles and registers untouched.
  */
 export const KERNEL_CONTRACT_VERSION = 1;

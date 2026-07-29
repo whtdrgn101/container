@@ -1,6 +1,6 @@
 import { actionSpace } from '../engine';
 import type { RussianRailroadsView } from '../engine';
-import { cn } from '@/lib/utils';
+import { cn } from '@game-hub/ui-kit';
 import { Meeple } from './art';
 import { ActionPlate } from './ActionPlate';
 import type { PlateAffordances } from './ActionPlate';

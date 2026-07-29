@@ -1,5 +1,5 @@
 import type { Color } from '../../engine';
-import { cn } from '@/lib/utils';
+import { cn } from '@game-hub/ui-kit';
 import { COLOR_HEX } from '../chips';
 
 /**

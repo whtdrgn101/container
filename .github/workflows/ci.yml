@@ -74,6 +74,12 @@ jobs:
       # failure modes it exists to catch.
       - run: pnpm --filter @game-hub/kernel pack:smoke
 
+      # `@game-hub/ui-kit` is published too (Track D / D2b — the shared board chrome + the game-facing REST
+      # helpers). Same reasoning as above, different failure modes: an undeclared runtime dependency, or
+      # React drifting out of `peerDependencies`. Packs *both* tarballs and typechecks a board-shaped
+      # consumer against them. See packages/ui-kit/scripts/pack-smoke.mjs.
+      - run: pnpm --filter @game-hub/ui-kit pack:smoke
+
   e2e:
     name: Playwright e2e
     runs-on: ubuntu-latest

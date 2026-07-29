@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@game-hub/kernel": "workspace:*",
+    "@game-hub/ui-kit": "workspace:*",
     "lucide-react": "^0.469.0"
   },
   "peerDependencies": {

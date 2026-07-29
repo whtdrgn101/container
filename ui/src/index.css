@@ -1,17 +1,27 @@
 @import 'tailwindcss';
 
 /*
- * Track D / D0: teach Tailwind to scan game packages for utility classes.
+ * Track D: teach Tailwind where the *other* packages' markup lives (design doc §2 — "the sneakiest
+ * breakage").
  *
- * Tailwind v4 auto-detects content by walking up from this stylesheet, but that heuristic skips
- * `node_modules` and won't cover a game that lives in its own package (the D1+ plan: a board ships from
- * `packages/games/<game>/` — or, once installed, `node_modules/@game-hub/game-<game>/`). Without an
- * explicit source, such a board's classes would be silently pruned from the build. `@source` paths are
- * resolved relative to this file (`ui/src/`), so `../../packages` reaches the workspace `packages/`
- * dir. Today that holds only `@game-hub/kernel` (no markup, so nothing to scan) — the directive is
- * here so the first packaged game's styles work with zero UI changes.
+ * Tailwind v4 auto-detects content by walking up from this stylesheet, and that heuristic **skips
+ * `node_modules` entirely** and stops at this package. Everything that renders markup from outside
+ * `ui/src` — the five game packages, and since D2b the shared chrome in `@game-hub/ui-kit` — therefore
+ * needs an explicit `@source`, or its utility classes are silently pruned and the board renders
+ * unstyled. `@source` paths resolve relative to *this file*, and an explicit one **does** descend into
+ * `node_modules` (that is exactly what the directive is for).
+ *
+ * Two globs, doing two different jobs:
+ *
+ * 1. `../../packages` — the in-workspace source of every `@game-hub/*` package (games + ui-kit), which
+ *    is what Vite actually serves here (see the aliases in `vite.config.ts`).
+ * 2. `../node_modules/@game-hub` — the same packages **as installed**, which is how an out-of-repo game
+ *    (D2c) and any consumer of a published `@game-hub/ui-kit` arrive. In this workspace pnpm makes these
+ *    symlinks back to (1), so the line is a no-op here and the *documented, tested* path for consumers.
+ *    An external host adds exactly this one line.
  */
 @source '../../packages';
+@source '../node_modules/@game-hub';
 
 @custom-variant dark (&:is(.dark *));
 

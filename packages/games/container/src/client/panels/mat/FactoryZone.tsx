@@ -1,9 +1,7 @@
 import { Factory as FactoryIcon, Plus } from 'lucide-react';
 import type { Action, PlayerView } from '../../../engine';
 import { FACTORY_LOT_PRICES } from '../../../engine';
-import { Button } from '@/components/ui/button';
-import { ActionTip } from '@/components/ActionTip';
-import { cn } from '@/lib/utils';
+import { ActionTip, Button, cn } from '@game-hub/ui-kit';
 import { ContainerChip, nextFactoryLot, StoredChip } from '../../chips';
 import { CONTAINER_TIPS } from '../../tips';
 

@@ -1,9 +1,6 @@
 import type { Action, GameView, PlayerView } from '../../engine';
 import { COLORS, SHIP_CAPACITY, WAREHOUSE_BUILD_COSTS } from '../../engine';
-import { Button } from '@/components/ui/button';
-import { ActionTip } from '@/components/ActionTip';
-import { Card, CardContent } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { ActionTip, Button, Card, CardContent, cn } from '@game-hub/ui-kit';
 import { cardRank, ContainerChip } from '../chips';
 import { CONTAINER_TIPS } from '../tips';
 import { seatColorOf } from '../seatColors';

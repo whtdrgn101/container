@@ -58,19 +58,21 @@ export default tseslint.config(
     },
   },
 
-  // React + hooks — scoped to the UI package only (nothing else renders JSX).
+  // React + hooks — every place that renders JSX. Track D moved that beyond `ui/`: each game package's
+  // `./client` and (D2b) the shared chrome in `packages/ui-kit` render too, and the hooks rules must
+  // follow the code rather than the directory it used to live in.
   {
     ...react.configs.flat.recommended,
-    files: ['ui/**/*.{ts,tsx}'],
+    files: ['ui/**/*.{ts,tsx}', 'packages/ui-kit/**/*.{ts,tsx}', 'packages/games/*/src/client/**/*.{ts,tsx}'],
     settings: { react: { version: 'detect' } },
   },
   {
     // The UI uses the automatic JSX runtime (tsconfig `jsx: react-jsx`), so React need not be in scope.
     ...react.configs.flat['jsx-runtime'],
-    files: ['ui/**/*.{ts,tsx}'],
+    files: ['ui/**/*.{ts,tsx}', 'packages/ui-kit/**/*.{ts,tsx}', 'packages/games/*/src/client/**/*.{ts,tsx}'],
   },
   {
-    files: ['ui/src/**/*.{ts,tsx}'],
+    files: ['ui/src/**/*.{ts,tsx}', 'packages/ui-kit/src/**/*.{ts,tsx}', 'packages/games/*/src/client/**/*.{ts,tsx}'],
     languageOptions: {
       globals: { ...globals.browser },
     },

@@ -1,7 +1,6 @@
 import { ARISTOCRAT_SCORE, displacementCost, handCost, handLimit, legalDisplaceTargets } from '../engine';
 import type { Card, CardKind, Phase, PlayerView } from '../engine';
-import { cn } from '@/lib/utils';
-import { ActionTip } from '@/components/ActionTip';
+import { ActionTip, cn } from '@game-hub/ui-kit';
 import { CardFace } from './art';
 
 /**

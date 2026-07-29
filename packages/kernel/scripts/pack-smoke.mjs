@@ -89,7 +89,7 @@ console.log('runtime smoke ok — . / ./bot / ./client all resolve and behave');
 const TYPE_CONSUMER = `import { GameError, KERNEL_CONTRACT_VERSION, makeSeating, record } from '@game-hub/kernel';
 import type { GameModule, GameSummary, ModuleContext, MoveRecord, Viewer } from '@game-hub/kernel';
 import { BotError, mulberry32 } from '@game-hub/kernel/bot';
-import type { BoardProps, GameClient } from '@game-hub/kernel/client';
+import type { BoardProps, GameClient, GameMessage, GamePayload } from '@game-hub/kernel/client';
 
 // A game-shaped declaration: the exact surface an out-of-repo package implements.
 type State = { readonly version: number; readonly log: readonly MoveRecord[]; readonly seat: number };
@@ -123,13 +123,32 @@ const seating = makeSeating<{ readonly id: string }>(() => {
   throw new BotError('unreachable');
 });
 
+// The D2b transport DTOs, bound exactly as a game package's client/types.ts binds them. This is the
+// out-of-workspace proof that they really ship on './client' — before D2b they lived in the hub's
+// ui/src, which an installed game cannot reach.
+type SmokeClient = GameClient<State, GamePayload<State>, GameMessage>;
+type SmokeBoardProps = BoardProps<State, GamePayload<State>, GameMessage>;
+
+const payload: GamePayload<State> = {
+  game: { version: 0, log: [], seat: 0 },
+  gameType: 'smoke',
+  bots: [],
+  colors: {},
+  players: [{ id: 'p1', name: 'Ann' }],
+  activePlayerId: 'p1',
+};
+
 // Referenced so the React-typed './client' subpath is genuinely resolved and checked, not just imported.
 export const surface = {
   module: smokeModule.id,
   seat: seating.activePlayer({ players: [{ id: 'p1' }], activePlayerIndex: 0 }).id,
   rng: mulberry32(1)(),
-  client: null as GameClient<State> | null,
-  boardTitle: null as BoardProps<State>['gameId'] | null,
+  client: null as SmokeClient | null,
+  boardTitle: null as SmokeBoardProps['gameId'] | null,
+  // The board's onPayload must accept exactly the payload a state route returns — the whole point of
+  // moving the DTO into the kernel. (No backticks in this comment: it lives inside a template literal.)
+  onPayload: (props: SmokeBoardProps) => props.onPayload(payload),
+  sideChannel: (message: GameMessage) => message.type,
 };
 `;
 

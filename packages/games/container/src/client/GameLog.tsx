@@ -1,5 +1,5 @@
 import type { Color, MoveRecord, PlayerView, ShipLocation } from '../engine';
-import { ActivityFeed } from '@/components/ActivityFeed';
+import { ActivityFeed } from '@game-hub/ui-kit';
 
 /**
  * Container's activity feed — the game-specific `describe`, rendered through the shared `ActivityFeed`

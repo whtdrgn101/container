@@ -10,9 +10,7 @@ import type {
   StoneAgeState,
   StoneAgeView,
 } from '../engine';
-import { Button } from '@/components/ui/button';
-import { ActionTip } from '@/components/ActionTip';
-import { cn } from '@/lib/utils';
+import { ActionTip, Button, cn } from '@game-hub/ui-kit';
 import { FieldIcon, FoodIcon, Hut, Meeple, ResourceIcon, SYMBOL_ICON, ToolIcon } from './art';
 import { AnyPips } from './pieces';
 import { ACQUIRE_CARD_TIP, DECLINE_TIP, PLACE_CARD_TIP } from './tips';

@@ -1,6 +1,5 @@
 import type { StPetersburgView } from '../engine';
-import { GameOver } from '@/components/GameOver';
-import { cn } from '@/lib/utils';
+import { cn, GameOver } from '@game-hub/ui-kit';
 
 /** The game once it has ended — `results`/`winnerIds` are present only on this arm of the state union. */
 type EndedView = Extract<StPetersburgView, { status: 'ended' }>;

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Dices } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@game-hub/ui-kit';
 
 /**
  * The site header: where you are, and the way back out.

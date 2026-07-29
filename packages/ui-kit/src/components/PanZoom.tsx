@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { Minus, Plus, Maximize } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { Button } from './ui/button.js';
+import { cn } from '../utils.js';
 
 /**
  * A dependency-free pan + zoom viewport. Wraps content that fills the frame at scale 1 and lets the user

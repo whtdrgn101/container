@@ -1,5 +1,5 @@
 import type { GameView, PlayerView } from '../../engine';
-import { TurnBanner } from '@/components/TurnBanner';
+import { TurnBanner } from '@game-hub/ui-kit';
 
 export interface IdentityBannerProps {
   readonly game: GameView;

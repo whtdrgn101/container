@@ -1,6 +1,6 @@
 import { SPECIALS, specialMet } from '../engine';
 import type { Locomotive, PlayerView, Route, RouteId, RussianRailroadsPlayer, TrackColor } from '../engine';
-import { ActionTip } from '@/components/ActionTip';
+import { ActionTip } from '@game-hub/ui-kit';
 import { DoublerClock, RailLine, RouteBand, SignalLamp, TrackChip } from './art';
 import type { SignalState } from './art';
 import { specialTip } from './tips';

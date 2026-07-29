@@ -7,7 +7,7 @@ import { useHomeLists } from '@/hooks/useHomeLists';
 import { clientFor } from '@/games/registry';
 import * as api from '@/lib/api';
 import type { GamePayload, Lobby, RematchInfo } from '@/lib/api';
-import { RematchContext } from '@/lib/rematch';
+import { RematchContext } from '@game-hub/ui-kit';
 
 /**
  * The Game Hub shell (roadmap C2).

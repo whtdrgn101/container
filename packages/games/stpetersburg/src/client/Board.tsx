@@ -9,12 +9,7 @@ import {
   unusedObservatories,
 } from '../engine';
 import type { Card, CardKind, Phase, PlayerView, StPetersburgView } from '../engine';
-import { Button } from '@/components/ui/button';
-import { ActionTip } from '@/components/ActionTip';
-import { ActivityFeed } from '@/components/ActivityFeed';
-import { TurnBanner } from '@/components/TurnBanner';
-import { seatIdentity } from '@/components/seatIdentity';
-import { cn } from '@/lib/utils';
+import { ActionTip, ActivityFeed, Button, cn, seatIdentity, TurnBanner } from '@game-hub/ui-kit';
 import type { BoardProps } from './types';
 import * as spApi from './api';
 import { CardFace } from './art';

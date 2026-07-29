@@ -1,6 +1,6 @@
 {
   "name": "@game-hub/kernel",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "The Game Hub kernel: the tiny set of primitives every game and both hosts share — GameError, MoveRecord, Viewer, record(), makeSeating, the end-state union, runBotLoop, and the GameModule/GameClient contracts. Its major version IS the host↔game contract version (KERNEL_CONTRACT_VERSION). In-workspace it is consumed as TypeScript source by subpath (the engine convention); the published tarball resolves the same subpaths to dist/ via publishConfig. This package MAY have a `.` entry — it's the kernel, not a per-game platform, so there is no ambiguity about a default.",
   "license": "BSD-3-Clause",

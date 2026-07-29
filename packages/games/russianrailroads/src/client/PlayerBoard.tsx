@@ -1,6 +1,6 @@
 import { frontierIndex, locosOnRoute, TRACK_COLORS, UNLOCK_SPACE } from '../engine';
 import type { PlayerView, RouteId, TrackColor } from '../engine';
-import { cn } from '@/lib/utils';
+import { cn } from '@game-hub/ui-kit';
 import { BonusStar, CoinIcon, KeyIcon, Meeple, TrackChip } from './art';
 import { RouteRow } from './RouteRow';
 import { IndustryStrip } from './IndustryStrip';

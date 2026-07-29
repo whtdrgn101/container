@@ -1,12 +1,16 @@
-import type { BoardProps as KernelBoardProps, GameClient as KernelGameClient } from '@game-hub/kernel/client';
-import type { GameMessage, GamePayload } from '@/lib/api';
+import type {
+  BoardProps as KernelBoardProps,
+  GameClient as KernelGameClient,
+  GameMessage,
+  GamePayload,
+} from '@game-hub/kernel/client';
 
 /**
  * The `GameClient` seam (roadmap C2) — the UI's binding of the shared kernel contract.
  *
- * As of Track D / D0 the *interfaces* live in `@game-hub/kernel/client`, so an out-of-repo game
- * package's UI can build against them. This file pins the kernel contract's generic transport
- * parameters to *this* shell's concrete DTOs (`GamePayload<S>`, `GameMessage`), which keeps every
+ * As of Track D / D0 the *interfaces* live in `@game-hub/kernel/client`, and as of D2b so do the
+ * transport DTOs — so an out-of-repo game package's UI can build against both. This file pins the kernel
+ * contract's generic transport parameters to the platform's DTOs (`GamePayload<S>`, `GameMessage`), which keeps every
  * board's `BoardProps<S>` and the registry's `GameClient<S>` reading exactly as they did before D0 —
  * one type argument, fully concrete. The seam rules are unchanged; see the kernel's doc comments.
  *

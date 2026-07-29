@@ -1,6 +1,6 @@
 import type { Action, PlaceId, StoneAgeView } from '../engine';
-import { applyAction, BASE_URL, getGame, JSON_HEADERS, unwrap } from '@/lib/api';
-import type { GamePayload } from '@/lib/api';
+import { apiUrl, applyAction, getGame, JSON_HEADERS, unwrap } from '@game-hub/ui-kit';
+import type { GamePayload } from '@game-hub/kernel/client';
 
 /**
  * Stone Age's API client. Pins the platform's generic calls to Stone Age's view type. So far the only
@@ -35,7 +35,7 @@ export async function gather(
 ): Promise<StoneAgePayload> {
   const query = viewer !== undefined ? `?viewer=${encodeURIComponent(viewer)}` : '';
   return unwrap<StoneAgeView>(
-    await fetch(`${BASE_URL}/games/${gameId}/stoneage/roll${query}`, {
+    await fetch(apiUrl(`/games/${gameId}/stoneage/roll${query}`), {
       method: 'POST',
       headers: JSON_HEADERS,
       body: JSON.stringify({ playerId, place }),

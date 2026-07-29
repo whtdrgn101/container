@@ -1,7 +1,6 @@
 import { Warehouse as WarehouseIcon } from 'lucide-react';
 import type { Action, PlayerView } from '../../../engine';
-import { Button } from '@/components/ui/button';
-import { ActionTip } from '@/components/ActionTip';
+import { ActionTip, Button } from '@game-hub/ui-kit';
 import { StoredChip } from '../../chips';
 import { CONTAINER_TIPS } from '../../tips';
 

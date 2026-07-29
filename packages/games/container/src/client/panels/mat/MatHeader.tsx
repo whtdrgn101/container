@@ -1,8 +1,6 @@
 import { Bot, Landmark } from 'lucide-react';
 import type { Action, PlayerView } from '../../../engine';
-import { Button } from '@/components/ui/button';
-import { ActionTip } from '@/components/ActionTip';
-import { CardHeader, CardTitle } from '@/components/ui/card';
+import { ActionTip, Button, CardHeader, CardTitle } from '@game-hub/ui-kit';
 import { CONTAINER_TIPS } from '../../tips';
 
 export interface MatHeaderProps {

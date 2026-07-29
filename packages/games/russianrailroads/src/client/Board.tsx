@@ -1,12 +1,7 @@
 import { useState } from 'react';
 import { legalActions, legalSteps, locoResolutions } from '../engine';
 import type { Action, RouteId, RussianRailroadsState, RussianRailroadsView, TrackColor } from '../engine';
-import { Button } from '@/components/ui/button';
-import { ActionTip } from '@/components/ActionTip';
-import { ActivityFeed } from '@/components/ActivityFeed';
-import { TurnBanner } from '@/components/TurnBanner';
-import { seatIdentity } from '@/components/seatIdentity';
-import { cn } from '@/lib/utils';
+import { ActionTip, ActivityFeed, Button, cn, seatIdentity, TurnBanner } from '@game-hub/ui-kit';
 import type { BoardProps } from './types';
 import * as rrApi from './api';
 import { describeMove } from './feed';

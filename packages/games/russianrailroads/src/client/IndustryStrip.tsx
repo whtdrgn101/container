@@ -1,6 +1,6 @@
 import { GAP_LANE_INDICES, INDUSTRY_LANE } from '../engine';
 import type { PlayerView } from '../engine';
-import { cn } from '@/lib/utils';
+import { cn } from '@game-hub/ui-kit';
 import { FactoryTile, IronPanel, WrenchIcon } from './art';
 
 /**

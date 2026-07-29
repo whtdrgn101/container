@@ -21,6 +21,9 @@ The ⚠️ notes below are not decoration — each marks something that actually
 packages/
   kernel/          @game-hub/kernel — the tiny neutral dependency every game and both hosts build on:
                      primitives + the GameModule / GameClient contracts (host bindings are generics)
+                     + the transport DTOs (GamePayload / GameMessage)
+  ui-kit/          @game-hub/ui-kit — the shared board chrome (TurnBanner, ActivityFeed, GameOver,
+                     ActionTip, PanZoom, Button/Card, cn, seatIdentity) + the game-facing REST calls
   games/<id>/      @game-hub/game-<id> — one package per game, four TS-source subpath exports:
                      ./engine  (pure rules)  ./module  (backend seam)  ./client  (UI seam)  ./bot (AI)
   bench/           @game-hub/bench — dev-only bot-strength harness (root `pnpm bench`)
@@ -125,7 +128,7 @@ state.
   code seems to need a rule, a colour, a piece or a seat count, the need belongs on the other side:
   **seat bounds come from `GET /games/catalog`**, not a `MIN_PLAYERS` constant. Only `games/registry.ts`
   may name a specific game.
-- **`unknown` at the seam, never inside a board.** `lib/api.ts` is generic in `S` (`getGame<GameView>(…)`);
+- **`unknown` at the seam, never inside a board.** The transport calls are generic in `S` (`getGame<GameView>(…)`);
   a game's own `api.ts` pins the types back, so the board is fully typed. ⚠️ Don't widen a board's props to
   `unknown` to make a call type-check — pass the type parameter. There is **exactly one cast**, at
   registration in `registry.ts` (TypeScript can't type a heterogeneous list of `GameClient<S>` because
@@ -138,11 +141,23 @@ state.
   the panels and the art, and the landing screen ships none of it. `Status` (the header status line —
   "2 actions left" is a Container rule) is a plugin slot: keep it cheap and non-lazy, it renders before
   the board chunk lands. `blurb` + `rules` feed the landing's game description.
-- **Shared chrome lives in `ui/src/components/`** and is typed off the payload's plain seat shape, never
-  off an engine: `seatIdentity` (the `canDrive` + `myNames` seat-binding rule — **gate every action
-  affordance on `canDrive`**), `TurnBanner`, `ActivityFeed` (the 🤖-badged log; the per-game part is a
-  `describe(entry) => string | null` closure), and `GameOver` (every game's end screen). A board keeps its
-  own banner wording and `describe`; the frame is shared.
+- **Shared chrome lives in `@game-hub/ui-kit`** (Track D / D2b — it used to be `ui/src/components/`) and is
+  typed off the payload's plain seat shape, never off an engine: `seatIdentity` (the `canDrive` + `myNames`
+  seat-binding rule — **gate every action affordance on `canDrive`**), `TurnBanner`, `ActivityFeed` (the
+  🤖-badged log; the per-game part is a `describe(entry) => string | null` closure), `GameOver` (every
+  game's end screen), plus `ActionTip`, `PanZoom`, `Button`/`Card` and `cn`. A board keeps its own banner
+  wording and `describe`; the frame is shared.
+- **⚠️ A game client may import exactly two platform packages: `@game-hub/kernel/client` (the contract +
+  the transport DTOs) and `@game-hub/ui-kit` (the chrome + `getGame`/`applyAction`/`apiUrl`).** Never
+  `ui/src`. `architecture.spec.ts` enforces it, because the `@` alias resolves fine in-workspace — the
+  breach is invisible until someone tries to install the package. The rule for what belongs in the ui-kit:
+  *if a game client imports it, it must be published; if only the shell does, it stays in `ui/src`.*
+- **⚠️ Tailwind doesn't scan `node_modules` by itself.** The chrome and every board style themselves with
+  utility classes and ship no CSS, so the host's stylesheet carries explicit `@source` lines
+  (`../../packages` + `../node_modules/@game-hub`) — without them the classes are silently pruned and the
+  board renders unstyled. Style with the **semantic tokens** the host defines (`bg-card`,
+  `text-muted-foreground`, `border-border`), not raw palette colours. Rationale + the measurements:
+  `track-d-externalize-games.md` §4b.
 - **Every game payload carries `gameType`** (`{ game, gameType, bots, colors, players, activePlayerId }`,
   plus the WS state push) — how the shell picks a board for a state it just fetched. `players` +
   `activePlayerId` are the **secret-free seat identity** the shell uses to name seats and apply seat
@@ -320,8 +335,11 @@ reaching into each other. It is consumed as **TS source by subpath**, and — un
   `MoveRecord`, `Viewer`, `record`, `makeSeating`, `GameEndState`/`WinnersEndState`), the game-agnostic
   bot drive-loop `runBotLoop`, **and** the `GameModule`/`ModuleContext`/`BotDriver`/… contract. Its host
   bindings (`Db`, `Hub`, `BotSeats`, `App`) are **generic parameters**, so the contract imports no backend.
-- `@game-hub/kernel/client` — the React `GameClient`/`BoardProps` contract, behind its own subpath because
-  it's the one entry that needs React (its transport DTOs are generic params too).
+- `@game-hub/kernel/client` — the React `GameClient`/`BoardProps` contract **and the transport DTOs**
+  (`GamePayload`, `GameIdentity`, `GameMessage` — moved out of `ui/src` in D2b), behind its own subpath
+  because it's the one entry that needs React. React stays a *type-only* import, so the emitted module is
+  empty and the kernel ships zero runtime dependencies. `Payload`/`Message` remain generic parameters on
+  the contract: binding them would drop two type parameters, i.e. a breaking major bump.
 - `@game-hub/kernel/bot` — the bot helpers above (framework-free, no React).
 
 **Why the structural host types exist.** A game package can't name the backend's concrete
@@ -333,12 +351,14 @@ binds `ModuleContext<Db, ModuleHub, ModuleBotSeats>`. ⚠️ The backend proves 
 `backend/src/games/module.ts` — so any drift is a type error in the host, not a runtime surprise. The
 kernel still imports no host.
 
-**Version-compat idea (for a future out-of-repo game).** The kernel's **major version is the contract
-version**; a game manifest would declare `kernelContract: N` and the registry would refuse a mismatch
-loudly at registration. Additive optional hooks = minor bump (old games keep working); changing a required
-member's meaning = major. A game's own state-shape evolution stays its own business via
-`schemaVersion`/`migrate` — deliberately orthogonal to the kernel contract version. This is not yet
-enforced (all games are in-workspace); see `track-d-externalize-games.md` §4.
+**Version-compat, and it is enforced (Track D / D2a).** The kernel's **major version is the contract
+version** (`KERNEL_CONTRACT_VERSION`). A module declares `kernelContract` — importing the constant, never a
+literal — and `GameRegistry.register` refuses a mismatch loudly at registration, beside the duplicate-id
+and seat-bound checks. All five games declare it. Additive optional hooks = minor bump (old games keep
+working; D2b's DTO addition took the kernel to `1.1.0` with the contract still `1`); changing a required
+member's meaning = major. ⚠️ A game that omits the field is treated as contract 1 — when a contract 2
+lands, make the field required. A game's own state-shape evolution stays its own business via
+`schemaVersion`/`migrate` — deliberately orthogonal. See `track-d-externalize-games.md` §4 / §4b.
 
 **Adding a game is one entry in `games.config.ts` + `pnpm generate`.** That root file is the ordered list
 of `{ id, module, client }` (import specifiers that default-export the module/client). `pnpm generate`

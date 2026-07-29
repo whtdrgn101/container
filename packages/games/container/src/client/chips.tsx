@@ -1,8 +1,7 @@
 import type { Color, PlayerView, ScoringCard, ShipLocation, StoredContainer } from '../engine';
 import { FACTORY_LOT_PRICES } from '../engine';
 import { ContainerSvg } from './art/Container';
-import { ActionTip } from '@/components/ActionTip';
-import { cn } from '@/lib/utils';
+import { ActionTip, cn } from '@game-hub/ui-kit';
 
 /**
  * Container's small shared pieces: the container glyphs and the label helpers its panels all need.

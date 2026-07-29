@@ -1,6 +1,5 @@
 import type { RussianRailroadsView } from '../engine';
-import { GameOver } from '@/components/GameOver';
-import { cn } from '@/lib/utils';
+import { cn, GameOver } from '@game-hub/ui-kit';
 
 /** The ended-game projection — `results` / `winnerIds` are present only on this arm of the union. */
 type EndedView = Extract<RussianRailroadsView, { status: 'ended' }>;
@@ -24,8 +23,8 @@ export function Results({
     <GameOver winnerNames={winnerNames} onNewGame={onLeave}>
       <div className="text-sm" data-testid="rr-results">
         <p className="mb-2 text-muted-foreground">
-          Final scoring (pg. 22): each round's routes + industry (base), plus end-bonus cards and the engineer majority
-          (40 / 20).
+          Final scoring (pg. 22): each round&apos;s routes + industry (base), plus end-bonus cards and the engineer
+          majority (40 / 20).
         </p>
         <table className="w-full text-left text-xs">
           <thead className="text-muted-foreground">

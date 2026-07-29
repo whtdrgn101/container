@@ -1,7 +1,7 @@
 import { useContext, type ReactNode } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { RematchContext } from '@/lib/rematch';
+import { Button } from './ui/button.js';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js';
+import { RematchContext } from '../rematch.js';
 
 export interface GameOverProps {
   /** Winner display name(s) — one, or several on a shared victory. */

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { cn } from '@/lib/utils';
+import { cn } from '../utils.js';
 
 /**
  * The shared turn banner every game shows at the top of its board (roadmap C2 / REVIEW §3.3).

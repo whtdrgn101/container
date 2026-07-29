@@ -1,5 +1,9 @@
-import type { BoardProps as KernelBoardProps, GameClient as KernelGameClient } from '@game-hub/kernel/client';
-import type { GameMessage, GamePayload } from '@/lib/api';
+import type {
+  BoardProps as KernelBoardProps,
+  GameClient as KernelGameClient,
+  GameMessage,
+  GamePayload,
+} from '@game-hub/kernel/client';
 
 /**
  * The `GameClient` seam, bound for Russian Railroads (Track D pilot).

@@ -1,7 +1,5 @@
 import type { Action, EngineerAction, PlayerView, RussianRailroadsView } from '../engine';
-import { Button } from '@/components/ui/button';
-import { ActionTip } from '@/components/ActionTip';
-import { cn } from '@/lib/utils';
+import { ActionTip, Button, cn } from '@game-hub/ui-kit';
 import { CoinIcon } from './art';
 import { hireTip, hiredEngineerTip, variableTip } from './tips';
 
@@ -146,7 +144,7 @@ export function EngineerStrip({
       {active && active.hiredEngineers.length > 0 ? (
         <div className="mt-3" data-testid="rr-hired">
           <h3 className="mb-1 text-xs font-semibold">
-            {active.name}'s engineers ({active.hiredEngineers.length})
+            {active.name}&apos;s engineers ({active.hiredEngineers.length})
           </h3>
           <div className="flex flex-wrap gap-2">
             {active.hiredEngineers.map((engineer) => {

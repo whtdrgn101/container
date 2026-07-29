@@ -1,6 +1,6 @@
 import { CARD_SYMBOLS, CIV_CARD_DECK, placedBy, RESOURCES } from '../engine';
 import type { StoneAgePlayer, StoneAgeState, StoneAgeView } from '../engine';
-import { cn } from '@/lib/utils';
+import { cn } from '@game-hub/ui-kit';
 import { CardIcon, FieldIcon, FoodIcon, Hut, Meeple, ResourceIcon, SYMBOL_ICON, ToolIcon } from './art';
 
 /** Card lookup for pricing a player's held cards (ids on the player, faces in the fixed deck). */

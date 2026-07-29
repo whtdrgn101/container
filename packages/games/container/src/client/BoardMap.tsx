@@ -3,7 +3,7 @@ import { ShipSvg } from './art/Ship';
 import { Chart, CompassRose } from './art/Chart';
 import { seatColorOf } from './seatColors';
 import { nodeTip } from './tips';
-import { cn } from '@/lib/utils';
+import { cn } from '@game-hub/ui-kit';
 
 type SailAction = Extract<Action, { type: 'SAIL' }>;
 

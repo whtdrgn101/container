@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Action, Color, GameState, GameView, StoredContainer } from '../engine';
 import { COLORS, FACTORY_BUILD_COSTS, legalActions } from '../engine';
-import { seatIdentity } from '@/components/seatIdentity';
+import { seatIdentity } from '@game-hub/ui-kit';
 import type { BoardProps } from './types';
 import * as containerApi from './api';
 import type { DeliveryAuctionView } from './api';

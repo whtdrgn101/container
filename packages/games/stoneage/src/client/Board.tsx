@@ -21,14 +21,7 @@ import type {
   StoneAgeState,
   StoneAgeView,
 } from '../engine';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { GameOver } from '@/components/GameOver';
-import { ActivityFeed } from '@/components/ActivityFeed';
-import { TurnBanner } from '@/components/TurnBanner';
-import { seatIdentity } from '@/components/seatIdentity';
-import { PanZoom } from '@/components/PanZoom';
-import { ActionTip } from '@/components/ActionTip';
+import { ActionTip, ActivityFeed, Button, cn, GameOver, PanZoom, seatIdentity, TurnBanner } from '@game-hub/ui-kit';
 import {
   buildTip,
   DECLINE_TIP,

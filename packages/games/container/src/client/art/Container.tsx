@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils';
+import { cn } from '@game-hub/ui-kit';
 
 /**
  * An original shipping-container glyph: corrugated body with a top highlight, bottom shadow, corner

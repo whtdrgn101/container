@@ -1,8 +1,6 @@
 import { Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button, Card, CardContent, CardHeader, CardTitle, cn } from '@game-hub/ui-kit';
 import { swatchColor } from '@/shell/WaitingRoom';
-import { cn } from '@/lib/utils';
 import type { GameInfo, GameSummary, Lobby, LobbyMember } from '@/lib/api';
 
 /**

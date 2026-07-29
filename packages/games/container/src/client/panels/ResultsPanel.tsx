@@ -1,7 +1,6 @@
 import type { GameView } from '../../engine';
 import { nameOf } from '../chips';
-import { GameOver } from '@/components/GameOver';
-import { cn } from '@/lib/utils';
+import { cn, GameOver } from '@game-hub/ui-kit';
 
 export interface ResultsPanelProps {
   readonly game: GameView;

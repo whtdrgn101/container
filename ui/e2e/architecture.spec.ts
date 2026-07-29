@@ -72,6 +72,37 @@ test('only the registry reaches into a game', () => {
   expect(offenders, 'only games/registry.ts may name a specific game').toEqual([]);
 });
 
+/**
+ * The other half of the seam, added in Track D / D2b: **no game package may import the host's UI.**
+ *
+ * The shell-side rule above stops the hub learning a game; this one stops a game learning the *hub*. A
+ * game package's `./client` may import `@game-hub/kernel/client` (the contract + transport DTOs) and
+ * `@game-hub/ui-kit` (the shared chrome + the game-facing REST calls) — and nothing else from this repo.
+ * The moment it reaches `@/…` or `ui/src`, the package stops being installable from `node_modules`, which
+ * is the entire point of D2 (design doc "contract gap #1").
+ *
+ * It fails silently in every other check — the `@` alias resolves fine in-workspace, so typecheck, tests
+ * and the build are all green while the package is quietly unpublishable. Hence a static test.
+ */
+const GAME_PACKAGES = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..', 'packages', 'games');
+
+test('no game package reaches into the UI shell', () => {
+  const games = readdirSync(GAME_PACKAGES).filter((entry) => statSync(join(GAME_PACKAGES, entry)).isDirectory());
+  // `@/…` (the shell's path alias) or any relative/absolute climb into `ui/src`.
+  const reachesShell = /^\s*(import|export)\s[^;]*from\s+'(@\/[^']*|[^']*\bui\/src\/[^']*)'/m;
+  const offenders = games.flatMap((game) => {
+    const src = join(GAME_PACKAGES, game, 'src');
+    return sourceFiles(src)
+      .filter((path) => reachesShell.test(readFileSync(path, 'utf8')))
+      .map((path) => path.slice(GAME_PACKAGES.length + 1));
+  });
+
+  expect(
+    offenders,
+    "a game package must not import ui/src — use '@game-hub/ui-kit' (chrome, REST) or '@game-hub/kernel/client' (contract, DTOs)",
+  ).toEqual([]);
+});
+
 test('every in-repo game folder is declared in games.config.ts', () => {
   // A folder under src/games/ that holds a client barrel but isn't in the config would never be
   // registered (the generated registry is built from the config), so the shell couldn't draw it — catch

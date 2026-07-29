@@ -53,7 +53,8 @@ Container is the everything template) and adjust.
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@game-hub/kernel": "workspace:*"
+    "@game-hub/kernel": "workspace:*",   // contracts + transport DTOs
+    "@game-hub/ui-kit": "workspace:*"    // the shared board chrome + the game-facing REST calls
     // + any third-party UI lib the client imports DIRECTLY (see the dep rules below)
   },
   "peerDependencies": {
@@ -72,8 +73,11 @@ Container is the everything template) and adjust.
 
 **Dependency rules (verified against the five games):**
 
-- `@game-hub/kernel` is the **only** runtime dependency every game needs. No game may depend on
-  `@game-hub/backend` or `@game-hub/ui` — that's a workspace cycle.
+- `@game-hub/kernel` (contracts + transport DTOs) and `@game-hub/ui-kit` (the shared chrome + the
+  game-facing REST helpers) are the **only** platform dependencies a game needs — and, since Track D /
+  D2b, the only two it is *allowed*. No game may depend on `@game-hub/backend` or `@game-hub/ui`: that's a
+  workspace cycle in here and an unpublishable package outside. ⚠️ `e2e/architecture.spec.ts` fails the
+  suite on any `@/…` or `ui/src` import from a game package.
 - **`fastify`** is a *type-only devDependency*, added **only if the module has a `routes.ts`** (the runtime
   instance is the host's; you import only its types). The routeless variant (Saint Petersburg) omits it.
 - **`better-sqlite3` + `@types/better-sqlite3`** are devDependencies **only if the module opens its own
@@ -81,7 +85,7 @@ Container is the everything template) and adjust.
   other four leave `Db` at `unknown`.
 - **A third-party UI lib the client imports directly** is the package's own real `dependency` (Container's
   `lucide-react`) — it can't lean on `ui/node_modules` resolution. A client that reaches such libs only
-  transitively through `@/components/ui/*` wrappers needs nothing extra.
+  transitively through the ui-kit's `Button`/`Card` wrappers needs nothing extra.
 
 ### `tsconfig.json`
 
@@ -89,18 +93,19 @@ Container is the everything template) and adjust.
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
+    "jsx": "react-jsx",                       // for ./client
+    "lib": ["ES2022", "DOM", "DOM.Iterable"], // for ./client
     "types": ["react"]                        // + "better-sqlite3" if the module binds Db
   },
-  // The engine/module/bot subpaths depend only on @game-hub/kernel (+ Fastify/React/sqlite types), so
-  // the package typechecks them itself. The ./client subpath reaches into the UI shell (@/lib/api, the
-  // shared board components), so the UI HOST typechecks it — a TS-source game package can't fully
-  // typecheck its own client without the shell's path aliases.
-  "include": ["src/engine", "src/module", "src/bot", "vitest.config.ts"]
+  // Track D / D2b: all four subpaths depend only on @game-hub/kernel, @game-hub/ui-kit and React, so the
+  // package typechecks itself — no host path aliases. (The UI host typechecks the client too; see §6.)
+  "include": ["src", "vitest.config.ts"]
 }
 ```
 
-⚠️ **The include split is deliberate: the client is not in it.** The package builds engine/module/bot
-standalone; the *client* is host-typechecked because it reaches the shell's `@/` alias (see §6).
+✅ **A package typechecks all four subpaths standalone** as of D2b. Before it, `./client` reached the
+shell's `@/` alias and only the UI host could check it — that coupling is gone, which is exactly what makes
+the package installable from `node_modules`.
 
 ### `vitest.config.ts`
 
@@ -254,29 +259,48 @@ module internal (Saint Petersburg's `mapStPetersburgError`), re-export it from t
 ### `src/client/types.ts` — bind the transport DTOs
 
 ```ts
-import type { BoardProps as KernelBoardProps, GameClient as KernelGameClient } from '@game-hub/kernel/client';
-import type { GameMessage, GamePayload } from '@/lib/api';
+import type {
+  BoardProps as KernelBoardProps,
+  GameClient as KernelGameClient,
+  GameMessage,
+  GamePayload,
+} from '@game-hub/kernel/client';
 
 export type GameClient<S> = KernelGameClient<S, GamePayload<S>, GameMessage>;
 export type BoardProps<S> = KernelBoardProps<S, GamePayload<S>, GameMessage>;
 ```
+
+The contract *and* the DTOs come from the one specifier (Track D / D2b). The kernel keeps `Payload`/
+`Message` generic rather than baking them in — dropping two type parameters would be a breaking arity
+change — so every game writes these two aliases and then works in one type argument.
 
 ### The client object
 
 - **`Board` is lazy** (`lazy(() => import('./Board'))`) — non-negotiable; it carries the engine + art and
   the landing must not ship it. **`Status`** (optional) is cheap and **non-lazy** — it renders before the
   board chunk lands. **`blurb`** (one line) + **`rules`** (a few bullets) feed the landing.
-- **`api.ts` pins the types back:** `lib/api.ts` is generic in `S`; call `api.getGame<GameView>(…)` so the
-  board is fully typed. Put the game's own endpoints here (they call `/games/:id/<id>/…`). ⚠️ Don't widen
-  the board to `unknown` — pass the type parameter.
+- **`api.ts` pins the types back:** the ui-kit's `getGame`/`applyAction`/`unwrap` are generic in `S`; call
+  `getGame<GameView>(…)` so the board is fully typed. Put the game's own endpoints here — build their URLs
+  with the ui-kit's **`apiUrl('/games/:id/<id>/…')`**, never a hard-coded prefix: the host injects where its
+  API lives (`configureTransport`) so the same package works behind a dev proxy and at an origin root. ⚠️
+  Don't widen the board to `unknown` — pass the type parameter.
 - **Map `BoardProps.colors`** (playerId → palette id) to your own tint system, falling back to seat index
   when a colour is missing. **Gate every action affordance on `canDrive`** (via the shared `seatIdentity`).
   Pass `viewer` to any call returning projected state.
-- **Shared chrome via `@/…`:** render the end screen with the shared `@/components/GameOver` frame; use
-  `@/components/TurnBanner`, `@/components/ActivityFeed`, `@/components/seatIdentity`. A board keeps its own
-  banner wording and `describe(entry)` closure; the frame is shared. ⚠️ The client couples to `ui/src` via
-  the `@` alias at build time — an accepted in-workspace coupling (design-doc contract gap #1), which is
-  also why the UI host typechecks the client (§1).
+- **Shared chrome from `@game-hub/ui-kit`:** render the end screen with `GameOver`; use `TurnBanner`,
+  `ActivityFeed`, `seatIdentity`, and the `Button`/`Card`/`ActionTip`/`PanZoom`/`cn` primitives. A board
+  keeps its own banner wording and `describe(entry)` closure; the frame is shared.
+- **⚠️ A client may import exactly two platform packages: `@game-hub/kernel/client` and
+  `@game-hub/ui-kit`.** Nothing from `ui/src`, ever — that was contract gap #1 and D2b closed it. The
+  architecture spec enforces it, because the `@` alias resolves fine in-workspace and the breakage only
+  shows up on install.
+- **⚠️ Tailwind: the host must scan your package.** Your board's utility classes are only in your source,
+  and Tailwind v4's content detection stops at the host's own package and skips `node_modules`. The hub's
+  `ui/src/index.css` already carries `@source '../../packages'` **and** `@source '../node_modules/@game-hub'`,
+  which covers both an in-workspace and an installed game — so an in-repo game needs no CSS change. Style
+  with the host's **semantic tokens** (`bg-card`, `text-muted-foreground`, `border-border`), not raw
+  palette colours, so a board inherits the theme instead of fighting it. Design doc §2 has the full
+  rationale.
 
 ---
 
@@ -320,8 +344,9 @@ Verified against how all five games are wired. For a game `<id>`:
    ),
    ```
    Only `/client` is needed — the client imports its own engine via a relative path within the package.
-7. **`ui/tsconfig.json`** — add `"../packages/games/<id>/src/client"` to `include` (so the UI host
-   typechecks the client — §1).
+7. **`ui/tsconfig.json`** — add `"../packages/games/<id>/src/client"` to `include`. Since D2b the package
+   typechecks its own client too, so this is now a *second* check rather than the only one — it is what
+   proves the board's props line up with the shell's registry (§1).
 8. **`packages/bench/package.json`** — add the game as a `workspace:*` dependency **if** you registered a
    `benchmark` in the aggregator.
 9. **`pnpm install`** again to relink the new host deps.
@@ -344,7 +369,8 @@ host.** The `architecture.spec.ts` forbids any shell file importing `@game-hub/g
   stable (Playwright depends on them) and don't change existing baselines. The landing picker activates
   automatically once two games are registered.
 - **Architecture-spec compliance** — no shell file imports the game; only `registry.ts` names it; the
-  folder is declared in `games.config.ts`.
+  folder is declared in `games.config.ts`; and (D2b) **the game imports nothing from `ui/src`** — only
+  `@game-hub/kernel/*` and `@game-hub/ui-kit`.
 
 ---
 

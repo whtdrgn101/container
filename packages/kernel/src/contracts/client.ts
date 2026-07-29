@@ -1,6 +1,13 @@
 import type { ComponentType, LazyExoticComponent } from 'react';
 
 /**
+ * The transport DTOs a game client names (Track D / D2b). They live in their own module but are part of
+ * the same `@game-hub/kernel/client` surface: a game's `types.ts` imports the contract *and* the DTOs it
+ * binds into it from one specifier. Type-only, so `client.js` stays an empty module.
+ */
+export type { GameIdentity, GameMessage, GamePayload } from './transport.js';
+
+/**
  * The `GameClient` seam (roadmap C2) — the UI's mirror of the backend's `GameModule` — now a **shared
  * kernel contract** (Track D / D0), so an out-of-repo game package's UI can build against it.
  *
@@ -8,12 +15,15 @@ import type { ComponentType, LazyExoticComponent } from 'react';
  * (one REST client, one WebSocket per game). It knows nothing about any game's rules or shape. A game
  * plugs in a **board** and the shell renders it.
  *
- * **This contract must never import a game** — it is the interface; each `ui/src/games/<game>/` is one
- * implementation and the generated registry is the lookup (same rule as the module contract). It also
- * must not import the UI's own transport types (`GamePayload`/`GameMessage` live in `ui/src/lib/api`):
- * those are generic parameters (`Payload`/`Message`) so this file needs nothing but React. The UI pins
- * them back to its concrete transport types in `ui/src/games/types.ts`, which is what keeps every
- * board's `BoardProps<S>` and `GameClient<S>` reading exactly as they did before D0.
+ * **This contract must never import a game** — it is the interface; each game package's `./client` is one
+ * implementation and the generated registry is the lookup (same rule as the module contract).
+ *
+ * `Payload`/`Message` stay **generic parameters** even though D2b brought the transport DTOs into this
+ * package (`./transport.ts`, re-exported above). Two reasons: binding them here would drop two type
+ * parameters, which is a *breaking* arity change (major bump — see `contract.ts`) for a purely cosmetic
+ * win; and a host is still free to hand its boards a richer payload than the platform's. Each game
+ * package's `client/types.ts` pins them to `GamePayload<S>`/`GameMessage`, which is what keeps every
+ * board's `BoardProps<S>` and `GameClient<S>` reading as one type argument.
  *
  * This is the one kernel entry that depends on React, so it lives behind the `@game-hub/kernel/client`
  * subpath rather than the framework-free `.` barrel — a backend/engine consumer never pulls React in.

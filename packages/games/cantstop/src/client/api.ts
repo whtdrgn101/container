@@ -1,6 +1,6 @@
 import type { Action, CantStopView } from '../engine';
-import { BASE_URL, JSON_HEADERS, applyAction, getGame, unwrap } from '@/lib/api';
-import type { GamePayload } from '@/lib/api';
+import { apiUrl, applyAction, getGame, JSON_HEADERS, unwrap } from '@game-hub/ui-kit';
+import type { GamePayload } from '@game-hub/kernel/client';
 
 /**
  * Can't Stop's own API client — the endpoints only this game has.
@@ -21,7 +21,7 @@ export const GAME_TYPE = 'cantstop';
 /** A Can't Stop game payload, with its state pinned to Can't Stop's view. */
 export type CantStopPayload = GamePayload<CantStopView>;
 
-const route = (gameId: string, path: string) => `${BASE_URL}/games/${gameId}/${GAME_TYPE}${path}`;
+const route = (gameId: string, path: string) => apiUrl(`/games/${gameId}/${GAME_TYPE}${path}`);
 
 /**
  * Apply a Can't Stop action (SELECT / STOP), typed. Thin wrapper over the opaque-action route.

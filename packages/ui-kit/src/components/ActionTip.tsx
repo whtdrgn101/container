@@ -1,6 +1,6 @@
 import { cloneElement, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
-import { cn } from '@/lib/utils';
+import { cn } from '../utils.js';
 
 /**
  * A descriptive hover/focus tooltip for an action spot — the shared chrome behind every game's

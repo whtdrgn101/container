@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { isGatherPlace, isUsePlace, legalActions, PLACE_CAPACITY, PLACES } from '../engine';
 import type { FixedPlaceId, StoneAgeState, StoneAgeView } from '../engine';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { Button, cn } from '@game-hub/ui-kit';
 import { Meeple, PLACE_ICON } from './art';
 import { Scene } from './art/Scene';
 import { GATHER_TIP, placeTip } from './tips';

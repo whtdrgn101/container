@@ -82,13 +82,32 @@ it lives here until then so the plan isn't tribal knowledge.
     inherits this rule.
   - Owner manual steps still outstanding: create the npm `game-hub` org, provide a publish token (or
     `npm login`), then `pnpm --filter @game-hub/kernel publish`.
-- **D2b — `@game-hub/ui-kit`**: transport DTOs (`GamePayload`/`GameMessage`) move into
-  `@game-hub/kernel/client`; shared chrome (`TurnBanner`/`ActivityFeed`/`GameOver`) extracts to a
-  published `@game-hub/ui-kit`, answering the Tailwind content-glob problem (design doc §2). Closes
-  D1 contract gap #1.
+- **D2b — `@game-hub/ui-kit`** ✅ (2026-07-29): the transport DTOs (`GamePayload`/`GameIdentity`/
+  `GameMessage`) now ship on `@game-hub/kernel/client` (kernel → **1.1.0**, contract still 1 — additive),
+  and the shared chrome extracts to a publish-ready **`@game-hub/ui-kit@1.0.0`**. Contract gap #1 is
+  closed: all five game clients import only `@game-hub/kernel/client` + `@game-hub/ui-kit`, and an e2e
+  architecture test fails the suite if one reaches `ui/src` again. Full shipped list and findings in the
+  design doc's §4b "Delivered in D2b".
+  - **The gap was wider than the slice named.** Beyond `TurnBanner`/`ActivityFeed`/`GameOver`, the five
+    clients also shared `ActionTip`, `PanZoom`, `seatIdentity`, `Button`, `Card`, `cn` **and six functions
+    from `lib/api`** — so the ui-kit owns the game-facing REST calls too. The shell keeps what only it uses,
+    including the WebSocket.
+  - **Tailwind answered, and measured:** ship utility classes in source and **no CSS**; the host adds
+    `@source '../node_modules/@game-hub'`. Proven by building three ways — with no `@source` the chrome's
+    classes are pruned (22.88 kB CSS), with the node_modules glob alone the build is byte-identical to the
+    full one (59.86 kB). An explicit `@source` **does** descend into `node_modules`; the automatic
+    detection does not. **This is the answer D2c's game package follows.**
+  - **Biggest finding:** `import.meta.env.PROD` (how `lib/api.ts` picked its base URL) is a *bundler*
+    constant and cannot ship in a published `dist/`. The ui-kit takes the base URL by injection instead —
+    the host calls `configureTransport({ baseUrl })` once at boot and games build URLs with `apiUrl()`.
+  - **Bonus:** every game package now typechecks all four subpaths standalone, retiring the D1 finding that
+    a TS-source package can't typecheck its own client.
 - **D2c — scaffold `whtdrgn101/game-labyrinth`** (public): the four-subpath package shape consuming
   *published* packages only, its own CI (typecheck, engine 100% / bot 90% gates). This file's digest +
-  slice plan move there as its ROADMAP.
+  slice plan move there as its ROADMAP. ⚠️ **Blocked on the owner's npm step** — D2c needs
+  `@game-hub/kernel@1.1.0` and `@game-hub/ui-kit@1.0.0` actually published (create the `game-hub` org,
+  provide a token, then `pnpm --filter @game-hub/kernel publish` and the same for the ui-kit). Both
+  tarballs are proven good by their pack smokes; nothing else stands in the way.
 - **D2d — hub consumption**: `@game-hub/game-labyrinth` published; the hub adds the dep +
   `games.config.ts` entry + `pnpm generate`. ⚠️ The in-workspace shims (per-subpath Vite aliases, TS
   includes, vitest inline regexes) must **not** grow a sixth copy — dist consumption is the point.

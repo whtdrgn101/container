@@ -42,10 +42,17 @@ packages/
   kernel/          @game-hub/kernel — the neutral dependency every game + both hosts build on:
                      primitives (GameError, MoveRecord, Viewer, record, makeSeating, GameEndState),
                      runBotLoop, the GameModule/GameClient contracts (host bindings are generics),
-                     and @game-hub/kernel/{client,bot} subpaths. Its own 100% gate.
+                     the transport DTOs (GamePayload/GameMessage), and the
+                     @game-hub/kernel/{client,bot} subpaths. Its own 100% gate. Published (1.1.0).
+  ui-kit/          @game-hub/ui-kit — the shared board chrome every game's UI renders inside
+                     (TurnBanner, ActivityFeed, GameOver, ActionTip, PanZoom, Button/Card, cn,
+                     seatIdentity) + the game-facing REST calls (getGame/applyAction/apiUrl).
+                     React is a peer; no CSS ships (Tailwind classes in source). Published (1.0.0).
   games/<id>/      @game-hub/game-<id> — one package per game, four TS-source subpath exports:
                      ./engine (pure rules, 100% gate)  ./module (backend seam)
-                     ./client (UI seam, host-typechecked)  ./bot (AI, 90% gate) + its own ROADMAP.md
+                     ./client (UI seam)  ./bot (AI, 90% gate) + its own ROADMAP.md.
+                     ⚠️ A ./client may import ONLY @game-hub/kernel/client + @game-hub/ui-kit —
+                     never ui/src (e2e architecture.spec.ts enforces it).
   bench/           @game-hub/bench — dev-only bot-strength harness (root `pnpm bench`)
 backend/           @game-hub/backend — game-agnostic Fastify REST core + SQLite + the generated registry
 ui/                @game-hub/ui — game-agnostic React + Tailwind + shadcn shell + the generated registry
@@ -110,6 +117,10 @@ pnpm format                 # Prettier --write .   (single quotes, semicolons, t
 pnpm format:check           # the CI gate (*.md is Prettier-ignored — hand-wrap docs to ~100-120 cols)
 
 pnpm generate               # games.config.ts → the two checked-in registries (CI freshness-checks the diff)
+
+# Publish-readiness of the two published packages (CI runs both after `pnpm test`)
+pnpm --filter @game-hub/kernel pack:smoke   # pack → install outside the workspace → node + nodenext tsc
+pnpm --filter @game-hub/ui-kit pack:smoke   # same, for the chrome (deps declared, React stays a peer)
 
 # The published kernel (Track D / D2a — @game-hub/kernel is the one package that leaves this repo)
 pnpm --filter @game-hub/kernel build       # tsc → dist/ (JS + .d.ts + maps); also runs as `prepack`

@@ -1,8 +1,7 @@
 import { Ship as ShipIcon } from 'lucide-react';
 import type { Action, PlayerView } from '../../../engine';
 import { SHIP_CAPACITY } from '../../../engine';
-import { Button } from '@/components/ui/button';
-import { ActionTip } from '@/components/ActionTip';
+import { ActionTip, Button } from '@game-hub/ui-kit';
 import { ShipSvg } from '../../art/Ship';
 import { ContainerChip, sailTarget, shipLabel } from '../../chips';
 import { CONTAINER_TIPS, sailTip } from '../../tips';

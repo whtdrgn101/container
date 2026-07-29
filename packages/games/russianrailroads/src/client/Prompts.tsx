@@ -1,5 +1,5 @@
 import type { Action, LocoResolution, RussianRailroadsView } from '../engine';
-import { Button } from '@/components/ui/button';
+import { Button } from '@game-hub/ui-kit';
 import { SteamLoco, WrenchIcon } from './art';
 
 /**

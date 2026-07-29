@@ -1,6 +1,5 @@
 import type { ActionSpaceDef, SpacePlacement } from '../engine';
-import { Button } from '@/components/ui/button';
-import { ActionTip } from '@/components/ActionTip';
+import { ActionTip, Button } from '@game-hub/ui-kit';
 import { CoinIcon, Meeple } from './art';
 import { spaceTip, USE_COIN_TIP } from './tips';
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as api from '@/lib/api';
-import type { GameMessage, GamePayload } from '@/lib/api';
+import type { GameMessage, GamePayload } from '@game-hub/kernel/client';
 
 /**
  * The shell's live connection to one game (roadmap C2).

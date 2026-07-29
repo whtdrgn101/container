@@ -20,19 +20,25 @@ What the migration resolved from the two gaps below (§D1 findings):
   `GameHub`/`BotRepository` satisfy them with a compile-time assertion. The kernel still imports no host.
   `runBotLoop` and the bot helpers (`@game-hub/kernel/bot`) moved to the kernel too. A `createBotDriver`
   can now be written entirely from the neutral kernel side.
-- **Contract gap #1 (the client transport layer) — accepted and documented for in-workspace.** Package
-  clients still reach the shell's transport DTOs (`GamePayload`/`GameMessage`) and shared chrome
-  (`TurnBanner`/`ActivityFeed`/`GameOver`) via the UI's `@` alias, which is why the UI host typechecks each
-  package's `./client`. Publishing the transport DTOs into `@game-hub/kernel/client` and a `@game-hub/ui-kit`
-  is deferred to **D2** — the point at which an out-of-repo client actually can't reach `ui/src`.
+- **Contract gap #1 (the client transport layer) — deferred to D2, and closed there in D2b.** Package
+  clients reached the shell's transport DTOs (`GamePayload`/`GameMessage`) and shared chrome
+  (`TurnBanner`/`ActivityFeed`/`GameOver`) via the UI's `@` alias, which is why the UI host had to typecheck
+  each package's `./client`. D2b published the DTOs on `@game-hub/kernel/client` and the chrome as
+  `@game-hub/ui-kit` — see §4b.
 
 What **D2** (out-of-repo) still forces that the in-workspace phase did not: a real `dist` (TS-source
-consumption + Vite aliases don't survive `node_modules`), the Tailwind content-glob problem (§2),
-enforced kernel-contract versioning (§4), and gap #1's `@game-hub/ui-kit` extraction.
+consumption + Vite aliases don't survive `node_modules`), the Tailwind content-glob problem (§2 — answered
+in §4b), enforced kernel-contract versioning (§4), and gap #1's `@game-hub/ui-kit` extraction (§4b).
 
 **D2a is done (2026-07-29):** the kernel builds a real `dist`, is publish-ready as `1.0.0` (unpublished —
 the npm org is the owner's manual step), and the kernel-contract check is live in the backend registry
 with all five games declaring it. Details and findings in §4 "Delivered in D2a".
+
+**D2b is done (2026-07-29) — contract gap #1 is closed.** The transport DTOs moved into
+`@game-hub/kernel/client` (kernel → `1.1.0`, contract still `1`) and the shared chrome + the game-facing
+REST helpers moved into a new publishable `@game-hub/ui-kit@1.0.0`. All five game packages now import
+**nothing** from `ui/src`, an e2e architecture test enforces that, and each package typechecks all four of
+its subpaths standalone. §2's Tailwind question is answered and proven. Details in §4b "Delivered in D2b".
 
 Original goal statement: four games had tested the engine and the seams; the long-term goal is making
 games easier to add, and eventually addable from *outside* this repo. Pilot: Russian Railroads (a
@@ -103,7 +109,8 @@ These are the things that only work because every game lives in this repo:
 - **Tailwind content scanning**: game boards style themselves with Tailwind utility classes, and the
   UI's Tailwind build scans `ui/src/**`. A game package outside that glob would silently lose its
   styles — the content globs must include installed game packages (or games must ship compiled CSS).
-  This is the sneakiest breakage in the list.
+  This is the sneakiest breakage in the list. ✅ **Answered in D2b** — explicit `@source`, no shipped CSS;
+  the decision, the alternatives, and the measurement are in §4b.
 - **The e2e `architecture.spec.ts`** derives the game list from the filesystem (`readdirSync` of
   `ui/src/games/`) — right for in-repo games, meaningless for installed ones. It would read the
   generated registry instead.
@@ -216,6 +223,112 @@ bundling its workspace deps, this becomes a real break — build the kernel in t
 
 **Not in this slice:** the actual `npm publish` (the `game-hub` npm org does not exist yet) and a
 package `README.md` (npm shows "no readme" without one).
+
+## 4b. The UI-side packages — `@game-hub/kernel/client` + `@game-hub/ui-kit`
+
+### ✅ Delivered in D2b (2026-07-29) — contract gap #1 is closed
+
+**The rule that decides what goes where:** *if a game client imports it, it must be published; if only
+the shell imports it, it stays in `ui/src`.* Applied to the audit, that split the old `ui/src` shared
+surface three ways.
+
+**1. Contract → `@game-hub/kernel/client`** (new `src/contracts/transport.ts`, type-only, re-exported from
+the `./client` subpath): `GamePayload<S>`, its `GameIdentity` base, and `GameMessage`. Nothing else — the
+shell-only DTOs (`Lobby`, `GameInfo`, `GameSummary`, `NewSeat`, `StatePush`, `RematchInfo`) never cross the
+game seam and stayed put. The kernel emits an empty `client.js` still, so it keeps its zero runtime
+dependencies.
+
+- **Version: `1.1.0`, contract still `1`.** Purely additive — nothing changed shape, nothing became
+  required — so by `contract.ts`'s own rule this is a minor bump and a game built against `1.0.0` still
+  compiles and registers. The reasoning lives in `contract.ts` beside the constant, as a version history.
+- **`GameClient`/`BoardProps` keep their `Payload`/`Message` generic parameters** even though the kernel
+  now owns the DTOs. Binding them would drop two type parameters — a *breaking arity change*, i.e. a major
+  bump — for a cosmetic win. Each game still writes the two-line binding in `client/types.ts`; it now
+  imports the contract and the DTOs from the same specifier.
+
+**2. Chrome + game-facing transport → `@game-hub/ui-kit@1.0.0`** (new `packages/ui-kit`, publish shape
+mirroring the kernel's: dev `exports` → TS source, `publishConfig.exports` → `dist/`, `files: ["dist"]`,
+`access: public`, `prepack` → `tsc`, `.js` extensions on relative imports, README). The audit found the
+gap was **wider than the three components the slice named**: the five clients also imported `ActionTip`,
+`PanZoom`, `seatIdentity`, `Button`, `Card`, `cn`, and six functions from `lib/api`. All of it moved.
+React is a real `peerDependency` (two copies = a broken app); `@game-hub/kernel` is a peer too (type-only
+use); `clsx`/`tailwind-merge`/`class-variance-authority`/`lucide-react` are real dependencies.
+
+- **⚠️ `import.meta.env` cannot ship in a published package.** `lib/api.ts` derived its base URL from
+  Vite's `import.meta.env.PROD` (dev proxies `/api`; prod serves the API at the origin root). That's a
+  *bundler* constant — baked into a `dist/`, it is fragile at best and wrong at worst for an installed
+  consumer. So the ui-kit exports `configureTransport({ baseUrl })` + `apiUrl(path)`, the **host** calls it
+  once in `main.tsx`, and every game builds URLs through `apiUrl`. Games that hard-coded `${BASE_URL}/…`
+  were rewritten. This is the one API shape change in the slice.
+- **`RematchContext` moved with `GameOver`**, so the rematch button still reaches the shell through
+  context. That makes ui-kit **duplication-sensitive**: two copies of the package = two distinct contexts =
+  a silently missing button. Hence the peer dep, and hence the single Vite alias in the hub.
+
+**3. Everything else stayed in `ui/src`:** the landing/header/waiting room, the catalog + lobby + resume +
+abandon + rematch endpoints, and `subscribeGame` — **the shell owns the socket**, and it is the one piece
+of transport a game must not touch. `lib/api.ts` re-exports the ui-kit's shared half so shell code keeps a
+single import site.
+
+### The Tailwind answer (§2's "sneakiest breakage") — explicit `@source`, no shipped CSS
+
+**Decision: the ui-kit (and every game package) ships utility classes in its source and *no CSS at all*;
+the host adds one `@source` line so its own Tailwind build compiles them.** Write it into the host's
+stylesheet exactly like this:
+
+```css
+@import 'tailwindcss';
+@source '../../packages';                  /* in-workspace packages (this repo only) */
+@source '../node_modules/@game-hub';       /* the same packages as installed — what an external host needs */
+```
+
+Why this and not the alternatives:
+
+- **Shipping compiled CSS from each package** would freeze the theme at *package* build time. The chrome
+  styles itself with the host's semantic tokens (`bg-card`, `text-muted-foreground`, `border-border`), so
+  it inherits the host's light/dark theme; a prebuilt stylesheet would either hard-code one theme or
+  duplicate the token layer. It also means two cascade sources fighting over specificity, and no
+  tree-shaking of unused utilities.
+- **A Tailwind preset/plugin from the package** solves theming but not content scanning — the host would
+  *still* need to point at the package's markup.
+- The cost of the chosen answer is exactly one line per host, and it is the shape Tailwind v4 documents
+  for component libraries.
+
+**Measured, not assumed** (`pnpm --filter @game-hub/ui build`, greping the emitted CSS for three classes
+that exist **only** in `packages/ui-kit/src` — `max-h-56`, `origin-top-left`, `touch-none`):
+
+| `@source` lines in `ui/src/index.css` | emitted CSS | the three chrome classes |
+|---|---|---|
+| none | 22.88 kB | **absent** — silently pruned, the failure mode this exists to prevent |
+| `../node_modules/@game-hub` only | 59.86 kB | present |
+| both (shipped) | 59.86 kB, **identical content hash** | present |
+
+The middle row is the finding: **an explicit `@source` does descend into `node_modules`** (through pnpm's
+symlinks, and one glob covers a package's `src` in-workspace *and* its `dist` when installed) — so the
+node_modules glob alone reproduces the whole build byte-for-byte. No compiled-CSS fallback was needed.
+⚠️ Tailwind's *automatic* detection still skips `node_modules`; only the explicit directive works.
+
+### Enforcement, and what it bought
+
+`ui/e2e/architecture.spec.ts` gained **"no game package reaches into the UI shell"**: any `@/…` or
+`ui/src` import from `packages/games/*/src` fails the suite. It is a static test for the same reason its
+sibling is — the `@` alias resolves fine in-workspace, so typecheck, unit tests and the production build
+all stay green while the package is quietly unpublishable. *Verified by breaking it:* adding
+`import { cn } from '@/lib/utils'` to Can't Stop's board fails the spec with the offending path; reverted.
+
+**Side effect worth having: every game package now typechecks all four subpaths standalone** (`include:
+["src", …]`, `jsx: react-jsx` + DOM libs). The D1 finding "a TS-source game package can't fully typecheck
+its own client" is retired — the client's only non-React dependencies are the two published packages. The
+UI host still typechecks the clients too, which is what proves each board's props line up with the shell.
+
+**Also found, and fixed, in passing:** ESLint's React + hooks rules were scoped to `ui/**` only, so they
+stopped applying to any game client the moment Track D moved it into a package — and to the chrome the
+moment D2b moved it. The globs now follow the JSX (`packages/ui-kit/**`, `packages/games/*/src/client/**`),
+which immediately surfaced two real `react/no-unescaped-entities` violations in the Russian Railroads
+client that had been unlinted since the migration. Both fixed.
+
+**Not in this slice:** the actual `npm publish` of either package (the `game-hub` org still doesn't exist),
+and any move of the hosts onto `dist` consumption — in-workspace they still read TS source, exactly as
+D2a decided.
 
 ## 5. Registration & discovery
 

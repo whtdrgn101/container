@@ -13,6 +13,11 @@ export default defineConfig({
       // bare entry so the more specific alias wins.
       '@game-hub/kernel/client': fileURLToPath(new URL('../packages/kernel/src/contracts/client.ts', import.meta.url)),
       '@game-hub/kernel': fileURLToPath(new URL('../packages/kernel/src/index.ts', import.meta.url)),
+      // Track D / D2b: the shared board chrome (+ the game-facing REST helpers) moved out of `ui/src`
+      // into its own publishable package. Consumed as source in-workspace, exactly like the kernel — and
+      // aliased for the same reason: one copy for the shell *and* every game package, so React context
+      // identity (`RematchContext`) holds across the seam.
+      '@game-hub/ui-kit': fileURLToPath(new URL('../packages/ui-kit/src/index.ts', import.meta.url)),
       // Track D legacy-migration (phase 5): Container moved from `ui/src/games/container/` into its own
       // in-workspace package over TS source, so its client entry is aliased to source (the RR pattern).
       // Only `/client` is needed — the client imports its own engine via a relative path within the

@@ -43,7 +43,8 @@ The near-term order, decided while play-testing:
    `@game-hub/game-<id>` package (migration plan + findings:
    **[`docs/track-d-legacy-migration.md`](docs/track-d-legacy-migration.md)**). **Still open:** D2 — an
    *out-of-repo* game against published `@game-hub/kernel` (forces a real `dist`, kernel-contract
-   versioning enforcement, and a `@game-hub/ui-kit`). See the design doc's status header.
+   versioning enforcement, and a `@game-hub/ui-kit`). D2a + D2b have since landed all three in-repo — what
+   remains is the publish itself and the external game. See the design doc's status header.
 5. **Russian Railroads board-UI revamp (RR9b)** (owner, 2026-07-28, while play-testing):
    the RR board fights itself — a responsive layout that works on mobile vs a game that genuinely
    needs table-top board density — and the compromise makes the game nearly unplayable. Redesign the
@@ -62,7 +63,15 @@ The near-term order, decided while play-testing:
    kernel-major-as-contract-version check is live in `GameRegistry.register` with all five games
    declaring `kernelContract`, and `pnpm --filter @game-hub/kernel pack:smoke` proves the tarball works
    outside the workspace (wired into CI). The `npm publish` itself waits on the owner creating the org.
-   **Next: D2b** (`@game-hub/ui-kit` + the transport DTOs).
+   **D2b ✅ (2026-07-29):** contract gap #1 closed — the transport DTOs
+   (`GamePayload`/`GameIdentity`/`GameMessage`) now ship on `@game-hub/kernel/client` (kernel → **1.1.0**,
+   contract still 1 — additive), and the shared chrome + the game-facing REST calls extract to a
+   publish-ready **`@game-hub/ui-kit@1.0.0`** (React a peer, no CSS shipped, its own pack smoke in CI).
+   All five game clients import only those two packages, an e2e architecture test fails the suite if one
+   reaches `ui/src`, and every game package now typechecks all four subpaths standalone. §2's Tailwind
+   question is answered *and measured*: ship classes in source, host adds `@source '../node_modules/@game-hub'`
+   (design doc §4b). **Next: D2c** — scaffold `whtdrgn101/game-labyrinth`, ⚠️ **blocked on the owner
+   creating the npm `game-hub` org and publishing both packages**.
 
 ## Principles
 

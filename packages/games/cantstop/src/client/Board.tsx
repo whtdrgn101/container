@@ -1,11 +1,6 @@
 import { COLUMN_HEIGHTS, COLUMNS, MAX_RUNNERS, legalActions } from '../engine';
 import type { Action, CantStopView } from '../engine';
-import { Button } from '@/components/ui/button';
-import { GameOver } from '@/components/GameOver';
-import { ActivityFeed } from '@/components/ActivityFeed';
-import { TurnBanner } from '@/components/TurnBanner';
-import { seatIdentity } from '@/components/seatIdentity';
-import { cn } from '@/lib/utils';
+import { ActivityFeed, Button, cn, GameOver, seatIdentity, TurnBanner } from '@game-hub/ui-kit';
 import type { BoardProps } from './types';
 import * as cantstopApi from './api';
 import { Die } from './art/Die';

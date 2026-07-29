@@ -1,3 +1,6 @@
+import { apiUrl, applyAction, fail, getGame, JSON_HEADERS, unwrap } from '@game-hub/ui-kit';
+import type { GameMessage, GamePayload } from '@game-hub/kernel/client';
+
 /**
  * The games-platform API client — **game-agnostic** (roadmap C2).
  *
@@ -11,17 +14,20 @@
  * to whichever board the registry picked, while a board calls them with its own view type
  * (`api.getGame<GameView>(…)`) and stays fully typed. Don't widen a board to `unknown` to make a call
  * type-check — pass the type parameter instead.
+ *
+ * **Track D / D2b — the split with `@game-hub/ui-kit`.** The calls a *game client* makes (`getGame`,
+ * `applyAction`, `unwrap`, `fail`, `JSON_HEADERS`, `apiUrl`) moved into the ui-kit so an installed game
+ * package can reach them without importing `ui/src`; their DTOs (`GamePayload`, `GameMessage`) moved into
+ * `@game-hub/kernel/client`. This file keeps everything **only the shell** uses — the catalog, lobbies, the
+ * resume list, abandon/rematch, and the socket — and re-exports the shared half so shell code keeps one
+ * import site. The base URL is injected once at boot (`main.tsx` → `configureTransport`), because a
+ * published package must not depend on Vite's `import.meta.env`.
  */
 
-// In dev the Vite server proxies `/api` → the backend (stripping the prefix). In a production build
-// the UI is served by the backend itself, so the API lives at the same origin's root.
-export const BASE_URL = import.meta.env.PROD ? '' : '/api';
-
-interface ApiError {
-  error?: { code?: string; message?: string };
-}
-
-export const JSON_HEADERS = { 'content-type': 'application/json' };
+// The shared half, re-exported so shell code has a single `lib/api` import site (the games import them
+// from the ui-kit directly — they must not reach into `ui/src`).
+export { apiUrl, applyAction, fail, getGame, JSON_HEADERS, unwrap };
+export type { GameIdentity, GameMessage, GamePayload } from '@game-hub/kernel/client';
 
 /** A claimed lobby seat: who's in it, whether that's a person or the AI, and its chosen colour. */
 export interface LobbyMember {
@@ -42,30 +48,6 @@ export interface Lobby {
   members: (LobbyMember | null)[];
   status: 'open' | 'started';
   gameId: string | null;
-}
-
-/** Secret-free seat identity carried beside every game state (roadmap C2 / REVIEW §3.3). */
-export interface GameIdentity {
-  /** Seats in order, name-and-id only — no hidden info. Filled from the module's `summarize`. */
-  players: { id: string; name: string }[];
-  /** Whose turn it is, or `null` (e.g. a finished game). */
-  activePlayerId: string | null;
-}
-
-/**
- * A game, plus what a generic caller needs to make sense of it.
- *
- * `gameType` says which board reads `game`; `bots` travels beside the state rather than inside it,
- * because which seats are bots is coordination state the engine never learns about. `players` /
- * `activePlayerId` (REVIEW §3.3) let the shell name seats and apply seat-binding rules **without**
- * duck-typing the opaque `game` blob — the one thing the shell must never read a game's shape for.
- */
-export interface GamePayload<S = unknown> extends GameIdentity {
-  game: S;
-  gameType: string;
-  bots: string[];
-  /** Each seat's chosen player colour (playerId → palette id). Beside the game like `bots`. */
-  colors: Record<string, string>;
 }
 
 /** One of the games this server hosts, from `GET /games/catalog`. */
@@ -106,33 +88,6 @@ export interface NewSeat {
   difficulty?: string;
 }
 
-/** Throw an Error carrying the server's message (used for any non-2xx response). */
-export async function fail(response: Response): Promise<never> {
-  const body = (await response.json().catch(() => ({}))) as ApiError;
-  throw new Error(body.error?.message ?? `Request failed (${response.status})`);
-}
-
-// The server sends a per-viewer projection (opponents' secret cards are redacted to null).
-export async function unwrap<S = unknown>(response: Response): Promise<GamePayload<S>> {
-  if (!response.ok) await fail(response);
-  const body = (await response.json()) as {
-    game: S;
-    gameType: string;
-    bots?: string[];
-    colors?: Record<string, string>;
-    players?: { id: string; name: string }[];
-    activePlayerId?: string | null;
-  };
-  return {
-    game: body.game,
-    gameType: body.gameType,
-    bots: body.bots ?? [],
-    colors: body.colors ?? {},
-    players: body.players ?? [],
-    activePlayerId: body.activePlayerId ?? null,
-  };
-}
-
 async function unwrapLobby(response: Response): Promise<Lobby> {
   if (!response.ok) await fail(response);
   return ((await response.json()) as { lobby: Lobby }).lobby;
@@ -140,7 +95,7 @@ async function unwrapLobby(response: Response): Promise<Lobby> {
 
 /** The games this server hosts — what the picker lists, and where seat bounds come from. */
 export async function listGameTypes(): Promise<GameInfo[]> {
-  const response = await fetch(`${BASE_URL}/games/catalog`);
+  const response = await fetch(apiUrl(`/games/catalog`));
   if (!response.ok) await fail(response);
   return ((await response.json()) as { games: GameInfo[] }).games;
 }
@@ -148,7 +103,7 @@ export async function listGameTypes(): Promise<GameInfo[]> {
 /** Create a new game of `gameType` and return its initial state. */
 export async function createGame<S = unknown>(gameType: string, players: NewSeat[]): Promise<GamePayload<S>> {
   return unwrap<S>(
-    await fetch(`${BASE_URL}/games`, {
+    await fetch(apiUrl(`/games`), {
       method: 'POST',
       headers: JSON_HEADERS,
       body: JSON.stringify({ gameType, players }),
@@ -156,57 +111,10 @@ export async function createGame<S = unknown>(gameType: string, players: NewSeat
   );
 }
 
-/**
- * Apply an action for a player and return the updated state.
- *
- * `action` is opaque: the server delegates all validation to the game's own module, so the shape is
- * the game's business. `viewer` (your seat ids) projects the response for your own seats so the reply
- * never reveals another player's card; omit for hotseat.
- *
- * `expectedVersion` is optimistic concurrency (REVIEW §4.2): pass the version of the state you acted
- * against and the server refuses (`409 STALE_VERSION`) if the game has since moved on. Rather than
- * surface that as an error, we **refetch and return the current state** — a double-click or a second
- * device that lost the race should feel like the board catching up, not a failure. Omit it to apply
- * unconditionally (the old behaviour).
- */
-export async function applyAction<S = unknown>(
-  gameId: string,
-  playerId: string,
-  action: unknown,
-  viewer?: string,
-  expectedVersion?: number,
-): Promise<GamePayload<S>> {
-  const query = viewer !== undefined ? `?viewer=${encodeURIComponent(viewer)}` : '';
-  const response = await fetch(`${BASE_URL}/games/${gameId}/actions${query}`, {
-    method: 'POST',
-    headers: JSON_HEADERS,
-    body: JSON.stringify({ playerId, action, ...(expectedVersion !== undefined ? { expectedVersion } : {}) }),
-  });
-  // Lost the optimistic-concurrency race (a double-click, a stale second device): don't error the
-  // user — catch the board up to the current server state, which is what the click would have shown.
-  if (response.status === 409) {
-    const body = (await response
-      .clone()
-      .json()
-      .catch(() => ({}))) as ApiError;
-    if (body.error?.code === 'STALE_VERSION') return getGame<S>(gameId, viewer);
-  }
-  return unwrap<S>(response);
-}
-
-/**
- * Fetch a game's current state by id. `viewer` is a comma-separated list of your seat ids (see only
- * those seats' hidden info); `''` is a spectator (no cards); omit it to follow the active player.
- */
-export async function getGame<S = unknown>(gameId: string, viewer?: string): Promise<GamePayload<S>> {
-  const query = viewer !== undefined ? `?viewer=${encodeURIComponent(viewer)}` : '';
-  return unwrap<S>(await fetch(`${BASE_URL}/games/${gameId}${query}`));
-}
-
 /** Create an empty lobby for `gameType` with `seats` unclaimed seats (its id is the shareable code). */
 export async function createLobby(gameType: string, seats: number): Promise<Lobby> {
   return unwrapLobby(
-    await fetch(`${BASE_URL}/lobbies`, {
+    await fetch(apiUrl(`/lobbies`), {
       method: 'POST',
       headers: JSON_HEADERS,
       body: JSON.stringify({ gameType, seats }),
@@ -216,14 +124,14 @@ export async function createLobby(gameType: string, seats: number): Promise<Lobb
 
 /** List open lobbies that still have a free seat (the home-screen "waiting for players" list). */
 export async function listLobbies(): Promise<Lobby[]> {
-  const response = await fetch(`${BASE_URL}/lobbies`);
+  const response = await fetch(apiUrl(`/lobbies`));
   if (!response.ok) await fail(response);
   return ((await response.json()) as { lobbies: Lobby[] }).lobbies;
 }
 
 /** List in-progress games so a player who closed their tab can jump back into a seat. */
 export async function listActiveGames(): Promise<GameSummary[]> {
-  const response = await fetch(`${BASE_URL}/games`);
+  const response = await fetch(apiUrl(`/games`));
   if (!response.ok) await fail(response);
   return ((await response.json()) as { games: GameSummary[] }).games;
 }
@@ -236,7 +144,7 @@ export async function listActiveGames(): Promise<GameSummary[]> {
  * Idempotent, so a double-click is harmless.
  */
 export async function abandonGame(gameId: string): Promise<void> {
-  const response = await fetch(`${BASE_URL}/games/${gameId}/abandon`, { method: 'POST' });
+  const response = await fetch(apiUrl(`/games/${gameId}/abandon`), { method: 'POST' });
   if (!response.ok) await fail(response);
 }
 
@@ -248,7 +156,7 @@ export interface RematchInfo {
 
 /** The current rematch proposal for a game (empty when none is open). */
 export async function getRematch(gameId: string): Promise<RematchInfo> {
-  const response = await fetch(`${BASE_URL}/games/${gameId}/rematch`);
+  const response = await fetch(apiUrl(`/games/${gameId}/rematch`));
   if (!response.ok) await fail(response);
   return ((await response.json()) as { rematch: RematchInfo }).rematch;
 }
@@ -259,7 +167,7 @@ export async function getRematch(gameId: string): Promise<RematchInfo> {
  * game has started.
  */
 export async function proposeRematch(gameId: string, controlledIds: string[] | null): Promise<RematchInfo> {
-  const response = await fetch(`${BASE_URL}/games/${gameId}/rematch`, {
+  const response = await fetch(apiUrl(`/games/${gameId}/rematch`), {
     method: 'POST',
     headers: JSON_HEADERS,
     body: JSON.stringify({ controlledIds }),
@@ -270,7 +178,7 @@ export async function proposeRematch(gameId: string, controlledIds: string[] | n
 
 /** Fetch a lobby by code, or throw if it doesn't exist. */
 export async function getLobby(id: string): Promise<Lobby> {
-  return unwrapLobby(await fetch(`${BASE_URL}/lobbies/${id}`));
+  return unwrapLobby(await fetch(apiUrl(`/lobbies/${id}`)));
 }
 
 /**
@@ -285,7 +193,7 @@ export async function joinLobby(
   color?: string,
   difficulty?: string,
 ): Promise<{ lobby: Lobby; seat: number }> {
-  const response = await fetch(`${BASE_URL}/lobbies/${id}/join`, {
+  const response = await fetch(apiUrl(`/lobbies/${id}/join`), {
     method: 'POST',
     headers: JSON_HEADERS,
     body: JSON.stringify({
@@ -302,7 +210,7 @@ export async function joinLobby(
 /** Change a claimed seat's player colour while waiting; returns the updated lobby. */
 export async function setLobbyColor(id: string, seat: number, color: string): Promise<Lobby> {
   return unwrapLobby(
-    await fetch(`${BASE_URL}/lobbies/${id}/color`, {
+    await fetch(apiUrl(`/lobbies/${id}/color`), {
       method: 'POST',
       headers: JSON_HEADERS,
       body: JSON.stringify({ seat, color }),
@@ -312,13 +220,13 @@ export async function setLobbyColor(id: string, seat: number, color: string): Pr
 
 /** Start a full lobby's game and return the created game state. */
 export async function startLobby<S = unknown>(id: string): Promise<GamePayload<S>> {
-  return unwrap<S>(await fetch(`${BASE_URL}/lobbies/${id}/start`, { method: 'POST' }));
+  return unwrap<S>(await fetch(apiUrl(`/lobbies/${id}/start`), { method: 'POST' }));
 }
 
 /** Absolute ws(s):// URL for the live stream, derived from the current page origin. */
 function streamUrl(gameId: string): string {
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${proto}//${window.location.host}${BASE_URL}/games/${gameId}/stream`;
+  return `${proto}//${window.location.host}${apiUrl(`/games/${gameId}/stream`)}`;
 }
 
 /** The state push every game gets. A board casts `game` to its own view type. */
@@ -332,12 +240,6 @@ export interface StatePush {
   /** Secret-free seat identity (REVIEW §3.3), same fields as `GamePayload`. */
   players?: { id: string; name: string }[];
   activePlayerId?: string | null;
-}
-
-/** Anything else the server pushes down the same socket — a game's own side-channel. */
-export interface GameMessage {
-  type: string;
-  [key: string]: unknown;
 }
 
 /**

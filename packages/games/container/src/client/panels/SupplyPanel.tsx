@@ -3,10 +3,7 @@ import type { Action, Color, GameView, PlayerView } from '../../engine';
 import { COLORS } from '../../engine';
 import { ContainerChip } from '../chips';
 import { CONTAINER_TIPS } from '../tips';
-import { Button } from '@/components/ui/button';
-import { ActionTip } from '@/components/ActionTip';
-import { Card, CardContent } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { ActionTip, Button, Card, CardContent, cn } from '@game-hub/ui-kit';
 
 export interface SupplyPanelProps {
   readonly game: GameView;

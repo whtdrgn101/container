@@ -143,12 +143,18 @@ decision.
    `@/components/*`) plus React/DOM libs, which live in the UI's tsconfig, not the package's. So the
    package's own `tsconfig` covers only `engine`/`module`/`bot` (kernel-only deps), and the **UI host
    typechecks the client**. This is the sharpest finding: the client subpath is not self-contained.
+   ✅ **Retired by Track D / D2b (2026-07-29)**: the client's only deps are now `@game-hub/kernel/client` +
+   `@game-hub/ui-kit` + React, so the package's own tsconfig covers all four subpaths (`include: ["src"]`,
+   `jsx: react-jsx` + DOM libs). The UI host include stays as a second check on the board's props.
 7. **Package → UI coupling (no file edited, but a real dependency).** The client reaches into `ui/src`
    through the `@` alias — `@/lib/api` (the transport DTOs `GamePayload`/`GameMessage`) and the shared
    board chrome (`TurnBanner`/`ActivityFeed`/`GameOver`/`seatIdentity`). The kernel's `GameClient`/
    `BoardProps` **contract** is neutral (good — the package binds it in `client/types.ts`), but the
    **concrete transport types and shared components are UI-internal**. Until the shell exports them as a
    package a game can depend on, a game client is not truly decoupled from this repo's UI.
+   ✅ **Closed by Track D / D2b (2026-07-29)**: the DTOs ship on `@game-hub/kernel/client` and the chrome as
+   `@game-hub/ui-kit`. This client imports nothing from `ui/src`, and `e2e/architecture.spec.ts` fails the
+   suite if it ever does again. See the design doc's §4b.
 8. **Coexistence tests hard-code the game list.** Adding a game touched `backend/src/tests/module-seam.test.ts`
    (catalog + "all games at once") and the exact-catalog assertions in `stoneage.test.ts` /
    `stpetersburg.test.ts`. Expected (these are the *point* of a coexistence test), but worth noting the

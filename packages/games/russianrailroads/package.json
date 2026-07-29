@@ -17,7 +17,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@game-hub/kernel": "workspace:*"
+    "@game-hub/kernel": "workspace:*",
+    "@game-hub/ui-kit": "workspace:*"
   },
   "peerDependencies": {
     "react": "^19.0.0"

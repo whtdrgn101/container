@@ -1,6 +1,6 @@
 import type { Action, StPetersburgView } from '../engine';
-import { applyAction, getGame } from '@/lib/api';
-import type { GamePayload } from '@/lib/api';
+import { applyAction, getGame } from '@game-hub/ui-kit';
+import type { GamePayload } from '@game-hub/kernel/client';
 
 /**
  * Saint Petersburg's own API client. Saint Petersburg has **no server-only actions** — even the SP5

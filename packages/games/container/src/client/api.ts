@@ -1,6 +1,6 @@
 import type { Action, GameView } from '../engine';
-import { BASE_URL, JSON_HEADERS, applyAction, fail, getGame, unwrap } from '@/lib/api';
-import type { GamePayload } from '@/lib/api';
+import { apiUrl, applyAction, fail, getGame, JSON_HEADERS, unwrap } from '@game-hub/ui-kit';
+import type { GamePayload } from '@game-hub/kernel/client';
 
 /**
  * Container's own API client — the endpoints only this game has.
@@ -20,7 +20,7 @@ export const GAME_TYPE = 'container';
 /** A Container game payload, with its state pinned to Container's view. */
 export type ContainerPayload = GamePayload<GameView>;
 
-const route = (gameId: string, path: string) => `${BASE_URL}/games/${gameId}/${GAME_TYPE}${path}`;
+const route = (gameId: string, path: string) => apiUrl(`/games/${gameId}/${GAME_TYPE}${path}`);
 
 /**
  * A pending delivery auction, as this client is allowed to see it (A1).

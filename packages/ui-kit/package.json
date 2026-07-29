@@ -1,0 +1,60 @@
+{
+  "name": "@game-hub/ui-kit",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Game Hub's shared board chrome: the frames every game's board renders inside (TurnBanner, ActivityFeed, GameOver, ActionTip, PanZoom, Button, Card), the seat-binding rule (seatIdentity), the `cn` class merger, and the game-facing REST helpers a client calls (getGame/applyAction/unwrap/fail). Styled with Tailwind v4 utility classes over the host's semantic tokens — a host adds one `@source` line so its Tailwind build scans this package. In-workspace it is consumed as TypeScript source; the published tarball resolves the same entry to dist/ via publishConfig.",
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/whtdrgn101/container.git",
+    "directory": "packages/ui-kit"
+  },
+  "keywords": [
+    "board-game",
+    "game-hub",
+    "react",
+    "tailwind",
+    "ui-components",
+    "typescript"
+  ],
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "pnpm build",
+    "pack:smoke": "node scripts/pack-smoke.mjs"
+  },
+  "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.469.0",
+    "tailwind-merge": "^2.6.0"
+  },
+  "peerDependencies": {
+    "@game-hub/kernel": "^1.1.0",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@game-hub/kernel": "workspace:*",
+    "@types/react": "^19.0.0",
+    "typescript": "^5.9.2"
+  }
+}
