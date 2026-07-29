@@ -56,7 +56,16 @@ jobs:
       - run: pnpm generate
       - run: git diff --exit-code -- backend/src/games/index.generated.ts ui/src/games/registry.generated.ts
 
-      - run: pnpm test # kernel + the game packages + backend; `ui` has no unit `test` script so it's skipped
+      # kernel + the game packages + backend; `ui` has no unit `test` script so it's skipped.
+      #
+      # One vitest worker per package: `pnpm -r` runs up to 4 packages concurrently, and each vitest
+      # would otherwise spawn ~4 forks — ~16 CPU-bound, coverage-instrumented processes on the free
+      # 4-core runner. That starved the bot bench tests past even a 30s timeout (a docs-only commit
+      # flaked). Capped, concurrency = pnpm's 4 packages ≈ 4 cores. Local runs are unaffected.
+      - run: pnpm test
+        env:
+          VITEST_MAX_FORKS: '1'
+          VITEST_MAX_THREADS: '1' # same cap if a config ever opts into the threads pool
 
   e2e:
     name: Playwright e2e
