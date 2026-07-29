@@ -8,3 +8,11 @@ packages:
 allowBuilds:
   esbuild: true
   better-sqlite3: true
+
+# Peers are contracts for EXTERNAL consumers (a published ui-kit expects the host to bring
+# react and @game-hub/kernel); inside this workspace every real dependency is declared
+# explicitly. With the default (true), the Dockerfile's `pnpm deploy --prod` drops the
+# workspace devDeps that satisfy those peers and then tries to FETCH them from the npm
+# registry — a 404 for @game-hub/* until they're published, and wrong even after (the image
+# must build from workspace source, never from the registry's copy of our own packages).
+autoInstallPeers: false
