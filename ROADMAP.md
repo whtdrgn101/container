@@ -44,11 +44,19 @@ The near-term order, decided while play-testing:
    **[`docs/track-d-legacy-migration.md`](docs/track-d-legacy-migration.md)**). **Still open:** D2 — an
    *out-of-repo* game against published `@game-hub/kernel` (forces a real `dist`, kernel-contract
    versioning enforcement, and a `@game-hub/ui-kit`). See the design doc's status header.
-5. **Russian Railroads board-UI revamp (RR9b) — next up** (owner, 2026-07-28, while play-testing):
+5. **Russian Railroads board-UI revamp (RR9b)** (owner, 2026-07-28, while play-testing):
    the RR board fights itself — a responsive layout that works on mobile vs a game that genuinely
    needs table-top board density — and the compromise makes the game nearly unplayable. Redesign the
    board UI before the bot (RR10). Sliced in
    [the RR roadmap](packages/games/russianrailroads/ROADMAP.md).
+6. **Track D D2 begins — game 6: Labyrinth, out-of-repo (owner, 2026-07-29) — next up.** D2 starts
+   now with *The aMAZEing Labyrinth* (Ravensburger; rulebook in `reference_materials/`), jumping ahead
+   of RR9b: the game's board UI should generate the layout ideas RR9b needs anyway, and the
+   grid/path-routing state is the engine workout the owner wants. Kickoff decisions (all recorded in
+   [`docs/game-labyrinth-kickoff.md`](docs/game-labyrinth-kickoff.md) with the rules digest and the
+   D2a–D2d + L0–L6 slice plans): **public npm** under the `game-hub` org (verified unclaimed
+   2026-07-29), a **new public repo** `whtdrgn101/game-labyrinth`, **classic theme with original art**
+   (Ravensburger's illustrations are copyrighted; the mechanics and treasure list are not).
 
 ## Principles
 
@@ -304,8 +312,9 @@ Stone Age's building-stack redaction (§4.6's second half) →
   and pause.
 - **Before starting a slice,** check remaining plan usage so you don't land mid-slice; if tight, pick an
   **M/S** item.
-- **Suggested next order (owner call 2026-07-28): RR9b — the Russian Railroads board-UI revamp** — the
-  game is nearly unplayable as laid out, so playability beats everything else — then **RR10** (its bot).
-  After that, open work is independent and can go in any order: Container's **A3–A5** (difficulty/search),
-  **Can't Stop CS3** (variants), **B3** (accounts), **Track D D2** (an out-of-repo game), and the review
-  backlog above — none essential for home/LAN play.
+- **Suggested next order (owner call 2026-07-29): Track D D2 — Labyrinth, the out-of-repo game 6**
+  (slices D2a–D2d then L0–L6, see [`docs/game-labyrinth-kickoff.md`](docs/game-labyrinth-kickoff.md)) —
+  then **RR9b** (the RR board-UI revamp, borrowing Labyrinth's board-UI findings), then **RR10** (its
+  bot). After that, open work is independent and can go in any order: Container's **A3–A5**
+  (difficulty/search), **Can't Stop CS3** (variants), **B3** (accounts), and the review backlog above —
+  none essential for home/LAN play.

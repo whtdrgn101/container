@@ -588,7 +588,9 @@ mechanics of engineers **#13** (occupancy-replay "repeat a previously-occupied s
 **#14** (cross-player "use another player's engineer action space", 2-player), which are art-era placeholders
 awaiting those mechanics. RR9 is board *art*, not a component re-read, so these stay open.
 
-### RR9b — Board-UI revamp 🔜 **next up** *(owner call, 2026-07-28)*
+### RR9b — Board-UI revamp *(owner call 2026-07-28; re-queued 2026-07-29 behind the Labyrinth/D2
+kickoff — its comps should borrow Labyrinth's board-UI findings, see
+`docs/game-labyrinth-kickoff.md` in the hub repo)*
 
 **The problem (from play-testing): the board is too crowded — the game is almost unplayable.**
 Russian Railroads has the platform's largest visible state (per player: three routes × up to five

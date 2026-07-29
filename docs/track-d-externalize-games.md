@@ -1,6 +1,9 @@
 # Track D — Externalize games (design doc)
 
-**Status: ✅ in-workspace phase complete (2026-07-27). D2 (out-of-repo) still open.** Game 5 (Russian
+**Status: ✅ in-workspace phase complete (2026-07-27). D2 (out-of-repo) in progress — kicked off
+2026-07-29 with game 6, Labyrinth: slices D2a–D2d and the kickoff decisions (public npm under the
+`game-hub` org — resolving §8 Q4 — a public `whtdrgn101/game-labyrinth` repo, per-game e2e out of
+contract per §8 Q3) live in [`game-labyrinth-kickoff.md`](./game-labyrinth-kickoff.md).** Game 5 (Russian
 Railroads) arrived *as* the Track D pilot — built as the first **in-workspace game package**
 (`packages/games/russianrailroads`, the §3 four-subpath shape) — and then **all four legacy games were
 migrated onto the same shape** and `@game-hub/engine`/`@game-hub/bot` retired (the working plan +

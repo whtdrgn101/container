@@ -14,7 +14,8 @@ platform is game-agnostic. The games:
 | **Can't Stop** | 2–4 | push-your-luck dice | complete + bot (CS1) + difficulty tiers (CS4); only variants (CS3) remain |
 | **Stone Age** | 2–4 | worker-placement Euro | **complete** (SA0–SA15): full game, illustrated board, bot, 2–3-player rules, deck redaction |
 | **Saint Petersburg** (1st ed.) | 2–4 | card-buying engine | **complete** (SP0–SP9): first game with real hidden info (hand + rubles secret) |
-| **Russian Railroads** (Ultimate ed.) | 2–4 | worker-placement | **in build** — base game + art (RR9) complete; **next up: board-UI revamp (RR9b)** — the shipped board is too crowded to play well; bot (RR10) after; the Track D **package pilot** |
+| **Russian Railroads** (Ultimate ed.) | 2–4 | worker-placement | **in build** — base game + art (RR9) complete; board-UI revamp (RR9b) queued behind the Labyrinth kickoff (it should borrow Labyrinth's board-UI findings); bot (RR10) after; the Track D **package pilot** |
+| **Labyrinth** (Ravensburger) | 2–4 | sliding-maze race, hidden treasure targets | **next up — the Track D D2 pilot**: game 6, built *out-of-repo* (`whtdrgn101/game-labyrinth`, public) against published `@game-hub/*`; kickoff decisions + rules digest + slices in [`docs/game-labyrinth-kickoff.md`](./docs/game-labyrinth-kickoff.md) |
 
 Per-game rules and slice history live in each game's `packages/games/<id>/ROADMAP.md`; the authoritative
 rules are the rulebook PDFs in `reference_materials/` (gitignored — copyrighted). ⚠️ **Read the spec
