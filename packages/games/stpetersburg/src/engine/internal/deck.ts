@@ -1,3 +1,4 @@
+import { shuffle } from '@game-hub/kernel';
 import { CARD_DEFS, PHASES } from '../core';
 import type { Card, CardDef, CardKind, Phase } from '../core';
 
@@ -29,21 +30,12 @@ export function mintStack(kind: CardKind): Card[] {
 }
 
 /**
- * Fisher–Yates on the injected `rng`, returning a new array (never mutating the input, so the engine
- * stays pure). Without an `rng` the order is kept — deterministic, for tests. Each of the four stacks is
- * shuffled **separately** (pg. 2, setup).
+ * Fisher–Yates on the injected `rng` — this game's copy was the third of four in the repo, so it moved
+ * to the kernel's `.` barrel in 1.2.0 (identical algorithm and identical `rng?` semantics: without an
+ * `rng` the order is kept, deterministic for tests). Re-exported here because each of the four stacks
+ * is shuffled **separately** (pg. 2, setup) and this file is where the dealers live.
  */
-export function shuffle<T>(items: readonly T[], rng?: () => number): T[] {
-  const out = [...items];
-  if (!rng) return out;
-  for (let i = out.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(rng() * (i + 1));
-    const swap = out[i]!;
-    out[i] = out[j]!;
-    out[j] = swap;
-  }
-  return out;
-}
+export { shuffle };
 
 /**
  * Deal the four starting-player markers to seats (pg. 2): one marker per phase, so `startingPlayers[phase]`

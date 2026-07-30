@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mulberry32, runBenchmark, wilsonInterval } from '../benchmark';
+import { mulberry32 } from '../../random';
+import { runBenchmark, wilsonInterval } from '../benchmark';
 
 describe('wilsonInterval', () => {
   it('matches the textbook value for 50/100 at 95%', () => {
@@ -29,22 +30,9 @@ describe('wilsonInterval', () => {
   });
 });
 
-describe('mulberry32', () => {
-  it('is deterministic given a seed', () => {
-    const a = mulberry32(42);
-    const b = mulberry32(42);
-    expect([a(), a(), a()]).toEqual([b(), b(), b()]);
-  });
-
-  it('yields values in [0, 1)', () => {
-    const rng = mulberry32(1);
-    for (let i = 0; i < 100; i += 1) {
-      const v = rng();
-      expect(v).toBeGreaterThanOrEqual(0);
-      expect(v).toBeLessThan(1);
-    }
-  });
-});
+// `mulberry32` itself is tested in `src/tests/random.test.ts` — it moved to the `.` barrel in kernel
+// 1.2.0. It is still imported *through* `./bot` by every game's bench, which `bot/index.ts` re-exports;
+// here it is used only as a deterministic seed source for the harness's own determinism test.
 
 describe('runBenchmark', () => {
   // A hand-built game where a designated seat always wins, so we can check the harness bookkeeping

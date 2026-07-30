@@ -3,11 +3,18 @@ import type { DB } from './db';
 /**
  * Which colour each seat picked (the feature: players pick their own player-colour).
  *
- * Coordination state, exactly like bots and lobbies: **the engine never learns a colour.** A colour
- * is presentation — a per-seat tint the boards paint meeples / hulls / ribbons / dots with — never a
- * rule, so it rides *beside* the game (its own table, its own repository), the same pattern as
- * `bots.ts`. The available palette belongs to the game's `GameModule` (`colors`); this only records
- * which id a seat ended up with.
+ * Coordination state, exactly like bots and lobbies: it rides *beside* the game (its own table, its
+ * own repository), the same pattern as `bots.ts`, and nothing here is ever read back out of game
+ * state. The available palette belongs to the game's `GameModule` (`colors`); this only records which
+ * id a seat ended up with.
+ *
+ * ⚠️ **A colour is usually presentation, but it is not always.** For all five hosted games it is a
+ * per-seat tint the boards paint meeples / hulls / ribbons / dots with, and their engines never learn
+ * it. Since kernel 1.2.0 the resolved colour is nevertheless handed to `createGame` (`app.ts`'s
+ * `startGame`), because a game can exist where the colour **is a rule** — Labyrinth's pawn colour
+ * names the corner you start on and must return to — and such a game has no other way to learn the
+ * lobby's pick. The store stays the source of truth either way: `startGame` resolves the colours once
+ * and both the game and this table are given the same array, so they cannot drift apart.
  */
 export class ColorRepository {
   constructor(private readonly db: DB) {}

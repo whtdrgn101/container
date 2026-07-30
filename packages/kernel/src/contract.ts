@@ -43,5 +43,19 @@
  *   hub's `ui/src`. Nothing existing changed shape or meaning and no member became required, so by the
  *   rule above this is a **minor** bump and the contract stays **1** — a game built against 1.0.0 still
  *   compiles and registers untouched.
+ * - **1.2.0** (D2c findings §16 + §13) — *additive*: two independent additions, neither of which
+ *   changes an existing member's meaning or adds a required one, so again **minor**, contract stays
+ *   **1**.
+ *   1. **The colour channel.** `GameModule.createGame`'s players element gained an optional
+ *      `color?: string` — the seat colour the host already resolved (picks honoured, the rest filled
+ *      from the palette) — so a game where the colour *is* a rule (Labyrinth's starting corner) can
+ *      read the lobby's pick instead of guessing at it. Strictly additive on both sides: the host only
+ *      ever *adds* a property, and `{ name: string }[]` is still assignable to the widened parameter,
+ *      so a 1.0.0/1.1.0 game that declares the narrow shape keeps compiling and ignores the field —
+ *      which is exactly what all five hosted games do.
+ *   2. **The rng helpers on the `.` barrel.** `mulberry32` (previously only on `./bot`, so an *engine*
+ *      test had to reach into the bot subpath or reimplement it) and `shuffle` (Fisher–Yates, the
+ *      helper four in-repo engines had each written for themselves) are now exported from the
+ *      framework-free barrel. Pure additions to the export surface — nothing moved off `./bot`.
  */
 export const KERNEL_CONTRACT_VERSION = 1;

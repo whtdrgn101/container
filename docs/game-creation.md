@@ -32,13 +32,46 @@ Create `packages/games/<id>/` with these four files. Copy an existing game close
 Petersburg is the routeless/hidden-info template; Can't Stop is the routes+dice+difficulty template;
 Container is the everything template) and adjust.
 
+> ### ⚠️ First, know which of the two situations you are in
+>
+> The **only** thing that differs between them is how the two platform packages are depended on — but
+> getting it wrong is a silent, hard-to-diagnose failure, so decide before you write `package.json`.
+>
+> | | **A — in this repo** (`packages/games/<id>/`) | **B — your own repo**, installed by a host |
+> |---|---|---|
+> | `@game-hub/kernel`, `@game-hub/ui-kit` | `dependencies: "workspace:*"` | **`peerDependencies` + `devDependencies`** |
+> | `react` | `peerDependencies` | `peerDependencies` + `devDependencies` |
+> | Consumed as | TypeScript **source**, one install tree | built `dist/` from **npm** |
+> | Who resolves the platform packages | pnpm, to the one workspace copy | the **host**, from its own tree |
+>
+> **A** is what all five hosted games do and what the rest of this recipe assumes. `workspace:*` is
+> correct there precisely *because* there is one install tree: pnpm links the single workspace copy, so
+> a duplicate is impossible.
+>
+> **B** — the out-of-repo shape (Track D §3, "a game package peer-depends on `@game-hub/kernel`") —
+> must use peer + dev, and this is not a style preference. A plain `dependency` lets npm/pnpm satisfy
+> your game with a **nested** copy at
+> `node_modules/@game-hub/game-<id>/node_modules/@game-hub/{kernel,ui-kit}`, and two copies break things
+> that look nothing like a dependency problem:
+>
+> - **`instanceof` stops working.** A `GameError` thrown from your copy of the kernel is not an
+>   `instanceof` the host's `GameError`, so the module's `mapError` returns `null` and a clean 400
+>   becomes a 500.
+> - **React double-loads.** A second React through a duplicated ui-kit means two reconcilers — hooks
+>   throw inside the shared chrome.
+> - **Tailwind silently loses the chrome's styles.** The host scans `@source '../node_modules/@game-hub'`;
+>   a *nested* duplicate is outside that glob, so a `Button` from it renders unstyled.
+>
+> `peerDependencies` says "the host provides exactly one copy"; the matching `devDependencies` entry is
+> what lets your repo build and test standalone. Same versions in both.
+
 ### `package.json`
 
 ```jsonc
 {
   "name": "@game-hub/game-<id>",
   "version": "0.0.0",
-  "private": true,
+  "private": true,                    // situation B: drop this, and add "files"/"exports" over dist/
   "type": "module",
   "license": "BSD-3-Clause",
   "exports": {
@@ -52,6 +85,7 @@ Container is the everything template) and adjust.
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
+  // ── Situation A (in this repo): one install tree, so the workspace link is the right dependency.
   "dependencies": {
     "@game-hub/kernel": "workspace:*",   // contracts + transport DTOs
     "@game-hub/ui-kit": "workspace:*"    // the shared board chrome + the game-facing REST calls
@@ -60,6 +94,9 @@ Container is the everything template) and adjust.
   "peerDependencies": {
     "react": "^19.0.0"              // for ./client
   },
+  // ── Situation B (your own repo) replaces the block above with:
+  //   "peerDependencies": { "@game-hub/kernel": "^1.2.0", "@game-hub/ui-kit": "^1.0.0", "react": "^19.0.0" },
+  //   and repeats all three in "devDependencies" at the same versions so the package builds standalone.
   "devDependencies": {
     "@types/react": "^19.0.0",
     "@vitest/coverage-v8": "^3.2.4",
@@ -78,6 +115,8 @@ Container is the everything template) and adjust.
   D2b, the only two it is *allowed*. No game may depend on `@game-hub/backend` or `@game-hub/ui`: that's a
   workspace cycle in here and an unpublishable package outside. ⚠️ `e2e/architecture.spec.ts` fails the
   suite on any `@/…` or `ui/src` import from a game package.
+- **Never more than one copy of either.** In situation A that's pnpm's job; in situation B it's the peer
+  declaration's — see the table above for why a duplicate is worse than it looks.
 - **`fastify`** is a *type-only devDependency*, added **only if the module has a `routes.ts`** (the runtime
   instance is the host's; you import only its types). The routeless variant (Saint Petersburg) omits it.
 - **`better-sqlite3` + `@types/better-sqlite3`** are devDependencies **only if the module opens its own
@@ -91,6 +130,11 @@ Container is the everything template) and adjust.
 
 ```jsonc
 {
+  // Situation A only — nothing publishes `tsconfig.base.json`. In situation B, inline its options
+  // (target/module/moduleResolution, strict, noUncheckedIndexedAccess, noImplicitOverride,
+  // noFallthroughCasesInSwitch, noImplicitReturns, forceConsistentCasingInFileNames,
+  // verbatimModuleSyntax, esModuleInterop, skipLibCheck, resolveJsonModule, isolatedModules,
+  // declaration, sourceMap) and re-check them when the platform tightens a flag.
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "jsx": "react-jsx",                       // for ./client
@@ -117,7 +161,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['src/engine/**/*.test.ts', 'src/bot/**/*.test.ts'],
-    server: { deps: { inline: [/@game-hub\/kernel/] } }, // kernel ships TS source — transform it
+    // Situation A only: in-workspace the kernel is TS source, so vitest must transform it. Situation B
+    // installs built ESM + .d.ts and needs no special handling — omit this line there.
+    server: { deps: { inline: [/@game-hub\/kernel/] } },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
@@ -169,6 +215,10 @@ Rules:
   `createGame` input, so the state function is deterministic and the 100% gate is reachable.
 - ⚠️ **Never bump `version` or append to the log outside `record()`.** Use the kernel `record()` /
   `makeSeating` helpers rather than re-implementing them.
+- **Setup randomness comes from the kernel's `.` barrel**, not a copy: `shuffle(items, rng?)` (Fisher–Yates,
+  returns a new array; omitting `rng` keeps the order, which is how a rules test deals a *known* deck) and
+  `mulberry32(seed)` for a seeded generator in `tests/helpers.ts`. Both are on `@game-hub/kernel` since
+  1.2.0 — don't reach into `@game-hub/kernel/bot` from an engine test, and don't re-implement either.
 - **The end state is the kernel `GameEndState<Score>` union** — intersect it into your state type
   (`… & GameEndState<PlayerScore>`) so the `active` arm carries no `results` and read sites narrow on
   `status`. A game with nothing to tabulate takes `WinnersEndState`.
@@ -226,6 +276,12 @@ each delegating to the engine. Then the optional hooks **only if the game needs 
 - **`colors`** — an ordered palette of lowercase colour ids that is *the board's current seat tints in seat
   order* (palette-order default reproduces the existing look). Cover `maxPlayers`. Player colours, not any
   game-piece colour. The platform does all the picking/uniqueness/persistence/wiring; you just name ids.
+- **`createGame({ id, players, rng })`** — `players[i]` is `{ name, color? }`. **Ignore `color` unless your
+  colour is a rule** (kernel 1.2.0): for all five hosted games it is a seat tint and stays coordination
+  state outside the engine. Read it when the pick decides something in the rules — Labyrinth's pawn colour
+  names its starting corner — in which case validate it against your own palette and fill an omission
+  deterministically, since `createGame` must stay pure and total. The host always sends a colour from your
+  `colors`, resolved exactly as `colorsFor` will later report it.
 - **`botDifficulties`** — declare tier ids only if the game offers them (Can't Stop); omit otherwise.
 - **`parseAction`** owns *all* action validation and **accepts only actions a client may send.** A
   server-only action (a dice roll) is refused here and built by a route from `ctx.rng`. ⚠️ Don't rely on

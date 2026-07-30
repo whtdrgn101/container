@@ -1,21 +1,14 @@
+import { shuffle } from '@game-hub/kernel';
 import { END_BONUS_CARDS, END_BONUS_REMOVED_UNSEEN, ENGINEER_DEAL, ENGINEERS } from '../core';
 import type { EndBonusCard, Engineer } from '../core';
 
 /**
- * A pure Fisher–Yates shuffle over an injected `rng` (`() => number` in [0, 1)). Returns a new array,
- * never mutating the input — the engine-purity rule. `rng` is required: setup randomness is injected so
- * the engine stays deterministic and the 100% gate is reachable (a fixed generator gives a fixed deal).
+ * A pure Fisher–Yates shuffle over an injected `rng` (`() => number` in [0, 1)) — the kernel's since
+ * 1.2.0 (identical algorithm; the kernel's `rng` is optional, and every call here passes one, because
+ * setup randomness is injected so the engine stays deterministic and the 100% gate is reachable).
+ * Re-exported so this game's setup helpers keep their single import site.
  */
-export function shuffle<T>(items: readonly T[], rng: () => number): T[] {
-  const out = [...items];
-  for (let i = out.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(rng() * (i + 1));
-    const a = out[i]!;
-    out[i] = out[j]!;
-    out[j] = a;
-  }
-  return out;
-}
+export { shuffle };
 
 /**
  * Deal the turn-order cards (pg. 5): shuffle the four cards `[1,2,3,4]`, deal one to each of `count`

@@ -1,3 +1,4 @@
+import { shuffle } from '@game-hub/kernel';
 import { CARD_COST, CARD_PLACES, CIV_CARD_DECK, CIV_CARD_SLOTS, MAX_FOOD_TRACK, RESOURCES } from '../core';
 import type { CardPlaceId, CivCard, PlaceId, Resource, StoneAgePlayer } from '../core';
 import { totalPaid } from './buildings';
@@ -30,15 +31,7 @@ export function civCardById(id: string): CivCard {
  * the display and the remaining draw pile.
  */
 export function dealCards(rng?: () => number): { display: (CivCard | null)[]; deck: CivCard[] } {
-  const deck = [...CIV_CARD_DECK];
-  if (rng) {
-    for (let i = deck.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(rng() * (i + 1));
-      const swap = deck[i]!;
-      deck[i] = deck[j]!;
-      deck[j] = swap;
-    }
-  }
+  const deck = shuffle(CIV_CARD_DECK, rng);
   const display = deck.splice(0, CIV_CARD_SLOTS);
   return { display, deck };
 }

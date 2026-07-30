@@ -70,8 +70,27 @@ The near-term order, decided while play-testing:
    All five game clients import only those two packages, an e2e architecture test fails the suite if one
    reaches `ui/src`, and every game package now typechecks all four subpaths standalone. §2's Tailwind
    question is answered *and measured*: ship classes in source, host adds `@source '../node_modules/@game-hub'`
-   (design doc §4b). **Next: D2c** — scaffold `whtdrgn101/game-labyrinth`, ⚠️ **blocked on the owner
-   creating the npm `game-hub` org and publishing both packages**.
+   (design doc §4b). **D2c (in flight, out-of-repo):** `whtdrgn101/game-labyrinth` is scaffolded and
+   building against the published packages; its findings log (`docs/d2c-findings.md` in that repo) is the
+   source of the hub-side work below.
+   **Hub-side response to D2c ✅ (2026-07-30) — kernel → `1.2.0`, contract still 1 (additive):**
+   (a) **the colour channel** (finding §16) — `GameModule.createGame`'s players element gained an optional
+   `color?: string`, and `app.ts`'s `startGame` now resolves every seat's colour *before* dealing and hands
+   it in, so a game whose colour is a **rule** (Labyrinth's starting corner) can read the lobby's pick.
+   No behaviour change for the five hosted games — they ignore the field, and `colors.test.ts` deals each
+   twice, with picks and without, to keep it that way; the counter stub in `module-seam.test.ts` is what
+   proves the pick actually arrives. (b) **the rng helpers** (finding §13) — `mulberry32` and a shared
+   `shuffle(items, rng?)` now sit on the framework-free `.` barrel, and the four in-repo Fisher–Yates
+   copies were replaced by it. ⚠️ **Follow-up (small, deliberately not in this slice):** eleven *test
+   helpers* still hand-roll a seeded PRNG, in **two different variants** — six are byte-identical to the
+   kernel's canonical mulberry32, five are a transcription drift (`s = (s + 0x6d2b79f5) >>> 0; t ^= …`)
+   that produces a **different stream**. Swapping the drifted ones changes every seeded expectation that
+   depends on them (e.g. the seeds chosen to make an all-bot Can't Stop game finish), so it needs its own
+   pass with each seed re-verified rather than a blind find-and-replace. (c) **the docs contradiction** (finding §2) — `game-creation.md` §1 now
+   opens with an in-repo vs out-of-repo table: `workspace:*` for the five games here, **peer + dev** for a
+   package a host installs, with the duplicate-copy failure modes spelled out. ⚠️ **Still blocked on the
+   owner creating the npm `game-hub` org and publishing** — 1.2.0 is unpublished, so Labyrinth cannot
+   consume the colour channel yet.
 
 ## Principles
 

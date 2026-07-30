@@ -188,8 +188,19 @@ every game gets them free. That's the real payoff of the seam.
 (`400 INVALID_COLOR` / `409 COLOR_TAKEN`), assigns on create/start (picks honoured, the rest defaulted in
 **palette order** — which reproduces each board's old per-seat tints, so visual baselines don't move), and
 persists them in `game_colors`. Colours ride **every** state payload as `colors: Record<playerId,
-colorId>`. **The engine never learns a colour** — it is presentation, same rule as bots. A board maps the
-id to its own tint system, falling back to seat index when one is missing.
+colorId>`. **No hosted game's engine learns a colour** — for all five it is presentation, same rule as
+bots. A board maps the id to its own tint system, falling back to seat index when one is missing.
+
+⚠️ **Colour is the one piece of coordination state that can also be a rule** (kernel 1.2.0, D2c finding
+§16), which is why `startGame` resolves every seat's colour *before* dealing and passes it to
+`createGame` as `players[].color`. In Labyrinth the pawn colour you pick **is** the corner you start on
+and must return to — so a game like that reads the field, and without the channel its colour picker
+would be a picker that picked nothing (the shell's seat chip and the board's home corner would simply
+disagree, and the disagreement would read as a bug in the game). The single resolved array feeds both
+`createGame` and `game_colors`, so the game and the store can never drift apart. **This does not
+generalise:** bots and difficulty tiers stay strictly outside the engine — a game that learns which
+seats an AI holds can play differently against them, which is cheating. Colour is different only because
+a physical game can print it on the board.
 
 Difficulty tiers are coordination state too (see §6).
 

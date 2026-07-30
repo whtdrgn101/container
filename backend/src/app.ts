@@ -69,8 +69,11 @@ export interface AppOptions {
 }
 
 /**
- * `NewSeat` is a name plus a per-seat AI flag and optional colour pick. `bot` and `color` are both
- * stripped before the engine ever sees the seat — the engine learns neither what a bot nor a colour is.
+ * `NewSeat` is a name plus a per-seat AI flag and optional colour pick. `bot` is stripped before the
+ * engine ever sees the seat — the engine must never learn which seats an AI holds. `color` is **not**
+ * stripped any more (kernel 1.2.0): the resolved pick is handed to `createGame`, because a game may
+ * treat its colour as rules data. It stays coordination state here regardless — stored beside the
+ * game, and never read back out of it.
  */
 interface NewSeat {
   name: string;
@@ -432,9 +435,21 @@ export function buildApp(options: AppOptions): FastifyInstance {
 
   /** Deal a new game of one type and record which of its seats an AI holds and each seat's colour. */
   const startGame = (module: AnyGameModule, seats: readonly NewSeat[]): unknown => {
+    // Resolve every seat's colour **before** dealing: honour each pick, fill the rest with the first
+    // free palette colour in order (so a table with no picks reproduces today's seat-order tints —
+    // visual baselines hold). Pure and game-agnostic, so it can run this early.
+    const assigned = assignColors(
+      module.colors,
+      seats.map((seat) => seat.color),
+    );
     const state = module.createGame({
       id: randomUUID(),
-      players: seats.map((seat) => ({ name: seat.name })),
+      // Each seat's resolved colour rides along (kernel 1.2.0, D2c finding §16). It is still
+      // *coordination* state — stored beside the game below, never read back out of it — but a game
+      // where the colour **is a rule** (Labyrinth's starting corner) has no other way to learn the
+      // lobby's pick, and without it such a game's colour picker would silently pick nothing. All five
+      // hosted games ignore the field and deal exactly as they did before it existed.
+      players: seats.map((seat, i) => ({ name: seat.name, color: assigned[i]! })),
       // Randomness is injected, never reached for inside a module — that is what keeps every engine
       // pure, deterministic and replayable.
       rng,
@@ -452,12 +467,8 @@ export function buildApp(options: AppOptions): FastifyInstance {
       .filter((_, seat) => seats[seat]?.bot === true);
     if (botEntries.length > 0) botSeats.setForGame(gameId, botEntries);
 
-    // Assign colours: honour each seat's pick, fill the rest with the first free palette colour in
-    // order (so a table with no picks reproduces today's seat-order tints — visual baselines hold).
-    const assigned = assignColors(
-      module.colors,
-      seats.map((seat) => seat.color),
-    );
+    // Store the same resolved colours as coordination state, so `colorsFor` reports exactly what the
+    // game was dealt with (the two can never disagree — they are one array).
     colorSeats.setForGame(gameId, Object.fromEntries(players.map((player, seat) => [player.id, assigned[seat]!])));
 
     // A bot in an early seat should already have played by the time anyone sees the board.

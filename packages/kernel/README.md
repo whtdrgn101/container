@@ -8,7 +8,8 @@ against, and nothing else.
 
 - **`.`** — `GameError`, `MoveRecord`, `Viewer`, `record()`, `makeSeating`, `GameEndState`, the
   `GameModule`/`ModuleContext` contract (with structural host interfaces, so the kernel imports no
-  host), and `KERNEL_CONTRACT_VERSION`.
+  host), `KERNEL_CONTRACT_VERSION`, and the seeded-setup helpers `shuffle(items, rng?)` /
+  `mulberry32(seed)` (1.2.0 — an engine and its tests need these, so they are not on `./bot`).
 - **`./bot`** — `runBotLoop` and the bot-driver helpers, written entirely against the generic
   contract surface.
 - **`./client`** — the `GameClient`/`BoardProps` contract the UI shell loads a game's board through,

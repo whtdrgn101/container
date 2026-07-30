@@ -1,3 +1,4 @@
+import { shuffle } from '@game-hub/kernel';
 import { BUILDING_DECK, BUILDING_PLACES, BUILDING_STACK_SIZE, RESOURCE_VALUE, RESOURCES } from '../core';
 import type { Building, BuildingPlaceId, PlaceId, Resource, StoneAgePlayer } from '../core';
 
@@ -24,15 +25,7 @@ export function buildingPlaceId(index: number): BuildingPlaceId {
  * (pg. 3, setup step 9). Without an rng the deck order is kept — deterministic, for tests.
  */
 export function dealBuildings(playerCount: number, rng?: () => number): Building[][] {
-  const deck = [...BUILDING_DECK];
-  if (rng) {
-    for (let i = deck.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(rng() * (i + 1));
-      const swap = deck[i]!;
-      deck[i] = deck[j]!;
-      deck[j] = swap;
-    }
-  }
+  const deck = shuffle(BUILDING_DECK, rng);
   const stacks: Building[][] = [];
   for (let s = 0; s < playerCount; s += 1) {
     stacks.push(deck.slice(s * BUILDING_STACK_SIZE, s * BUILDING_STACK_SIZE + BUILDING_STACK_SIZE));

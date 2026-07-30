@@ -1,3 +1,4 @@
+import { shuffle } from '@game-hub/kernel';
 import { createGame, SCORING_CARDS } from '../engine';
 import type { GameState } from '../engine';
 
@@ -13,13 +14,12 @@ export function newContainerGame(opts: {
   readonly players: readonly { readonly name: string }[];
   readonly rng: () => number;
 }): GameState {
-  const cardIds = SCORING_CARDS.map((card) => card.id);
-  for (let i = cardIds.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(opts.rng() * (i + 1));
-    const swap = cardIds[i]!;
-    cardIds[i] = cardIds[j]!;
-    cardIds[j] = swap;
-  }
+  // The kernel's Fisher–Yates (1.2.0) — the same algorithm this file used to spell out inline, so the
+  // deal a given `rng` produces is unchanged.
+  const cardIds = shuffle(
+    SCORING_CARDS.map((card) => card.id),
+    opts.rng,
+  );
   const players = opts.players.map((player, seat) => ({ name: player.name, scoringCardId: cardIds[seat]! }));
   return createGame({ id: opts.id, players });
 }

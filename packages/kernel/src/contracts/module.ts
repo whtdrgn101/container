@@ -63,6 +63,9 @@ export interface GameModule<S, A, Ctx = unknown, App = unknown> {
    * seat colours, in its current order*. Should cover `maxPlayers` so every seat can get a distinct
    * colour. These are **player** colours (a seat tint), not any game-piece colour a game may also have
    * (Container's container cargo is white/red/green/blue/yellow — unrelated to this).
+   *
+   * The resolved pick is handed to `createGame` as each seat's `color` (kernel 1.2.0), for the rare
+   * game where the colour is rules data rather than a tint — see `createGame`.
    */
   readonly colors: readonly string[];
 
@@ -81,10 +84,24 @@ export interface GameModule<S, A, Ctx = unknown, App = unknown> {
    * Build a fresh game. **`rng` is injected, never reached for.** Every engine here is pure and
    * deterministic; the module must not call `Math.random` itself, or replay and reproducible tests
    * both die. (Container shuffles its scoring deck with this.)
+   *
+   * Each seat carries the **colour it will be shown in** (kernel 1.2.0, D2c finding §16): the host
+   * resolves every seat's colour *before* dealing — honouring the lobby/`POST /games` picks and
+   * filling the rest from `colors` in palette order, exactly what `colorsFor` later reports — and
+   * hands the resolved id in. It is always a member of this module's `colors`, and every seat has
+   * one; `color?` is optional only so a game (or a test) can call `createGame` without it.
+   *
+   * **Most games ignore it.** A colour is normally presentation — a per-seat tint the board paints
+   * meeples/hulls with — and stays coordination state outside the engine (design-patterns §2); all
+   * five hosted games drop the field on the floor and deal exactly as they did before it existed. A
+   * game reads it only when the colour **is a rule**: Labyrinth's pawn colour names the corner you
+   * start on and must return to, so its engine takes the pick and the shell's seat tint and the
+   * board's home corner can never disagree. That is the whole reason this channel exists — before it,
+   * a picker for such a game was a picker that didn't pick.
    */
   createGame(opts: {
     readonly id: string;
-    readonly players: readonly { readonly name: string }[];
+    readonly players: readonly { readonly name: string; readonly color?: string }[];
     readonly rng: () => number;
   }): S;
 

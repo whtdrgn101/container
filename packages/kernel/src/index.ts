@@ -31,6 +31,9 @@ export type { Viewer } from './viewer.js';
 export { record } from './record.js';
 export type { VersionedState } from './record.js';
 export { makeSeating } from './seating.js';
+// Seeded setup randomness (kernel 1.2.0). Here rather than only on `./bot` because an *engine* deals
+// its game and an engine *test* seeds it — neither may reach into the bot subpath to do so.
+export { mulberry32, shuffle } from './random.js';
 export type { SeatedState, SeatHelpers } from './seating.js';
 export type { GameEndState, WinnersEndState } from './endState.js';
 

@@ -23,6 +23,13 @@ interface CounterState {
   id: string;
   count: number;
   names: string[];
+  /**
+   * What each seat's colour was **at the deal** (kernel 1.2.0's colour channel). Container and the
+   * other four hosted games ignore `players[].color`, so the counter is the only place in this repo
+   * that can prove the host actually sends it — the same reason this whole stub exists. A game where
+   * the colour is rules data (Labyrinth's starting corner) reads it exactly like this.
+   */
+  seatColors: (string | undefined)[];
   version: number;
 }
 
@@ -43,6 +50,8 @@ const counterModule: GameModule<CounterState, CounterAction> = {
     // Reads the injected rng, to prove the core actually supplies one.
     count: Math.floor(opts.rng() * 10),
     names: opts.players.map((p) => p.name),
+    // Consumes the colour channel, so a host that stopped threading picks fails here loudly.
+    seatColors: opts.players.map((p) => p.color),
     version: 0,
   }),
 
@@ -120,6 +129,50 @@ describe('a non-Container game hosted through the GameModule seam', () => {
     const game = await create();
     expect(game.names).toEqual(['Ann', 'Bo']);
     expect(game.count).toBeGreaterThanOrEqual(0);
+  });
+
+  /**
+   * The **colour channel** (kernel 1.2.0, D2c finding §16). A colour is coordination state for every
+   * game hosted here, but it does not have to be: the colour a player picks can *be* a rule (Labyrinth's
+   * pawn colour names the starting corner). Before 1.2.0 `createGame` took `{ name }` only, so such a
+   * game could never learn the pick and its colour picker would silently pick nothing.
+   *
+   * These three tests are the honest proof the pick arrives, and they are here rather than in
+   * `colors.test.ts` for the same reason this whole file exists: all five real games ignore the field,
+   * so only a stub can observe it. Each asserts the *same* array the payload's `colors` map reports —
+   * the game and the coordination store are handed one resolved array, so they cannot disagree.
+   */
+  describe('the colour channel — each seat’s resolved colour reaches createGame', () => {
+    it('defaults to palette order when nobody picks', async () => {
+      const game = await create();
+      expect(game.seatColors).toEqual(['red', 'green']);
+    });
+
+    it('honours a create-time pick and fills the rest with the first free colour', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/games',
+        payload: { players: [{ name: 'Ann', color: 'blue' }, { name: 'Bo' }] },
+      });
+      expect(response.statusCode).toBe(201);
+      const body = response.json() as { game: CounterState; colors: Record<string, string> };
+      expect(body.game.seatColors).toEqual(['blue', 'red']);
+      // The engine's copy and the coordination store's copy are the same resolution, always.
+      expect(body.colors).toEqual({ p1: 'blue', p2: 'red' });
+    });
+
+    it('carries a lobby’s picks into the deal', async () => {
+      const lobby = (await app.inject({ method: 'POST', url: '/lobbies', payload: { seats: 2 } })).json().lobby as {
+        id: string;
+      };
+      await app.inject({ method: 'POST', url: `/lobbies/${lobby.id}/join`, payload: { name: 'Ann', color: 'blue' } });
+      await app.inject({ method: 'POST', url: `/lobbies/${lobby.id}/join`, payload: { name: 'Bo' } });
+      const started = await app.inject({ method: 'POST', url: `/lobbies/${lobby.id}/start` });
+      expect(started.statusCode).toBe(201);
+      const body = started.json() as { game: CounterState; colors: Record<string, string> };
+      expect(body.game.seatColors).toEqual(['blue', 'red']);
+      expect(body.colors).toEqual({ p1: 'blue', p2: 'red' });
+    });
   });
 
   it('applies an action the core cannot interpret', async () => {

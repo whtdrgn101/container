@@ -40,6 +40,33 @@ REST helpers moved into a new publishable `@game-hub/ui-kit@1.0.0`. All five gam
 **nothing** from `ui/src`, an e2e architecture test enforces that, and each package typechecks all four of
 its subpaths standalone. §2's Tailwind question is answered and proven. Details in §4b "Delivered in D2b".
 
+**Hub-side response to the D2c findings (2026-07-30) — kernel → `1.2.0`, contract still `1`.** The
+out-of-repo pilot's findings log (`docs/d2c-findings.md` in `whtdrgn101/game-labyrinth`) produced three
+hub-side changes, all additive:
+
+- **The colour channel (finding §16).** Labyrinth's owner ruling made the pawn colour *rules data* — the
+  colour you pick is the corner you start on — and contract 1 typed `createGame`'s seats as `{ name }`
+  only, so a lobby pick physically could not reach the rules. `GameModule.createGame` now takes
+  `players: { name, color? }[]`, and the backend's `startGame` resolves every seat's colour **before**
+  dealing (one `assignColors` call, whose result feeds both `createGame` and the `game_colors` store, so
+  the two can never disagree) and threads it in. Strictly additive by the rule below: the host only *adds*
+  a property, `{ name }[]` stays assignable to the widened parameter, and all five hosted games ignore
+  the field. Proven both ways — the counter stub in `module-seam.test.ts` consumes it (and fails loudly
+  if the threading is removed: verified by deleting it), and `colors.test.ts` deals Container and Stone
+  Age from the same seed with picks and without and requires identical states.
+- **The rng helpers on the `.` barrel (finding §13).** `mulberry32` lived only on `@game-hub/kernel/bot`,
+  so an *engine* test had to import the bot subpath or re-implement it (every hub game did the latter),
+  and the Fisher–Yates `shuffle` every dealer needs existed in four in-repo copies. Both now live in
+  `packages/kernel/src/random.ts` and export from `.`; `./bot` re-exports `mulberry32` unchanged, and the
+  four game copies (Saint Petersburg, Russian Railroads, Stone Age ×2, Container's module) were replaced
+  by the kernel's — same algorithm, so every seeded deal is byte-identical.
+- **The dependency contradiction (finding §2).** `game-creation.md` §1 said `dependencies:
+  "workspace:*"` while §3 here says a game package **peer-depends** on the kernel. Both are right for
+  different situations, and the recipe now opens with a table saying which one the reader is in:
+  `workspace:*` in this repo (one install tree, so a duplicate is impossible), **peer + dev** for a
+  package a host installs — with the three duplicate-copy failure modes named (`instanceof` breaking
+  `mapError`, React double-loading, Tailwind's `@source` glob missing a nested copy).
+
 Original goal statement: four games had tested the engine and the seams; the long-term goal is making
 games easier to add, and eventually addable from *outside* this repo. Pilot: Russian Railroads (a
 heavyweight is the right stress test).

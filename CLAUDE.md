@@ -40,10 +40,12 @@ it (id `container`), not the platform. Don't conflate them.
 ```
 packages/
   kernel/          @game-hub/kernel — the neutral dependency every game + both hosts build on:
-                     primitives (GameError, MoveRecord, Viewer, record, makeSeating, GameEndState),
-                     runBotLoop, the GameModule/GameClient contracts (host bindings are generics),
-                     the transport DTOs (GamePayload/GameMessage), and the
-                     @game-hub/kernel/{client,bot} subpaths. Its own 100% gate. Published (1.1.0).
+                     primitives (GameError, MoveRecord, Viewer, record, makeSeating, GameEndState,
+                     shuffle/mulberry32), runBotLoop, the GameModule/GameClient contracts (host
+                     bindings are generics), the transport DTOs (GamePayload/GameMessage), and the
+                     @game-hub/kernel/{client,bot} subpaths. Its own 100% gate.
+                     Published through 1.1.0; **1.2.0 is in the tree and unpublished** (the colour
+                     channel + the rng helpers — see contract.ts's version history).
   ui-kit/          @game-hub/ui-kit — the shared board chrome every game's UI renders inside
                      (TurnBanner, ActivityFeed, GameOver, ActionTip, PanZoom, Button/Card, cn,
                      seatIdentity) + the game-facing REST calls (getGame/applyAction/apiUrl).
@@ -159,6 +161,10 @@ in `app.ts` (`/^\/(games|lobbies|health)\b/`).
   Native `better-sqlite3` and `esbuild` builds are allow-listed in `pnpm-workspace.yaml`.
 - **Container colours:** `white, red, green, blue, yellow` (container cargo, from the rulebook scoring
   cards). *Player* colours are a separate per-game palette the module declares (design-patterns §2).
+- **A player colour may be rules data** (kernel 1.2.0, 2026-07-30): every seat's resolved colour is passed
+  to `createGame` as `players[].color`. All five hosted games ignore it — for them a colour is still
+  presentation and stays coordination state — but a game where the pick *is* a rule (Labyrinth's starting
+  corner) can read it. Bots and difficulty tiers stay strictly out of the engine; colour is the exception.
 - **Produce is "as many as you are able to"** (Container rulebook pg. 9) — an idle factory shrinks the run
   rather than blocking it; only when *every* factory colour is exhausted does Produce throw `OUT_OF_SUPPLY`.
 - **Stone Age caps population and the food track at 10** (`MAX_PEOPLE`/`MAX_FOOD_TRACK`) — the rulebook's

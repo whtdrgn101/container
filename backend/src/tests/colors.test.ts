@@ -236,6 +236,48 @@ describe('colours across the platform', () => {
     await botApp.close();
   });
 
+  /**
+   * Kernel 1.2.0 hands each seat's resolved colour to `createGame`, for the rare game whose colour is
+   * rules data. **None of the five hosted games is that game**, and this is what proves it stayed that
+   * way: deal the same seeded table twice, once with picks and once without, and the dealt state must
+   * be identical apart from the game id. A game that started reading `players[].color` — or a host
+   * that started leaking it into state some other way — fails here.
+   *
+   * (That the channel *does* deliver is proved in `module-seam.test.ts`, whose stub consumes it; only a
+   * stub can, precisely because these five ignore it.)
+   */
+  it('does not change what any hosted game is dealt (the five ignore players[].color)', async () => {
+    const seeded = () => buildApp({ db: createDatabase(), rng: mulberry32(0x5eed) });
+    const deal = async (instance: FastifyInstance, gameType: string, colored: boolean) => {
+      const names = ['Ann', 'Bob', 'Cy'];
+      const picks = { container: ['indigo', 'teal', 'rose'], stoneage: ['red', 'blue', 'green'] }[gameType]!;
+      const response = await instance.inject({
+        method: 'POST',
+        url: '/games',
+        payload: {
+          gameType,
+          players: names.map((name, seat) => ({ name, ...(colored ? { color: picks[seat] } : {}) })),
+        },
+      });
+      expect(response.statusCode).toBe(201);
+      const game = response.json().game as { id: string };
+      return { ...game, id: 'normalised' };
+    };
+
+    for (const gameType of ['container', 'stoneage']) {
+      // Same seed, same seats, same order — the only difference is that every seat picked its colour.
+      // Note the picks are deliberately the *same* colours the defaults would assign, so the stored
+      // colours match too and the only variable is whether the pick travelled through `createGame`.
+      const plainApp = seeded();
+      const pickedApp = seeded();
+      await plainApp.ready();
+      await pickedApp.ready();
+      expect(await deal(pickedApp, gameType, true)).toEqual(await deal(plainApp, gameType, false));
+      await plainApp.close();
+      await pickedApp.close();
+    }
+  });
+
   it('synthesises palette-order defaults for an old game with no colour rows', async () => {
     // Simulate a pre-feature game: create one, then delete its colour rows as if it predated the table.
     const id = (

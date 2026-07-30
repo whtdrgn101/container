@@ -36,8 +36,8 @@ import { fileURLToPath } from 'node:url';
  */
 const RUNTIME_SMOKE = `import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { GameError, KERNEL_CONTRACT_VERSION, makeSeating, record, runBotLoop } from '@game-hub/kernel';
-import { BotError, mulberry32, wilsonInterval } from '@game-hub/kernel/bot';
+import { GameError, KERNEL_CONTRACT_VERSION, makeSeating, mulberry32, record, runBotLoop, shuffle } from '@game-hub/kernel';
+import { BotError, mulberry32 as botMulberry32, wilsonInterval } from '@game-hub/kernel/bot';
 import * as clientContract from '@game-hub/kernel/client';
 
 const require = createRequire(import.meta.url);
@@ -67,8 +67,16 @@ assert.equal(seating.activePlayer(state).id, 'p2');
 assert.deepEqual(seating.withPlayer(state, 0, { id: 'p9' }), [{ id: 'p9' }, { id: 'p2' }]);
 assert.throws(() => seating.seatOf(state, 'nobody'), /no such seat/);
 
-// './bot' — the bot primitives.
+// Seeded setup randomness on the '.' barrel (kernel 1.2.0) — what an out-of-repo *engine* test needs.
+assert.deepEqual(shuffle([1, 2, 3]), [1, 2, 3], 'no rng ⇒ the given order');
+assert.deepEqual(shuffle([1, 2, 3, 4, 5], mulberry32(3)), shuffle([1, 2, 3, 4, 5], mulberry32(3)));
+assert.deepEqual([...shuffle([1, 2, 3, 4, 5], mulberry32(3))].sort(), [1, 2, 3, 4, 5]);
+
+// './bot' — the bot primitives. mulberry32 is re-exported here (the benches import it from this
+// subpath), and must be the very same function the '.' barrel exports, not a second copy.
+// (No backticks in these comments: they live inside a template literal.)
 assert.ok(new BotError('nope') instanceof Error);
+assert.equal(botMulberry32, mulberry32);
 assert.equal(typeof mulberry32(1)(), 'number');
 assert.equal(wilsonInterval(0, 0).length, 2);
 
@@ -86,7 +94,7 @@ console.log('runtime smoke ok — . / ./bot / ./client all resolve and behave');
 `;
 
 /** What a consumer's compiler must see: the whole exported type surface, through the published `exports`. */
-const TYPE_CONSUMER = `import { GameError, KERNEL_CONTRACT_VERSION, makeSeating, record } from '@game-hub/kernel';
+const TYPE_CONSUMER = `import { GameError, KERNEL_CONTRACT_VERSION, makeSeating, record, shuffle } from '@game-hub/kernel';
 import type { GameModule, GameSummary, ModuleContext, MoveRecord, Viewer } from '@game-hub/kernel';
 import { BotError, mulberry32 } from '@game-hub/kernel/bot';
 import type { BoardProps, GameClient, GameMessage, GamePayload } from '@game-hub/kernel/client';
@@ -101,7 +109,10 @@ const smokeModule: GameModule<State, { readonly type: 'NOOP' }> = {
   minPlayers: 2,
   maxPlayers: 4,
   colors: ['red', 'blue'],
-  createGame: () => ({ version: 0, log: [], seat: 0 }),
+  // kernel 1.2.0's colour channel: a game whose colour is rules data reads the host's resolved pick
+  // off each seat. Checking it here is the out-of-workspace proof that the widened parameter really
+  // ships in the tarball's .d.ts — the field an out-of-repo game (Labyrinth) needs.
+  createGame: (opts) => ({ version: 0, log: [], seat: opts.players.findIndex((player) => player.color === 'red') }),
   applyAction: (state) => record(state, 'NOOP', 'p1'),
   legalActions: () => [{ type: 'NOOP' }],
   viewFor: (state, viewer: Viewer) => ({ ...state, viewer }),
@@ -117,6 +128,18 @@ const smokeModule: GameModule<State, { readonly type: 'NOOP' }> = {
   movesOf: (state) => state.log,
   mapError: (error) => (error instanceof GameError ? { status: 400, code: error.code, message: error.message } : null),
   createBotDriver: (ctx: ModuleContext) => ({ tick: () => void ctx.rng() }),
+};
+
+// …and the other half of "additive": a game written against kernel 1.0/1.1, whose setup declares the
+// narrow name-only seat, still satisfies the widened member untouched. This is the assignability the
+// minor bump rests on — if it ever stops compiling, the change was breaking and the contract must move.
+const legacyCreateGame = (opts: {
+  readonly id: string;
+  readonly players: readonly { readonly name: string }[];
+  readonly rng: () => number;
+}): State => ({ version: 0, log: [], seat: opts.players.length });
+const legacyModule: Pick<GameModule<State, { readonly type: 'NOOP' }>, 'createGame'> = {
+  createGame: legacyCreateGame,
 };
 
 const seating = makeSeating<{ readonly id: string }>(() => {
@@ -141,8 +164,11 @@ const payload: GamePayload<State> = {
 // Referenced so the React-typed './client' subpath is genuinely resolved and checked, not just imported.
 export const surface = {
   module: smokeModule.id,
+  legacySeat: legacyModule.createGame({ id: 'g', players: [{ name: 'Ann' }], rng: () => 0 }).seat,
   seat: seating.activePlayer({ players: [{ id: 'p1' }], activePlayerIndex: 0 }).id,
   rng: mulberry32(1)(),
+  // The '.' barrel's setup helper, generic-checked against a concrete element type.
+  deal: shuffle<string>(['a', 'b', 'c'], mulberry32(2))[0] ?? '',
   client: null as SmokeClient | null,
   boardTitle: null as SmokeBoardProps['gameId'] | null,
   // The board's onPayload must accept exactly the payload a state route returns — the whole point of
