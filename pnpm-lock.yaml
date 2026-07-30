@@ -843,7 +843,7 @@ packages:
     resolution: {integrity: sha512-g89ag4BCcD9YP5wBZXixzoLnuf5j89p/sXFcfpCiv2pdEkYYukBEoK3heVzqsp0EAtszVDc2BBZG0KZqeAShIA==}
 
   '@game-hub/game-labyrinth@file:vendor/game-hub-game-labyrinth-0.1.0.tgz':
-    resolution: {integrity: sha512-FPLK7qHAZmnC2i7QzhLe5TzSvOum2pth3hljDShWWD03SfePseVS7aCGuVvnjSANXXgTMjk5ahEVgNoQvLHvBg==, tarball: file:vendor/game-hub-game-labyrinth-0.1.0.tgz}
+    resolution: {integrity: sha512-0ADiOU97SKp/6BL1GvxLBxf3vmRLquvGtesa7xsFSnitoVjFy+3lWTcGTS71y2cLTIp+a9LArdP15rUkdtNcKQ==, tarball: file:vendor/game-hub-game-labyrinth-0.1.0.tgz}
     version: 0.1.0
     engines: {node: '>=22'}
     peerDependencies:
