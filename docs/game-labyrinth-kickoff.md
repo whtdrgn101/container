@@ -16,8 +16,10 @@ Decisions made at kickoff:
   engine workout unlike any hosted game (see "why it flexes" below). Its board UI should also feed
   ideas back into the RR9b revamp (which is queued right after).
 
-This file seeds the new repo's `ROADMAP.md` + rules digest and **moves there when D2c scaffolds it**;
-it lives here until then so the plan isn't tribal knowledge.
+**Moved (D2c, 2026-07-30):** the rules digest, the L0–L6 slice plan, and all game-side rulings now
+live in the game's own repo — [`whtdrgn101/game-labyrinth`](https://github.com/whtdrgn101/game-labyrinth)
+(`ROADMAP.md` there is authoritative; its `docs/d2c-findings.md` logs the out-of-repo frictions). This
+file remains the hub-side record of the kickoff decisions and the D2a–D2d platform slices below.
 
 ## Rules digest (rulebook read 2026-07-29 — 2 pp.; page refs are to that PDF)
 
