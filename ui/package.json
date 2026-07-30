@@ -16,6 +16,7 @@
   "dependencies": {
     "@game-hub/game-cantstop": "workspace:*",
     "@game-hub/game-container": "workspace:*",
+    "@game-hub/game-labyrinth": "file:../vendor/game-hub-game-labyrinth-0.1.0.tgz",
     "@game-hub/game-russianrailroads": "workspace:*",
     "@game-hub/game-stoneage": "workspace:*",
     "@game-hub/game-stpetersburg": "workspace:*",

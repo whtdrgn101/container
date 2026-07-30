@@ -12,8 +12,11 @@ game, and the higher-level "which games, and what's left of them" view. Game-spe
 | **Russian Railroads** | **in build** (game 5, Ultimate Railroads edition — and the Track D pilot: the first *package-shaped* game, `@game-hub/game-russianrailroads`). RR0–RR8 **base game complete** (worker placement, track advancement, locomotives, engineers, game end + final scoring); RR9 art **shipped**; RR9b — board-UI revamp (the shipped board is too crowded to play well — owner call 2026-07-28) queued behind the Labyrinth/D2 kickoff and should borrow its board-UI findings; RR10 bot after; expansion modules after that. Rules digest done (48 pp. read; hidden info = one secret end-bonus card/player; all base randomness setup-only; the legalActions hazard = split-move combinatorics, resolved by the pending-lock ruling) | [`packages/games/russianrailroads/ROADMAP.md`](packages/games/russianrailroads/ROADMAP.md) |
 | **Saint Petersburg** | **complete** (SP0–SP9, game 4, 1st edition) — including the "Malachite & Gilt" board art (SP8, comps-approved) and the platform's first redacted-view bot (SP9, greedy baseline): **SP0–SP7 shipped** — registered, viewable fourth game with redacting `viewFor` (hands *and* rubles secret) + the 116-card deck data (SP0), the playable **phase spine** — `BUY`/`PASS`, turn order, cumulative cost reductions (min 1 ruble), all-pass phase close with scoring + refill, interactive board (SP1), the **full round loop** — trading-phase frame (no scoring), round transition (discard lower, slide upper→lower, deal workers, rotate all four markers left) with the pg. 8 "no cards taken → skip the *mid-round* refill" special case (round-end worker deal unconditional — a drain-spiral bug corrected in SP3), marker chips + rollover feed (SP2), the **hidden hand** — `ADD_TO_HAND` (free, limit 3) / `PLAY_FROM_HAND` (cost with reductions, no lower-row discount), non-empty-hand redaction proof, playable-hand UI + face-down opponent counts (SP3), **trading-card displacement** — `BUY`/`PLAY_FROM_HAND` take a `displace` card-id (green ware-pairs incl. Czar-by-any-green, blue→any building, orange→any aristocrat, never trading-on-trading), cost = difference-or-1 with all reductions, carpenter-workshop/gold-smelter owned-card reductions live, UI displacement picker + upgrade feed (SP4), and the **six special cards** — Warehouse (hand limit 4), Mariinskij (+1₽/aristocrat at building scoring), Tax man (+1₽/worker at aristocrat scoring), Potjomkin (buy 2, worth 6 when displaced), the **Pub** interlude (after building scoring, buy ≤5 pts @ 2₽) and the **Observatory** (skip its point to draw a stack top → forced buy/hand/discard), both as engine-level turn locks (`pendingPubBuy`/`pendingDraw`, no backend routes; the draw is a pure engine action, `pendingDraw` publicly revealed like an SP3 take), engine 476 @ 100% + seeded backend REST proof (SP5), and **game end + final scoring** — a `finalRound` flag armed when a board refill places a group's last card (pg. 5; dealing short of a *pre-empty* stack is not the trigger; the round-end worker deal arming it makes the fresh round "this round"), ending at the final round's trading close into `finalScoring` (distinct-aristocrat table 1/3/6/10/15/21/28/36/45/55 by card identity incl. orange trading cards, +1/full 10₽, −5/hand card, **unclamped**; ties by money then shared), `viewFor` revealing all at `ended`, and the shared `GameOver` results table (SP6), and **playable-game hardening** — full seeded games driven to a real end over REST at 2/3/4 players (whole surface: both rows, add+play hand, a trading displacement, a paying Pub buy, an Observatory draw+resolve; coherent breakdowns, monotonic version, sane move log), the honest **four-games-coexist** check (all four real games + the counter stub in one app; the routeless `stpetersburg` namespace 404s cleanly while cross-game calls stay guarded), lobby+colours / resume / abandon proven in e2e, the **seat palette** on the board, a `describe(move)` audit, and a `legalActions⊆applyAction` fuzz (SP7); then the approved **art** (SP8) and the redacted-view **bot** (SP9) — see the per-game roadmap for both | [`packages/games/stpetersburg/ROADMAP.md`](packages/games/stpetersburg/ROADMAP.md) |
 
-Adding a game is **additive** — implement the seams, register, done (proven five times now — Container,
-Can't Stop, Stone Age, Saint Petersburg, and the package-shaped Russian Railroads). See
+| **Labyrinth** | **playable** (game 6, and the Track D **out-of-repo** proof — the first game built in its own repository, `whtdrgn101/game-labyrinth`, against the published `@game-hub/kernel` + `@game-hub/ui-kit`, and hosted here as an **installed package resolving to compiled `dist/`**). L0–L4 shipped: the engine (tile deal, the 12-arrow slide with the no-reverse rule and pawn wraparound, movement/reachability, treasure flips, the win), the module seam (per-seat stack redaction — your own top card, everyone else a count), and the playable board. **Remaining: L4b** (original art — the tile fills, the 24 treasure marks and the pawns) and **L5** (the bot). ⚠️ Its roadmap, rules digest, rulings and findings live in **that repo**, not here | [`github.com/whtdrgn101/game-labyrinth`](https://github.com/whtdrgn101/game-labyrinth) |
+
+Adding a game is **additive** — implement the seams, register, done (proven six times now — Container,
+Can't Stop, Stone Age, Saint Petersburg, the package-shaped Russian Railroads, and Labyrinth from
+outside the repo entirely). See
 [`docs/game-creation.md`](docs/game-creation.md) for the recipe and [`docs/design-patterns.md`](docs/design-patterns.md)
 for how the seams work.
 
@@ -41,16 +44,20 @@ The near-term order, decided while play-testing:
    **package** (`packages/games/russianrailroads/`), then **all four legacy games were migrated onto the
    same shape** and `@game-hub/engine`/`@game-hub/bot` retired — so every game now lives in its own
    `@game-hub/game-<id>` package (migration plan + findings:
-   **[`docs/track-d-legacy-migration.md`](docs/track-d-legacy-migration.md)**). **Still open:** D2 — an
-   *out-of-repo* game against published `@game-hub/kernel` (forces a real `dist`, kernel-contract
-   versioning enforcement, and a `@game-hub/ui-kit`). D2a + D2b have since landed all three in-repo — what
-   remains is the publish itself and the external game. See the design doc's status header.
+   **[`docs/track-d-legacy-migration.md`](docs/track-d-legacy-migration.md)**). **✅ COMPLETE
+   (2026-07-30):** D2 — the *out-of-repo* game — landed with Labyrinth. `@game-hub/kernel@1.2.0` and
+   `@game-hub/ui-kit@1.0.0` are published to npm, the game is built in its own repo against them, and the
+   hub hosts it as an installed package resolving to compiled `dist/` — proven in the production Docker
+   image, not just in dev. See the design doc's "Delivered in D2d" for what it cost (two dependency lines,
+   one config entry) and the three things that broke first. **The one thing left is bookkeeping:** publish
+   `@game-hub/game-labyrinth` to npm so `vendor/`'s committed tarball can become a version range
+   ([`vendor/README.md`](vendor/README.md) has the three-step swap; nothing architectural changes).
 5. **Russian Railroads board-UI revamp (RR9b)** (owner, 2026-07-28, while play-testing):
    the RR board fights itself — a responsive layout that works on mobile vs a game that genuinely
    needs table-top board density — and the compromise makes the game nearly unplayable. Redesign the
    board UI before the bot (RR10). Sliced in
    [the RR roadmap](packages/games/russianrailroads/ROADMAP.md).
-6. **Track D D2 begins — game 6: Labyrinth, out-of-repo (owner, 2026-07-29) — next up.** D2 starts
+6. **Track D D2 — game 6: Labyrinth, out-of-repo (owner, 2026-07-29). ✅ COMPLETE (2026-07-30).** D2 started
    now with *The aMAZEing Labyrinth* (Ravensburger; rulebook in `reference_materials/`), jumping ahead
    of RR9b: the game's board UI should generate the layout ideas RR9b needs anyway, and the
    grid/path-routing state is the engine workout the owner wants. Kickoff decisions (all recorded in
@@ -88,9 +95,27 @@ The near-term order, decided while play-testing:
    depends on them (e.g. the seeds chosen to make an all-bot Can't Stop game finish), so it needs its own
    pass with each seed re-verified rather than a blind find-and-replace. (c) **the docs contradiction** (finding §2) — `game-creation.md` §1 now
    opens with an in-repo vs out-of-repo table: `workspace:*` for the five games here, **peer + dev** for a
-   package a host installs, with the duplicate-copy failure modes spelled out. ⚠️ **Still blocked on the
-   owner creating the npm `game-hub` org and publishing** — 1.2.0 is unpublished, so Labyrinth cannot
-   consume the colour channel yet.
+   package a host installs, with the duplicate-copy failure modes spelled out.
+   **D2c ✅ + L0–L4 ✅ (2026-07-30, out-of-repo):** the game repo built its engine, module seam and
+   playable board against the **published** `@game-hub/kernel@1.2.0` + `@game-hub/ui-kit@1.0.0` (its CI
+   installs them from the registry with `--frozen-lockfile`, which is the honest proof), 352 tests with
+   the engine at 100%.
+   **D2d ✅ (2026-07-30) — the hub consumes it, and this closes Track D.** The game is now installable
+   (a real `tsc` build to `dist/` behind `publishConfig`, `.js` extensions in its shipped sources, and a
+   `pack:smoke` that installs the tarball outside its repo and plays a game under plain `node`), and the
+   hub hosts it as a **dist consumer**: two dependency lines, one `games.config.ts` entry, `pnpm generate`
+   — **no Vite alias, no tsconfig include, no vitest inline entry**. Verified where it counts:
+   `docker compose up --build` boots healthy, `/games/catalog` lists Labyrinth (2–4 seats, the four pawn
+   colours), a full game is created and played over REST **against the container** (version increments,
+   409 on a stale write, per-viewer stack redaction on the wire), and a browser driven against the image
+   plays a turn while fetching exactly one of the six `Board-*.js` chunks. Three real findings, all in the
+   design doc: `tsc`'s extensionless emit (game-side, fixed), Vite dev-server pre-bundling forking
+   `@game-hub/ui-kit` into two copies and silently breaking the injected REST base
+   (`optimizeDeps.exclude`), and pnpm fetching *registry* copies of our own packages to satisfy an
+   external game's peers (`linkWorkspacePackages: true`). §2's Tailwind question is answered against a
+   real host: the existing `@source '../node_modules/@game-hub'` **does** reach an installed package's
+   `dist/` — no glob change. Until the game is published, the hub depends on a tarball committed under
+   [`vendor/`](vendor/README.md); `pnpm labyrinth:refresh` is the whole two-repo loop.
 
 ## Principles
 
@@ -346,9 +371,12 @@ Stone Age's building-stack redaction (§4.6's second half) →
   and pause.
 - **Before starting a slice,** check remaining plan usage so you don't land mid-slice; if tight, pick an
   **M/S** item.
-- **Suggested next order (owner call 2026-07-29): Track D D2 — Labyrinth, the out-of-repo game 6**
-  (slices D2a–D2d then L0–L6, see [`docs/game-labyrinth-kickoff.md`](docs/game-labyrinth-kickoff.md)) —
-  then **RR9b** (the RR board-UI revamp, borrowing Labyrinth's board-UI findings), then **RR10** (its
-  bot). After that, open work is independent and can go in any order: Container's **A3–A5**
-  (difficulty/search), **Can't Stop CS3** (variants), **B3** (accounts), and the review backlog above —
-  none essential for home/LAN play.
+- **Suggested next order (updated 2026-07-30, now that Track D D2 is done):** **RR9b** — the RR board-UI
+  revamp, which was queued behind Labyrinth precisely so it could borrow that board's findings (a fluid
+  no-fixed-width grid, `ActionTip` on disabled affordances, inline-SVG art that survives a mis-wired
+  host) — then **RR10** (its bot). Two small Labyrinth endnotes can be picked up in either repo whenever:
+  **L4b** (its original art) and **L5** (its bot), both tracked in
+  [`whtdrgn101/game-labyrinth`](https://github.com/whtdrgn101/game-labyrinth); and hub-side, the
+  one-line-each **npm publish of `@game-hub/game-labyrinth`** that retires `vendor/`. After that, open
+  work is independent and can go in any order: Container's **A3–A5** (difficulty/search), **Can't Stop
+  CS3** (variants), **B3** (accounts), and the review backlog above — none essential for home/LAN play.

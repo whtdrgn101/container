@@ -122,7 +122,14 @@ describe('Saint Petersburg', () => {
       maxPlayers: number;
       colors: string[];
     }[];
-    expect(catalog.map((g) => g.id)).toEqual(['container', 'cantstop', 'stoneage', 'stpetersburg', 'russianrailroads']);
+    expect(catalog.map((g) => g.id)).toEqual([
+      'container',
+      'cantstop',
+      'stoneage',
+      'stpetersburg',
+      'russianrailroads',
+      'labyrinth',
+    ]);
     const sp = catalog.find((g) => g.id === 'stpetersburg')!;
     expect(sp.colors).toEqual(['blue', 'yellow', 'green', 'red']);
     expect([sp.minPlayers, sp.maxPlayers]).toEqual([2, 4]);

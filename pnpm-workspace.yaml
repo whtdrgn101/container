@@ -16,3 +16,21 @@ allowBuilds:
 # registry — a 404 for @game-hub/* until they're published, and wrong even after (the image
 # must build from workspace source, never from the registry's copy of our own packages).
 autoInstallPeers: false
+
+# ⚠️ Track D / D2d — required by the first *externally built* game (Labyrinth, vendored as a tarball
+# under `vendor/`). That package declares plain semver peers on `@game-hub/kernel` (^1.2.0) and
+# `@game-hub/ui-kit` (^1.0.0), because from out there they are ordinary published packages. pnpm 10+
+# defaults this setting to **false**, so a non-`workspace:` range is resolved from the registry even
+# when this very repo builds the package — and it did: the backend (which declares no ui-kit of its own,
+# and shouldn't — it has no React) got a **registry copy of `@game-hub/ui-kit@1.0.0`** grafted in as a
+# peer, which then forked the game into two physical copies (one per peer set) and dragged a
+# `minimumReleaseAgeExclude` entry along with it.
+#
+# `true` links a matching workspace package instead: one copy of the game, its ui-kit peer resolved to
+# `link:packages/ui-kit` — the same module instance the shell uses, which is what keeps React context
+# identity (`RematchContext`) intact across the seam. It is also just the rule the comment above already
+# states — our own packages come from workspace source, never the registry's copy of them.
+#
+# Safe here because every in-repo dependency on a `@game-hub/*` package is already written
+# `workspace:*`; this setting only changes how an *external* package's peers on our packages resolve.
+linkWorkspacePackages: true

@@ -53,6 +53,9 @@ importers:
       '@game-hub/game-container':
         specifier: workspace:*
         version: link:../packages/games/container
+      '@game-hub/game-labyrinth':
+        specifier: file:../vendor/game-hub-game-labyrinth-0.1.0.tgz
+        version: file:vendor/game-hub-game-labyrinth-0.1.0.tgz(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
       '@game-hub/game-russianrailroads':
         specifier: workspace:*
         version: link:../packages/games/russianrailroads
@@ -298,6 +301,9 @@ importers:
       '@game-hub/game-container':
         specifier: workspace:*
         version: link:../packages/games/container
+      '@game-hub/game-labyrinth':
+        specifier: file:../vendor/game-hub-game-labyrinth-0.1.0.tgz
+        version: file:vendor/game-hub-game-labyrinth-0.1.0.tgz(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
       '@game-hub/game-russianrailroads':
         specifier: workspace:*
         version: link:../packages/games/russianrailroads
@@ -835,6 +841,20 @@ packages:
 
   '@fastify/websocket@11.3.0':
     resolution: {integrity: sha512-g89ag4BCcD9YP5wBZXixzoLnuf5j89p/sXFcfpCiv2pdEkYYukBEoK3heVzqsp0EAtszVDc2BBZG0KZqeAShIA==}
+
+  '@game-hub/game-labyrinth@file:vendor/game-hub-game-labyrinth-0.1.0.tgz':
+    resolution: {integrity: sha512-FPLK7qHAZmnC2i7QzhLe5TzSvOum2pth3hljDShWWD03SfePseVS7aCGuVvnjSANXXgTMjk5ahEVgNoQvLHvBg==, tarball: file:vendor/game-hub-game-labyrinth-0.1.0.tgz}
+    version: 0.1.0
+    engines: {node: '>=22'}
+    peerDependencies:
+      '@game-hub/kernel': ^1.2.0
+      '@game-hub/ui-kit': ^1.0.0
+      react: ^19.0.0
+    peerDependenciesMeta:
+      '@game-hub/ui-kit':
+        optional: true
+      react:
+        optional: true
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -3350,6 +3370,13 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+
+  '@game-hub/game-labyrinth@file:vendor/game-hub-game-labyrinth-0.1.0.tgz(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)':
+    dependencies:
+      '@game-hub/kernel': link:packages/kernel
+    optionalDependencies:
+      '@game-hub/ui-kit': link:packages/ui-kit
+      react: 19.2.7
 
   '@humanfs/core@0.19.2':
     dependencies:

@@ -20,6 +20,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "generate": "tsx scripts/generate-registries.ts",
+    "labyrinth:refresh": "node scripts/labyrinth-refresh.mjs",
     "build": "pnpm -r build",
     "dev:backend": "pnpm --filter @game-hub/backend dev",
     "dev:ui": "pnpm --filter @game-hub/ui dev"

@@ -5,6 +5,30 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  optimizeDeps: {
+    /**
+     * ⚠️ Track D / D2d — **required** once a game arrives as an installed package rather than as
+     * workspace source (Labyrinth). Measured, not guessed; here is the failure it fixes.
+     *
+     * In **dev**, Vite pre-bundles anything under `node_modules` with esbuild. `@game-hub/game-labyrinth`
+     * is exactly that, and its board imports `@game-hub/ui-kit`. The optimizer followed the alias below,
+     * pulled the ui-kit **into the game's pre-bundle**, and the app then ran *two* copies of it: the
+     * shell's (aliased to source) and the game's. Module-level state is per copy, so the shell's
+     * `configureTransport({ baseUrl: '/api' })` never reached the board's — every action it sent went to
+     * `/games/:id/actions` instead of `/api/games/:id/actions` and 404'd. React context identity
+     * (`RematchContext`) has the same failure mode, silently.
+     *
+     * Excluding the two shared packages leaves them as runtime imports inside the pre-bundle, which Vite
+     * then resolves through the aliases below — one copy, shared by shell and game. It is stated as a
+     * rule about the *shared singletons* rather than about Labyrinth, so every future installed game is
+     * covered without touching this file.
+     *
+     * Only the dev server is affected: `vite build` resolves through the same aliases with Rollup and
+     * already emitted a single transport (verified in `ui/dist/assets/`), which is why the Docker image
+     * was never wrong — and why this would have shipped as a dev-only mystery without the e2e suite.
+     */
+    exclude: ['@game-hub/kernel', '@game-hub/ui-kit'],
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

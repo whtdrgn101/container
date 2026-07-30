@@ -413,6 +413,73 @@ host.** The `architecture.spec.ts` forbids any shell file importing `@game-hub/g
 
 ---
 
+## 6b. Hosting a game built **outside** this repo (Track D / D2d)
+
+An external game — Labyrinth (`whtdrgn101/game-labyrinth`) is the worked example — arrives as an
+**installed package whose `exports` resolve to compiled `dist/`**, not as workspace TypeScript source.
+That is *less* wiring, not more: steps 6, 7 and 8 above **do not apply**, and neither does the backend's
+vitest `deps.inline` list. The package resolves out of `node_modules` like any other dependency, and its
+`./client` binds `@game-hub/kernel/client` rather than the shell's `@/` alias, so nothing needs teaching.
+Steps 1–5 and 9 are unchanged, except that the dependency specifier points at the published package (or,
+until it is published, the vendored tarball below).
+
+**If you find yourself adding an alias or a tsconfig include for an external game, stop** — it means the
+package is reaching into this repo, which is the one thing the four-subpath contract forbids.
+
+Two host-level settings *are* required, and both are already in place. They are properties of hosting
+**any** installed game, so a second one needs neither changed:
+
+- `pnpm-workspace.yaml` → `linkWorkspacePackages: true`. An external package peer-depends on
+  `@game-hub/kernel`/`@game-hub/ui-kit` by plain semver range; without this pnpm fetches *registry* copies
+  of packages this repo builds, forking the game into two physical copies.
+- `ui/vite.config.ts` → `optimizeDeps.exclude: ['@game-hub/kernel', '@game-hub/ui-kit']`. Vite's dev-server
+  pre-bundler would otherwise inline a **second copy** of the ui-kit into the installed game's bundle,
+  which silently breaks everything that depends on module identity — the injected REST base URL
+  (`configureTransport`) and React context (`RematchContext`). Dev-server only; `vite build` was always
+  correct, which is what makes this worth writing down.
+
+### Local testing an external game — the two-repo loop
+
+Until the game is on npm, the hub depends on a **packed tarball committed under `vendor/`**
+(`"@game-hub/game-<id>": "file:../vendor/<tarball>"` in both hosts — the `../` is required, because pnpm
+resolves a `file:` specifier relative to the package that declares it). Committed on purpose: a fresh
+clone and the Dockerfile both install with `--frozen-lockfile`.
+
+Editing the game and seeing it here is one command from the hub root:
+
+```bash
+pnpm labyrinth:refresh                      # expects ../game-labyrinth
+LABYRINTH_REPO=~/src/game-labyrinth pnpm labyrinth:refresh    # …or point it anywhere
+```
+
+It packs the game (whose `prepack` runs its `tsc` build, so `dist/` is always current), drops the tarball
+in `vendor/`, deletes the superseded one, rewrites the `file:` specifier in both hosts if the version
+changed, and runs `pnpm install`. **Commit `vendor/`, the two `package.json` files and `pnpm-lock.yaml`
+together** — the lockfile carries the tarball's integrity hash. Then the usual `pnpm dev:backend` +
+`pnpm dev:ui`, or `docker compose up --build`.
+
+Adding a *second* external game means a second script or a generalised one; the current script is
+deliberately named for the single game it serves rather than pretending to a generality nothing has
+asked for yet. See [`vendor/README.md`](../vendor/README.md) for what `npm publish` replaces.
+
+### What the external package owes its host
+
+The other side of this contract lives in the game's own repo, but two items bite the host if they are
+missing, so check them when adopting one:
+
+- **Relative imports in shipped sources carry an explicit `.js` extension.** `tsc` emits specifiers
+  verbatim and Node ESM does neither extension nor directory resolution, so `from '../engine'` produces a
+  tarball that throws `ERR_MODULE_NOT_FOUND` on first import while every check in the game's repo is
+  green. The game should have a **pack smoke** (install the tarball outside its own repo, import all four
+  subpaths under plain `node`) proving it; the kernel's `scripts/pack-smoke.mjs` is the model.
+- **It ships utility classes and no CSS.** The hub's `@source '../node_modules/@game-hub'` (in
+  `ui/src/index.css`) already reaches an installed package's `dist/` through the pnpm symlink — verified,
+  no glob change needed — but the host must also define the ui-kit's semantic tokens (`--color-card`,
+  `--color-muted-foreground`, …), which `ui/src/index.css` does. Without them nothing breaks; the chrome
+  just degrades to something that looks like a bug in the game.
+
+---
+
 ## 7. Testing expectations
 
 - **Engine 100%** — every rule and every rejection path (the `src/engine/**` glob threshold). Tests ship

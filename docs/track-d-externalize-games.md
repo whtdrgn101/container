@@ -1,9 +1,13 @@
 # Track D — Externalize games (design doc)
 
-**Status: ✅ in-workspace phase complete (2026-07-27). D2 (out-of-repo) in progress — kicked off
-2026-07-29 with game 6, Labyrinth: slices D2a–D2d and the kickoff decisions (public npm under the
-`game-hub` org — resolving §8 Q4 — a public `whtdrgn101/game-labyrinth` repo, per-game e2e out of
-contract per §8 Q3) live in [`game-labyrinth-kickoff.md`](./game-labyrinth-kickoff.md).** Game 5 (Russian
+**Status: ✅ COMPLETE (2026-07-30). D2d delivered the thing the whole track existed to prove: Labyrinth
+— built in its own repository, against published `@game-hub/kernel` + `@game-hub/ui-kit`, consumed here
+as an installed package resolving to compiled `dist/` — is the hub's playable sixth game, in the
+production Docker image.** The remaining step is bookkeeping, not architecture: `npm publish` the game
+so `vendor/` can become a version range (see "Delivered in D2d" below). Slices D2a–D2d and the kickoff
+decisions (public npm under the `game-hub` org — resolving §8 Q4 — a public
+`whtdrgn101/game-labyrinth` repo, per-game e2e out of contract per §8 Q3) live in
+[`game-labyrinth-kickoff.md`](./game-labyrinth-kickoff.md). Game 5 (Russian
 Railroads) arrived *as* the Track D pilot — built as the first **in-workspace game package**
 (`packages/games/russianrailroads`, the §3 four-subpath shape) — and then **all four legacy games were
 migrated onto the same shape** and `@game-hub/engine`/`@game-hub/bot` retired (the working plan +
@@ -66,6 +70,67 @@ hub-side changes, all additive:
   `workspace:*` in this repo (one install tree, so a duplicate is impossible), **peer + dev** for a
   package a host installs — with the three duplicate-copy failure modes named (`instanceof` breaking
   `mapError`, React double-loading, Tailwind's `@source` glob missing a nested copy).
+
+### ✅ Delivered in D2d (2026-07-30) — the hub hosts a game it did not compile
+
+The claim under test: **an out-of-repo game is an ordinary dependency.** Measured, not asserted —
+`docker compose up --build`, then a Labyrinth game created and played over REST against the running
+container and again in a real browser against it.
+
+**What the hub had to add, in full:** two `dependencies` lines (`backend` + `ui`), one `games.config.ts`
+entry, `pnpm generate`, and `vendor/` (see below). That is it. Specifically, **none** of the five shims
+every in-workspace game needs was required:
+
+| Shim an in-workspace game needs | Needed for Labyrinth? |
+| --- | --- |
+| a per-subpath `resolve.alias` in `ui/vite.config.ts` | **no** — it resolves out of `node_modules` |
+| an `ui/tsconfig.json` `include` for its `./client` | **no** — it binds `@game-hub/kernel/client`, never the shell's `@/` |
+| a `server.deps.inline` entry in `backend/vitest.config.ts` | **no** — it ships JS (the existing `@game-hub/game-` regex matches it harmlessly) |
+| a workspace glob in `pnpm-workspace.yaml` | **no** |
+| an extra Tailwind `@source` | **no** — see below |
+
+**Three things that had to be got right, each of which failed first:**
+
+1. **`tsc` emits relative specifiers verbatim** (the D2a lesson, re-learned game-side). The game's
+   sources now carry explicit `.js` extensions — `from '../engine/index.js'` — which resolve to `.ts`
+   in its own workspace *and* to the emitted `.js` in the tarball. Its `pnpm pack:smoke` (adapted from
+   the kernel's) installs the tarball outside its repo and drives a real game under plain `node`; without
+   the extensions the first import throws `ERR_MODULE_NOT_FOUND` while every other check stays green.
+2. **Vite's dev-server dependency pre-bundling forked the shared singletons.** `@game-hub/game-labyrinth`
+   lives under `node_modules`, so esbuild pre-bundled it — and pulled `@game-hub/ui-kit` *into* that
+   bundle. Two copies of the ui-kit meant two copies of its module-level transport state: the shell's
+   `configureTransport({ baseUrl: '/api' })` never reached the board's, and every action it sent 404'd at
+   `/games/:id/actions`. (`RematchContext` identity has the same failure mode, silently.) Fixed with
+   `optimizeDeps.exclude: ['@game-hub/kernel', '@game-hub/ui-kit']` — stated as a rule about the shared
+   singletons, so it covers every future installed game. **Dev-server only**: `vite build` resolves
+   through the same aliases with Rollup and always emitted a single transport, so the image was never
+   wrong — which is exactly why this would have shipped as a mystery without an e2e suite.
+3. **pnpm resolved the game's peers from the registry.** An external package declares plain semver peers
+   (`@game-hub/ui-kit: ^1.0.0`); pnpm 10+ defaults `linkWorkspacePackages` to **false**, so the backend
+   — which declares no ui-kit of its own, and shouldn't — got a *registry* copy grafted in, forking the
+   game into two physical copies. `linkWorkspacePackages: true` in `pnpm-workspace.yaml` links the
+   workspace package instead: one game copy, ui-kit peer resolved to `link:packages/ui-kit`.
+
+**§2's Tailwind question, finally answered against a real host** (D2b proved the mechanism; D2c §11
+could not test the hoisting). The existing `@source '../node_modules/@game-hub'` in `ui/src/index.css`
+**does** reach an installed game: it follows pnpm's symlink and scans the compiled `.js` in `dist/`. Three
+utilities that exist nowhere in this repo's sources — `max-w-[34rem]`, `lg:max-w-[20rem]`,
+`outline-offset-[-3px]` — are present in the built stylesheet the container serves. **No glob change was
+needed.** The other half of the answer (D2c §21: the ui-kit's ~16 semantic tokens) also held, because the
+hub defines them; a host that doesn't still owes them.
+
+**Code-splitting survived publication** (§3's open worry). `lazy(() => import('./Board.js'))` inside
+`node_modules` still becomes its own chunk: the container serves six `Board-*.js` chunks and a browser
+opening Labyrinth fetches exactly one of them.
+
+**Distribution, and the one piece of scaffolding that is temporary.** The `game-hub` npm org exists
+(the kernel and the ui-kit are published) but the *game* is not published yet, so the hub depends on a
+**packed tarball committed under `vendor/`** with `"@game-hub/game-labyrinth": "file:../vendor/<tarball>"`
+in both hosts. It is committed deliberately: a fresh clone and `docker build` must both install it with
+`--frozen-lockfile`. `pnpm labyrinth:refresh` is the whole two-repo loop in one command (pack in
+`../game-labyrinth` → drop in `vendor/` → rewrite the specifier → install). See
+[`vendor/README.md`](../vendor/README.md) — publishing to npm deletes that directory and changes nothing
+else, which is the point: the vendoring is a **distribution** detail, not an architectural one.
 
 Original goal statement: four games had tested the engine and the seams; the long-term goal is making
 games easier to add, and eventually addable from *outside* this repo. Pilot: Russian Railroads (a

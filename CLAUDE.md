@@ -5,8 +5,9 @@ Context and working agreement for this repo. Read this first, then the two refer
 ## What we're building
 
 **Game Hub** — a self-hosted board-game platform (a "games room") that hosts *multiple* games behind
-shared engine/backend/UI seams. Each game is its own in-workspace package (`packages/games/<id>/`); the
-platform is game-agnostic. The games:
+shared engine/backend/UI seams. Each game is its own package — five in-workspace (`packages/games/<id>/`)
+and, since Track D / D2d, one built in an entirely **separate repository** and installed like any npm
+dependency. The platform is game-agnostic. The games:
 
 | Game | Players | Kind | Status |
 |------|---------|------|--------|
@@ -15,11 +16,12 @@ platform is game-agnostic. The games:
 | **Stone Age** | 2–4 | worker-placement Euro | **complete** (SA0–SA15): full game, illustrated board, bot, 2–3-player rules, deck redaction |
 | **Saint Petersburg** (1st ed.) | 2–4 | card-buying engine | **complete** (SP0–SP9): first game with real hidden info (hand + rubles secret) |
 | **Russian Railroads** (Ultimate ed.) | 2–4 | worker-placement | **in build** — base game + art (RR9) complete; board-UI revamp (RR9b) queued behind the Labyrinth kickoff (it should borrow Labyrinth's board-UI findings); bot (RR10) after; the Track D **package pilot** |
-| **Labyrinth** (Ravensburger) | 2–4 | sliding-maze race, hidden treasure targets | **next up — the Track D D2 pilot**: game 6, built *out-of-repo* (`whtdrgn101/game-labyrinth`, public) against published `@game-hub/*`; kickoff decisions + rules digest + slices in [`docs/game-labyrinth-kickoff.md`](./docs/game-labyrinth-kickoff.md) |
+| **Labyrinth** (Ravensburger) | 2–4 | sliding-maze race, hidden treasure targets | **playable — and the Track D D2 proof**: game 6, built *out-of-repo* ([`whtdrgn101/game-labyrinth`](https://github.com/whtdrgn101/game-labyrinth), public) against published `@game-hub/*` and hosted here as an **installed package over compiled `dist/`**. L0–L4 shipped; L4b (art) + L5 (bot) remain. ⚠️ Its roadmap, rules digest and rulings live **in that repo** |
 
-Per-game rules and slice history live in each game's `packages/games/<id>/ROADMAP.md`; the authoritative
-rules are the rulebook PDFs in `reference_materials/` (gitignored — copyrighted). ⚠️ **Read the spec
-before implementing a rule** — never from memory.
+Per-game rules and slice history live in each game's `packages/games/<id>/ROADMAP.md` — **except
+Labyrinth's, which live in its own repo** (`../game-labyrinth`: `ROADMAP.md`, `CLAUDE.md`,
+`docs/d2c-findings.md`). The authoritative rules are the rulebook PDFs in `reference_materials/`
+(gitignored — copyrighted). ⚠️ **Read the spec before implementing a rule** — never from memory.
 
 **Naming split:** the **platform** is "Game Hub" (npm scope `@game-hub/*`). **Container** is one game *on*
 it (id `container`), not the platform. Don't conflate them.
@@ -44,8 +46,8 @@ packages/
                      shuffle/mulberry32), runBotLoop, the GameModule/GameClient contracts (host
                      bindings are generics), the transport DTOs (GamePayload/GameMessage), and the
                      @game-hub/kernel/{client,bot} subpaths. Its own 100% gate.
-                     Published through 1.1.0; **1.2.0 is in the tree and unpublished** (the colour
-                     channel + the rng helpers — see contract.ts's version history).
+                     Published through **1.2.0** (the colour channel + the rng helpers — see
+                     contract.ts's version history).
   ui-kit/          @game-hub/ui-kit — the shared board chrome every game's UI renders inside
                      (TurnBanner, ActivityFeed, GameOver, ActionTip, PanZoom, Button/Card, cn,
                      seatIdentity) + the game-facing REST calls (getGame/applyAction/apiUrl).
@@ -59,12 +61,23 @@ packages/
 backend/           @game-hub/backend — game-agnostic Fastify REST core + SQLite + the generated registry
 ui/                @game-hub/ui — game-agnostic React + Tailwind + shadcn shell + the generated registry
 games.config.ts    the ordered list of hosted games → `pnpm generate` → the two checked-in registries
+vendor/            the packed @game-hub/game-labyrinth tarball — game 6 lives in its OWN repo and is
+                     consumed here as an installed dist package (Track D / D2d). Committed on purpose:
+                     it IS the dependency until the package is published. `pnpm labyrinth:refresh` is
+                     the whole two-repo loop. See vendor/README.md.
 ```
 
 **Data flow:** UI → REST → backend → **module → engine** (authoritative) → SQLite snapshot + move log.
 The backend then **pushes** new state to every client over a push-only WebSocket, each projected
 per-viewer via the module's `viewFor`. Adding a game is **additive** — one `games.config.ts` entry +
-`pnpm generate` + one dep/alias/include line per host (see `docs/game-creation.md`).
+`pnpm generate` + one dep/alias/include line per host (see `docs/game-creation.md`). An **out-of-repo**
+game (Labyrinth) is *less*: two dependency lines and the config entry, with **no** Vite alias, tsconfig
+include or vitest inline entry, because a dist consumer is just a dependency (`game-creation.md` §6b).
+⚠️ Two host settings make that work and must not be reverted — `linkWorkspacePackages: true`
+(`pnpm-workspace.yaml`) and `optimizeDeps.exclude: ['@game-hub/kernel', '@game-hub/ui-kit']`
+(`ui/vite.config.ts`); both stop a **second copy** of a shared package reaching the installed game, which
+breaks module-identity singletons (the injected REST base URL, React context) silently. Each has a
+measured note where it lives.
 
 | Layer | Choice | Why |
 |-------|--------|-----|
@@ -119,6 +132,9 @@ pnpm format                 # Prettier --write .   (single quotes, semicolons, t
 pnpm format:check           # the CI gate (*.md is Prettier-ignored — hand-wrap docs to ~100-120 cols)
 
 pnpm generate               # games.config.ts → the two checked-in registries (CI freshness-checks the diff)
+pnpm labyrinth:refresh      # re-pack ../game-labyrinth into vendor/ + reinstall (LABYRINTH_REPO overrides
+                            #   the path). The two-repo loop for game 6 — commit vendor/ + both
+                            #   package.json files + the lockfile together. See vendor/README.md.
 
 # Publish-readiness of the two published packages (CI runs both after `pnpm test`)
 pnpm --filter @game-hub/kernel pack:smoke   # pack → install outside the workspace → node + nodenext tsc
@@ -172,16 +188,17 @@ in `app.ts` (`/^\/(games|lobbies|health)\b/`).
 - **Reference PDFs stay gitignored** (copyright) — local-only; cite page numbers in comments instead.
 - **v1 was hotseat / pass-and-play.** Online multiplayer (lobbies, live sync, seat identity, resume) and
   AI both shipped; hotseat still works and its testids are intact.
-- All five games are persisted-state **shape-v1** (no `schemaVersion` declared).
+- All six games are persisted-state **shape-v1** (no `schemaVersion` declared).
 - **`@game-hub/kernel`'s major version IS the host↔game contract version** (Track D / D2a). It exports
   `KERNEL_CONTRACT_VERSION` (= 1); every module declares `kernelContract: KERNEL_CONTRACT_VERSION` and
   `GameRegistry.register` boot-crashes on a mismatch. Additive optional hooks = minor; a changed required
   member = major. An undeclared `kernelContract` means 1 **only during this transition** — make it
   required when a contract 2 lands. Full rule: `packages/kernel/src/contract.ts` + design doc §4.
-- ⚠️ **Shipped kernel files write relative imports with an explicit `.js` extension.** The kernel is the
-  one package that leaves this repo, and `tsc` emits relative specifiers verbatim — extensionless ones
-  make the installed tarball unloadable by Node while every in-repo suite stays green. `pack:smoke` is
-  what catches it. Same rule applies to any game package that later ships a `dist`.
+- ⚠️ **Files in a package that ships a `dist` write relative imports with an explicit `.js` extension.**
+  `tsc` emits relative specifiers verbatim, and Node ESM does neither extension nor directory
+  resolution — an extensionless `from './errors'` makes the installed tarball unloadable while every
+  in-repo suite stays green. `pack:smoke` is what catches it. Applies to `@game-hub/kernel`,
+  `@game-hub/ui-kit`, and (learned again the hard way at D2d) the out-of-repo Labyrinth package.
 
 Older decision detail (Track A/B/C/D slice history) lives in `ROADMAP.md` and the per-game roadmaps.
 
