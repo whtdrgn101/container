@@ -100,7 +100,12 @@ The near-term order, decided while play-testing:
    kernel's canonical mulberry32, five are a transcription drift (`s = (s + 0x6d2b79f5) >>> 0; t ^= …`)
    that produces a **different stream**. Swapping the drifted ones changes every seeded expectation that
    depends on them (e.g. the seeds chosen to make an all-bot Can't Stop game finish), so it needs its own
-   pass with each seed re-verified rather than a blind find-and-replace. (c) **the docs contradiction** (finding §2) — resolved at the
+   pass with each seed re-verified rather than a blind find-and-replace. **Partly closed 2026-07-31:** the
+   four *backend* test helpers literally named `mulberry32` (one canonical + three drifted) now import the
+   kernel's canonical `mulberry32` via `backend/src/tests/helpers.ts`; the drifted-→-canonical swap was
+   re-verified green (those seeds still reach their intended finishes). What remains hand-rolled is the
+   `makeRng` copies in the backend's stpetersburg/russianrailroads suites and any in the now-out-of-repo
+   game repos — still a seed-by-seed matter, tracked where each lives. (c) **the docs contradiction** (finding §2) — resolved at the
    time with an in-repo vs out-of-repo table in `game-creation.md` §1, since **superseded** (2026-07-31):
    with every game now out-of-repo, that doc was rewritten standalone-repo-first as a single path, and
    **peer + dev** (with the duplicate-copy failure modes spelled out) is simply *the* dependency shape.
@@ -346,20 +351,36 @@ CI).
 
 **Platform items (independent, any order — none blocks play):**
 
-- **`app.ts` is the file that grew back** — 926+ lines holding games, abandon, rematch, lobbies, WS and
-  static serving; the same monolith shape C2 fixed in `App.tsx` (1895 → 364). Split it the next time a
-  feature lands there, not as a big-bang refactor.
-- **Backend test hygiene** — `app.test.ts` is 1237+ lines with a second suite already living mid-file
-  (violates the repo's own "well under 1000" rule); the backend never adopted the engine's
-  `tests/helpers.ts` convention; `mulberry32` is duplicated verbatim across three test files.
-- **Engine immutability is asserted only in Container** — CLAUDE.md states the invariant as tested, but
-  none of the four newer games has such a test. All are in fact clean; Stone Age and Saint Petersburg do
-  the most nested-record rebuilding, so they're the ones most worth pinning.
-- **`expectError` typing regressed in the newer games** — Container's helper is compile-checked against
-  its error union; the others take a bare `string`, so a test asserting an error code that no longer
-  exists stays green.
-- **`MoveRecord.type` is stringly-typed** — it discards each game's precise `ActionType` union, and the
-  UI's log filters match on string literals with no compile-time link to the engine.
+- ✅ **`app.ts` is the file that grew back** — **done 2026-07-31** (a chat/presence feature is queued
+  next, which is the "next time a feature lands there" trigger). Split from 1182 lines into a thin
+  composition root (`app.ts`, ~95 lines) plus a shared `services.ts` (repositories + the game-lifecycle
+  and error-reply helpers) and one registrar per concern under `backend/src/routes/`
+  (`health`, `stream`, `games`, `abandon`, `rematch`, `modules`, `lobbies`, `static`). Pure refactor —
+  registration order preserved (abandon guard first, `@fastify/websocket` before the stream route), the
+  ⚠️ SPA-fallback allowlist regex moved intact into `routes/static.ts`, all backend tests green.
+- ✅ **Backend test hygiene** — **done 2026-07-31.** `app.test.ts` (1238 lines) split by concern into
+  `app.test.ts` (core REST), `auctions.test.ts` (Container's auction module routes) and
+  `botSeats.test.ts` (the bot-seat platform); added `backend/src/tests/helpers.ts` (the engine
+  convention — `newApp`, a generic `wsReader`, and a re-export of the kernel's `mulberry32`); the four
+  hand-rolled `mulberry32` copies now import from `@game-hub/kernel`. Three were the *drifted* variant the
+  D2c follow-up flagged; the swap to the canonical stream was re-verified green (their seeds still reach
+  the intended finishes), so that follow-up is closed for the four `mulberry32` copies. The differently
+  named `makeRng` copies in stpetersburg/russianrailroads stay as a separate seed-verified matter. 306
+  tests before and after.
+- **Engine immutability is asserted only in Container** — **now a per-game-repo concern** (2026-07-31):
+  the engines all left this repo when the games went out-of-repo, so an immutability test for a game
+  belongs in that game's own repository, beside its engine. Tracked in each game's own ROADMAP; not a
+  hub-side item any more. (Stone Age and Saint Petersburg do the most nested-record rebuilding, so
+  they're the ones most worth pinning — a note for those repos.)
+- **`expectError` typing regressed in the newer games** — **now a per-game-repo concern** (2026-07-31):
+  each game's `expectError` helper lives with its engine tests in that game's repository now, so
+  compile-checking it against the game's error union is work for that repo. Tracked in each game's own
+  ROADMAP; not a hub-side item any more.
+- **`MoveRecord.type` is stringly-typed** — **stays in the hub backlog** (it's a **kernel** change):
+  `MoveRecord` is a `@game-hub/kernel` primitive, so typing `type` against each game's `ActionType` union
+  (and the UI's log filters with it) is a kernel API change that needs a **kernel release** to land —
+  every game and both hosts consume the published contract. Not a quiet edit; schedule it with a kernel
+  version bump.
 - ✅ **WS heartbeat** (deferred from §4.7) — **done 2026-07-31.** `GameHub.startHeartbeat` pings every
   live-stream socket on an interval (`WS_HEARTBEAT_INTERVAL_MS`, 30s) and terminates any that missed the
   previous pong, so a half-open socket (a peer gone without a FIN) is reaped within a sweep or two rather
@@ -367,11 +388,16 @@ CI).
   runs the stream route's existing cleanup; the interval is `unref`'d and stopped on `onClose`. The
   origin check is untouched. Covered by `backend/src/tests/hub.test.ts` (reap, spare-on-pong, skip a bare
   Sendable, skip a non-open socket, interval + stop). See design-patterns §4.
-- **Dependencies are clean but stale** (re-measured 2026-07-28): vite 6 → 8 (2 majors), vitest 3 → 4
-  (must move in lockstep across packages), better-sqlite3 11 → 13 (the one bump that can break the
-  Docker build). `pnpm audit` still clean.
-- **`reference_materials/` needs a README note** — the PDFs are gitignored (copyright) while 9 committed
-  files cite them, including `TODO(verify)` items a fresh clone can't resolve. One README line saying so.
+- ✅ **Dependencies are clean but stale** — **done 2026-07-31**, each its own commit: **vitest 3.2.4 →
+  4.1.10** (with `@vitest/coverage-v8`, lockstep across kernel + backend; no config migration — v4's
+  AST-aware v8 coverage shifted the measured backend numbers down a little but they stay above the gate),
+  **vite 6 → 8.2.0** in ui (with `@vitejs/plugin-react` 4 → 6; no config migration; dev server + build +
+  e2e verified), and **better-sqlite3 11 → 13** in backend (`docker build` clean, the container boots
+  healthy — `/health`'s real `SELECT 1` exercises the native binding, no ABI mismatch). `pnpm audit`
+  still clean.
+- ✅ **`reference_materials/` needs a README note** — **done 2026-07-31.** `reference_materials/README.md`
+  records that the PDFs are gitignored for copyright and the exact filename each of the six games'
+  rulebook belongs under, and points at each game repo's own same-convention note.
 
 **Game-scoped remainders** moved to their game's roadmap: Container's auction-fetch race and
 `Action`-marker shape → [`packages/games/container/ROADMAP.md`](packages/games/container/ROADMAP.md);

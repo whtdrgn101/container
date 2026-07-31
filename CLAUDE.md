@@ -158,7 +158,9 @@ tsx/vite/vitest, runs as unprivileged `node`, in-image
 `HEALTHCHECK`, boot-proven by `backend/scripts/smoke.mjs`). Games persist to `DATABASE_PATH`
 (default `/data/game-hub.sqlite`) — mount `/data` to a volume. No auth (trusted-LAN use). See
 [`DEPLOY.md`](./DEPLOY.md). ⚠️ When adding a top-level API route, update the SPA-fallback allowlist regex
-in `app.ts` (`/^\/(games|lobbies|health)\b/`).
+in `backend/src/routes/static.ts` (`/^\/(games|lobbies|health)\b/`). (`app.ts` was split 2026-07-31 into a
+thin composition root + per-concern registrars under `backend/src/routes/`; the shared repositories and
+helpers live in `backend/src/services.ts`.)
 
 ## Testing strategy (summary — full detail in design-patterns §9)
 

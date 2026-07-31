@@ -263,7 +263,9 @@ Hidden information is enforced **server-side**, never as UI discipline. The engi
   stopped on the app's `onClose`. The `release`-on-`error` guard in the stream route stays as a
   belt-and-suspenders for a proxy reset between sweeps.
 - **⚠️ When adding a top-level API route**, update the `setNotFoundHandler` SPA-fallback allowlist regex
-  in `app.ts` (`/^\/(games|lobbies|health)\b/`) so it isn't swallowed by the SPA fallback.
+  in `backend/src/routes/static.ts` (`/^\/(games|lobbies|health)\b/`) so it isn't swallowed by the SPA
+  fallback. (`app.ts` was split into per-concern registrars under `backend/src/routes/` on 2026-07-31,
+  with the shared repositories + helpers in `backend/src/services.ts`.)
 
 ---
 
