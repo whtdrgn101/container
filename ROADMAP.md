@@ -58,7 +58,7 @@ The near-term order, decided while play-testing:
    and the `labyrinth:refresh`/`test:games` scripts are gone, and the per-game Vite aliases + tsconfig
    includes with them (Labyrinth never had any — the proof they were unneeded). All gates green after the
    swap (typecheck, kernel+backend tests, 158 e2e, lint, format, `docker build`). See CLAUDE.md's decisions
-   log (2026-07-31 entry) and `docs/game-creation.md` §6b — now the *only* path for adding a game.
+   log (2026-07-31 entry) and `docs/game-creation.md` §6 — now the *only* path for adding a game.
 5. **Russian Railroads board-UI revamp (RR9b)** (owner, 2026-07-28, while play-testing):
    the RR board fights itself — a responsive layout that works on mobile vs a game that genuinely
    needs table-top board density — and the compromise makes the game nearly unplayable. Redesign the
@@ -100,9 +100,10 @@ The near-term order, decided while play-testing:
    kernel's canonical mulberry32, five are a transcription drift (`s = (s + 0x6d2b79f5) >>> 0; t ^= …`)
    that produces a **different stream**. Swapping the drifted ones changes every seeded expectation that
    depends on them (e.g. the seeds chosen to make an all-bot Can't Stop game finish), so it needs its own
-   pass with each seed re-verified rather than a blind find-and-replace. (c) **the docs contradiction** (finding §2) — `game-creation.md` §1 now
-   opens with an in-repo vs out-of-repo table: `workspace:*` for the five games here, **peer + dev** for a
-   package a host installs, with the duplicate-copy failure modes spelled out.
+   pass with each seed re-verified rather than a blind find-and-replace. (c) **the docs contradiction** (finding §2) — resolved at the
+   time with an in-repo vs out-of-repo table in `game-creation.md` §1, since **superseded** (2026-07-31):
+   with every game now out-of-repo, that doc was rewritten standalone-repo-first as a single path, and
+   **peer + dev** (with the duplicate-copy failure modes spelled out) is simply *the* dependency shape.
    **D2c ✅ + L0–L4 ✅ (2026-07-30, out-of-repo):** the game repo built its engine, module seam and
    playable board against the **published** `@game-hub/kernel@1.2.0` + `@game-hub/ui-kit@1.0.0` (its CI
    installs them from the registry with `--frozen-lockfile`, which is the honest proof), 352 tests with

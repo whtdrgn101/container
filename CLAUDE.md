@@ -73,7 +73,7 @@ The backend then **pushes** new state to every client over a push-only WebSocket
 per-viewer via the module's `viewFor`. Adding a game is **additive** and now *always* the out-of-repo
 shape: publish the `@game-hub/game-<id>` package, add two dependency lines (backend + ui) and one
 `games.config.ts` entry, `pnpm generate` — with **no** Vite alias, tsconfig include or vitest inline
-entry, because a dist consumer is just a dependency (`docs/game-creation.md` §6b, the only path now).
+entry, because a dist consumer is just a dependency (`docs/game-creation.md` §6, the only path now).
 ⚠️ Two host settings make that work and must not be reverted — `linkWorkspacePackages: true`
 (`pnpm-workspace.yaml`) and `optimizeDeps.exclude: ['@game-hub/kernel', '@game-hub/ui-kit']`
 (`ui/vite.config.ts`); both stop a **second copy** of a shared package reaching the installed game, which

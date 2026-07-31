@@ -1,534 +1,426 @@
-# Adding a game — the package recipe
+# Building a game for Game Hub — the standalone-repo recipe
 
-> ⚠️ **Status (2026-07-31): the out-of-repo path is now the ONLY path.** All six games were extracted to
-> their own repositories (`whtdrgn101/game-<id>`) and are published to npm; nothing lives under
-> `packages/games/` anymore, and the hub consumes every game as `@game-hub/game-*@^0.1.0` over compiled
-> `dist/`. **A new game is built in its own repo and hosted here as an installed package — jump to
-> [§6b](#6b-hosting-a-game-built-outside-this-repo-track-d--d2d), which is the whole host-side recipe now.**
-> Sections 1–6 below describe the historical **in-workspace** shape (`packages/games/<id>/`, "situation A")
-> — kept because the four-subpath contract, the engine/module/client/bot layout, the purity rules and the
-> testing expectations are **identical** whether the game lives here or in its own repo. Read them for the
-> *package internals*; take the dependency/tsconfig/vitest wiring from the **"situation B"** column and
-> §6b, never the "situation A" `workspace:*` column.
+This is the complete, self-sufficient guide to building a new game for Game Hub. As of 2026-07-31 there is
+**one way to build a game and it is out-of-repo**: a game is its own repository, published to npm as
+`@game-hub/game-<id>`, and hosted here as an ordinary installed dependency resolving to compiled `dist/`.
+All six games — the five originally in-workspace and Labyrinth, which was born external — now live this way
+(`whtdrgn101/game-<id>`), and nothing lives under `packages/games/` anymore.
 
-This is the complete, self-sufficient recipe for adding a game to Game Hub in the **package shape** that
-every game uses (four TS-source subpath exports over `@game-hub/kernel`). Follow it top to bottom and the
-game coexists with the others, touching no shared core. It is written to be executable as-is.
+You are the audience whether you work for this project or are a third party: a game builds against the
+**published** `@game-hub/kernel` and `@game-hub/ui-kit` and never against this repo's filesystem. If the
+published contract has a hole, your CI is where it shows up — which is the whole point of the shape.
 
-Read [`design-patterns.md`](./design-patterns.md) first — this recipe references its principles
-(engine purity, the three seams, coordination state, redaction, injected randomness) rather than
-re-explaining them. Adding a game is **additive**: implement the seams, register, done.
+> **Start from the template.** [`whtdrgn101/game-template`](https://github.com/whtdrgn101/game-template) is a
+> complete, working, minimal game (Nim) in exactly this shape, with every gate green. `gh repo create
+> <you>/game-<id> --template whtdrgn101/game-template` (or copy it) and do its rename checklist. This guide
+> explains the _why_ behind each file the template ships; read them together.
 
-Throughout, `<id>` is the game id (lowercase, no spaces) — the engine folder name, the package suffix,
-and the `game_type` discriminator, all the same string.
+Read [`design-patterns.md`](./design-patterns.md) first for the platform's principles (engine purity, the
+three seams, coordination state, redaction, injected randomness); this guide references them rather than
+re-explaining. Throughout, `<id>` is the game id — lowercase, no spaces — used as the engine folder name,
+the package suffix, the module's `id`, and the `game_type` discriminator, all the same string.
 
 ---
 
-## 0. Prerequisites
+## 1. The contract — four subpath exports over one kernel
 
-- **The rulebook lives in `reference_materials/`** (gitignored — copyrighted PDFs stay local-only). ⚠️
-  **Read the spec before implementing a rule** — rulebook page, not memory. Cite the page in a comment at
-  every mechanic (`// pg. 9: Produce as many as you are able to`). Never implement a rule from memory or
-  guess at one you could check.
-- Decide the game's shape up front: seat bounds, whether it has **hidden information** (drives `viewFor`),
-  and whether it needs **per-turn randomness** (dice/draws — drives `routes` + `ctx.rng`) or only
-  **setup randomness** (a shuffle — drives `createGame({ rng })`).
+A game is **one npm package** with **four subpath exports**, one per seam:
+
+```
+@game-hub/game-<id>
+├── ./engine   pure rules — deterministic, injected randomness, 100% test gate. Imports only @game-hub/kernel.
+├── ./module   the backend GameModule — server seam. Imports ./engine (+ kernel).
+├── ./client   the UI GameClient — a lazy board. Imports ./engine, @game-hub/kernel/client, @game-hub/ui-kit.
+└── ./bot      optional AI — pure policy, 90% test gate. Imports ./engine (+ @game-hub/kernel/bot).
+```
+
+The **only** platform dependencies a game may have are `@game-hub/kernel` (contracts + primitives) and
+`@game-hub/ui-kit` (the shared board chrome + the game-facing REST helpers). A game **may not** depend on
+the hub's `backend` or `ui` — that is an unpublishable package, and the seam rule below forbids it.
+
+**`@game-hub/kernel`'s major version _is_ the host↔game contract version.** It exports
+`KERNEL_CONTRACT_VERSION` (= 1 today); every module declares `kernelContract: KERNEL_CONTRACT_VERSION`, and
+the host's registry boot-crashes on a mismatch. Additive optional hooks are a **minor** bump; a changed
+required member is a **major**. See §6 for what that means when you publish.
+
+### `./engine` — pure rules, injected randomness
+
+The authoritative rules, as a pure `state + action → state` library. **Purity is absolute**: no `Date`, no
+`Math.random`, no mutation. Randomness is **injected** — at setup through `createGame({ rng })` (a shuffle),
+or per action through a module route drawing from `ctx.rng` (dice), never reached for. Randomness a _rule_
+consumes comes in as data: model a die roll as an action carrying the already-rolled values, so the state
+function stays deterministic and the 100% gate is reachable.
+
+Lay it out one folder per concern (the template and every hub game do this):
+
+```
+src/engine/
+  index.ts            THE public API — the ONLY thing ./module, ./client, ./bot import from the engine
+  createGame.ts       deterministic setup (rng injected as a param if it shuffles)
+  core/               constants.ts, types.ts (compile-time only), errors.ts (a GameError subclass), index.ts
+  internal/           shared helpers, incl. the kernel record()/makeSeating bindings
+  actions/            one file per mechanic + action.ts (the Action union) + applyAction.ts + legalActions.ts
+  view.ts             viewFor + the view type (redaction — see below)
+  tests/              one file per mechanic + helpers.ts
+```
+
+- **One mechanic = one file** in `actions/` + one matching test in `tests/`. Adding an action is a variant
+  in `action.ts`, a mechanic file, an `applyAction` case, a `legalActions` branch, a public export, a test.
+- **Setup randomness comes from the kernel's `.` barrel**: `shuffle(items, rng?)` (Fisher–Yates, new array;
+  omitting `rng` keeps order — how a rules test deals a _known_ deck) and `mulberry32(seed)` for a seeded
+  generator in `tests/helpers.ts`. Both are on `@game-hub/kernel` since 1.2.0 — don't reach into
+  `@game-hub/kernel/bot` from an engine test, and don't re-implement either.
+- **⚠️ Never bump `version` or append to the log outside `record()`** — the kernel's `record()` is the one
+  place both move, and everything it logs is public (see below). Bind the kernel's `makeSeating` with your
+  own `GameError` subclass (`internal/players.ts`) so a `PLAYER_NOT_FOUND` stays `instanceof` your class.
+- **The end state is the kernel's union.** Intersect `GameEndState<Score>` (a game that tabulates) or
+  `WinnersEndState` (a winner and nothing else — Nim, Can't Stop) into your state type, so `ended` and
+  `results`/`winnerIds` can never disagree; read sites narrow on `status`.
+
+### `viewFor` redaction — an explicit per-game decision
+
+`viewFor(state, viewer)` projects state for one client (`viewer` is one seat, several in hotseat, or `null`
+for a spectator). **It is the only thing standing between a client and another player's secrets**, so it is
+an explicit decision every game writes, in the _engine_ (under the 100% gate) — not the module — because
+what a player may see is as much a rule as what they may do, and because `./client`/`./bot` must name the
+view type without importing `./module`.
+
+- A game with **hidden information** (Saint Petersburg's hand, Labyrinth's face-down stack) rebuilds the
+  view **field by field**, redacting each non-viewer's secrets to `null`/a bare count, and reveals
+  everything once `status === 'ended'`. ⚠️ **Never spread the state into a view** — a spread ships every
+  secret, and a field added later rides along silently.
+- A game with **no secrets** (Nim, Can't Stop) makes `viewFor` (nearly) the identity — but write it
+  deliberately, aliasing the view type (`NimView = NimState`) so the seam is visible and the day a secret
+  appears, the view diverges and the client follows _it_, not the un-redacted state.
+- **⚠️ Everything logged is public** (design-patterns §3). Anything the engine records is on the wire
+  regardless of `viewFor`, so a genuine secret must be redacted in the log entry _or never logged_ —
+  Container never records a _losing_ bid at all. Redacting only in the UI is a leak.
+
+### Typed errors
+
+Every rejection is a typed `GameError` subclass whose `code` is drawn from your own union
+(`NimErrorCode`, `LabyrinthErrorCode`, …), so a thrown code is always one the game declares. Split codes
+along the platform's house shape — **404** (a named thing doesn't exist), **400** (the request could never
+be valid — a bad seat count, a malformed payload; `parseAction` normally catches these first), **409** (a
+well-formed move this state refuses — out of turn, illegal now). The module's `mapError` turns each code
+into a status through a **total** record, so a code added later fails to compile until its status is
+decided.
+
+### Coverage discipline
+
+- **Engine 100%** — every rule and every rejection path, enforced by a `src/engine/**` per-glob gate. Tests
+  ship with the code; a feature without tests isn't finished.
+- **Bot 90%** — heuristics get retuned, so a 100% bar on judgement calls buys churn, not correctness.
+- The **module** and **client** are host bindings — tested (their tests still run), but not gated here; the
+  hub's backend/UI suites are what finally exercise them once the game is registered.
 
 ---
 
-## 1. Scaffold the package
+## 2. Repo scaffold
 
-Create `packages/games/<id>/` with these four files. Copy an existing game closest in shape (Saint
-Petersburg is the routeless/hidden-info template; Can't Stop is the routes+dice+difficulty template;
-Container is the everything template) and adjust.
-
-> ### ⚠️ First, know which of the two situations you are in
->
-> The **only** thing that differs between them is how the two platform packages are depended on — but
-> getting it wrong is a silent, hard-to-diagnose failure, so decide before you write `package.json`.
->
-> | | **A — in this repo** (`packages/games/<id>/`) | **B — your own repo**, installed by a host |
-> |---|---|---|
-> | `@game-hub/kernel`, `@game-hub/ui-kit` | `dependencies: "workspace:*"` | **`peerDependencies` + `devDependencies`** |
-> | `react` | `peerDependencies` | `peerDependencies` + `devDependencies` |
-> | Consumed as | TypeScript **source**, one install tree | built `dist/` from **npm** |
-> | Who resolves the platform packages | pnpm, to the one workspace copy | the **host**, from its own tree |
->
-> **A** is what all five hosted games do and what the rest of this recipe assumes. `workspace:*` is
-> correct there precisely *because* there is one install tree: pnpm links the single workspace copy, so
-> a duplicate is impossible.
->
-> **B** — the out-of-repo shape (Track D §3, "a game package peer-depends on `@game-hub/kernel`") —
-> must use peer + dev, and this is not a style preference. A plain `dependency` lets npm/pnpm satisfy
-> your game with a **nested** copy at
-> `node_modules/@game-hub/game-<id>/node_modules/@game-hub/{kernel,ui-kit}`, and two copies break things
-> that look nothing like a dependency problem:
->
-> - **`instanceof` stops working.** A `GameError` thrown from your copy of the kernel is not an
->   `instanceof` the host's `GameError`, so the module's `mapError` returns `null` and a clean 400
->   becomes a 500.
-> - **React double-loads.** A second React through a duplicated ui-kit means two reconcilers — hooks
->   throw inside the shared chrome.
-> - **Tailwind silently loses the chrome's styles.** The host scans `@source '../node_modules/@game-hub'`;
->   a *nested* duplicate is outside that glob, so a `Button` from it renders unstyled.
->
-> `peerDependencies` says "the host provides exactly one copy"; the matching `devDependencies` entry is
-> what lets your repo build and test standalone. Same versions in both.
+Take all of this from the template; the notes below say what each file is _for_ and what must not drift.
 
 ### `package.json`
+
+The shape that makes one package resolve two ways — TS source in your workspace, `dist/` when a host
+installs it:
 
 ```jsonc
 {
   "name": "@game-hub/game-<id>",
-  "version": "0.0.0",
-  "private": true,                    // situation B: drop this, and add "files"/"exports" over dist/
+  "version": "0.1.0",
   "type": "module",
   "license": "BSD-3-Clause",
+  "engines": { "node": ">=22" },
+  "packageManager": "pnpm@11.13.1",
+  "files": ["dist"],
+  // Dev resolution: the four subpaths point at TS SOURCE, so your own tests/typecheck read source directly.
   "exports": {
     "./engine": "./src/engine/index.ts",
     "./module": "./src/module/index.ts",
     "./client": "./src/client/index.ts",
-    "./bot": "./src/bot/index.ts"     // omit if the game has no bot
+    "./bot": "./src/bot/index.ts",
+    "./package.json": "./package.json"
+  },
+  // Publish resolution (a pnpm feature applied at pack/publish): the SAME subpaths rewritten to dist/,
+  // `types` first. This is what a host installs — one package, two resolutions, no host-side shim.
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      "./engine": { "types": "./dist/engine/index.d.ts", "default": "./dist/engine/index.js" },
+      "./module": { "types": "./dist/module/index.d.ts", "default": "./dist/module/index.js" },
+      "./client": { "types": "./dist/client/index.d.ts", "default": "./dist/client/index.js" },
+      "./bot":    { "types": "./dist/bot/index.d.ts",    "default": "./dist/bot/index.js" },
+      "./package.json": "./package.json"
+    }
   },
   "scripts": {
     "test": "vitest run --coverage",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "… && tsc -p tsconfig.build.json",
+    "prepack": "pnpm build",            // so `pack`/`publish` always builds dist first
+    "pack:smoke": "node scripts/pack-smoke.mjs",
+    "lint": "eslint .",
+    "format:check": "prettier --check ."
   },
-  // ── Situation A (in this repo): one install tree, so the workspace link is the right dependency.
-  "dependencies": {
-    "@game-hub/kernel": "workspace:*",   // contracts + transport DTOs
-    "@game-hub/ui-kit": "workspace:*"    // the shared board chrome + the game-facing REST calls
-    // + any third-party UI lib the client imports DIRECTLY (see the dep rules below)
-  },
+  // ⚠️ PEER + DEV, not `dependencies`. The host provides exactly ONE copy of each; the matching
+  // devDependency (same version) lets your repo build and test standalone.
   "peerDependencies": {
-    "react": "^19.0.0"              // for ./client
+    "@game-hub/kernel": "^1.2.0",
+    "@game-hub/ui-kit": "^1.0.0",
+    "react": "^19.0.0"
   },
-  // ── Situation B (your own repo) replaces the block above with:
-  //   "peerDependencies": { "@game-hub/kernel": "^1.2.0", "@game-hub/ui-kit": "^1.0.0", "react": "^19.0.0" },
-  //   and repeats all three in "devDependencies" at the same versions so the package builds standalone.
-  "devDependencies": {
-    "@types/react": "^19.0.0",
-    "@vitest/coverage-v8": "^3.2.4",
-    "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
-    // + "fastify": "^5.2.0"                              — ONLY if the module has routes.ts
-    // + "better-sqlite3" + "@types/better-sqlite3"       — ONLY if the module opens its own table
-  }
+  "peerDependenciesMeta": {
+    "@game-hub/ui-kit": { "optional": true },   // only ./client needs it — a ./module-only host must not owe it
+    "react": { "optional": true }
+  },
+  "devDependencies": { "@game-hub/kernel": "^1.2.0", "@game-hub/ui-kit": "^1.0.0", "react": "^19.0.0", "…": "…" }
 }
 ```
 
-**Dependency rules (verified against the five games):**
+**Why peer + dev and not a plain `dependency`** (this is not a style preference): a plain dependency lets
+pnpm/npm satisfy your game with a **nested** second copy of the kernel/ui-kit under your package's own
+`node_modules`, and two copies break things that look nothing like a dependency problem —
 
-- `@game-hub/kernel` (contracts + transport DTOs) and `@game-hub/ui-kit` (the shared chrome + the
-  game-facing REST helpers) are the **only** platform dependencies a game needs — and, since Track D /
-  D2b, the only two it is *allowed*. No game may depend on `@game-hub/backend` or `@game-hub/ui`: that's a
-  workspace cycle in here and an unpublishable package outside. ⚠️ `e2e/architecture.spec.ts` fails the
-  suite on any `@/…` or `ui/src` import from a game package.
-- **Never more than one copy of either.** In situation A that's pnpm's job; in situation B it's the peer
-  declaration's — see the table above for why a duplicate is worse than it looks.
-- **`fastify`** is a *type-only devDependency*, added **only if the module has a `routes.ts`** (the runtime
-  instance is the host's; you import only its types). The routeless variant (Saint Petersburg) omits it.
-- **`better-sqlite3` + `@types/better-sqlite3`** are devDependencies **only if the module opens its own
-  table** to hold coordination state (Container's delivery-auction table binds the `Db` generic). The
-  other four leave `Db` at `unknown`.
-- **A third-party UI lib the client imports directly** is the package's own real `dependency` (Container's
-  `lucide-react`) — it can't lean on `ui/node_modules` resolution. A client that reaches such libs only
-  transitively through the ui-kit's `Button`/`Card` wrappers needs nothing extra.
+- **`instanceof` stops working.** A `GameError` from your copy of the kernel is not `instanceof` the host's,
+  so the module's `mapError` returns `null` and a clean 400 becomes a 500.
+- **React double-loads.** A second React through a duplicated ui-kit means two reconcilers — hooks throw
+  inside the shared chrome, and `configureTransport`/`RematchContext` module state silently forks.
+- **Tailwind loses the chrome's styles.** The host scans `node_modules/@game-hub`; a _nested_ duplicate is
+  outside that glob, so a `Button` from it renders unstyled.
 
-### `tsconfig.json`
+`peerDependencies` says "the host provides one copy"; the dev entry is what builds you standalone. Add
+`fastify` as a **type-only devDependency** only if your module has a `routes.ts`; add `better-sqlite3` +
+its types only if the module opens its own coordination table. A third-party UI lib the client imports
+_directly_ (Container's `lucide-react`) is the package's own real `dependency`.
 
-```jsonc
-{
-  // Situation A only — nothing publishes `tsconfig.base.json`. In situation B, inline its options
-  // (target/module/moduleResolution, strict, noUncheckedIndexedAccess, noImplicitOverride,
-  // noFallthroughCasesInSwitch, noImplicitReturns, forceConsistentCasingInFileNames,
-  // verbatimModuleSyntax, esModuleInterop, skipLibCheck, resolveJsonModule, isolatedModules,
-  // declaration, sourceMap) and re-check them when the platform tightens a flag.
-  "extends": "../../../tsconfig.base.json",
-  "compilerOptions": {
-    "jsx": "react-jsx",                       // for ./client
-    "lib": ["ES2022", "DOM", "DOM.Iterable"], // for ./client
-    "types": ["react"]                        // + "better-sqlite3" if the module binds Db
+### `tsconfig.json` / `tsconfig.build.json`
+
+A standalone repo has no `tsconfig.base.json` to extend, so `tsconfig.json` **inlines** the hub's base
+options verbatim (`target ES2022`, `module ESNext`, `moduleResolution Bundler`, `strict`,
+`noUncheckedIndexedAccess`, `verbatimModuleSyntax`, `declaration`, `sourceMap`, …) plus the three a `./client`
+adds (`jsx: react-jsx`, DOM libs, `types: ["react"]`), and `include: ["src", "vitest.config.ts"]`. Keep it
+byte-compatible with the hub's base and re-check when the platform tightens a flag.
+
+`tsconfig.build.json` extends it and _emits_ (`outDir: dist`, `noEmit: false`, `include: ["src"]`,
+`exclude: ["src/**/tests/**"]`). ⚠️ Two properties it must not lose: **`module: ESNext` is inherited, not
+overridden** (it keeps the client's `lazy(() => import('./Board.js'))` a real dynamic `import()` the host
+code-splits on — CJS would un-split it), and it pairs `sourceMap` with **`inlineSources`** because the
+tarball ships `dist`, not `src` (a plain map points at `../src/**` files a consumer doesn't have, and every
+bundler warns). `declarationMap` stays **off** for the same reason.
+
+### `vitest.config.ts` — the two per-glob gates
+
+```ts
+coverage: {
+  include: ['src/engine/**/*.ts', 'src/bot/**/*.ts'],
+  exclude: [
+    'src/engine/**/tests/**', 'src/engine/**/index.ts',   // test files + barrels
+    'src/engine/core/types.ts', 'src/engine/actions/action.ts',  // compile-time only
+    'src/bot/**/tests/**', 'src/bot/**/index.ts', 'src/bot/types.ts',
+  ],
+  thresholds: {
+    'src/engine/**': { statements: 100, branches: 100, functions: 100, lines: 100 },
+    'src/bot/**':    { statements: 90,  branches: 90,  functions: 90,  lines: 90 },
   },
-  // Track D / D2b: all four subpaths depend only on @game-hub/kernel, @game-hub/ui-kit and React, so the
-  // package typechecks itself — no host path aliases. (The UI host typechecks the client too; see §6.)
-  "include": ["src", "vitest.config.ts"]
 }
 ```
 
-✅ **A package typechecks all four subpaths standalone** as of D2b. Before it, `./client` reached the
-shell's `@/` alias and only the UI host could check it — that coupling is gone, which is exactly what makes
-the package installable from `node_modules`.
+⚠️ Port your game's _actual_ type-only/barrel excludes verbatim — the gate must not silently weaken. Run
+the module/client tests too (they're in `include` for the run, out of `coverage.include`). ⚠️ A **client**
+test opts into a DOM with a `// @vitest-environment jsdom` docblock on line 1 — one line in the file that
+needs it, leaving the per-glob gates untouched (a per-glob `environment` is deprecated in Vitest 3).
 
-### `vitest.config.ts`
+### The rest
 
-Two **per-glob thresholds** — engine 100%, bot 90% — with the coverage excludes:
+`eslint.config.js` (flat config: syntactic hazards + React/hooks scoped to `src/client/**`; **not** a
+second typechecker — `recommendedTypeChecked` is deliberately off), `.prettierrc.json` (single quotes,
+semicolons, trailing commas, width 120; `*.md` ignored — hand-wrap docs), `.npmrc` (pin
+`registry.npmjs.org` so `@game-hub/*` can never resolve to a local link), `.nvmrc` (22),
+`pnpm-workspace.yaml` (one package, not a workspace — it exists only for pnpm's settings;
+`autoInstallPeers: false` so a missing peer surfaces; a `minimumReleaseAgeExclude` entry if you bump to a
+just-published `@game-hub` version), `LICENSE`, `scripts/pack-smoke.mjs` (§3, §7), and
+`.github/workflows/ci.yml` (install `--frozen-lockfile` from the public registry → typecheck → lint →
+format:check → test → **pack:smoke**, on a runner with no access to this repo).
+
+---
+
+## 3. The ⚠️ hazards — each with the story of what it broke
+
+These are not style notes. Each is something that actually broke, invisibly, because a game repo's own
+checks all read TS source while a host reads `dist/`.
+
+### 3a. Explicit `.js` extensions on every relative specifier in shipped `src`
+
+Write `from '../engine/index.js'`, `from './take.js'`, `import('./Board.js')` — **including folder barrels**
+(`'../core/index.js'`). `tsc` emits relative specifiers **verbatim**, and Node ESM does neither extension
+nor directory resolution, so an extensionless `from '../engine'` produces a tarball that throws
+`ERR_MODULE_NOT_FOUND` on a host's **first import** — while every check in your repo stays green, because
+TS, Vite, Vitest and esbuild all do the `.js`→`.ts` mapping in-workspace. One spelling (`.js`) resolves to
+`.ts` source in your repo _and_ to the emitted `.js` in the tarball. This is the platform's D2a lesson,
+re-learned game-side at D2d. Test files (excluded from the build) keep the extensionless style.
+**`pack:smoke` is the honest check** — do not let anyone "tidy" the extensions away.
+
+### 3b. No bundler constants (`import.meta.env`) in package code — `configureTransport` instead
+
+The ui-kit's transport helpers once derived their base URL from Vite's `import.meta.env.PROD` (dev proxies
+`/api`; prod serves at the origin root). That is a _bundler_ constant — baked into a published `dist/`, it
+is fragile at best and wrong at worst for an installed consumer. So a game **never reads `import.meta.env`
+in a shipped file, and never hard-codes an API prefix**: the **host** calls `configureTransport({ baseUrl })`
+once at boot, and every game builds URLs through the ui-kit's `apiUrl('/games/:id/<id>/…')`. That injection
+is why the same published package works behind the hub's dev proxy and at an origin root. (This is also why
+the ui-kit is duplication-sensitive — see 3c/§2: a second copy forks that module-level state silently.)
+
+### 3c. Tailwind classes ship in source; the package ships **no CSS**
+
+Your board styles itself with Tailwind utility classes, in your source only. Tailwind v4's automatic content
+detection **stops at `node_modules`**, so a host must scan the installed package with an explicit `@source`
+(the hub's `ui/src/index.css` carries `@source '../node_modules/@game-hub'`, which follows pnpm's symlink
+into `dist/` and compiles your classes — measured byte-for-byte at D2d, no glob change needed). Style with
+the host's **semantic tokens** (`bg-card`, `text-muted-foreground`, `border-border`), not raw palette
+colours, so a board inherits the host's light/dark theme instead of fighting it. Shipping compiled CSS
+instead would freeze the theme at _package_ build time and fight the cascade — the decision (design-patterns
+§2 / Track D §4b) is explicit `@source`, no shipped CSS.
+
+### 3d. Don't import the hub shell
+
+A `./client` may import exactly two platform packages — `@game-hub/kernel/client` and `@game-hub/ui-kit` —
+and **nothing from `ui/src`**, ever. In-workspace the shell's `@/` alias resolves fine, so a stray
+`import { cn } from '@/lib/utils'` typechecks and unit-tests and even builds green while the package is
+quietly unpublishable; the breakage only shows on install. The hub's `architecture.spec.ts` enforces the
+shell side; in a standalone repo such an import _cannot resolve at all_ (no alias, no `ui/` tree), so your
+typecheck/build/`pack:smoke` enforce it structurally — which is exactly why the four-subpath contract makes
+a game installable.
+
+### 3e. Keep the engine pure
+
+No `Date`, no `Math.random`, no mutation, no I/O in `./engine` — or replay, reproducible tests and the 100%
+gate all die. A **module** must not reach for `Math.random` either: per-turn randomness comes from
+`ctx.rng` inside a route. This is the discipline that lets a seeded generator drive every test and every
+bench.
+
+---
+
+## 4. The standardized `./client` export surface
+
+Prescribe the **full** surface — `src/client/index.ts` exports the client object as **default AND named**,
+plus the two types a host and your own tests need to name: **`BoardProps`** and the game's **payload type**.
+The template (and Labyrinth) do this; the five originally-in-workspace games under-export it today and will
+be aligned to match — so build a new game to the full surface:
 
 ```ts
-import { defineConfig } from 'vitest/config';
-
-export default defineConfig({
-  test: {
-    include: ['src/engine/**/*.test.ts', 'src/bot/**/*.test.ts'],
-    // Situation A only: in-workspace the kernel is TS source, so vitest must transform it. Situation B
-    // installs built ESM + .d.ts and needs no special handling — omit this line there.
-    server: { deps: { inline: [/@game-hub\/kernel/] } },
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'html'],
-      include: ['src/engine/**/*.ts', 'src/bot/**/*.ts'],
-      exclude: [
-        'src/engine/**/tests/**',       // test files + helpers
-        'src/engine/**/index.ts',       // barrels (re-exports only)
-        'src/engine/core/types.ts',     // compile-time only
-        'src/engine/actions/action.ts', // compile-time only (the Action union)
-        'src/bot/**/tests/**',
-        'src/bot/**/index.ts',
-        'src/bot/types.ts',             // compile-time only
-      ],
-      thresholds: {
-        'src/engine/**': { statements: 100, branches: 100, functions: 100, lines: 100 },
-        'src/bot/**': { statements: 90, branches: 90, functions: 90, lines: 90 },
-      },
-    },
-  },
-});
+export const nimClient: GameClient<NimView> = { id, name, blurb, rules, Board: lazy(() => import('./Board.js')), Status };
+export default nimClient; // the generated registry imports the default; nimClient stays a named export too
+// ── the standardized surface ─────────────────────────────────────────────────
+export type { BoardProps, GameClient } from './types.js';
+export { act, fetchGame, GAME_TYPE } from './api.js';
+export type { NimPayload, NimView } from './api.js';    // ← the game's PAYLOAD type, named from here
 ```
 
-⚠️ Port your game's *actual* type-only/barrel excludes verbatim — the gate must not silently weaken. The
-module and client are host bindings, tested by the backend/UI suites; they are not in this gate.
+Why: a host binds a board as `ComponentType<BoardProps<View>>` and reads a `GamePayload<View>` off the
+wire; both should be nameable from the one `./client` subpath without reaching into `./api`. The board
+object itself is **lazy** (`Board: lazy(() => import('./Board.js'))`) — non-negotiable, so a games room
+doesn't ship your board (and the engine slice it pulls) to someone who only opened the landing; `Status` is
+cheap and **non-lazy**. `blurb` + `rules` feed the landing. In `client/types.ts` bind the DTOs once —
+`GameClient<S> = KernelGameClient<S, GamePayload<S>, GameMessage>` and the matching `BoardProps<S>` — so
+every board works in a single type argument. In the board, map `BoardProps.colors` (playerId → palette id)
+to your tints (fall back to seat index), gate every affordance on `canDrive` (from the shared
+`seatIdentity`), and render the end screen with the ui-kit's `GameOver`.
 
 ---
 
-## 2. `./engine` — the pure rules core
+## 5. Rulebook discipline
 
-Lay it out one folder per concern (see design-patterns §1 and CLAUDE.md → "Engine layout" precedent):
+**Read the spec before implementing a rule — the rulebook page, not memory — and cite the page in a comment
+at every mechanic** (`// pg. 9: produce as many as you are able to`). A wrong rule that passes its tests is
+worse than a missing feature, because the tests enshrine the mistake.
 
-```
-src/engine/
-  index.ts            THE public API — the only thing ./module, ./bot, ./client import
-  createGame.ts       deterministic setup (rng injected as a param if it shuffles)
-  core/               constants.ts, types.ts, errors.ts (subclass the kernel GameError), index.ts
-  internal/           shared helpers, incl. record.ts (the ONE place that bumps version + logs)
-  actions/            one file per mechanic + action.ts (the Action union) + applyAction.ts + legalActions.ts
-  tests/              one test file per mechanic + helpers.ts
-```
-
-Rules:
-
-- **One mechanic = one file** in `actions/` + **one matching test file** in `tests/`. Reuse `internal/`
-  helpers (DRY). Adding an action = a variant in `action.ts` + a mechanic file + an `applyAction` case +
-  a `legalActions` branch + a public export in `index.ts` + a test file.
-- **Purity is absolute** — no `Date`, no `Math.random`, no mutation. Randomness a *rule* consumes (dice,
-  shuffles) comes in as **data**: model it as an action carrying the already-rolled values, or as a
-  `createGame` input, so the state function is deterministic and the 100% gate is reachable.
-- ⚠️ **Never bump `version` or append to the log outside `record()`.** Use the kernel `record()` /
-  `makeSeating` helpers rather than re-implementing them.
-- **Setup randomness comes from the kernel's `.` barrel**, not a copy: `shuffle(items, rng?)` (Fisher–Yates,
-  returns a new array; omitting `rng` keeps the order, which is how a rules test deals a *known* deck) and
-  `mulberry32(seed)` for a seeded generator in `tests/helpers.ts`. Both are on `@game-hub/kernel` since
-  1.2.0 — don't reach into `@game-hub/kernel/bot` from an engine test, and don't re-implement either.
-- **The end state is the kernel `GameEndState<Score>` union** — intersect it into your state type
-  (`… & GameEndState<PlayerScore>`) so the `active` arm carries no `results` and read sites narrow on
-  `status`. A game with nothing to tabulate takes `WinnersEndState`.
-- **`viewFor(state, viewer)` is an explicit per-game decision** — redact each non-viewer's secrets to
-  `null`/hidden, revealing all at `status === 'ended'`. A game with no secrets makes it (nearly) a no-op —
-  that's fine, but write it deliberately. ⚠️ Anything the engine logs is public (design-patterns §3): a
-  hidden value is redacted in `record()`/`viewFor` or simply never logged, never hidden in the UI.
-- Import siblings by **direct path** (`./roll`), cross-folder via the barrel (`../core`), the kernel by
-  package specifier (`@game-hub/kernel`). Under `src/engine/tests/` and other subfolders, reach the engine
-  as `../` / `../../` — not a package self-import.
+The rulebook PDF is **copyrighted**: keep it **local and gitignored** under `reference_materials/`. Commit a
+`reference_materials/README.md` documenting the pattern and where to obtain the book (a `.gitignore` that
+ignores `reference_materials/*` but keeps `!reference_materials/README.md`), and record the source there —
+never paste the rules text in. Game _mechanics_ aren't copyrightable; the book's _text and illustrations_
+are, so ship none of them: any board art is drawn fresh, from the plain word, not traced. (The template's
+game, Nim, is a folk game with no protectable rulebook — its `reference_materials/README.md` says so and
+keeps the pattern visible for the game you build.)
 
 ---
 
-## 3. `./module` — the backend seam
+## 6. Publishing, and hosting the game
 
-`src/module/` implements `GameModule<State, Action>`. Files: `index.ts` (the module object, default +
-named export), `context.ts` (the bound context — below), `createGame.ts`, `parseAction.ts`, `errors.ts`
-(the `GameError` → HTTP map), plus `routes.ts` / `botRunner.ts` / a coordination table as needed.
+### Publish the package
 
-### `src/module/context.ts` — bind the generic host types
-
-A package can't name the backend's concrete `ModuleContext`/`GameHub`/`BotRepository` (workspace cycle),
-so bind the kernel's **structural** host types (design-patterns §7):
-
-```ts
-import type { FastifyInstance } from 'fastify'; // omit if no routes
-import type {
-  GameModule as KernelGameModule,
-  ModuleBotSeats,
-  ModuleContext as KernelModuleContext,
-  ModuleHub,
-} from '@game-hub/kernel';
-
-export type ModuleContext = KernelModuleContext<unknown, ModuleHub, ModuleBotSeats>;
-export type GameModule<S, A> = KernelGameModule<S, A, ModuleContext, FastifyInstance>;
+```bash
+pnpm pack:smoke          # prove the tarball loads before you publish it (§7)
+npm publish              # publishConfig already sets access: public and rewrites exports → dist/
 ```
 
-- **Routeless variant:** omit the `fastify` import and leave `App` at its `unknown` default (contravariance
-  makes that assignable to the backend registry's `FastifyInstance` slot since `routes` is absent).
-- **Owns its own table:** bind the first generic to better-sqlite3 —
-  `import type { Database } from 'better-sqlite3'; export type Db = Database;` then
-  `KernelModuleContext<Db, ModuleHub, ModuleBotSeats>`.
+`prepack` builds `dist/` first, so `publish` can never ship stale output. **Semver:** a game's own versions
+are ordinary (`0.1.0`, `0.2.0`, …); the number that carries contract meaning is the **kernel's** — its
+_major_ is the host↔game contract version, so bump your peer range only within a major you still satisfy,
+and if you move to a kernel major you are migrating to a new contract. Declare
+`kernelContract: KERNEL_CONTRACT_VERSION` (imported, never a literal) so a game that resolves the wrong
+kernel copy is caught at registration, not mid-game.
 
-### The module object (`index.ts`)
+### Host it in the hub
 
-Implement the required members — `id`/`name`/`minPlayers`/`maxPlayers`, `colors`, `createGame`,
-`applyAction`, `legalActions`, `viewFor`, `parseAction`, `summarize`, `versionOf`, `movesOf`, `mapError` —
-each delegating to the engine. Then the optional hooks **only if the game needs them**:
+Adding a published game here is **less** than the historical in-workspace shape, not more — a dist consumer
+is just a dependency. In full:
 
-- **`kernelContract`** — declare it: `import { KERNEL_CONTRACT_VERSION } from '@game-hub/kernel'` and set
-  `kernelContract: KERNEL_CONTRACT_VERSION`. Never a literal — taken from the kernel the game compiled
-  against, the number can't drift, and a game that ends up resolving a *different* kernel copy is caught by
-  `GameRegistry.register` at boot instead of failing mid-game (Track D design doc §4). Technically optional
-  (absent ⇒ contract 1) only while every game predates the field; write it in every new game.
-- **`colors`** — an ordered palette of lowercase colour ids that is *the board's current seat tints in seat
-  order* (palette-order default reproduces the existing look). Cover `maxPlayers`. Player colours, not any
-  game-piece colour. The platform does all the picking/uniqueness/persistence/wiring; you just name ids.
-- **`createGame({ id, players, rng })`** — `players[i]` is `{ name, color? }`. **Ignore `color` unless your
-  colour is a rule** (kernel 1.2.0): for all five hosted games it is a seat tint and stays coordination
-  state outside the engine. Read it when the pick decides something in the rules — Labyrinth's pawn colour
-  names its starting corner — in which case validate it against your own palette and fill an omission
-  deterministically, since `createGame` must stay pure and total. The host always sends a colour from your
-  `colors`, resolved exactly as `colorsFor` will later report it.
-- **`botDifficulties`** — declare tier ids only if the game offers them (Can't Stop); omit otherwise.
-- **`parseAction`** owns *all* action validation and **accepts only actions a client may send.** A
-  server-only action (a dice roll) is refused here and built by a route from `ctx.rng`. ⚠️ Don't rely on
-  Fastify to validate the action — it validates only `{ playerId, action: object }`.
-- **`pendingStep`** — return a 409 for an action currently owned by a flow of yours (Container refuses
-  `DELIVER` while an auction is pending).
-- **`routes(app, ctx)`** — a game's own endpoints, declared *relative* to `/games/:id/<id>/`. **Per-turn
-  randomness:** a route rolls from `ctx.rng` and applies a pure engine action carrying the result — the
-  client asks but can't choose the dice. ⚠️ Never reach for `Math.random` in a module. If a route replies
-  with game state, include `colors: ctx.colorsFor(id, state)` so its shape matches the core payload, and
-  project through `viewFor` with the caller's viewer.
-- **`onStateChanged(state, ctx)`** — push a side-channel of your own (Container's projected auction) via
-  `ctx.hub.broadcastEach`.
-- **`createBotDriver(ctx)`** — wire the bot (§5). Omit for a game with no bots.
-- **`schemaVersion` / `migrate`** — only when a shipped engine's serialized shape changes later (§ Persistence
-  in design-patterns). Start with neither (implicitly v1).
-
-**Coordination state goes in its own table, not the engine** (design-patterns §2). Open it off `ctx.db`
-the way `lobbies.ts`/`bots.ts` do.
-
-**Test-visibility:** a package exposes only its four barrels (no deep imports). If a host test needs a
-module internal (Saint Petersburg's `mapStPetersburgError`), re-export it from the `./module` barrel.
-
----
-
-## 4. `./client` — the UI seam
-
-`src/client/` implements `GameClient`. Files: `index.ts` (the client object, default + named export),
-`types.ts` (bind the transport DTOs — below), `Board.tsx`, `api.ts`, panels/art as needed.
-
-### `src/client/types.ts` — bind the transport DTOs
-
-```ts
-import type {
-  BoardProps as KernelBoardProps,
-  GameClient as KernelGameClient,
-  GameMessage,
-  GamePayload,
-} from '@game-hub/kernel/client';
-
-export type GameClient<S> = KernelGameClient<S, GamePayload<S>, GameMessage>;
-export type BoardProps<S> = KernelBoardProps<S, GamePayload<S>, GameMessage>;
-```
-
-The contract *and* the DTOs come from the one specifier (Track D / D2b). The kernel keeps `Payload`/
-`Message` generic rather than baking them in — dropping two type parameters would be a breaking arity
-change — so every game writes these two aliases and then works in one type argument.
-
-### The client object
-
-- **`Board` is lazy** (`lazy(() => import('./Board'))`) — non-negotiable; it carries the engine + art and
-  the landing must not ship it. **`Status`** (optional) is cheap and **non-lazy** — it renders before the
-  board chunk lands. **`blurb`** (one line) + **`rules`** (a few bullets) feed the landing.
-- **`api.ts` pins the types back:** the ui-kit's `getGame`/`applyAction`/`unwrap` are generic in `S`; call
-  `getGame<GameView>(…)` so the board is fully typed. Put the game's own endpoints here — build their URLs
-  with the ui-kit's **`apiUrl('/games/:id/<id>/…')`**, never a hard-coded prefix: the host injects where its
-  API lives (`configureTransport`) so the same package works behind a dev proxy and at an origin root. ⚠️
-  Don't widen the board to `unknown` — pass the type parameter.
-- **Map `BoardProps.colors`** (playerId → palette id) to your own tint system, falling back to seat index
-  when a colour is missing. **Gate every action affordance on `canDrive`** (via the shared `seatIdentity`).
-  Pass `viewer` to any call returning projected state.
-- **Shared chrome from `@game-hub/ui-kit`:** render the end screen with `GameOver`; use `TurnBanner`,
-  `ActivityFeed`, `seatIdentity`, and the `Button`/`Card`/`ActionTip`/`PanZoom`/`cn` primitives. A board
-  keeps its own banner wording and `describe(entry)` closure; the frame is shared.
-- **⚠️ A client may import exactly two platform packages: `@game-hub/kernel/client` and
-  `@game-hub/ui-kit`.** Nothing from `ui/src`, ever — that was contract gap #1 and D2b closed it. The
-  architecture spec enforces it, because the `@` alias resolves fine in-workspace and the breakage only
-  shows up on install.
-- **⚠️ Tailwind: the host must scan your package.** Your board's utility classes are only in your source,
-  and Tailwind v4's content detection stops at the host's own package and skips `node_modules`. The hub's
-  `ui/src/index.css` already carries `@source '../../packages'` **and** `@source '../node_modules/@game-hub'`,
-  which covers both an in-workspace and an installed game — so an in-repo game needs no CSS change. Style
-  with the host's **semantic tokens** (`bg-card`, `text-muted-foreground`, `border-border`), not raw
-  palette colours, so a board inherits the theme instead of fighting it. Design doc §2 has the full
-  rationale.
-
----
-
-## 5. `./bot` — the AI (optional)
-
-`src/bot/` over the kernel's `@game-hub/kernel/bot` helpers. See design-patterns §6 for the principles.
-
-- **Decide from the redacted view:** `decide(viewFor(state, botId), botId)` — never a `GameState`. Use
-  `assertBotTurn` for the ended/not-your-turn preamble.
-- **⚠️ Injected randomness:** the bot can't roll dice or see sealed opponent bids — the caller supplies
-  them (`rollDice`/`collectBids`); `decide` throws a `BotError` if not. Self-play seeds it; the runner
-  fills from `ctx.rng`.
-- **⚠️ Score long chains against the goal, not the hop** — a greedy bot can't see a multi-action payoff and
-  will never start one (Container's ships never left port; Stone Age hunted food forever).
-- **`playSelfPlay` is the real test** — thousands of live engine actions; any illegal action throws. Keep
-  it green at every seat count.
-- A `benchmark` export (over `runBenchmark`/`wilsonInterval`/`mulberry32`) lets `packages/bench/` measure
-  the bot's win rate; register it there if you want `pnpm bench` to cover the game.
-- Bot files under `src/bot/tests/` reach the engine as `../../engine`.
-
----
-
-## 6. Host wiring checklist
-
-Verified against how all five games are wired. For a game `<id>`:
-
-1. **`games.config.ts`** — add one entry (config order = registration order):
+1. `"@game-hub/game-<id>": "^0.1.0"` in **both** `backend/package.json` and `ui/package.json`.
+2. One `games.config.ts` entry (config order = registration order):
    ```ts
    { id: '<id>', module: '@game-hub/game-<id>/module', client: '@game-hub/game-<id>/client' },
    ```
-2. **`pnpm install`** — link the new workspace package (`packages/games/*` is already a workspace glob in
-   `pnpm-workspace.yaml`; no edit there).
-3. **`pnpm generate`** — regenerates `backend/src/games/index.generated.ts` and
-   `ui/src/games/registry.generated.ts`. Both must regenerate cleanly (the CI freshness check diffs them).
-4. **`backend/package.json`** — add `"@game-hub/game-<id>": "workspace:*"` to `dependencies`.
-5. **`ui/package.json`** — add `"@game-hub/game-<id>": "workspace:*"` to `dependencies`.
-6. **`ui/vite.config.ts`** — add one alias so Vite consumes the client as TS source:
-   ```ts
-   '@game-hub/game-<id>/client': fileURLToPath(
-     new URL('../packages/games/<id>/src/client/index.ts', import.meta.url),
-   ),
-   ```
-   Only `/client` is needed — the client imports its own engine via a relative path within the package.
-7. **`ui/tsconfig.json`** — add `"../packages/games/<id>/src/client"` to `include`. Since D2b the package
-   typechecks its own client too, so this is now a *second* check rather than the only one — it is what
-   proves the board's props line up with the shell's registry (§1).
-8. **`packages/bench/package.json`** — add the game as a `workspace:*` dependency **if** you registered a
-   `benchmark` in the aggregator.
-9. **`pnpm install`** again to relink the new host deps.
+3. `pnpm generate` — regenerates the two checked-in registries (CI freshness-checks the diff).
+4. `pnpm install`.
 
-That's the whole surface: **one `games.config.ts` entry + `pnpm generate` + one dep/alias/include line per
-host.** The `architecture.spec.ts` forbids any shell file importing `@game-hub/game-*` (or the historical
-`@game-hub/engine`) — only the generated registry may name a game.
+That is **all**: two dependency lines + one config entry + `pnpm generate`. **No** Vite alias, **no**
+`tsconfig` include, **no** vitest inline entry — those were in-workspace shims and an installed game needs
+none (it resolves out of `node_modules`, and its `./client` binds `@game-hub/kernel/client`, never the
+shell's `@/`). If you find yourself adding an alias or include for an external game, stop — it means the
+package is reaching into this repo, the one thing the contract forbids.
+
+Two host-level settings make installed games work and are **already in place** — do not revert them:
+`linkWorkspacePackages: true` (`pnpm-workspace.yaml`) resolves the game's kernel/ui-kit peers to the single
+workspace copies instead of registry duplicates; `optimizeDeps.exclude: ['@game-hub/kernel',
+'@game-hub/ui-kit']` (`ui/vite.config.ts`) stops Vite's dev pre-bundler inlining a second ui-kit copy into
+the installed game (which forks the injected transport + React context — dev-server only, but silent). One
+subtlety survives: `backend/vitest.config.ts` still inlines `/@game-hub\/(kernel|game-)/` because each
+game's `dist` imports the workspace TS-source kernel — a native-external load would drag `.js` specifiers
+through Node, which does no `.js`→`.ts` mapping and throws. Keep the inline entry.
 
 ---
 
-## 6b. Hosting a game built **outside** this repo (Track D / D2d) — the only path now
+## 7. Final verification checklist
 
-An external game arrives as an **installed package whose `exports` resolve to compiled `dist/`**, not as
-workspace TypeScript source. Since 2026-07-31 **every** game is hosted this way (all six were extracted to
-their own `whtdrgn101/game-<id>` repos and published; the hub depends on `@game-hub/game-*@^0.1.0`). This
-is *less* wiring than the historical in-workspace shape, not more: steps 6, 7 and 8 above **do not apply**.
-The package resolves out of `node_modules` like any other dependency, and its `./client` binds
-`@game-hub/kernel/client` rather than the shell's `@/` alias, so nothing needs teaching. The host-side
-recipe in full:
-
-1. Publish `@game-hub/game-<id>` to npm (its own repo's job — with a `pack:smoke` proving the tarball
-   loads; see "What the external package owes its host" below).
-2. Add `"@game-hub/game-<id>": "^0.1.0"` to **both** `backend/package.json` and `ui/package.json`.
-3. Add the `games.config.ts` entry (`module`/`client` subpath specifiers) and run `pnpm generate`.
-4. `pnpm install` — `linkWorkspacePackages: true` resolves the game's `@game-hub/kernel`/`ui-kit` peers to
-   the single workspace copies (never a registry duplicate).
-
-> ⚠️ **One vitest subtlety that survives the move.** `backend/vitest.config.ts` still inlines the game
-> packages (`/@game-hub\/(kernel|game-)/`) even though they ship compiled `dist/`. It is *not* for the
-> game's own JS — it is because each game's dist imports `@game-hub/kernel`, which in-workspace resolves
-> to the kernel's TS **source** (its dev `exports` point at `./src`, with `.js`-extension specifiers). A
-> game loaded as a native-external module would drag that source in through Node, which does no
-> `.js`→`.ts` mapping and throws `Cannot find module .../contract.js`. Inlining puts the whole `@game-hub/*`
-> subtree through Vite's transform. (The D2d table below predates this being exercised by more than one
-> game; the inline entry is load-bearing, keep it.)
-
-**If you find yourself adding an alias or a tsconfig include for an external game, stop** — it means the
-package is reaching into this repo, which is the one thing the four-subpath contract forbids.
-
-Two host-level settings *are* required, and both are already in place. They are properties of hosting
-**any** installed game, so a second one needs neither changed:
-
-- `pnpm-workspace.yaml` → `linkWorkspacePackages: true`. An external package peer-depends on
-  `@game-hub/kernel`/`@game-hub/ui-kit` by plain semver range; without this pnpm fetches *registry* copies
-  of packages this repo builds, forking the game into two physical copies.
-- `ui/vite.config.ts` → `optimizeDeps.exclude: ['@game-hub/kernel', '@game-hub/ui-kit']`. Vite's dev-server
-  pre-bundler would otherwise inline a **second copy** of the ui-kit into the installed game's bundle,
-  which silently breaks everything that depends on module identity — the injected REST base URL
-  (`configureTransport`) and React context (`RematchContext`). Dev-server only; `vite build` was always
-  correct, which is what makes this worth writing down.
-
-### Iterating on an external game
-
-Now that every game is published, the loop is the ordinary npm one: cut a new version in the game's own
-repo (`npm publish`), then bump the `^0.1.0` range in `backend/package.json` + `ui/package.json` and
-`pnpm install`. Commit the two `package.json` files and `pnpm-lock.yaml` together (the lockfile carries
-the tarball's integrity hash), then `pnpm dev:backend` + `pnpm dev:ui`, or `docker compose up --build`.
-
-> **Historical note (retired 2026-07-31).** Before a game was published, the hub depended on a **packed
-> tarball committed under `vendor/`** (`"@game-hub/game-<id>": "file:../vendor/<tarball>"`), refreshed by
-> a `pnpm labyrinth:refresh` script that packed `../game-labyrinth`, dropped the tarball in `vendor/`,
-> rewrote the `file:` specifier and reinstalled. That was Labyrinth's D2 distribution scaffold only; the
-> npm publish deleted `vendor/`, the script and the `file:` specifiers, and — as the design doc promised —
-> changed nothing architectural. If you are bootstrapping a *brand-new* game before its first publish, a
-> local `file:` or `link:` dependency or `pnpm pack` into a scratch dir is the equivalent stopgap; there
-> is no longer a committed vendor loop.
-
-### What the external package owes its host
-
-The other side of this contract lives in the game's own repo, but two items bite the host if they are
-missing, so check them when adopting one:
-
-- **Relative imports in shipped sources carry an explicit `.js` extension.** `tsc` emits specifiers
-  verbatim and Node ESM does neither extension nor directory resolution, so `from '../engine'` produces a
-  tarball that throws `ERR_MODULE_NOT_FOUND` on first import while every check in the game's repo is
-  green. The game should have a **pack smoke** (install the tarball outside its own repo, import all four
-  subpaths under plain `node`) proving it; the kernel's `scripts/pack-smoke.mjs` is the model.
-- **It ships utility classes and no CSS.** The hub's `@source '../node_modules/@game-hub'` (in
-  `ui/src/index.css`) already reaches an installed package's `dist/` through the pnpm symlink — verified,
-  no glob change needed — but the host must also define the ui-kit's semantic tokens (`--color-card`,
-  `--color-muted-foreground`, …), which `ui/src/index.css` does. Without them nothing breaks; the chrome
-  just degrades to something that looks like a bug in the game.
-
----
-
-## 7. Testing expectations
-
-- **Engine 100%** — every rule and every rejection path (the `src/engine/**` glob threshold). Tests ship
-  with the code.
-- **Bot 90%** + self-play at every seat count (the `src/bot/**` glob threshold).
-- **Backend REST coexistence suite** — play the game to a real end over REST (seed `AppOptions.rng` for
-  deterministic rolls) *and* assert it coexists with the other games (the honest multi-game test — a stub
-  counter game already lives in `module-seam.test.ts`; keep it green).
-- **e2e spec** — `ui/e2e/<id>.spec.ts` picks the game from the landing and plays a turn; keep testids
-  stable (Playwright depends on them) and don't change existing baselines. The landing picker activates
-  automatically once two games are registered.
-- **Architecture-spec compliance** — no shell file imports the game; only `registry.ts` names it; the
-  folder is declared in `games.config.ts`; and (D2b) **the game imports nothing from `ui/src`** — only
-  `@game-hub/kernel/*` and `@game-hub/ui-kit`.
-
----
-
-## 8. Final verification checklist
-
-Run all of these; each must be green before the game is done:
+In the **game's own repo**, each must be green before you publish:
 
 ```bash
-pnpm generate && git diff --exit-code    # generated registries fresh & Prettier-clean
-pnpm typecheck                           # strict, all packages (incl. the UI-host client typecheck)
-pnpm -r test                             # kernel + every game package's engine/bot gates + backend
-pnpm --filter @game-hub/game-<id> test   # this game's engine 100% / bot 90% gates in isolation
-pnpm lint
-pnpm format:check                        # note: *.md is Prettier-ignored — hand-wrap docs
-pnpm --filter @game-hub/ui exec playwright test <id> architecture   # the game's e2e + the seam guard
-pnpm bench                               # optional — if you registered a benchmark
+pnpm typecheck                 # strict, all four subpaths (a package checks its own client)
+pnpm test                      # engine 100% + bot 90% gates, and the module/client tests
+pnpm lint                      # ESLint 9 flat config — real hazards, not a second typecheck
+pnpm format:check              # Prettier (*.md hand-wrapped, Prettier-ignored)
+pnpm build                     # tsc → dist/ (what publishConfig points at)
+pnpm pack:smoke                # the honest check ↓
 ```
 
-Cross-reference [`design-patterns.md`](./design-patterns.md) whenever a "why" is unclear — this recipe is
-the *how*; that doc is the *why*.
+**`pack:smoke` is the only check that runs against `dist/` rather than source**, and it is what catches 3a:
+it packs the tarball, installs it **plus its declared peers from the public registry** into a throwaway
+project outside the repo, drives a real game through all four subpaths under plain `node` (create → parse →
+apply → redact, the board still `React.lazy`, the lazy `Board.js` actually in the tarball, zero runtime
+`dependencies`), and typechecks a consumer against the shipped `.d.ts` under **`nodenext`** resolution (the
+strictest mode — it honours `exports` exactly as Node does and rejects extensionless specifiers in the
+`.d.ts`). Green there ⇒ a `bundler`-resolution host is safe by construction.
+
+Then **host-side**, after publishing and wiring it in (§6):
+
+```bash
+pnpm install && pnpm generate && git diff --exit-code   # registries fresh & clean
+pnpm typecheck                                           # the UI host typechecks the client binding too
+pnpm test:backend                                        # the game coexists in the core (module-seam stays green)
+pnpm --filter @game-hub/ui exec playwright test <id>     # the game's e2e smoke: pick it, play a turn
+```
+
+Cross-reference [`design-patterns.md`](./design-patterns.md) whenever a "why" is unclear — this guide is the
+_how_; that doc is the _why_ — and the [template repo](https://github.com/whtdrgn101/game-template) whenever
+you want to see a file in full.
