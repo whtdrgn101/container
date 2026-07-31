@@ -59,7 +59,11 @@ packages/
                      React is a peer; no CSS ships (Tailwind classes in source). Published (1.0.0).
   bench/           @game-hub/bench — dev-only bot-strength harness (root `pnpm bench`)
 backend/           @game-hub/backend — game-agnostic Fastify REST core + SQLite + the generated registry
-ui/                @game-hub/ui — game-agnostic React + Tailwind + shadcn shell + the generated registry
+ui/                @game-hub/ui — game-agnostic React + Tailwind + shadcn shell + the generated registry.
+                     Its front door is the **Card Table** (2026-07-31): a shelf of box-lid cards (each a
+                     game's own `client.Icon`) → a per-game detail screen (Pass and play / Play online) →
+                     a felt "Open tables" band. `shell/`: Shelf, GameDetail, GameIcon, OpenTables, Header,
+                     WaitingRoom, ChatPanel. Identity lives in `index.css` theme tokens; ui-kit untouched.
 games.config.ts    the ordered list of hosted games → `pnpm generate` → the two checked-in registries
 
 The games themselves live OUTSIDE this repo (each `whtdrgn101/game-<id>`, published to npm), consumed here
@@ -190,6 +194,19 @@ helpers live in `backend/src/services.ts`.)
   Native `better-sqlite3` and `esbuild` builds are allow-listed in `pnpm-workspace.yaml`.
 - **Container colours:** `white, red, green, blue, yellow` (container cargo, from the rulebook scoring
   cards). *Player* colours are a separate per-game palette the module declares (design-patterns §2).
+- **The Card Table shell redesign** (2026-07-31): the shell has one coherent board-game-room identity —
+  felt `#2e5d45` / cream `#f4ecdc` / brass `#b98a2f` / wood `#7a5232` / ink `#2a241c`, serif display
+  headings. It's applied as **Tailwind v4 theme tokens** in `ui/src/index.css`, with the five named colours
+  also **mapped onto the semantic tokens** (`--primary`, `--card`, `--foreground`, …) so the published
+  `@game-hub/ui-kit` chrome adopts the palette **without touching ui-kit** (remap, not restyle). Landing =
+  a shelf of box lids (each game's lazy `client.Icon`, from `GameClient.Icon` / games `0.1.1`); a lid opens
+  a detail screen with two separated actions (**Pass and play** = hotseat form, **Play online** = shared
+  lobby); resume/waiting lists are a felt "Open tables" band. Every prior capability is preserved. ⚠️ The
+  board-map visual baselines are **image-generated** — a host-run diff (Pop!_OS fonts ≠ jammy) is not a
+  real failure; the boards are untouched and the pinned CI image (`playwright:v1.61.1-jammy`) passes with
+  the committed baselines. ⚠️ Never `docker run` the repo with `node_modules` mounted as **root** — a
+  container-side `pnpm install` corrupts the host `.bin`/store (root-owned); if it happens, `chown` back
+  and clean-reinstall.
 - **A player colour may be rules data** (kernel 1.2.0, 2026-07-30): every seat's resolved colour is passed
   to `createGame` as `players[].color`. All five hosted games ignore it — for them a colour is still
   presentation and stays coordination state — but a game where the pick *is* a rule (Labyrinth's starting

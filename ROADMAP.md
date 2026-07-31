@@ -147,6 +147,21 @@ The near-term order, decided while play-testing:
    React and the design keeps it off the React-typed `./client` subpath; its `chat.ts`/`hub.ts` DTOs stay
    the wire source of truth.
 
+6. **The Card Table — shell redesign ✅ (2026-07-31).** One warm, physical, board-game-room identity for
+   the whole shell (felt / cream / brass / wood / ink, serif display headings), applied as **Tailwind v4
+   theme tokens** in `ui/src/index.css` — the five named colours are also mapped onto the semantic tokens
+   `@game-hub/ui-kit`'s chrome already reads, so the published Button/Card adopt the look with **ui-kit
+   untouched**. Three structural changes: (a) the landing is a **shelf of box lids** (`Shelf` + `GameIcon`),
+   one per hosted game from the generated registry — each lid renders the game's own `client.Icon` (lazy,
+   the `GameClient.Icon` from kernel 1.3.0 / games `0.1.1`) with a neutral cream fallback; (b) a lid opens
+   a **game detail** screen (`GameDetail`) with two separated actions — **Pass and play** (the hotseat seat
+   form) and **Play online** (shared-lobby creation) — every prior capability preserved verbatim; (c) the
+   resume/waiting lists become a felt **"Open tables"** band (`OpenTables`), with the in-game header on felt
+   + a brass turn accent and chat as paper panes. Every game consumed at `0.1.1` for its icon (lockfile bump;
+   ranges stay `^0.1.0`). e2e migrated to the shelf → detail → mode flow (new `pick-game-*` on the lids,
+   `mode-hotseat`/`mode-online`, `game-detail`, `back-to-shelf`); full suite green in the pinned CI image,
+   visual board baselines unchanged (boards untouched).
+
 ## Principles
 
 - **Every slice is vertical:** engine → API → UI → tests. Each ends **green and demoable** — a safe place
