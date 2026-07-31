@@ -41,3 +41,11 @@ minimumReleaseAgeExclude:
   - '@game-hub/game-russianrailroads@0.1.0'
   - '@game-hub/game-stoneage@0.1.0'
   - '@game-hub/game-stpetersburg@0.1.0'
+  # 0.1.1 adds each game's `GameClient.Icon` (kernel 1.3.0) — the box-lid mark the Card Table shelf
+  # renders. Freshly published, so it's excluded from the release-age gate exactly like 0.1.0 was.
+  - '@game-hub/game-cantstop@0.1.1'
+  - '@game-hub/game-container@0.1.1'
+  - '@game-hub/game-labyrinth@0.1.1'
+  - '@game-hub/game-russianrailroads@0.1.1'
+  - '@game-hub/game-stoneage@0.1.1'
+  - '@game-hub/game-stpetersburg@0.1.1'
