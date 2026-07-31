@@ -1,10 +1,21 @@
 # Track D — Externalize games (design doc)
 
+> **✅ FULLY LANDED (2026-07-31) — the extraction wave.** The "remaining bookkeeping" below (publish the
+> game so `vendor/` becomes a version range) is done, and it generalised past Labyrinth: **all five
+> in-workspace games were extracted to their own `whtdrgn101/game-<id>` repos and published to npm, every
+> game now `0.1.0`.** The hub consumes all six as `@game-hub/game-*@^0.1.0` over compiled `dist/`;
+> `packages/games/`, `vendor/` and the `labyrinth:refresh`/`test:games` scripts are gone, and with them
+> the five per-game Vite aliases + tsconfig includes (Labyrinth never had any — that was the proof). The
+> two host settings that make installed games work — `linkWorkspacePackages: true` and
+> `optimizeDeps.exclude` — carried over unchanged, and the backend vitest `deps.inline` **keeps** its
+> `game-` entry (each game's dist imports the workspace TS-source kernel; see `backend/vitest.config.ts`).
+> The mechanism below is unchanged; only the distribution detail (vendor tarball → registry) flipped.
+
 **Status: ✅ COMPLETE (2026-07-30). D2d delivered the thing the whole track existed to prove: Labyrinth
 — built in its own repository, against published `@game-hub/kernel` + `@game-hub/ui-kit`, consumed here
 as an installed package resolving to compiled `dist/` — is the hub's playable sixth game, in the
-production Docker image.** The remaining step is bookkeeping, not architecture: `npm publish` the game
-so `vendor/` can become a version range (see "Delivered in D2d" below). Slices D2a–D2d and the kickoff
+production Docker image.** The remaining step was bookkeeping, not architecture: `npm publish` the game
+so `vendor/` becomes a version range — **done 2026-07-31** (see the banner above). Slices D2a–D2d and the kickoff
 decisions (public npm under the `game-hub` org — resolving §8 Q4 — a public
 `whtdrgn101/game-labyrinth` repo, per-game e2e out of contract per §8 Q3) live in
 [`game-labyrinth-kickoff.md`](./game-labyrinth-kickoff.md). Game 5 (Russian
@@ -123,14 +134,14 @@ hub defines them; a host that doesn't still owes them.
 `node_modules` still becomes its own chunk: the container serves six `Board-*.js` chunks and a browser
 opening Labyrinth fetches exactly one of them.
 
-**Distribution, and the one piece of scaffolding that is temporary.** The `game-hub` npm org exists
-(the kernel and the ui-kit are published) but the *game* is not published yet, so the hub depends on a
-**packed tarball committed under `vendor/`** with `"@game-hub/game-labyrinth": "file:../vendor/<tarball>"`
-in both hosts. It is committed deliberately: a fresh clone and `docker build` must both install it with
-`--frozen-lockfile`. `pnpm labyrinth:refresh` is the whole two-repo loop in one command (pack in
-`../game-labyrinth` → drop in `vendor/` → rewrite the specifier → install). See
-[`vendor/README.md`](../vendor/README.md) — publishing to npm deletes that directory and changes nothing
-else, which is the point: the vendoring is a **distribution** detail, not an architectural one.
+**Distribution, and the one piece of scaffolding that was temporary — now retired (2026-07-31).** During
+D2d the `game-hub` npm org had the kernel and ui-kit but not the *game*, so the hub depended on a **packed
+tarball committed under `vendor/`** with `"@game-hub/game-labyrinth": "file:../vendor/<tarball>"` in both
+hosts, refreshed by `pnpm labyrinth:refresh` (pack `../game-labyrinth` → drop in `vendor/` → rewrite the
+specifier → install). **That scaffold is gone:** the game was published to npm on 2026-07-31 (along with
+the other five), so `vendor/`, its README and the refresh script were deleted and both hosts now depend on
+`@game-hub/game-labyrinth@^0.1.0`. As promised, publishing changed nothing architectural — the vendoring
+was always a **distribution** detail, and this is the proof.
 
 Original goal statement: four games had tested the engine and the seams; the long-term goal is making
 games easier to add, and eventually addable from *outside* this repo. Pilot: Russian Railroads (a

@@ -3,9 +3,15 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
-    // The kernel and the in-workspace game packages are consumed as TypeScript source via workspace
-    // symlink; tell Vitest to transform them rather than treat them as external deps. `game-` covers
-    // every game package (`@game-hub/game-container`, `@game-hub/game-russianrailroads`, …).
+    // The kernel is consumed as TypeScript source via workspace symlink; Vitest must transform it rather
+    // than treat it as an external dep. The six games now install as compiled dist (`@game-hub/game-*@
+    // ^0.1.0` from npm), but they must be inlined too — and not for their own sake. Each game's dist
+    // imports `@game-hub/kernel`, which resolves through the workspace symlink to the kernel's TS *source*
+    // (its dev `exports` point at `./src`, with `.js`-extension relative specifiers). A game loaded as a
+    // native-external module would drag that source in through Node, which does no `.js`→`.ts` mapping and
+    // throws `Cannot find module .../contract.js`. Inlining the game packages puts their whole `@game-hub/*`
+    // subtree through Vite's transform, where the mapping happens — the same reason the pre-publish
+    // vendored Labyrinth tarball was inlined (design doc §6b: "the existing regex matches it harmlessly").
     server: {
       deps: {
         inline: [/@game-hub\/(kernel|game-)/],

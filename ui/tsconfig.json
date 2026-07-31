@@ -13,23 +13,10 @@
     "src",
     "e2e",
     "vite.config.ts",
-    "playwright.config.ts",
-    // Track D legacy-migration (phase 5): Container's UI client moved into its own package (outside
-    // `ui/src`) but reaches the shell's `@/` alias, so the UI host typechecks it — a Track D finding (a
-    // TS-source game package can't fully typecheck its own client without the shell's path aliases).
-    "../packages/games/container/src/client",
-    // Track D pilot: Russian Railroads' UI client lives in its own package (outside `ui/src`) but reaches
-    // the shell's `@/` alias, so the UI host typechecks it — a Track D finding (a TS-source game package
-    // can't fully typecheck its own client without the shell's path aliases). See the package ROADMAP.
-    "../packages/games/russianrailroads/src/client",
-    // Track D pilot retrofit (phase 2): Can't Stop's UI client moved into its own package (outside
-    // `ui/src`) but reaches the shell's `@/` alias, so the UI host typechecks it — the same finding.
-    "../packages/games/cantstop/src/client",
-    // Track D legacy-migration (phase 3): Stone Age's UI client moved into its own package (outside
-    // `ui/src`) but reaches the shell's `@/` alias, so the UI host typechecks it — the same finding.
-    "../packages/games/stoneage/src/client",
-    // Track D legacy-migration (phase 4): Saint Petersburg's UI client moved into its own package (outside
-    // `ui/src`) but reaches the shell's `@/` alias, so the UI host typechecks it — the same finding.
-    "../packages/games/stpetersburg/src/client"
+    "playwright.config.ts"
+    // No per-game `./client` includes: since 2026-07-31 all six games install from npm as compiled
+    // `dist/` (with shipped `.d.ts`), so each package typechecks its own client in its own repo and the
+    // shell consumes the published types out of `node_modules` like any dependency — exactly as Labyrinth
+    // already did. The shell still typechecks its own registry against those types.
   ]
 }

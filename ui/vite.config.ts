@@ -42,42 +42,11 @@ export default defineConfig({
       // aliased for the same reason: one copy for the shell *and* every game package, so React context
       // identity (`RematchContext`) holds across the seam.
       '@game-hub/ui-kit': fileURLToPath(new URL('../packages/ui-kit/src/index.ts', import.meta.url)),
-      // Track D legacy-migration (phase 5): Container moved from `ui/src/games/container/` into its own
-      // in-workspace package over TS source, so its client entry is aliased to source (the RR pattern).
-      // Only `/client` is needed — the client imports its own engine via a relative path within the
-      // package. (Track D phase 6 retired the `@game-hub/engine` package entirely; no `@game-hub/engine/*`
-      // aliases remain, and the UI depends only on `@game-hub/kernel` + the game packages.)
-      '@game-hub/game-container/client': fileURLToPath(
-        new URL('../packages/games/container/src/client/index.ts', import.meta.url),
-      ),
-      // Track D pilot: Russian Railroads ships as an in-workspace package over TS source, so — exactly
-      // like the engine subpaths above — its client entry is aliased to source rather than resolved as a
-      // prebundled node_modules dep. Only `/client` is needed here (the client imports its own engine via
-      // a relative path within the package). This alias is a Track D finding — see the package ROADMAP.
-      '@game-hub/game-russianrailroads/client': fileURLToPath(
-        new URL('../packages/games/russianrailroads/src/client/index.ts', import.meta.url),
-      ),
-      // Track D pilot retrofit (phase 2): Can't Stop moved from `ui/src/games/cantstop/` into its own
-      // in-workspace package over TS source, so its client entry is aliased to source (the RR pattern).
-      // Only `/client` is needed — the client imports its own engine via a relative path within the
-      // package. The old `@game-hub/engine/cantstop` alias is gone (the client uses `../engine` now).
-      '@game-hub/game-cantstop/client': fileURLToPath(
-        new URL('../packages/games/cantstop/src/client/index.ts', import.meta.url),
-      ),
-      // Track D legacy-migration (phase 3): Stone Age moved from `ui/src/games/stoneage/` into its own
-      // in-workspace package over TS source, so its client entry is aliased to source (the RR pattern).
-      // Only `/client` is needed — the client imports its own engine via a relative path within the
-      // package. The old `@game-hub/engine/stoneage` alias is gone (the client uses `../engine` now).
-      '@game-hub/game-stoneage/client': fileURLToPath(
-        new URL('../packages/games/stoneage/src/client/index.ts', import.meta.url),
-      ),
-      // Track D legacy-migration (phase 4): Saint Petersburg moved from `ui/src/games/stpetersburg/` into
-      // its own in-workspace package over TS source, so its client entry is aliased to source (the RR
-      // pattern). Only `/client` is needed — the client imports its own engine via a relative path within
-      // the package. The old `@game-hub/engine/stpetersburg` alias is gone (the client uses `../engine`).
-      '@game-hub/game-stpetersburg/client': fileURLToPath(
-        new URL('../packages/games/stpetersburg/src/client/index.ts', import.meta.url),
-      ),
+      // No per-game `/client` aliases: since 2026-07-31 all six games install from npm as compiled
+      // `dist/` and resolve out of `node_modules` like any dependency — exactly as Labyrinth already did
+      // (it never had an alias, which is what proved these were unneeded). The kernel + ui-kit aliases
+      // above stay because both hosts still consume those two as TS source in-workspace, and
+      // `optimizeDeps.exclude` (above) keeps a single copy of each reaching the installed games.
     },
   },
   server: {

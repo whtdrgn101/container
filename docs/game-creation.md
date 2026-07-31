@@ -1,9 +1,19 @@
 # Adding a game — the package recipe
 
+> ⚠️ **Status (2026-07-31): the out-of-repo path is now the ONLY path.** All six games were extracted to
+> their own repositories (`whtdrgn101/game-<id>`) and are published to npm; nothing lives under
+> `packages/games/` anymore, and the hub consumes every game as `@game-hub/game-*@^0.1.0` over compiled
+> `dist/`. **A new game is built in its own repo and hosted here as an installed package — jump to
+> [§6b](#6b-hosting-a-game-built-outside-this-repo-track-d--d2d), which is the whole host-side recipe now.**
+> Sections 1–6 below describe the historical **in-workspace** shape (`packages/games/<id>/`, "situation A")
+> — kept because the four-subpath contract, the engine/module/client/bot layout, the purity rules and the
+> testing expectations are **identical** whether the game lives here or in its own repo. Read them for the
+> *package internals*; take the dependency/tsconfig/vitest wiring from the **"situation B"** column and
+> §6b, never the "situation A" `workspace:*` column.
+
 This is the complete, self-sufficient recipe for adding a game to Game Hub in the **package shape** that
-all five current games use (`packages/games/<id>/`, four TS-source subpath exports over
-`@game-hub/kernel`). Follow it top to bottom and the game coexists with the others, touching no shared
-core. It is written to be executable as-is.
+every game uses (four TS-source subpath exports over `@game-hub/kernel`). Follow it top to bottom and the
+game coexists with the others, touching no shared core. It is written to be executable as-is.
 
 Read [`design-patterns.md`](./design-patterns.md) first — this recipe references its principles
 (engine purity, the three seams, coordination state, redaction, injected randomness) rather than
@@ -413,15 +423,31 @@ host.** The `architecture.spec.ts` forbids any shell file importing `@game-hub/g
 
 ---
 
-## 6b. Hosting a game built **outside** this repo (Track D / D2d)
+## 6b. Hosting a game built **outside** this repo (Track D / D2d) — the only path now
 
-An external game — Labyrinth (`whtdrgn101/game-labyrinth`) is the worked example — arrives as an
-**installed package whose `exports` resolve to compiled `dist/`**, not as workspace TypeScript source.
-That is *less* wiring, not more: steps 6, 7 and 8 above **do not apply**, and neither does the backend's
-vitest `deps.inline` list. The package resolves out of `node_modules` like any other dependency, and its
-`./client` binds `@game-hub/kernel/client` rather than the shell's `@/` alias, so nothing needs teaching.
-Steps 1–5 and 9 are unchanged, except that the dependency specifier points at the published package (or,
-until it is published, the vendored tarball below).
+An external game arrives as an **installed package whose `exports` resolve to compiled `dist/`**, not as
+workspace TypeScript source. Since 2026-07-31 **every** game is hosted this way (all six were extracted to
+their own `whtdrgn101/game-<id>` repos and published; the hub depends on `@game-hub/game-*@^0.1.0`). This
+is *less* wiring than the historical in-workspace shape, not more: steps 6, 7 and 8 above **do not apply**.
+The package resolves out of `node_modules` like any other dependency, and its `./client` binds
+`@game-hub/kernel/client` rather than the shell's `@/` alias, so nothing needs teaching. The host-side
+recipe in full:
+
+1. Publish `@game-hub/game-<id>` to npm (its own repo's job — with a `pack:smoke` proving the tarball
+   loads; see "What the external package owes its host" below).
+2. Add `"@game-hub/game-<id>": "^0.1.0"` to **both** `backend/package.json` and `ui/package.json`.
+3. Add the `games.config.ts` entry (`module`/`client` subpath specifiers) and run `pnpm generate`.
+4. `pnpm install` — `linkWorkspacePackages: true` resolves the game's `@game-hub/kernel`/`ui-kit` peers to
+   the single workspace copies (never a registry duplicate).
+
+> ⚠️ **One vitest subtlety that survives the move.** `backend/vitest.config.ts` still inlines the game
+> packages (`/@game-hub\/(kernel|game-)/`) even though they ship compiled `dist/`. It is *not* for the
+> game's own JS — it is because each game's dist imports `@game-hub/kernel`, which in-workspace resolves
+> to the kernel's TS **source** (its dev `exports` point at `./src`, with `.js`-extension specifiers). A
+> game loaded as a native-external module would drag that source in through Node, which does no
+> `.js`→`.ts` mapping and throws `Cannot find module .../contract.js`. Inlining puts the whole `@game-hub/*`
+> subtree through Vite's transform. (The D2d table below predates this being exercised by more than one
+> game; the inline entry is load-bearing, keep it.)
 
 **If you find yourself adding an alias or a tsconfig include for an external game, stop** — it means the
 package is reaching into this repo, which is the one thing the four-subpath contract forbids.
@@ -438,29 +464,21 @@ Two host-level settings *are* required, and both are already in place. They are 
   (`configureTransport`) and React context (`RematchContext`). Dev-server only; `vite build` was always
   correct, which is what makes this worth writing down.
 
-### Local testing an external game — the two-repo loop
+### Iterating on an external game
 
-Until the game is on npm, the hub depends on a **packed tarball committed under `vendor/`**
-(`"@game-hub/game-<id>": "file:../vendor/<tarball>"` in both hosts — the `../` is required, because pnpm
-resolves a `file:` specifier relative to the package that declares it). Committed on purpose: a fresh
-clone and the Dockerfile both install with `--frozen-lockfile`.
+Now that every game is published, the loop is the ordinary npm one: cut a new version in the game's own
+repo (`npm publish`), then bump the `^0.1.0` range in `backend/package.json` + `ui/package.json` and
+`pnpm install`. Commit the two `package.json` files and `pnpm-lock.yaml` together (the lockfile carries
+the tarball's integrity hash), then `pnpm dev:backend` + `pnpm dev:ui`, or `docker compose up --build`.
 
-Editing the game and seeing it here is one command from the hub root:
-
-```bash
-pnpm labyrinth:refresh                      # expects ../game-labyrinth
-LABYRINTH_REPO=~/src/game-labyrinth pnpm labyrinth:refresh    # …or point it anywhere
-```
-
-It packs the game (whose `prepack` runs its `tsc` build, so `dist/` is always current), drops the tarball
-in `vendor/`, deletes the superseded one, rewrites the `file:` specifier in both hosts if the version
-changed, and runs `pnpm install`. **Commit `vendor/`, the two `package.json` files and `pnpm-lock.yaml`
-together** — the lockfile carries the tarball's integrity hash. Then the usual `pnpm dev:backend` +
-`pnpm dev:ui`, or `docker compose up --build`.
-
-Adding a *second* external game means a second script or a generalised one; the current script is
-deliberately named for the single game it serves rather than pretending to a generality nothing has
-asked for yet. See [`vendor/README.md`](../vendor/README.md) for what `npm publish` replaces.
+> **Historical note (retired 2026-07-31).** Before a game was published, the hub depended on a **packed
+> tarball committed under `vendor/`** (`"@game-hub/game-<id>": "file:../vendor/<tarball>"`), refreshed by
+> a `pnpm labyrinth:refresh` script that packed `../game-labyrinth`, dropped the tarball in `vendor/`,
+> rewrote the `file:` specifier and reinstalled. That was Labyrinth's D2 distribution scaffold only; the
+> npm publish deleted `vendor/`, the script and the `file:` specifiers, and — as the design doc promised —
+> changed nothing architectural. If you are bootstrapping a *brand-new* game before its first publish, a
+> local `file:` or `link:` dependency or `pnpm pack` into a scratch dir is the equivalent stopgap; there
+> is no longer a committed vendor loop.
 
 ### What the external package owes its host
 

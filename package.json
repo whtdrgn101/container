@@ -11,7 +11,6 @@
   "packageManager": "pnpm@11.13.0",
   "scripts": {
     "test": "pnpm -r test",
-    "test:games": "pnpm --filter \"@game-hub/game-*\" test",
     "test:backend": "pnpm --filter @game-hub/backend test",
     "test:e2e": "pnpm --filter @game-hub/ui test:e2e",
     "typecheck": "pnpm -r typecheck",
@@ -20,7 +19,6 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "generate": "tsx scripts/generate-registries.ts",
-    "labyrinth:refresh": "node scripts/labyrinth-refresh.mjs",
     "build": "pnpm -r build",
     "dev:backend": "pnpm --filter @game-hub/backend dev",
     "dev:ui": "pnpm --filter @game-hub/ui dev"

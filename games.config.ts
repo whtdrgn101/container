@@ -71,10 +71,11 @@ const games: readonly GameEntry[] = [
   // Labyrinth — Track D / D2d: the first game hosted from a package built **outside this repo**
   // (github.com/whtdrgn101/game-labyrinth, the D2c pilot), consumed as its published `dist/` rather than
   // as TypeScript source. Nothing about this entry is special, and that is the whole result: the same
-  // `GameEntry` shape, the same two subpath specifiers. What it does *not* need is the shim list every
-  // in-workspace game carries — no Vite alias, no `ui/tsconfig.json` include, no vitest inline entry —
-  // because a dist consumer is just a dependency. Until the package is on npm the hub depends on a
-  // packed tarball committed under `vendor/`; see `vendor/README.md` and `pnpm labyrinth:refresh`.
+  // `GameEntry` shape, the same two subpath specifiers. What it does *not* need is the shim list an
+  // in-workspace game once carried — no Vite alias, no `ui/tsconfig.json` include, no vitest inline entry
+  // — because a dist consumer is just a dependency. Published to npm 2026-07-31, so it installs from the
+  // registry (`@game-hub/game-labyrinth@^0.1.0`) like every other game; the vendored-tarball loop is
+  // retired. It was the proof; now all six games follow this shape.
   {
     id: 'labyrinth',
     module: '@game-hub/game-labyrinth/module',

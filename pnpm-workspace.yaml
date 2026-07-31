@@ -1,6 +1,5 @@
 packages:
   - packages/*
-  - packages/games/*
   - backend
   - ui
 
@@ -17,14 +16,14 @@ allowBuilds:
 # must build from workspace source, never from the registry's copy of our own packages).
 autoInstallPeers: false
 
-# ⚠️ Track D / D2d — required by the first *externally built* game (Labyrinth, vendored as a tarball
-# under `vendor/`). That package declares plain semver peers on `@game-hub/kernel` (^1.2.0) and
-# `@game-hub/ui-kit` (^1.0.0), because from out there they are ordinary published packages. pnpm 10+
-# defaults this setting to **false**, so a non-`workspace:` range is resolved from the registry even
-# when this very repo builds the package — and it did: the backend (which declares no ui-kit of its own,
-# and shouldn't — it has no React) got a **registry copy of `@game-hub/ui-kit@1.0.0`** grafted in as a
-# peer, which then forked the game into two physical copies (one per peer set) and dragged a
-# `minimumReleaseAgeExclude` entry along with it.
+# ⚠️ Track D — required by every *externally built* game. Since 2026-07-31 all six games are installed
+# from the public npm registry (`@game-hub/game-*@^0.1.0`); each declares plain semver peers on
+# `@game-hub/kernel` (^1.2.0) and `@game-hub/ui-kit` (^1.0.0), because from out there those are ordinary
+# published packages. pnpm 10+ defaults this setting to **false**, so a non-`workspace:` range is
+# resolved from the registry even when this very repo builds the package — and it did: the backend (which
+# declares no ui-kit of its own, and shouldn't — it has no React) got a **registry copy of
+# `@game-hub/ui-kit@1.0.0`** grafted in as a peer, which then forked the game into two physical copies
+# (one per peer set) and dragged a `minimumReleaseAgeExclude` entry along with it.
 #
 # `true` links a matching workspace package instead: one copy of the game, its ui-kit peer resolved to
 # `link:packages/ui-kit` — the same module instance the shell uses, which is what keeps React context
@@ -34,3 +33,11 @@ autoInstallPeers: false
 # Safe here because every in-repo dependency on a `@game-hub/*` package is already written
 # `workspace:*`; this setting only changes how an *external* package's peers on our packages resolve.
 linkWorkspacePackages: true
+
+minimumReleaseAgeExclude:
+  - '@game-hub/game-cantstop@0.1.0'
+  - '@game-hub/game-container@0.1.0'
+  - '@game-hub/game-labyrinth@0.1.0'
+  - '@game-hub/game-russianrailroads@0.1.0'
+  - '@game-hub/game-stoneage@0.1.0'
+  - '@game-hub/game-stpetersburg@0.1.0'

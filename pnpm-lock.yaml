@@ -48,23 +48,23 @@ importers:
         specifier: ^11.3.0
         version: 11.3.0
       '@game-hub/game-cantstop':
-        specifier: workspace:*
-        version: link:../packages/games/cantstop
+        specifier: ^0.1.0
+        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
       '@game-hub/game-container':
-        specifier: workspace:*
-        version: link:../packages/games/container
+        specifier: ^0.1.0
+        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
       '@game-hub/game-labyrinth':
-        specifier: file:../vendor/game-hub-game-labyrinth-0.1.0.tgz
-        version: file:vendor/game-hub-game-labyrinth-0.1.0.tgz(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
+        specifier: ^0.1.0
+        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
       '@game-hub/game-russianrailroads':
-        specifier: workspace:*
-        version: link:../packages/games/russianrailroads
+        specifier: ^0.1.0
+        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
       '@game-hub/game-stoneage':
-        specifier: workspace:*
-        version: link:../packages/games/stoneage
+        specifier: ^0.1.0
+        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
       '@game-hub/game-stpetersburg':
-        specifier: workspace:*
-        version: link:../packages/games/stpetersburg
+        specifier: ^0.1.0
+        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
       '@game-hub/kernel':
         specifier: workspace:*
         version: link:../packages/kernel
@@ -100,17 +100,17 @@ importers:
   packages/bench:
     dependencies:
       '@game-hub/game-cantstop':
-        specifier: workspace:*
-        version: link:../games/cantstop
+        specifier: ^0.1.0
+        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
       '@game-hub/game-container':
-        specifier: workspace:*
-        version: link:../games/container
+        specifier: ^0.1.0
+        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
       '@game-hub/game-stoneage':
-        specifier: workspace:*
-        version: link:../games/stoneage
+        specifier: ^0.1.0
+        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
       '@game-hub/game-stpetersburg':
-        specifier: workspace:*
-        version: link:../games/stpetersburg
+        specifier: ^0.1.0
+        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
       '@game-hub/kernel':
         specifier: workspace:*
         version: link:../kernel
@@ -121,134 +121,6 @@ importers:
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
-
-  packages/games/cantstop:
-    dependencies:
-      '@game-hub/kernel':
-        specifier: workspace:*
-        version: link:../../kernel
-      '@game-hub/ui-kit':
-        specifier: workspace:*
-        version: link:../../ui-kit
-    devDependencies:
-      '@types/react':
-        specifier: ^19.0.0
-        version: 19.2.17
-      '@vitest/coverage-v8':
-        specifier: ^3.2.4
-        version: 3.2.7(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1))
-      fastify:
-        specifier: ^5.2.0
-        version: 5.10.0
-      typescript:
-        specifier: ^5.9.2
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)
-
-  packages/games/container:
-    dependencies:
-      '@game-hub/kernel':
-        specifier: workspace:*
-        version: link:../../kernel
-      '@game-hub/ui-kit':
-        specifier: workspace:*
-        version: link:../../ui-kit
-      lucide-react:
-        specifier: ^0.469.0
-        version: 0.469.0(react@19.2.7)
-    devDependencies:
-      '@types/better-sqlite3':
-        specifier: ^7.6.12
-        version: 7.6.13
-      '@types/react':
-        specifier: ^19.0.0
-        version: 19.2.17
-      '@vitest/coverage-v8':
-        specifier: ^3.2.4
-        version: 3.2.7(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1))
-      better-sqlite3:
-        specifier: ^11.8.0
-        version: 11.10.0
-      fastify:
-        specifier: ^5.2.0
-        version: 5.10.0
-      typescript:
-        specifier: ^5.9.2
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)
-
-  packages/games/russianrailroads:
-    dependencies:
-      '@game-hub/kernel':
-        specifier: workspace:*
-        version: link:../../kernel
-      '@game-hub/ui-kit':
-        specifier: workspace:*
-        version: link:../../ui-kit
-    devDependencies:
-      '@types/react':
-        specifier: ^19.0.0
-        version: 19.2.17
-      '@vitest/coverage-v8':
-        specifier: ^3.2.4
-        version: 3.2.7(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1))
-      typescript:
-        specifier: ^5.9.2
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)
-
-  packages/games/stoneage:
-    dependencies:
-      '@game-hub/kernel':
-        specifier: workspace:*
-        version: link:../../kernel
-      '@game-hub/ui-kit':
-        specifier: workspace:*
-        version: link:../../ui-kit
-    devDependencies:
-      '@types/react':
-        specifier: ^19.0.0
-        version: 19.2.17
-      '@vitest/coverage-v8':
-        specifier: ^3.2.4
-        version: 3.2.7(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1))
-      fastify:
-        specifier: ^5.2.0
-        version: 5.10.0
-      typescript:
-        specifier: ^5.9.2
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)
-
-  packages/games/stpetersburg:
-    dependencies:
-      '@game-hub/kernel':
-        specifier: workspace:*
-        version: link:../../kernel
-      '@game-hub/ui-kit':
-        specifier: workspace:*
-        version: link:../../ui-kit
-    devDependencies:
-      '@types/react':
-        specifier: ^19.0.0
-        version: 19.2.17
-      '@vitest/coverage-v8':
-        specifier: ^3.2.4
-        version: 3.2.7(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1))
-      typescript:
-        specifier: ^5.9.2
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)
 
   packages/kernel:
     devDependencies:
@@ -296,23 +168,23 @@ importers:
   ui:
     dependencies:
       '@game-hub/game-cantstop':
-        specifier: workspace:*
-        version: link:../packages/games/cantstop
+        specifier: ^0.1.0
+        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
       '@game-hub/game-container':
-        specifier: workspace:*
-        version: link:../packages/games/container
+        specifier: ^0.1.0
+        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
       '@game-hub/game-labyrinth':
-        specifier: file:../vendor/game-hub-game-labyrinth-0.1.0.tgz
-        version: file:vendor/game-hub-game-labyrinth-0.1.0.tgz(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
+        specifier: ^0.1.0
+        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
       '@game-hub/game-russianrailroads':
-        specifier: workspace:*
-        version: link:../packages/games/russianrailroads
+        specifier: ^0.1.0
+        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
       '@game-hub/game-stoneage':
-        specifier: workspace:*
-        version: link:../packages/games/stoneage
+        specifier: ^0.1.0
+        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
       '@game-hub/game-stpetersburg':
-        specifier: workspace:*
-        version: link:../packages/games/stpetersburg
+        specifier: ^0.1.0
+        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)
       '@game-hub/kernel':
         specifier: workspace:*
         version: link:../packages/kernel
@@ -842,9 +714,73 @@ packages:
   '@fastify/websocket@11.3.0':
     resolution: {integrity: sha512-g89ag4BCcD9YP5wBZXixzoLnuf5j89p/sXFcfpCiv2pdEkYYukBEoK3heVzqsp0EAtszVDc2BBZG0KZqeAShIA==}
 
-  '@game-hub/game-labyrinth@file:vendor/game-hub-game-labyrinth-0.1.0.tgz':
-    resolution: {integrity: sha512-0ADiOU97SKp/6BL1GvxLBxf3vmRLquvGtesa7xsFSnitoVjFy+3lWTcGTS71y2cLTIp+a9LArdP15rUkdtNcKQ==, tarball: file:vendor/game-hub-game-labyrinth-0.1.0.tgz}
-    version: 0.1.0
+  '@game-hub/game-cantstop@0.1.0':
+    resolution: {integrity: sha512-ogJXTnBHEuujbB9XBq/Er+sW8cPJ75tkDQwqZthRHmtf4uKO98x/YyEc9nyPZqLK3prCfzHdOlkEHsw0Gu4o9A==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      '@game-hub/kernel': ^1.2.0
+      '@game-hub/ui-kit': ^1.0.0
+      react: ^19.0.0
+    peerDependenciesMeta:
+      '@game-hub/ui-kit':
+        optional: true
+      react:
+        optional: true
+
+  '@game-hub/game-container@0.1.0':
+    resolution: {integrity: sha512-2y7clLYH07j5pKDZGNPPR3PbbI/1uj4fRRwdQB1QrJWr9e4kp7/H/JqvvYyBgw4zP8FZCjnLMHepj3qwl2Rkow==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      '@game-hub/kernel': ^1.2.0
+      '@game-hub/ui-kit': ^1.0.0
+      react: ^19.0.0
+    peerDependenciesMeta:
+      '@game-hub/ui-kit':
+        optional: true
+      react:
+        optional: true
+
+  '@game-hub/game-labyrinth@0.1.0':
+    resolution: {integrity: sha512-cGeNcKsMuotnWtwHRhpobzoq/sn55Oq7OazfAyTc41Nqi/PkibTgYPUA+jh3otCPqm9gy/Pyr9bqwssR+r3Lng==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      '@game-hub/kernel': ^1.2.0
+      '@game-hub/ui-kit': ^1.0.0
+      react: ^19.0.0
+    peerDependenciesMeta:
+      '@game-hub/ui-kit':
+        optional: true
+      react:
+        optional: true
+
+  '@game-hub/game-russianrailroads@0.1.0':
+    resolution: {integrity: sha512-77aNxigoWFzZl/Zw2/stzBSVTkWn4BqyB7o/dRKbxWKczeS7I3Db0Y6DYHezCwQZhdisp3PsmLwVFbGv8Ot4yA==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      '@game-hub/kernel': ^1.2.0
+      '@game-hub/ui-kit': ^1.0.0
+      react: ^19.0.0
+    peerDependenciesMeta:
+      '@game-hub/ui-kit':
+        optional: true
+      react:
+        optional: true
+
+  '@game-hub/game-stoneage@0.1.0':
+    resolution: {integrity: sha512-jhsCaq/WJ18QNg6cufhoRW3p8gQhItHpQ8uunSt5zsjWsZAB9TPR0gxS7KzPPd3fJN9L3XITU5IiDQRPviej0w==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      '@game-hub/kernel': ^1.2.0
+      '@game-hub/ui-kit': ^1.0.0
+      react: ^19.0.0
+    peerDependenciesMeta:
+      '@game-hub/ui-kit':
+        optional: true
+      react:
+        optional: true
+
+  '@game-hub/game-stpetersburg@0.1.0':
+    resolution: {integrity: sha512-s7DvxMwxjxU9emTYB/zKjNEcRV6PE3Wbpj7iIU5KcU382HXB3zSVzt4qaduqslHpgoRy8MT3pvDKrPIeazDRbw==}
     engines: {node: '>=22'}
     peerDependencies:
       '@game-hub/kernel': ^1.2.0
@@ -3371,7 +3307,43 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@game-hub/game-labyrinth@file:vendor/game-hub-game-labyrinth-0.1.0.tgz(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)':
+  '@game-hub/game-cantstop@0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)':
+    dependencies:
+      '@game-hub/kernel': link:packages/kernel
+    optionalDependencies:
+      '@game-hub/ui-kit': link:packages/ui-kit
+      react: 19.2.7
+
+  '@game-hub/game-container@0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)':
+    dependencies:
+      '@game-hub/kernel': link:packages/kernel
+      lucide-react: 0.469.0(react@19.2.7)
+    optionalDependencies:
+      '@game-hub/ui-kit': link:packages/ui-kit
+      react: 19.2.7
+
+  '@game-hub/game-labyrinth@0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)':
+    dependencies:
+      '@game-hub/kernel': link:packages/kernel
+    optionalDependencies:
+      '@game-hub/ui-kit': link:packages/ui-kit
+      react: 19.2.7
+
+  '@game-hub/game-russianrailroads@0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)':
+    dependencies:
+      '@game-hub/kernel': link:packages/kernel
+    optionalDependencies:
+      '@game-hub/ui-kit': link:packages/ui-kit
+      react: 19.2.7
+
+  '@game-hub/game-stoneage@0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)':
+    dependencies:
+      '@game-hub/kernel': link:packages/kernel
+    optionalDependencies:
+      '@game-hub/ui-kit': link:packages/ui-kit
+      react: 19.2.7
+
+  '@game-hub/game-stpetersburg@0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.7)':
     dependencies:
       '@game-hub/kernel': link:packages/kernel
     optionalDependencies:

@@ -21,6 +21,12 @@ live in the game's own repo — [`whtdrgn101/game-labyrinth`](https://github.com
 (`ROADMAP.md` there is authoritative; its `docs/d2c-findings.md` logs the out-of-repo frictions). This
 file remains the hub-side record of the kickoff decisions and the D2a–D2d platform slices below.
 
+**Update (2026-07-31):** Labyrinth (and all five other games) are now **published to npm** and consumed by
+the hub as `@game-hub/game-*@^0.1.0` over compiled `dist/`. The vendored-tarball scaffold this doc's D2a/D2d
+notes describe (`vendor/`, `pnpm labyrinth:refresh`) is retired — see `docs/track-d-externalize-games.md`'s
+top banner. The mechanism is unchanged; only the distribution flipped from a committed tarball to the
+registry.
+
 ## Rules digest (rulebook read 2026-07-29 — 2 pp.; page refs are to that PDF)
 
 - **Board**: 7×7 = 49 squares. **16 fixed tiles** at the even/even coordinates: 4 corner starting

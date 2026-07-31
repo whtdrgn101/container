@@ -5,23 +5,25 @@ Context and working agreement for this repo. Read this first, then the two refer
 ## What we're building
 
 **Game Hub** — a self-hosted board-game platform (a "games room") that hosts *multiple* games behind
-shared engine/backend/UI seams. Each game is its own package — five in-workspace (`packages/games/<id>/`)
-and, since Track D / D2d, one built in an entirely **separate repository** and installed like any npm
-dependency. The platform is game-agnostic. The games:
+shared engine/backend/UI seams. Each game is its own package. As of 2026-07-31 **all six games are built
+in their own repositories** (`whtdrgn101/game-<id>`) and installed here like any npm dependency —
+published to the public registry at `0.1.0` and consumed as `@game-hub/game-*@^0.1.0` over compiled
+`dist/`. Nothing under `packages/games/` remains; the hub is a pure *host*. The platform is game-agnostic.
+The games (each links its own repo):
 
 | Game | Players | Kind | Status |
 |------|---------|------|--------|
-| **Container** (10th Anniv.) | 3–5 | economic supply-chain — you can never buy/ship *your own* containers | core game complete; AI A0–A2 shipped (A3–A5 optional) |
-| **Can't Stop** | 2–4 | push-your-luck dice | complete + bot (CS1) + difficulty tiers (CS4); only variants (CS3) remain |
-| **Stone Age** | 2–4 | worker-placement Euro | **complete** (SA0–SA15): full game, illustrated board, bot, 2–3-player rules, deck redaction |
-| **Saint Petersburg** (1st ed.) | 2–4 | card-buying engine | **complete** (SP0–SP9): first game with real hidden info (hand + rubles secret) |
-| **Russian Railroads** (Ultimate ed.) | 2–4 | worker-placement | **in build** — base game + art (RR9) complete; board-UI revamp (RR9b) queued behind the Labyrinth kickoff (it should borrow Labyrinth's board-UI findings); bot (RR10) after; the Track D **package pilot** |
-| **Labyrinth** (Ravensburger) | 2–4 | sliding-maze race, hidden treasure targets | **playable — and the Track D D2 proof**: game 6, built *out-of-repo* ([`whtdrgn101/game-labyrinth`](https://github.com/whtdrgn101/game-labyrinth), public) against published `@game-hub/*` and hosted here as an **installed package over compiled `dist/`**. L0–L4 shipped; L4b (art) + L5 (bot) remain. ⚠️ Its roadmap, rules digest and rulings live **in that repo** |
+| **Container** (10th Anniv.) — [`whtdrgn101/game-container`](https://github.com/whtdrgn101/game-container) | 3–5 | economic supply-chain — you can never buy/ship *your own* containers | core game complete; AI A0–A2 shipped (A3–A5 optional) |
+| **Can't Stop** — [`whtdrgn101/game-cantstop`](https://github.com/whtdrgn101/game-cantstop) | 2–4 | push-your-luck dice | complete + bot (CS1) + difficulty tiers (CS4); only variants (CS3) remain |
+| **Stone Age** — [`whtdrgn101/game-stoneage`](https://github.com/whtdrgn101/game-stoneage) | 2–4 | worker-placement Euro | **complete** (SA0–SA15): full game, illustrated board, bot, 2–3-player rules, deck redaction |
+| **Saint Petersburg** (1st ed.) — [`whtdrgn101/game-stpetersburg`](https://github.com/whtdrgn101/game-stpetersburg) | 2–4 | card-buying engine | **complete** (SP0–SP9): first game with real hidden info (hand + rubles secret) |
+| **Russian Railroads** (Ultimate ed.) — [`whtdrgn101/game-russianrailroads`](https://github.com/whtdrgn101/game-russianrailroads) | 2–4 | worker-placement | **in build** — base game + art (RR9) complete; board-UI revamp (RR9b) queued behind the Labyrinth kickoff (it should borrow Labyrinth's board-UI findings); bot (RR10) after; the Track D **package pilot** |
+| **Labyrinth** (Ravensburger) — [`whtdrgn101/game-labyrinth`](https://github.com/whtdrgn101/game-labyrinth) | 2–4 | sliding-maze race, hidden treasure targets | **playable — the Track D D2 proof**: game 6, the *first* built out-of-repo against published `@game-hub/*`. L0–L4 shipped; L4b (art) + L5 (bot) remain |
 
-Per-game rules and slice history live in each game's `packages/games/<id>/ROADMAP.md` — **except
-Labyrinth's, which live in its own repo** (`../game-labyrinth`: `ROADMAP.md`, `CLAUDE.md`,
-`docs/d2c-findings.md`). The authoritative rules are the rulebook PDFs in `reference_materials/`
-(gitignored — copyrighted). ⚠️ **Read the spec before implementing a rule** — never from memory.
+Per-game rules and slice history now live **in each game's own repo** (`ROADMAP.md`, `CLAUDE.md`, and —
+for Labyrinth — `docs/d2c-findings.md`), not in this repo. The authoritative rules are the rulebook PDFs
+in `reference_materials/` (gitignored — copyrighted). ⚠️ **Read the spec before implementing a rule** —
+never from memory.
 
 **Naming split:** the **platform** is "Game Hub" (npm scope `@game-hub/*`). **Container** is one game *on*
 it (id `container`), not the platform. Don't conflate them.
@@ -29,7 +31,9 @@ it (id `container`), not the platform. Don't conflate them.
 ## Non-negotiables (set at kickoff, still binding)
 
 - **100% unit-test coverage of every game engine** (rules), enforced per game by a `src/engine/**`
-  coverage gate. The bot gate is **90%** (heuristics shouldn't fight a 100% bar).
+  coverage gate. The bot gate is **90%** (heuristics shouldn't fight a 100% bar). Since 2026-07-31 every
+  game lives in its own repo, so these gates run in **that** repo's CI — the platform can't enforce them
+  on an installed package, but the discipline is still the contract every game owes the hub.
 - **Tests ship with the code, not after.** A feature without tests isn't finished.
 - **The engine is pure** — no `Date`, no `Math.random`, no mutation. Randomness is **injected** (at setup
   `createGame({ rng })`, per action `ModuleContext.rng`). A module reaching for `Math.random` is a bug.
@@ -52,27 +56,24 @@ packages/
                      (TurnBanner, ActivityFeed, GameOver, ActionTip, PanZoom, Button/Card, cn,
                      seatIdentity) + the game-facing REST calls (getGame/applyAction/apiUrl).
                      React is a peer; no CSS ships (Tailwind classes in source). Published (1.0.0).
-  games/<id>/      @game-hub/game-<id> — one package per game, four TS-source subpath exports:
-                     ./engine (pure rules, 100% gate)  ./module (backend seam)
-                     ./client (UI seam)  ./bot (AI, 90% gate) + its own ROADMAP.md.
-                     ⚠️ A ./client may import ONLY @game-hub/kernel/client + @game-hub/ui-kit —
-                     never ui/src (e2e architecture.spec.ts enforces it).
   bench/           @game-hub/bench — dev-only bot-strength harness (root `pnpm bench`)
 backend/           @game-hub/backend — game-agnostic Fastify REST core + SQLite + the generated registry
 ui/                @game-hub/ui — game-agnostic React + Tailwind + shadcn shell + the generated registry
 games.config.ts    the ordered list of hosted games → `pnpm generate` → the two checked-in registries
-vendor/            the packed @game-hub/game-labyrinth tarball — game 6 lives in its OWN repo and is
-                     consumed here as an installed dist package (Track D / D2d). Committed on purpose:
-                     it IS the dependency until the package is published. `pnpm labyrinth:refresh` is
-                     the whole two-repo loop. See vendor/README.md.
+
+The games themselves live OUTSIDE this repo (each `whtdrgn101/game-<id>`, published to npm), consumed here
+as `@game-hub/game-*@^0.1.0` — an installed package whose four subpath exports resolve to compiled `dist/`:
+  ./engine (pure rules)  ./module (backend seam)  ./client (UI seam)  ./bot (AI).
+⚠️ A ./client may import ONLY @game-hub/kernel/client + @game-hub/ui-kit — never ui/src. That seam, and
+the engine 100% / bot 90% coverage gates, are enforced in each game's OWN repo/CI now, not here.
 ```
 
 **Data flow:** UI → REST → backend → **module → engine** (authoritative) → SQLite snapshot + move log.
 The backend then **pushes** new state to every client over a push-only WebSocket, each projected
-per-viewer via the module's `viewFor`. Adding a game is **additive** — one `games.config.ts` entry +
-`pnpm generate` + one dep/alias/include line per host (see `docs/game-creation.md`). An **out-of-repo**
-game (Labyrinth) is *less*: two dependency lines and the config entry, with **no** Vite alias, tsconfig
-include or vitest inline entry, because a dist consumer is just a dependency (`game-creation.md` §6b).
+per-viewer via the module's `viewFor`. Adding a game is **additive** and now *always* the out-of-repo
+shape: publish the `@game-hub/game-<id>` package, add two dependency lines (backend + ui) and one
+`games.config.ts` entry, `pnpm generate` — with **no** Vite alias, tsconfig include or vitest inline
+entry, because a dist consumer is just a dependency (`docs/game-creation.md` §6b, the only path now).
 ⚠️ Two host settings make that work and must not be reverted — `linkWorkspacePackages: true`
 (`pnpm-workspace.yaml`) and `optimizeDeps.exclude: ['@game-hub/kernel', '@game-hub/ui-kit']`
 (`ui/vite.config.ts`); both stop a **second copy** of a shared package reaching the installed game, which
@@ -108,7 +109,7 @@ The platform explanation now lives in two docs. Read them before touching platfo
 History and rationale: **[`docs/track-d-externalize-games.md`](./docs/track-d-externalize-games.md)** (the
 game-package design) and **[`docs/track-d-legacy-migration.md`](./docs/track-d-legacy-migration.md)** (the
 migration that made all five games package-shaped). Platform roadmap:
-**[`ROADMAP.md`](./ROADMAP.md)**; per-game roadmaps at `packages/games/<id>/ROADMAP.md`. The 2026-07
+**[`ROADMAP.md`](./ROADMAP.md)**; per-game roadmaps now live in each game's own repo. The 2026-07
 architecture review (`REVIEW.md`) is **retired** — its remaining items live in ROADMAP.md's
 "Review backlog" section (full text in git history; code comments citing "REVIEW §x.y" refer to it).
 Deployment: **[`DEPLOY.md`](./DEPLOY.md)**.
@@ -119,8 +120,8 @@ Deployment: **[`DEPLOY.md`](./DEPLOY.md)**.
 pnpm install                # bootstrap the workspace
 
 # Tests
-pnpm test                   # every workspace's tests (pnpm -r test)
-pnpm test:games             # every game package's engine 100% + bot 90% gates (@game-hub/game-*)
+pnpm test                   # every workspace's tests (pnpm -r test) — kernel + backend (the games'
+                            #   engine 100% / bot 90% gates run in each game's OWN repo/CI now)
 pnpm test:backend           # backend integration tests (Fastify inject + :memory: sqlite)
 pnpm test:e2e               # Playwright (auto-starts API + UI); first run: pnpm --filter @game-hub/ui exec playwright install chromium
 pnpm typecheck              # strict typecheck across all packages
@@ -132,9 +133,6 @@ pnpm format                 # Prettier --write .   (single quotes, semicolons, t
 pnpm format:check           # the CI gate (*.md is Prettier-ignored — hand-wrap docs to ~100-120 cols)
 
 pnpm generate               # games.config.ts → the two checked-in registries (CI freshness-checks the diff)
-pnpm labyrinth:refresh      # re-pack ../game-labyrinth into vendor/ + reinstall (LABYRINTH_REPO overrides
-                            #   the path). The two-repo loop for game 6 — commit vendor/ + both
-                            #   package.json files + the lockfile together. See vendor/README.md.
 
 # Publish-readiness of the two published packages (CI runs both after `pnpm test`)
 pnpm --filter @game-hub/kernel pack:smoke   # pack → install outside the workspace → node + nodenext tsc
@@ -154,8 +152,9 @@ docker run -d -p 8080:3001 -v game-hub-game-data:/data game-hub:latest   # → h
 ```
 
 **Deployment:** a multi-stage `Dockerfile` builds the UI + native SQLite and **esbuild-bundles** the
-backend (inlining the workspace TS deps — `@game-hub/kernel` and the game packages — since they ship `.ts`
-source), producing a slim Node runtime image (no tsx/vite/vitest, runs as unprivileged `node`, in-image
+backend (inlining `@game-hub/kernel` — a workspace TS dep shipping `.ts` source — plus the six installed
+games' already-compiled `dist/` JS from `node_modules`), producing a slim Node runtime image (no
+tsx/vite/vitest, runs as unprivileged `node`, in-image
 `HEALTHCHECK`, boot-proven by `backend/scripts/smoke.mjs`). Games persist to `DATABASE_PATH`
 (default `/data/game-hub.sqlite`) — mount `/data` to a volume. No auth (trusted-LAN use). See
 [`DEPLOY.md`](./DEPLOY.md). ⚠️ When adding a top-level API route, update the SPA-fallback allowlist regex
@@ -163,7 +162,8 @@ in `app.ts` (`/^\/(games|lobbies|health)\b/`).
 
 ## Testing strategy (summary — full detail in design-patterns §9)
 
-- **Engine:** exhaustive unit tests, 100% gate per game — the primary correctness guarantee.
+- **Engine:** exhaustive unit tests, 100% gate per game — the primary correctness guarantee, now run in
+  each game's own repo/CI (the games install here as compiled `dist/`).
 - **Backend:** integration tests via `app.inject` against `:memory:` SQLite. ⚠️ `module-seam.test.ts`
   drives a stub *counter* game through the core — the only honest test that the core hosts games, plural;
   keep it green.
@@ -173,6 +173,16 @@ in `app.ts` (`/^\/(games|lobbies|health)\b/`).
 
 ## Decisions & assumptions log (still-operative)
 
+- **All six games are out-of-repo, installed from npm** (2026-07-31). The five in-workspace games
+  (`packages/games/*`) were extracted to their own repositories (`whtdrgn101/game-<id>`) and published to
+  the public registry alongside Labyrinth; every game now installs as `@game-hub/game-*@^0.1.0` over
+  compiled `dist/`. `packages/games/`, `vendor/` and the `labyrinth:refresh`/`test:games` scripts are
+  gone; Labyrinth's publish retired the vendored-tarball loop. The hub keeps only `@game-hub/kernel` +
+  `@game-hub/ui-kit` as workspace source. The five per-game Vite aliases and tsconfig includes are gone
+  (Labyrinth never had them — that was the proof they were unneeded). ⚠️ The backend vitest
+  `deps.inline` **still lists `game-`** even though the games ship dist: each game's dist imports the
+  *workspace TS-source* kernel, so the whole `@game-hub/*` subtree must go through Vite's transform (see
+  the note in `backend/vitest.config.ts`).
 - **Package manager is pnpm** (installed via Homebrew — corepack couldn't symlink into `/usr/local/bin`).
   Native `better-sqlite3` and `esbuild` builds are allow-listed in `pnpm-workspace.yaml`.
 - **Container colours:** `white, red, green, blue, yellow` (container cargo, from the rulebook scoring
@@ -198,7 +208,7 @@ in `app.ts` (`/^\/(games|lobbies|health)\b/`).
   `tsc` emits relative specifiers verbatim, and Node ESM does neither extension nor directory
   resolution — an extensionless `from './errors'` makes the installed tarball unloadable while every
   in-repo suite stays green. `pack:smoke` is what catches it. Applies to `@game-hub/kernel`,
-  `@game-hub/ui-kit`, and (learned again the hard way at D2d) the out-of-repo Labyrinth package.
+  `@game-hub/ui-kit`, and all six out-of-repo game packages (each carries its own pack smoke).
 
 Older decision detail (Track A/B/C/D slice history) lives in `ROADMAP.md` and the per-game roadmaps.
 
