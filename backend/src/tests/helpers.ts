@@ -31,12 +31,19 @@ type WsClient = Awaited<ReturnType<FastifyInstance['injectWS']>>;
  * Wrap an injected WebSocket in a pull-based reader: `next()` resolves with the next JSON message,
  * typed as `T`. Generic so each suite names the `game` shape it expects (the hub's `StateMessage.game`
  * is `unknown` by design — the transport hosts any game and must not know one game's shape).
+ *
+ * ⚠️ **Platform coordination frames (`presence`, `chat`) are skipped** so a suite asserting on a game's
+ * `state`/`auction`/`rematch` sequence isn't disrupted by the always-on presence roster (pushed on every
+ * subscribe/leave) or by chat. A test that *wants* those frames reads them with its own raw listener
+ * (see `chat.test.ts`). This is the single point that keeps every game-suite WS test green under presence.
  */
 export function wsReader<T>(socket: WsClient): () => Promise<T> {
   const queue: T[] = [];
   const pending: Array<(m: T) => void> = [];
   socket.on('message', (raw: unknown) => {
     const msg = JSON.parse(String(raw)) as T;
+    const type = (msg as { type?: unknown }).type;
+    if (type === 'presence' || type === 'chat') return; // platform frames — not what game suites assert on
     const resolve = pending.shift();
     if (resolve) resolve(msg);
     else queue.push(msg);

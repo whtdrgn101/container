@@ -31,6 +31,19 @@ export const WS_HEARTBEAT_INTERVAL_MS = 30_000;
 /** Longest accepted display name / game-type string, on every body that takes one (input-bound §4.7). */
 export const MAX_NAME_LENGTH = 64;
 
+/**
+ * Longest accepted chat message body (input-bound §4.7). Chat is stored append-only and echoed to every
+ * viewer, so an unbounded body would be a storage/broadcast amplifier — a generous line of text, capped.
+ */
+export const MAX_CHAT_LENGTH = 500;
+
+/**
+ * How many past chat messages a resuming client is backfilled with over the socket. Chat is table-public
+ * and append-only; a joiner sees the recent tail rather than the whole history, so a long-running game's
+ * log can't grow the resume payload without bound.
+ */
+export const CHAT_BACKFILL_LIMIT = 100;
+
 /** Longest accepted `gameType` id. */
 export const MAX_GAME_TYPE_LENGTH = 64;
 

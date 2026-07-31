@@ -170,7 +170,11 @@ describe('§4.7 WebSocket origin check', () => {
     });
     // A same-origin socket is not closed for the origin reason; it receives the initial snapshot.
     const message = (await new Promise<string>((resolve) => {
-      socket.on('message', (raw: unknown) => resolve(String(raw)));
+      socket.on('message', (raw: unknown) => {
+        // Skip the platform presence frame pushed on subscribe; we're asserting the state snapshot lands.
+        if ((JSON.parse(String(raw)) as { type: string }).type === 'presence') return;
+        resolve(String(raw));
+      });
     })) as string;
     expect((JSON.parse(message) as { type: string }).type).toBe('state');
     socket.close();

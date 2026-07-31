@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { BotRepository } from './bots';
+import { ChatRepository } from './chat';
 import { ColorRepository, assignColors, colorsForSeats } from './colors';
 import type { DB } from './db';
 import { createDefaultRegistry, DEFAULT_GAME_ID } from './games';
@@ -84,6 +85,8 @@ export interface AppServices {
   readonly botSeats: BotRepository;
   readonly colorSeats: ColorRepository;
   readonly rematches: RematchRepository;
+  /** The append-only, game-scoped chat log (coordination state, table-public — see `chat.ts`). */
+  readonly chats: ChatRepository;
   readonly hub: GameHub;
   readonly wsConnections: WsConnectionLimiter;
   readonly allowedOrigins: readonly string[];
@@ -147,6 +150,8 @@ export function buildServices(app: FastifyInstance, options: AppOptions): AppSer
   // Which colour each seat picked — coordination state beside the game, like bot seats (see colors.ts).
   const colorSeats = new ColorRepository(options.db);
   const rematches = new RematchRepository(options.db);
+  // In-game chat log — coordination state beside the game, like bots and rematches (see chat.ts).
+  const chats = new ChatRepository(options.db);
   const hub = new GameHub();
 
   /**
@@ -497,6 +502,7 @@ export function buildServices(app: FastifyInstance, options: AppOptions): AppSer
     botSeats,
     colorSeats,
     rematches,
+    chats,
     hub,
     wsConnections,
     allowedOrigins,

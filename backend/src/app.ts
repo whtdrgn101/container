@@ -9,6 +9,7 @@ import { registerAbandonRoutes } from './routes/abandon';
 import { registerHealthRoutes } from './routes/health';
 import { registerStreamRoutes } from './routes/stream';
 import { registerGameRoutes } from './routes/games';
+import { registerChatRoutes } from './routes/chat';
 import { registerRematchRoutes } from './routes/rematch';
 import { registerModuleRoutes } from './routes/modules';
 import { registerLobbyRoutes } from './routes/lobbies';
@@ -87,6 +88,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
   registerHealthRoutes(app, services);
   registerStreamRoutes(app, services);
   registerGameRoutes(app, services);
+  registerChatRoutes(app, services);
   registerRematchRoutes(app, services);
   registerModuleRoutes(app, services);
   registerLobbyRoutes(app, services);

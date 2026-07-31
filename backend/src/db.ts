@@ -99,6 +99,24 @@ CREATE TABLE IF NOT EXISTS game_colors (
   FOREIGN KEY (game_id) REFERENCES games(id)
 );
 
+-- In-game chat (presence + chat feature). Coordination state, game-agnostic and **table-public**: the
+-- engine never learns a message exists, and every viewer of the game sees every message (no per-seat
+-- redaction — consistent with "everything logged is public"). Append-only, keyed by game and a per-game
+-- sequence, so a resuming client can be backfilled the recent tail in order. A separate table, so
+-- CREATE TABLE IF NOT EXISTS picks it up on an existing database with no migration.
+CREATE TABLE IF NOT EXISTS chat_messages (
+  game_id    TEXT NOT NULL,
+  seq        INTEGER NOT NULL,
+  -- The seat that spoke (a player id). A send must name a real seat; spectators are read-only, so this
+  -- is never null — but the label is stored alongside so a rename can't retro-change a printed message.
+  sender_id  TEXT NOT NULL,
+  sender     TEXT NOT NULL,
+  body       TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (game_id, seq),
+  FOREIGN KEY (game_id) REFERENCES games(id)
+);
+
 -- A proposed rematch of a finished game. Coordination state, game-agnostic (like lobbies/bots): when
 -- enough of the same players agree, a fresh game of the same type starts with the same seats + bot
 -- assignments. Keyed by the finished game; holds who has agreed and the new game's id once it starts.

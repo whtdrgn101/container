@@ -165,7 +165,11 @@ describe('colours across the platform', () => {
     // The live stream's first snapshot carries them as well.
     const socket = await app.injectWS(`/games/${id}/stream`);
     const first = await new Promise<{ colors: Record<string, string> }>((resolve) => {
-      socket.on('message', (data: Buffer) => resolve(JSON.parse(data.toString())));
+      socket.on('message', (data: Buffer) => {
+        const msg = JSON.parse(data.toString());
+        if (msg.type === 'presence' || msg.type === 'chat') return; // platform frames, not the state snapshot
+        resolve(msg);
+      });
     });
     expect(first.colors).toEqual({ p1: 'emerald', p2: 'rose' });
     await socket.terminate();

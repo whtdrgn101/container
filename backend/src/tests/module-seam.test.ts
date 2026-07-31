@@ -388,7 +388,11 @@ describe('hosting two games at once', () => {
     const counter = await createOf('counter', [{ name: 'Ann' }, { name: 'Bo' }]);
     const socket = await app.injectWS(`/games/${counter.id}/stream`);
     const first = await new Promise<{ gameType: string }>((resolve) => {
-      socket.on('message', (data: Buffer) => resolve(JSON.parse(data.toString())));
+      socket.on('message', (data: Buffer) => {
+        const msg = JSON.parse(data.toString());
+        if (msg.type === 'presence' || msg.type === 'chat') return; // platform frames, not the state snapshot
+        resolve(msg);
+      });
     });
     expect(first.gameType).toBe('counter');
     await socket.terminate();

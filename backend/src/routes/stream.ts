@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import fastifyWebsocket from '@fastify/websocket';
+import { presenceLabel } from '../presence';
 import { SchemaUnsupportedError } from '../repository';
-import { isAllowedWsOrigin, WS_MAX_PAYLOAD } from '../security';
+import { CHAT_BACKFILL_LIMIT, isAllowedWsOrigin, WS_MAX_PAYLOAD } from '../security';
 import type { AppServices } from '../services';
 
 /**
@@ -11,7 +12,7 @@ import type { AppServices } from '../services';
  * lives in one file.
  */
 export function registerStreamRoutes(app: FastifyInstance, services: AppServices): void {
-  const { moduleOf, repo, hub, wsConnections, allowedOrigins, tick, stateMessage } = services;
+  const { moduleOf, repo, hub, chats, wsConnections, allowedOrigins, tick, stateMessage } = services;
 
   // `maxPayload` (§4.7): the stream is push-only, so a client legitimately sends no data frames at all
   // — a small inbound cap rejects anything a misbehaving or hostile peer tries to push up the socket.
@@ -71,12 +72,24 @@ export function registerStreamRoutes(app: FastifyInstance, services: AppServices
         }
         // No `?viewer` ⇒ follow the active player; `?viewer=p1,p3` ⇒ those seats; `?viewer=` ⇒ spectator.
         const viewer = request.query.viewer !== undefined ? request.query.viewer.split(',').filter(Boolean) : null;
-        const unsubscribe = hub.subscribe(request.params.id, socket, viewer);
+        // The presence label is game-shaped (it names seats), so it is computed here — where the seat
+        // names are known — and handed to the hub as an opaque string; the hub broadcasts the roster.
+        const label = presenceLabel(viewer, module.summarize(state).players);
+        const unsubscribe = hub.subscribe(request.params.id, socket, viewer, label);
         socket.on('close', unsubscribe);
         tick(request.params.id); // a watching client is enough to drive stalled bot turns
         // Send the first snapshot on the next tick, after the open handshake settles, so a client
-        // that attaches its message handler right after connecting never misses it.
-        setImmediate(() => hub.send(socket, stateMessage(module, request.params.id, state, viewer)));
+        // that attaches its message handler right after connecting never misses it. The chat backfill
+        // (the recent tail, capped) rides right behind it, so a resuming client sees the conversation.
+        setImmediate(() => {
+          hub.send(socket, stateMessage(module, request.params.id, state, viewer));
+          // Send this joiner its initial presence roster explicitly: the subscribe-time broadcast can
+          // race a socket that is still mid-handshake (see `hub.broadcastPresence`), so deliver it here,
+          // past the same setImmediate that guards the state snapshot, to reliably reach a fresh client.
+          hub.send(socket, hub.presenceMessage(request.params.id));
+          const history = chats.recent(request.params.id, CHAT_BACKFILL_LIMIT);
+          if (history.length > 0) hub.send(socket, { type: 'chat', messages: history });
+        });
       },
     );
   });

@@ -52,6 +52,7 @@ function reader(socket: WsClient): () => Promise<{ type: string; game: PlayerVie
   const pending: Array<(m: Msg) => void> = [];
   socket.on('message', (raw: unknown) => {
     const msg = JSON.parse(String(raw)) as Msg;
+    if (msg.type === 'presence' || msg.type === 'chat') return; // platform frames, not game state
     const resolve = pending.shift();
     if (resolve) resolve(msg);
     else queue.push(msg);

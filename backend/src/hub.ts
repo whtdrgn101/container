@@ -32,7 +32,29 @@ export interface Pingable {
 const isPingable = (socket: Sendable): socket is Sendable & Pingable =>
   typeof (socket as Partial<Pingable>).ping === 'function';
 
-/** The wire message pushed to clients. `type` leaves room for future kinds (chat, presence, …). */
+/** One entry in a presence roster: a stable per-connection id and its viewer label. */
+export interface PresenceViewer {
+  /** Stable for the life of the socket, so a client can key/dedupe the roster. */
+  readonly id: string;
+  /** Human-readable viewer label (seat name(s), `'Spectator'`, or `'Table'` — see `presence.ts`). */
+  readonly label: string;
+}
+
+/**
+ * The presence envelope: who is currently watching this game's room. Pushed by the hub to every member
+ * on each subscription change (join / leave / heartbeat-reap). Table-public — the same roster for
+ * everyone, no per-viewer projection.
+ */
+export interface PresenceMessage {
+  readonly type: 'presence';
+  readonly viewers: readonly PresenceViewer[];
+}
+
+/**
+ * The wire message pushed to clients. `type` was left extensible for exactly this: the platform now
+ * also pushes `{ type: 'presence' }` (the hub, on subscription changes) and `{ type: 'chat' }` (the chat
+ * route, fanned out over the same socket), plus each game's own side-channels (Container's `'auction'`).
+ */
 export interface StateMessage {
   readonly type: 'state';
   /** A `GameView` — whatever the game's own `viewFor` produced for this subscriber. */
@@ -57,9 +79,13 @@ export interface StateMessage {
 }
 
 interface Subscriber {
+  /** Stable per-connection id, surfaced in the presence roster so a client can key/dedupe it. */
+  readonly id: string;
   readonly socket: Sendable;
   /** Seat(s) to project for, or `null` to follow the active player (hotseat default). */
   readonly viewerId: Viewer;
+  /** This subscriber's presence label (seat name(s) / `'Spectator'` / `'Table'`), opaque to the hub. */
+  readonly label: string;
   /**
    * Heartbeat liveness (§4.7). Set `true` on subscribe and on every `pong`; a sweep sets it `false`
    * just before pinging, so a socket that misses the round-trip is `false` at the next sweep and gets
@@ -73,18 +99,28 @@ const WS_OPEN = 1; // WebSocket.OPEN readyState
 export class GameHub {
   private readonly rooms = new Map<string, Set<Subscriber>>();
   private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+  /** Monotonic source of stable per-connection ids for the presence roster. */
+  private nextSubId = 0;
 
-  /** Register a socket for a game's updates. Returns an unsubscribe function (call it on close). */
-  subscribe(gameId: string, socket: Sendable, viewerId: Viewer): () => void {
-    const sub: Subscriber = { socket, viewerId, alive: true };
+  /**
+   * Register a socket for a game's updates. Returns an unsubscribe function (call it on close).
+   *
+   * `label` is this subscriber's presence label (opaque to the hub — the stream route computes it from
+   * the game's seat names, see `presence.ts`). Registering a socket changes the room's roster, so the
+   * hub pushes a fresh presence envelope to every member here — and again from the returned unsubscribe.
+   */
+  subscribe(gameId: string, socket: Sendable, viewerId: Viewer, label = ''): () => void {
+    const sub: Subscriber = { id: String(++this.nextSubId), socket, viewerId, label, alive: true };
     // A pong answers the sweep's ping — mark the socket live again so the next sweep spares it.
     if (isPingable(socket)) socket.on('pong', () => (sub.alive = true));
     const room = this.rooms.get(gameId) ?? new Set<Subscriber>();
     room.add(sub);
     this.rooms.set(gameId, room);
+    this.broadcastPresence(gameId); // tell the room (including the new socket) who is now watching
     return () => {
       room.delete(sub);
       if (room.size === 0) this.rooms.delete(gameId);
+      else this.broadcastPresence(gameId); // someone left — refresh the remaining members' roster
     };
   }
 
@@ -118,6 +154,7 @@ export class GameHub {
    */
   sweep(): void {
     for (const [gameId, room] of this.rooms) {
+      let reaped = false;
       for (const sub of room) {
         const socket = sub.socket;
         // Bare `Sendable` (broadcast unit tests) has nothing to ping; a non-open socket is already on
@@ -126,12 +163,53 @@ export class GameHub {
         if (!sub.alive) {
           socket.terminate();
           room.delete(sub);
+          reaped = true;
           continue;
         }
         sub.alive = false;
         socket.ping();
       }
       if (room.size === 0) this.rooms.delete(gameId);
+      // A reaped half-open socket left the room the same way a graceful close would — so the survivors
+      // get a refreshed presence roster here too (a `terminate()` also emits a local `close`, but that
+      // fires asynchronously and its unsubscribe would run after this sweep; do it now so presence is
+      // never stale between a reap and that close).
+      else if (reaped) this.broadcastPresence(gameId);
+    }
+  }
+
+  /** The current presence roster for a room — every open socket's `{ id, label }`. */
+  private roster(gameId: string): PresenceViewer[] {
+    const room = this.rooms.get(gameId);
+    if (!room) return [];
+    const viewers: PresenceViewer[] = [];
+    for (const sub of room) {
+      if (sub.socket.readyState === WS_OPEN) viewers.push({ id: sub.id, label: sub.label });
+    }
+    return viewers;
+  }
+
+  /** The presence envelope for a room, for a caller that wants to send a fresh joiner its initial roster. */
+  presenceMessage(gameId: string): PresenceMessage {
+    return { type: 'presence', viewers: this.roster(gameId) };
+  }
+
+  /**
+   * Push the current presence roster to every open socket in a room. Table-public: the same roster for
+   * everyone (no per-viewer projection), because who is watching is not secret. A no-op for an unknown
+   * or empty room. Called on every roster change — subscribe, unsubscribe, and heartbeat reap.
+   *
+   * ⚠️ A socket that is still mid-handshake at subscribe time (its own `readyState` not yet `OPEN`) is
+   * skipped here and so can miss its *own* join frame — the same race the stream route defers the state
+   * snapshot past with `setImmediate`. The route therefore also sends the joiner its initial roster from
+   * inside that deferred send (`presenceMessage`), so a fresh client reliably learns who is present.
+   */
+  private broadcastPresence(gameId: string): void {
+    const frame = JSON.stringify(this.presenceMessage(gameId));
+    const room = this.rooms.get(gameId);
+    if (!room) return;
+    for (const sub of room) {
+      if (sub.socket.readyState === WS_OPEN) sub.socket.send(frame);
     }
   }
 
