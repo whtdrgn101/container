@@ -4,18 +4,7 @@ import { buildApp } from '../app';
 import { createDatabase } from '../db';
 import type { DB } from '../db';
 import { assignColors } from '../colors';
-
-/** Deterministic PRNG (mirrors rematch.test) — a seed that lets an all-bot Can't Stop game finish. */
-function mulberry32(seed: number): () => number {
-  let s = seed >>> 0;
-  return () => {
-    s = (s + 0x6d2b79f5) >>> 0;
-    let t = s;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+import { mulberry32 } from './helpers';
 
 /**
  * Player-colour picking — the cross-game feature: each game declares a palette, the platform offers

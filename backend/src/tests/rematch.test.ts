@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../app';
 import { createDatabase } from '../db';
 import type { DB } from '../db';
+import { mulberry32 } from './helpers';
 
 /**
  * Rematch — the game-agnostic "play again with the same players" flow. Uses Can't Stop as the vehicle
@@ -16,17 +17,6 @@ function diceRng() {
     for (const face of faces) queue.push((face - 0.5) / 6);
   };
   return { rng, enqueue };
-}
-
-function mulberry32(seed: number): () => number {
-  let s = seed >>> 0;
-  return () => {
-    s = (s + 0x6d2b79f5) >>> 0;
-    let t = s;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 describe('rematch', () => {
