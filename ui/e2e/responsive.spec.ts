@@ -7,6 +7,31 @@ async function startGame(page: Page): Promise<void> {
   await expect(page.getByTestId('board')).toBeVisible();
 }
 
+const noOverflow = async (page: Page) => {
+  const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+  expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
+};
+
+test('the shelf and a game detail screen reflow to 320px without horizontal overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.goto('/');
+
+  // The shelf of box lids fits — the grid drops to two columns at this width.
+  await expect(page.getByTestId('game-shelf')).toBeVisible();
+  await noOverflow(page);
+
+  // A game's detail screen (the box lid writ large + the setup form) also fits.
+  await page.getByTestId('pick-game-container').click();
+  await expect(page.getByTestId('game-detail')).toBeVisible();
+  await noOverflow(page);
+
+  // …in either mode.
+  await page.getByTestId('mode-online').click();
+  await expect(page.getByTestId('online-panel')).toBeVisible();
+  await noOverflow(page);
+});
+
 test('player cards stack on mobile and lay out in a row on desktop', async ({ page }) => {
   await startGame(page);
   const card1 = page.getByTestId('player-card-p1');
