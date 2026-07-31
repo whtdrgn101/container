@@ -18,6 +18,20 @@ export interface Sendable {
   send(data: string): void;
 }
 
+/**
+ * The extra ws-level controls the heartbeat needs, beyond `Sendable`. A real `@fastify/websocket`
+ * socket has all three; the broadcast-only unit tests pass a bare `Sendable` and are simply never
+ * pinged (`isPingable` skips them), so the transport contract stays tiny for everything else.
+ */
+export interface Pingable {
+  ping(): void;
+  terminate(): void;
+  on(event: 'pong', listener: () => void): void;
+}
+
+const isPingable = (socket: Sendable): socket is Sendable & Pingable =>
+  typeof (socket as Partial<Pingable>).ping === 'function';
+
 /** The wire message pushed to clients. `type` leaves room for future kinds (chat, presence, …). */
 export interface StateMessage {
   readonly type: 'state';
@@ -46,16 +60,25 @@ interface Subscriber {
   readonly socket: Sendable;
   /** Seat(s) to project for, or `null` to follow the active player (hotseat default). */
   readonly viewerId: Viewer;
+  /**
+   * Heartbeat liveness (§4.7). Set `true` on subscribe and on every `pong`; a sweep sets it `false`
+   * just before pinging, so a socket that misses the round-trip is `false` at the next sweep and gets
+   * terminated. Only meaningful for a `Pingable` socket.
+   */
+  alive: boolean;
 }
 
 const WS_OPEN = 1; // WebSocket.OPEN readyState
 
 export class GameHub {
   private readonly rooms = new Map<string, Set<Subscriber>>();
+  private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
 
   /** Register a socket for a game's updates. Returns an unsubscribe function (call it on close). */
   subscribe(gameId: string, socket: Sendable, viewerId: Viewer): () => void {
-    const sub: Subscriber = { socket, viewerId };
+    const sub: Subscriber = { socket, viewerId, alive: true };
+    // A pong answers the sweep's ping — mark the socket live again so the next sweep spares it.
+    if (isPingable(socket)) socket.on('pong', () => (sub.alive = true));
     const room = this.rooms.get(gameId) ?? new Set<Subscriber>();
     room.add(sub);
     this.rooms.set(gameId, room);
@@ -63,6 +86,53 @@ export class GameHub {
       room.delete(sub);
       if (room.size === 0) this.rooms.delete(gameId);
     };
+  }
+
+  /**
+   * Start the heartbeat: every `intervalMs`, ping each live-stream socket and terminate any that
+   * missed the previous ping's pong (§4.7, deferred from REVIEW). Half-open sockets — a TCP peer that
+   * vanished without a FIN, so no `close` ever fires — would otherwise sit in `rooms` (and against
+   * their per-IP cap) forever; this reaps them within one-to-two intervals. `unref`'d so it never
+   * keeps the process (or a test's app) alive; idempotent — a second call is a no-op.
+   */
+  startHeartbeat(intervalMs: number): void {
+    if (this.heartbeatTimer) return;
+    this.heartbeatTimer = setInterval(() => this.sweep(), intervalMs);
+    this.heartbeatTimer.unref?.();
+  }
+
+  /** Stop the heartbeat (registered on the app's `onClose`). Safe to call when not started. */
+  stopHeartbeat(): void {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = undefined;
+    }
+  }
+
+  /**
+   * One heartbeat pass over every subscriber. A socket still marked `alive` is pinged and marked
+   * pending (`alive = false`); one already pending missed its pong and is terminated and dropped.
+   * Terminating a real socket emits a local `close`, which runs the stream route's cleanup (releasing
+   * the per-IP slot and unsubscribing) — so this frees everything a graceful close would. Exposed
+   * (not private) so a test can drive the two-sweep reap deterministically without a wall-clock wait.
+   */
+  sweep(): void {
+    for (const [gameId, room] of this.rooms) {
+      for (const sub of room) {
+        const socket = sub.socket;
+        // Bare `Sendable` (broadcast unit tests) has nothing to ping; a non-open socket is already on
+        // its way out and its own `close` path reaps it.
+        if (!isPingable(socket) || socket.readyState !== WS_OPEN) continue;
+        if (!sub.alive) {
+          socket.terminate();
+          room.delete(sub);
+          continue;
+        }
+        sub.alive = false;
+        socket.ping();
+      }
+      if (room.size === 0) this.rooms.delete(gameId);
+    }
   }
 
   /** Live subscriber count for a game (diagnostics / tests). */

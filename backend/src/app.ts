@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import type { FastifyInstance } from 'fastify';
 import fastifyRateLimit from '@fastify/rate-limit';
 import { LOBBY_SWEEP_INTERVAL_MS, OPEN_LOBBY_TTL_MS } from './lobbies';
-import { BODY_LIMIT_BYTES } from './security';
+import { BODY_LIMIT_BYTES, WS_HEARTBEAT_INTERVAL_MS } from './security';
 import { buildServices } from './services';
 import type { AppOptions } from './services';
 import { registerAbandonRoutes } from './routes/abandon';
@@ -74,6 +74,12 @@ export function buildApp(options: AppOptions): FastifyInstance {
   const sweepTimer = setInterval(sweepLobbies, LOBBY_SWEEP_INTERVAL_MS);
   sweepTimer.unref();
   app.addHook('onClose', async () => clearInterval(sweepTimer));
+
+  // Reap half-open live-stream sockets (§4.7): ping every socket on an interval and terminate any that
+  // stops answering, so a peer that vanished without a FIN can't sit in the hub — or against its per-IP
+  // cap — forever. `unref`'d inside the hub; stopped on close.
+  services.hub.startHeartbeat(WS_HEARTBEAT_INTERVAL_MS);
+  app.addHook('onClose', async () => services.hub.stopHeartbeat());
 
   // Order-sensitive: the abandon guard's `preHandler` must be registered ahead of the mutating routes
   // it protects (see the ⚠️ note above).

@@ -254,6 +254,14 @@ Hidden information is enforced **server-side**, never as UI discipline. The engi
   different Host than the browser's Origin (the e2e setup) must list that origin. There is also a per-IP
   connection cap (`1013` over it) and `maxPayload: 1024` — the socket is push-only, so **don't add a
   client→server WS message; add a REST route instead.**
+- **The hub runs a ws-level heartbeat to reap half-open sockets.** `GameHub.startHeartbeat` pings every
+  subscriber on an interval (`WS_HEARTBEAT_INTERVAL_MS`, 30s) and terminates any that missed the previous
+  ping's pong — a TCP peer that vanished without a FIN never fires `close`, so without this it would sit
+  in `rooms` (and against its per-IP cap) forever. A `pong` re-marks the socket live; `terminate()` emits
+  a local `close`, which runs the stream route's existing cleanup (releasing the per-IP slot,
+  unsubscribing), so the reap frees everything a graceful close would. The interval is `unref`'d and
+  stopped on the app's `onClose`. The `release`-on-`error` guard in the stream route stays as a
+  belt-and-suspenders for a proxy reset between sweeps.
 - **⚠️ When adding a top-level API route**, update the `setNotFoundHandler` SPA-fallback allowlist regex
   in `app.ts` (`/^\/(games|lobbies|health)\b/`) so it isn't swallowed by the SPA fallback.
 

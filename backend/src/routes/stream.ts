@@ -38,9 +38,9 @@ export function registerStreamRoutes(app: FastifyInstance, services: AppServices
           return;
         }
         // Release on 'error' as well as 'close': a proxy reset (the Vite dev proxy's documented
-        // ECONNRESET under load) can error a socket without a clean close, and the deferred WS
-        // heartbeat means nothing else reaps it — an orphan would then count against the IP forever.
-        // `release` is idempotent per acquire only if called once, so guard against double-fire.
+        // ECONNRESET under load) can error a socket without a clean close. The hub's heartbeat reaps a
+        // half-open socket within a sweep or two, but this releases the IP slot immediately rather than
+        // waiting for it. `release` is idempotent per acquire only if called once, so guard double-fire.
         let released = false;
         const releaseOnce = () => {
           if (!released) {

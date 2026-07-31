@@ -20,6 +20,14 @@ export const WS_MAX_CONNECTIONS_PER_IP = 32;
  */
 export const WS_MAX_PAYLOAD = 1024;
 
+/**
+ * How often the hub pings each live-stream socket to reap half-open ones (REVIEW §4.7). A socket that
+ * misses a whole interval's ping/pong round-trip is terminated on the next sweep — so a dead peer is
+ * gone within one-to-two intervals, freeing its per-IP slot. 30s matches the compose healthcheck
+ * cadence: frequent enough to bound the `rooms` map, cheap enough to be invisible.
+ */
+export const WS_HEARTBEAT_INTERVAL_MS = 30_000;
+
 /** Longest accepted display name / game-type string, on every body that takes one (input-bound §4.7). */
 export const MAX_NAME_LENGTH = 64;
 

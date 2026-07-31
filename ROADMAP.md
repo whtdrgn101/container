@@ -360,8 +360,13 @@ CI).
   exists stays green.
 - **`MoveRecord.type` is stringly-typed** — it discards each game's precise `ActionType` union, and the
   UI's log filters match on string literals with no compile-time link to the engine.
-- **WS heartbeat** (deferred from §4.7) — no ping/pong to reap half-open sockets. The per-IP cap +
-  close-on-unsubscribe bound the `rooms` map; add a ping sweep if idle sockets ever pile up.
+- ✅ **WS heartbeat** (deferred from §4.7) — **done 2026-07-31.** `GameHub.startHeartbeat` pings every
+  live-stream socket on an interval (`WS_HEARTBEAT_INTERVAL_MS`, 30s) and terminates any that missed the
+  previous pong, so a half-open socket (a peer gone without a FIN) is reaped within a sweep or two rather
+  than sitting in `rooms` and against its per-IP cap forever. `terminate()` emits a local `close`, which
+  runs the stream route's existing cleanup; the interval is `unref`'d and stopped on `onClose`. The
+  origin check is untouched. Covered by `backend/src/tests/hub.test.ts` (reap, spare-on-pong, skip a bare
+  Sendable, skip a non-open socket, interval + stop). See design-patterns §4.
 - **Dependencies are clean but stale** (re-measured 2026-07-28): vite 6 → 8 (2 majors), vitest 3 → 4
   (must move in lockstep across packages), better-sqlite3 11 → 13 (the one bump that can break the
   Docker build). `pnpm audit` still clean.
