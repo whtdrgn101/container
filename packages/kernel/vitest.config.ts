@@ -14,7 +14,12 @@ export default defineConfig({
         'src/moveRecord.ts', // compile-time only (MoveRecord interface)
         'src/viewer.ts', // compile-time only (Viewer type alias)
         'src/endState.ts', // compile-time only (GameEndState / WinnersEndState unions)
-        'src/contracts/**', // compile-time only (the GameModule / GameClient contracts — interfaces)
+        // The contract files are compile-time only (the GameModule / GameClient contracts + transport DTOs
+        // — interfaces). `contracts/platform.ts` is the exception: it carries the chat/presence guards,
+        // real runtime code, so it is deliberately NOT excluded and its branches are gated at 100%.
+        'src/contracts/client.ts',
+        'src/contracts/module.ts',
+        'src/contracts/transport.ts',
       ],
       // The kernel keeps the engine's 100% bar: it holds the load-bearing primitives every game leans
       // on (`record`, `makeSeating`, `GameError`), so every branch here deserves a test. The engine's

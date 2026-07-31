@@ -57,5 +57,20 @@
  *      test had to reach into the bot subpath or reimplement it) and `shuffle` (Fisher–Yates, the
  *      helper four in-repo engines had each written for themselves) are now exported from the
  *      framework-free barrel. Pure additions to the export surface — nothing moved off `./bot`.
+ * - **1.3.0** (2026-07-31) — *additive*: two independent additions to `@game-hub/kernel/client`, neither
+ *   changing an existing member's meaning or adding a required one, so again **minor**, contract stays
+ *   **1**. A game built against any earlier `1.x` compiles and registers untouched.
+ *   1. **Typed platform envelopes.** The DTOs (`ChatMessage`, `PresenceViewer`), the frame shapes
+ *      (`ChatPush`/`PresencePush`) and the two narrowing guards (`isChatPush`/`isPresencePush`) for the
+ *      platform's `chat` and `presence` socket frames now live on the client subpath (`contracts/platform.ts`).
+ *      They previously lived twice over — once in the hub's `ui/src` and once in the backend — even though
+ *      both hosts speak the same wire frames; the shared contract is their proper home. `GameMessage` is
+ *      **left open on purpose** (`{ type: string; [k]: unknown }`): these are *typed recognisers* for two
+ *      known frames, not a closed union, so a new platform or game frame still flows without a kernel bump.
+ *      Purely additive to the export surface — nothing that already shipped changed shape.
+ *   2. **`GameClient.icon`.** A new **optional** `Icon` field on the `GameClient` contract — a game's own
+ *      "box lid" identity mark, a `LazyExoticComponent<ComponentType<{ className?: string }>>` erased and
+ *      lazy-loaded exactly like `Board`. Optional, so every existing `GameClient` (which omits it) still
+ *      satisfies the contract; the shell renders it (with a neutral fallback) in the Card Table redesign.
  */
 export const KERNEL_CONTRACT_VERSION = 1;

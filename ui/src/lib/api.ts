@@ -1,5 +1,6 @@
 import { apiUrl, applyAction, fail, getGame, JSON_HEADERS, unwrap } from '@game-hub/ui-kit';
-import type { GameMessage, GamePayload } from '@game-hub/kernel/client';
+import { isChatPush, isPresencePush } from '@game-hub/kernel/client';
+import type { ChatMessage, GameMessage, GamePayload } from '@game-hub/kernel/client';
 
 /**
  * The games-platform API client — **game-agnostic** (roadmap C2).
@@ -27,7 +28,11 @@ import type { GameMessage, GamePayload } from '@game-hub/kernel/client';
 // The shared half, re-exported so shell code has a single `lib/api` import site (the games import them
 // from the ui-kit directly — they must not reach into `ui/src`).
 export { apiUrl, applyAction, fail, getGame, JSON_HEADERS, unwrap };
-export type { GameIdentity, GameMessage, GamePayload } from '@game-hub/kernel/client';
+// Chat/presence are platform frames on the socket; since kernel 1.3.0 their DTOs and the guards that
+// narrow the open `GameMessage` live on `@game-hub/kernel/client` (both hosts speak them). Re-exported
+// here so shell code keeps a single `lib/api` import site (`isChatPush`, `ChatMessage`, …).
+export { isChatPush, isPresencePush };
+export type { ChatMessage, GameIdentity, GameMessage, GamePayload, PresenceViewer } from '@game-hub/kernel/client';
 
 /** A claimed lobby seat: who's in it, whether that's a person or the AI, and its chosen colour. */
 export interface LobbyMember {
@@ -233,38 +238,11 @@ function streamUrl(gameId: string): string {
  * In-game chat + presence — platform (shell-owned) coordination, not a game side-channel.
  *
  * These ride the same socket as game state, as `{ type: 'chat' }` / `{ type: 'presence' }` frames. The
- * kernel's `GameMessage` is intentionally open (`{ type: string; [k]: unknown }`), so they already flow
- * through `subscribeGame`'s `onMessage` without a kernel change — the shell just narrows them by `type`
- * with the local types below. ⚠️ Giving `chat`/`presence` a *typed* place in the kernel's `GameMessage`
- * union is a **next kernel-minor** job (a release is out of scope here); see ROADMAP.
- */
-export interface ChatMessage {
-  seq: number;
-  senderId: string;
-  sender: string;
-  body: string;
-  at: string;
-}
-
-/** One entry in a game room's presence roster: a stable per-connection id and its viewer label. */
-export interface PresenceViewer {
-  id: string;
-  label: string;
-}
-
-/** Narrow an open `GameMessage` to a chat frame (a batch of messages — one new, or a resume backfill). */
-export function isChatPush(message: GameMessage): message is GameMessage & { type: 'chat'; messages: ChatMessage[] } {
-  return message.type === 'chat' && Array.isArray((message as { messages?: unknown }).messages);
-}
-
-/** Narrow an open `GameMessage` to a presence frame (the current viewer roster). */
-export function isPresencePush(
-  message: GameMessage,
-): message is GameMessage & { type: 'presence'; viewers: PresenceViewer[] } {
-  return message.type === 'presence' && Array.isArray((message as { viewers?: unknown }).viewers);
-}
-
-/**
+ * kernel's `GameMessage` is intentionally open (`{ type: string; [k]: unknown }`), so they flow through
+ * `subscribeGame`'s `onMessage` without any kernel change — the shell narrows them by `type`. Since kernel
+ * 1.3.0 the DTOs (`ChatMessage`, `PresenceViewer`) and the guards (`isChatPush`/`isPresencePush`) live on
+ * `@game-hub/kernel/client`, the shared contract both hosts speak; they are imported and re-exported above.
+ *
  * Send a chat message to a game, as one of its seats (`playerId`). Table-public: the server fans it out
  * to every viewer over the socket. A spectator holds no seat and is refused (`INVALID_SENDER`, 400).
  */

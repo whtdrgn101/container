@@ -3,9 +3,19 @@ import type { ComponentType, LazyExoticComponent } from 'react';
 /**
  * The transport DTOs a game client names (Track D / D2b). They live in their own module but are part of
  * the same `@game-hub/kernel/client` surface: a game's `types.ts` imports the contract *and* the DTOs it
- * binds into it from one specifier. Type-only, so `client.js` stays an empty module.
+ * binds into it from one specifier. Type-only, so it adds nothing to `client.js`.
  */
 export type { GameIdentity, GameMessage, GamePayload } from './transport.js';
+
+/**
+ * The platform WS envelopes carried on a game's socket besides `state` and a game's own side-channels
+ * (kernel 1.3.0): the `chat`/`presence` DTOs, their frame shapes, and the two narrowing guards. `GameMessage`
+ * stays deliberately open (§`transport.ts`) — these are the *typed* recognisers for the frames the shell
+ * owns, not a closed union, so a new frame type still flows without a kernel bump. The two guards are the
+ * one bit of **runtime** code on this subpath; they import no React, so `client.js` stays React-free.
+ */
+export type { ChatMessage, ChatPush, PresencePush, PresenceViewer } from './platform.js';
+export { isChatPush, isPresencePush } from './platform.js';
 
 /**
  * The `GameClient` seam (roadmap C2) — the UI's mirror of the backend's `GameModule` — now a **shared
@@ -45,6 +55,17 @@ export interface GameClient<S = unknown, Payload = unknown, Message = unknown> {
   readonly blurb: string;
   /** A few short "how to play" bullets, shown in a collapsible on the landing. Optional. */
   readonly rules?: readonly string[];
+  /**
+   * The game's own identity mark — its "box lid". Rendered by the shell in the game picker; a game without
+   * one gets a neutral lid. A component taking `{ className?: string }` so the shell sizes/tints it.
+   *
+   * **Lazy on purpose**, exactly like `Board`: the picker shows every hosted game, so an eager icon would
+   * ship every game's mark (and whatever art it pulls in) to someone who only opened the home screen.
+   * Type-erased to `ComponentType<{ className?: string }>` the same way `Board` erases its props at the
+   * seam — `React.lazy(() => import('./Icon'))` satisfies it. Optional and unrendered as yet: it lands in
+   * the shell with the Card Table redesign.
+   */
+  readonly Icon?: LazyExoticComponent<ComponentType<{ className?: string }>>;
   /**
    * The board. **Lazy on purpose**: a games room shouldn't ship every game's board to someone who
    * opened the home screen, and Container's board pulls in the whole engine.

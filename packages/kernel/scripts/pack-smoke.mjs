@@ -39,6 +39,7 @@ import { createRequire } from 'node:module';
 import { GameError, KERNEL_CONTRACT_VERSION, makeSeating, mulberry32, record, runBotLoop, shuffle } from '@game-hub/kernel';
 import { BotError, mulberry32 as botMulberry32, wilsonInterval } from '@game-hub/kernel/bot';
 import * as clientContract from '@game-hub/kernel/client';
+import { isChatPush, isPresencePush } from '@game-hub/kernel/client';
 
 const require = createRequire(import.meta.url);
 
@@ -80,9 +81,14 @@ assert.equal(botMulberry32, mulberry32);
 assert.equal(typeof mulberry32(1)(), 'number');
 assert.equal(wilsonInterval(0, 0).length, 2);
 
-// './client' — types only, so the module is empty at runtime. What matters is that it *resolves*, and
-// that reaching it pulls in no React: the kernel must never make React a runtime dependency.
-assert.deepEqual(Object.keys(clientContract), []);
+// './client' — mostly types, but since kernel 1.3.0 it also carries the two platform-envelope guards
+// (chat/presence), the one bit of runtime code on this subpath. They must resolve, behave, and — the
+// load-bearing part — pull in no React: the kernel must never make React a runtime dependency.
+assert.deepEqual(Object.keys(clientContract).sort(), ['isChatPush', 'isPresencePush']);
+assert.equal(isChatPush({ type: 'chat', messages: [] }), true);
+assert.equal(isChatPush({ type: 'state', game: {} }), false);
+assert.equal(isPresencePush({ type: 'presence', viewers: [] }), true);
+assert.equal(isPresencePush({ type: 'chat', messages: [] }), false);
 assert.throws(() => require.resolve('react'), /Cannot find module/);
 assert.deepEqual(
   require('@game-hub/kernel/package.json').dependencies ?? {},
@@ -97,7 +103,17 @@ console.log('runtime smoke ok — . / ./bot / ./client all resolve and behave');
 const TYPE_CONSUMER = `import { GameError, KERNEL_CONTRACT_VERSION, makeSeating, record, shuffle } from '@game-hub/kernel';
 import type { GameModule, GameSummary, ModuleContext, MoveRecord, Viewer } from '@game-hub/kernel';
 import { BotError, mulberry32 } from '@game-hub/kernel/bot';
-import type { BoardProps, GameClient, GameMessage, GamePayload } from '@game-hub/kernel/client';
+import { isChatPush, isPresencePush } from '@game-hub/kernel/client';
+import type {
+  BoardProps,
+  ChatMessage,
+  ChatPush,
+  GameClient,
+  GameMessage,
+  GamePayload,
+  PresencePush,
+  PresenceViewer,
+} from '@game-hub/kernel/client';
 
 // A game-shaped declaration: the exact surface an out-of-repo package implements.
 type State = { readonly version: number; readonly log: readonly MoveRecord[]; readonly seat: number };
@@ -161,6 +177,19 @@ const payload: GamePayload<State> = {
   activePlayerId: 'p1',
 };
 
+// kernel 1.3.0: the typed platform envelopes on './client' — the DTOs, the frame shapes, and the two
+// guards that narrow the open GameMessage. Binding them here is the out-of-workspace proof they ship.
+const chat: ChatMessage = { seq: 1, senderId: 'p1', sender: 'Ann', body: 'gg', at: '2026-07-31T00:00:00.000Z' };
+const chatFrame: ChatPush = { type: 'chat', messages: [chat] };
+const presenceFrame: PresencePush = {
+  type: 'presence',
+  viewers: [{ id: '1', label: 'Ann' } satisfies PresenceViewer],
+};
+// The frames arrive off the socket as an open GameMessage; the guards narrow one back to its typed shape
+// (never the reverse — a closed frame has no index signature, which is the whole point of leaving
+// GameMessage open). So the guard input is a GameMessage, exactly as subscribeGame hands it over.
+const frame: GameMessage = { type: 'chat', messages: [chat] };
+
 // Referenced so the React-typed './client' subpath is genuinely resolved and checked, not just imported.
 export const surface = {
   module: smokeModule.id,
@@ -170,7 +199,16 @@ export const surface = {
   // The '.' barrel's setup helper, generic-checked against a concrete element type.
   deal: shuffle<string>(['a', 'b', 'c'], mulberry32(2))[0] ?? '',
   client: null as SmokeClient | null,
+  // kernel 1.3.0's optional GameClient.icon — the lazy "box lid". Indexed off the contract so a change to
+  // its type surfaces here, the same out-of-workspace check the DTOs get.
+  icon: undefined as SmokeClient['Icon'],
   boardTitle: null as SmokeBoardProps['gameId'] | null,
+  // The platform envelopes, narrowed through the shipped guards.
+  chatSeq: chat.seq,
+  chatType: chatFrame.type,
+  presenceCount: presenceFrame.viewers.length,
+  narrowedChat: isChatPush(frame) ? frame.messages.length : 0,
+  narrowedPresence: isPresencePush(frame) ? frame.viewers.length : 0,
   // The board's onPayload must accept exactly the payload a state route returns — the whole point of
   // moving the DTO into the kernel. (No backticks in this comment: it lives inside a template literal.)
   onPayload: (props: SmokeBoardProps) => props.onPayload(payload),

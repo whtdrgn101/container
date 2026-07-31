@@ -131,6 +131,21 @@ The near-term order, decided while play-testing:
    temporary distribution scaffold; it was **retired on 2026-07-31** when the game was published to npm and
    the whole extraction wave landed (see item 4's "Fully closed" note) — Labyrinth now installs from the
    registry like every other game.
+   **kernel → `1.3.0` ✅ (2026-07-31) — contract still 1 (additive), two additions on `./client`:**
+   (a) **typed platform envelopes** — the `chat`/`presence` DTOs (`ChatMessage`, `PresenceViewer`), their
+   frame shapes (`ChatPush`/`PresencePush`) and the two narrowing guards (`isChatPush`/`isPresencePush`)
+   moved from the hub's `ui/src` (and, for the DTOs, the backend) onto `@game-hub/kernel/client`
+   (`contracts/platform.ts`), the shared home both hosts speak; `GameMessage` stays **deliberately open**, so
+   they are typed *recognisers*, not a closed union (a new frame type still flows without a kernel bump).
+   The shell now consumes the kernel types and deleted its local copies. This **closes the "next kernel
+   minor" note** below. (b) **`GameClient.icon`** — a new *optional* `Icon` field, a game's own "box lid"
+   identity mark (`LazyExoticComponent<ComponentType<{ className?: string }>>`, erased + lazy exactly like
+   `Board`); every existing client omits it and still satisfies the contract. The shell renders it (with a
+   neutral fallback) in the coming Card Table redesign. The guards are the first **runtime** code on
+   `./client`, so `pack:smoke` was extended to import and drive them, and the kernel's 100% gate now
+   measures `contracts/platform.ts`. Backend DTOs were **left unbound** on purpose — the backend has no
+   React and the design keeps it off the React-typed `./client` subpath; its `chat.ts`/`hub.ts` DTOs stay
+   the wire source of truth.
 
 ## Principles
 
@@ -342,9 +357,11 @@ Built in the core, so **every game gets them free** — the real payoff of the C
   and handed to the hub as an opaque string, so `GameHub` stays game-agnostic. **No `GameModule` hook** —
   every game gets it free. Own route module (`routes/chat.ts`), backend + two-context e2e tests, and a
   320px responsive spec. See [`docs/design-patterns.md`](docs/design-patterns.md) §4 (Transport).
-  - ⚠️ **Next kernel minor:** `chat`/`presence` ride the kernel's *open* `GameMessage`
-    (`{ type: string; … }`) and are narrowed shell-side today; giving them a **typed** place in a
-    `GameMessage` union is a `@game-hub/kernel` minor (a release was out of scope for this feature).
+  - ✅ **Typed in the kernel (2026-07-31, kernel `1.3.0`):** `chat`/`presence` still ride the kernel's
+    *open* `GameMessage`, but their DTOs (`ChatMessage`, `PresenceViewer`), frame shapes
+    (`ChatPush`/`PresencePush`) and narrowing guards (`isChatPush`/`isPresencePush`) now live on
+    `@game-hub/kernel/client` (`contracts/platform.ts`); the shell consumes them and dropped its local
+    copies. `GameMessage` stays open on purpose — the guards are typed recognisers, not a closed union.
 - ✅ **Deployment — single-image container:** a multi-stage `Dockerfile` builds the UI + native SQLite and
   runs one Node/Fastify process serving the web app **and** the API on one port; SQLite persists to a
   `/data` volume. `docker-compose.yml` + **[`DEPLOY.md`](./DEPLOY.md)** cover a Portainer/home-NAS deploy.

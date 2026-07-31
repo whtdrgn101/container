@@ -274,9 +274,13 @@ Hidden information is enforced **server-side**, never as UI discipline. The engi
   - ⚠️ Both are new socket frames on the **same** stream a game suite reads, so the backend WS test
     reader (`tests/helpers.ts`'s `wsReader`, and the inline readers) **skips `presence`/`chat`** — a
     suite asserting on a game's `state`/`auction` sequence must not trip over the always-on roster.
-  - **Next kernel minor:** `chat`/`presence` flow through the kernel's open `GameMessage`
-    (`{ type: string; … }`) but have no *typed* place in it yet; folding them into a typed `GameMessage`
-    union belongs to a `@game-hub/kernel` minor (a release was out of scope for this feature).
+  - **Typed on the kernel (kernel `1.3.0`).** `chat`/`presence` still flow through the kernel's *open*
+    `GameMessage` (`{ type: string; … }`), but their DTOs (`ChatMessage`, `PresenceViewer`), frame shapes
+    (`ChatPush`/`PresencePush`) and the two narrowing guards (`isChatPush`/`isPresencePush`) now live on
+    `@game-hub/kernel/client` (`contracts/platform.ts`) — the shared home both hosts speak — and the shell
+    consumes them in place of its old local copies. `GameMessage` is left open **on purpose**: these are
+    typed *recognisers* for two known platform frames, not a closed union, so a new frame type (a game's
+    own side-channel, or a future platform frame) still flows without a kernel bump.
 - **⚠️ The WS is exempt from CORS, so `/games/:id/stream` enforces its own origin check.** It refuses a
   cross-origin upgrade (`1008`) unless same-origin, no-Origin (non-browser), or in
   `AppOptions.allowedOrigins` / `ALLOWED_ORIGINS`. A reverse/Vite proxy fronting the socket under a
@@ -385,11 +389,15 @@ reaching into each other. It is consumed as **TS source by subpath**, and — un
   `MoveRecord`, `Viewer`, `record`, `makeSeating`, `GameEndState`/`WinnersEndState`), the game-agnostic
   bot drive-loop `runBotLoop`, **and** the `GameModule`/`ModuleContext`/`BotDriver`/… contract. Its host
   bindings (`Db`, `Hub`, `BotSeats`, `App`) are **generic parameters**, so the contract imports no backend.
-- `@game-hub/kernel/client` — the React `GameClient`/`BoardProps` contract **and the transport DTOs**
-  (`GamePayload`, `GameIdentity`, `GameMessage` — moved out of `ui/src` in D2b), behind its own subpath
-  because it's the one entry that needs React. React stays a *type-only* import, so the emitted module is
-  empty and the kernel ships zero runtime dependencies. `Payload`/`Message` remain generic parameters on
-  the contract: binding them would drop two type parameters, i.e. a breaking major bump.
+- `@game-hub/kernel/client` — the React `GameClient`/`BoardProps` contract, **the transport DTOs**
+  (`GamePayload`, `GameIdentity`, `GameMessage` — moved out of `ui/src` in D2b), **and the platform
+  envelopes** (`ChatMessage`/`PresenceViewer`, the `ChatPush`/`PresencePush` frame shapes and the
+  `isChatPush`/`isPresencePush` guards — kernel `1.3.0`, `contracts/platform.ts`), behind its own subpath
+  because it's the one entry that needs React. React stays a *type-only* import, so the kernel ships zero
+  runtime dependencies; the two guards are the only runtime code here and pull in no React. `GameClient`
+  also carries an **optional `Icon`** — a game's lazy "box lid", erased exactly like `Board` (kernel
+  `1.3.0`). `Payload`/`Message` remain generic parameters on the contract: binding them would drop two
+  type parameters, i.e. a breaking major bump.
 - `@game-hub/kernel/bot` — the bot helpers above (framework-free, no React).
 
 **Why the structural host types exist.** A game package can't name the backend's concrete

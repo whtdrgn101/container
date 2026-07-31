@@ -48,10 +48,11 @@ packages/
   kernel/          @game-hub/kernel — the neutral dependency every game + both hosts build on:
                      primitives (GameError, MoveRecord, Viewer, record, makeSeating, GameEndState,
                      shuffle/mulberry32), runBotLoop, the GameModule/GameClient contracts (host
-                     bindings are generics), the transport DTOs (GamePayload/GameMessage), and the
+                     bindings are generics), the transport DTOs (GamePayload/GameMessage), the platform
+                     envelopes (chat/presence DTOs + guards) and optional GameClient.icon, and the
                      @game-hub/kernel/{client,bot} subpaths. Its own 100% gate.
-                     Published through **1.2.0** (the colour channel + the rng helpers — see
-                     contract.ts's version history).
+                     Published through **1.3.0** (1.2.0 = the colour channel + rng helpers; 1.3.0 = the
+                     typed chat/presence envelopes + GameClient.icon — see contract.ts's version history).
   ui-kit/          @game-hub/ui-kit — the shared board chrome every game's UI renders inside
                      (TurnBanner, ActivityFeed, GameOver, ActionTip, PanZoom, Button/Card, cn,
                      seatIdentity) + the game-facing REST calls (getGame/applyAction/apiUrl).
