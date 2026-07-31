@@ -178,9 +178,11 @@ The worked examples:
 - **Bots** (`bots.ts`) — which seats an AI holds, plus each seat's difficulty tier.
 - **Colours** (`colors.ts`) — which palette id each seat picked.
 - **Rematch** (`rematch.ts`) — play-again proposals.
+- **Chat + presence** (`chat.ts`, `presence.ts`) — in-game messages (append-only, table-public) and the
+  live viewer roster derived from the socket lifecycle (see §4).
 
-**Game-agnostic ones (bots, colours, abandon, rematch) live in the core with no `GameModule` hook**, so
-every game gets them free. That's the real payoff of the seam.
+**Game-agnostic ones (bots, colours, abandon, rematch, chat, presence) live in the core with no
+`GameModule` hook**, so every game gets them free. That's the real payoff of the seam.
 
 **Player colours are the fully-worked example.** Each module declares an ordered `colors` palette
 (lowercase ids). The platform offers the pick (lobby join + a waiting-room/landing swatch picker;
@@ -248,6 +250,33 @@ Hidden information is enforced **server-side**, never as UI discipline. The engi
 - **`GameHub` is game-agnostic** — it fans out per-viewer messages and projects nothing itself, so
   redaction stays an explicit decision made by code that knows the game. The client subscribes via
   `subscribeGame` (version-guarded so a late push can't overwrite newer POST state; auto-reconnecting).
+- **The socket carries three platform envelope types plus each game's own side-channels.** The `type`
+  field was always extensible; today the platform pushes `state` (per-viewer game state), `presence`
+  (the game room's viewer roster), and `chat` (in-game messages), alongside a game's own frames
+  (Container's `auction`) and the coordination `rematch`/`abandoned` frames. `subscribeGame` routes
+  `state` to `onState` and hands everything else to `onMessage`; the shell narrows `presence`/`chat`
+  itself (they are shell-owned) and forwards the rest to the board as `lastMessage`.
+- **Chat + presence are coordination state, game-agnostic and table-public.**
+  - **Chat** is sent over REST (`POST /games/:id/chat`, never up the push-only socket) and fanned out as
+    a `chat` envelope. It lives in its own append-only `chat_messages` table (per-game sequence), never
+    touches an engine or module, and is **table-public** — every viewer sees every message, no per-seat
+    redaction ("everything logged is public", §3). A send must **name a real seat** (`playerId`); a
+    spectator holds none and is read-only (`INVALID_SENDER`, 400) — the same no-auth, trusted-LAN model
+    as abandon/rematch. A resuming client is backfilled the recent tail (capped, `CHAT_BACKFILL_LIMIT`
+    = 100) right behind its state snapshot.
+  - **Presence** is derived entirely from the subscription lifecycle — no polling, no persistence. The
+    hub pushes a `presence` envelope (the room's `{ id, label }` roster) on every change: subscribe,
+    unsubscribe, and heartbeat reap. A viewer's **label** is the one game-shaped ingredient (it names
+    seats), so the stream route computes it (`presence.ts`: seat name(s) / `'Spectator'` / `'Table'`) and
+    hands it to the hub as an opaque string — the hub stays game-agnostic. ⚠️ A joiner's own
+    subscribe-time roster frame can race its socket's `OPEN` state, so the stream route re-sends it the
+    roster from inside the deferred `setImmediate` that already guards the state snapshot.
+  - ⚠️ Both are new socket frames on the **same** stream a game suite reads, so the backend WS test
+    reader (`tests/helpers.ts`'s `wsReader`, and the inline readers) **skips `presence`/`chat`** — a
+    suite asserting on a game's `state`/`auction` sequence must not trip over the always-on roster.
+  - **Next kernel minor:** `chat`/`presence` flow through the kernel's open `GameMessage`
+    (`{ type: string; … }`) but have no *typed* place in it yet; folding them into a typed `GameMessage`
+    union belongs to a `@game-hub/kernel` minor (a release was out of scope for this feature).
 - **⚠️ The WS is exempt from CORS, so `/games/:id/stream` enforces its own origin check.** It refuses a
   cross-origin upgrade (`1008`) unless same-origin, no-Origin (non-browser), or in
   `AppOptions.allowedOrigins` / `ALLOWED_ORIGINS`. A reverse/Vite proxy fronting the socket under a

@@ -331,6 +331,20 @@ Built in the core, so **every game gets them free** — the real payoff of the C
   starts in one click). The shell owns it end to end and reaches the shared `GameOver` (in any board) via
   a React context, so no game's board threads it. `409 REMATCH_NOT_READY` before the game ends; refused on
   an abandoned game by the same `preHandler`.
+- ✅ **In-game chat + presence:** a game-agnostic chat panel in the shell's board chrome. **Chat** is sent
+  over REST (`POST /games/:id/chat`) and fanned out as a `chat` socket envelope; it lives in its own
+  append-only `chat_messages` table and is **table-public** (every viewer sees every message — nothing to
+  redact, per "everything logged is public"). A send must name a real seat; **spectators are read-only**
+  (`INVALID_SENDER`, 400). A resuming client is backfilled the recent tail (capped at
+  `CHAT_BACKFILL_LIMIT` = 100). **Presence** is derived purely from the socket subscription lifecycle
+  (subscribe / unsubscribe / heartbeat-reap) — no polling, no persistence — and pushed as a `presence`
+  envelope; the viewer label (seat name(s) / `'Spectator'` / `'Table'`) is computed in the stream route
+  and handed to the hub as an opaque string, so `GameHub` stays game-agnostic. **No `GameModule` hook** —
+  every game gets it free. Own route module (`routes/chat.ts`), backend + two-context e2e tests, and a
+  320px responsive spec. See [`docs/design-patterns.md`](docs/design-patterns.md) §4 (Transport).
+  - ⚠️ **Next kernel minor:** `chat`/`presence` ride the kernel's *open* `GameMessage`
+    (`{ type: string; … }`) and are narrowed shell-side today; giving them a **typed** place in a
+    `GameMessage` union is a `@game-hub/kernel` minor (a release was out of scope for this feature).
 - ✅ **Deployment — single-image container:** a multi-stage `Dockerfile` builds the UI + native SQLite and
   runs one Node/Fastify process serving the web app **and** the API on one port; SQLite persists to a
   `/data` volume. `docker-compose.yml` + **[`DEPLOY.md`](./DEPLOY.md)** cover a Portainer/home-NAS deploy.
