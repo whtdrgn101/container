@@ -24,11 +24,11 @@
     "@game-hub/game-stoneage": "^0.1.0",
     "@game-hub/game-stpetersburg": "^0.1.0",
     "@game-hub/kernel": "workspace:*",
-    "better-sqlite3": "^11.8.0",
+    "better-sqlite3": "^13.0.2",
     "fastify": "^5.2.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.10.0",
     "@vitest/coverage-v8": "^4.1.10",
     "esbuild": "^0.28.0",
