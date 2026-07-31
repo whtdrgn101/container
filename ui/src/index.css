@@ -24,44 +24,70 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * The Card Table (2026-07-31) — one warm, physical, board-game-room identity for the whole shell.
+ *
+ * Palette: table felt #2e5d45, cream #f4ecdc, brass #b98a2f, wood #7a5232, ink #2a241c. The five names
+ * are exposed as their own tokens (`--felt`, `--brass`, …) *and* mapped onto the semantic tokens
+ * `@game-hub/ui-kit`'s chrome already reads (`bg-primary`, `bg-card`, `text-muted-foreground`, `border`,
+ * `bg-accent`…). Remapping — not restyling — is what lets the published Button/Card adopt the felt-and-
+ * brass look with the ui-kit left untouched. Games keep their own board art; this dresses the *room*.
+ *
+ * The ground is warm parchment; cards are lighter cream so they read as paper laid on the table. Felt is
+ * a *band* colour (open-tables strip, in-game header) via the `--felt` token, not the page background.
+ */
 :root {
   --radius: 0.625rem;
-  /* Indigo accent over near-neutral surfaces — enough colour to feel designed, not loud. */
-  --background: oklch(0.995 0.003 265);
-  --foreground: oklch(0.16 0.01 265);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.16 0.01 265);
-  --primary: oklch(0.52 0.19 264);
-  --primary-foreground: oklch(0.985 0.004 265);
-  --secondary: oklch(0.968 0.006 265);
-  --secondary-foreground: oklch(0.24 0.03 265);
-  --muted: oklch(0.968 0.006 265);
-  --muted-foreground: oklch(0.53 0.02 265);
-  --accent: oklch(0.95 0.028 264);
-  --accent-foreground: oklch(0.36 0.14 264);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.915 0.008 265);
-  --input: oklch(0.915 0.008 265);
-  --ring: oklch(0.52 0.19 264);
+  --background: #ece1cb; /* warm parchment — the table edge the paper sits on */
+  --foreground: #2a241c; /* ink */
+  --card: #f7efdd; /* cream paper */
+  --card-foreground: #2a241c;
+  --primary: #b98a2f; /* brass */
+  --primary-foreground: #fbf6ea;
+  --secondary: #e4d7bd; /* sand */
+  --secondary-foreground: #43381f;
+  --muted: #e7dcc3;
+  --muted-foreground: #6d6047; /* warm brown-grey */
+  --accent: #dbe4d9; /* pale felt tint, for hover/badges */
+  --accent-foreground: #2e5d45; /* felt */
+  --destructive: #b23a2c; /* a warm brick red, not a neon one */
+  --border: #d8c7a3; /* soft tan */
+  --input: #d8c7a3;
+  --ring: #b98a2f;
+
+  /* The five Card Table colours, as first-class tokens for the shell's bands and accents. */
+  --felt: #2e5d45;
+  --felt-foreground: #f4ecdc;
+  --brass: #b98a2f;
+  --wood: #7a5232;
+  --cream: #f4ecdc;
+  --ink: #2a241c;
 }
 
 .dark {
-  --background: oklch(0.16 0.008 265);
-  --foreground: oklch(0.985 0.003 265);
-  --card: oklch(0.216 0.012 265);
-  --card-foreground: oklch(0.985 0.003 265);
-  --primary: oklch(0.64 0.17 264);
-  --primary-foreground: oklch(0.145 0.01 265);
-  --secondary: oklch(0.279 0.014 265);
-  --secondary-foreground: oklch(0.985 0.003 265);
-  --muted: oklch(0.279 0.014 265);
-  --muted-foreground: oklch(0.72 0.02 265);
-  --accent: oklch(0.32 0.045 264);
-  --accent-foreground: oklch(0.985 0.003 265);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.64 0.17 264);
+  --background: #211d16; /* deep ink-brown table */
+  --foreground: #f4ecdc; /* cream */
+  --card: #2c261c;
+  --card-foreground: #f4ecdc;
+  --primary: #cfa145; /* brass, lifted for contrast */
+  --primary-foreground: #211d16;
+  --secondary: #37301f;
+  --secondary-foreground: #f4ecdc;
+  --muted: #37301f;
+  --muted-foreground: #c3b48f;
+  --accent: #2f4638; /* dim felt */
+  --accent-foreground: #dbe9df;
+  --destructive: #d4634f;
+  --border: #4a3f2a;
+  --input: #4a3f2a;
+  --ring: #cfa145;
+
+  --felt: #3a6d54;
+  --felt-foreground: #f4ecdc;
+  --brass: #cfa145;
+  --wood: #9a6a44;
+  --cream: #f4ecdc;
+  --ink: #211d16;
 }
 
 @theme inline {
@@ -81,6 +107,18 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  /* Card Table named colours → `bg-felt`, `text-brass`, `border-wood`, `bg-cream`, `text-ink`, … */
+  --color-felt: var(--felt);
+  --color-felt-foreground: var(--felt-foreground);
+  --color-brass: var(--brass);
+  --color-wood: var(--wood);
+  --color-cream: var(--cream);
+  --color-ink: var(--ink);
+
+  /* Serif display face for headings — the printed-box-lid feel. UI text stays the current sans. */
+  --font-display: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
@@ -100,6 +138,17 @@
       -apple-system,
       sans-serif;
   }
+}
+
+/*
+ * Felt: the table surface, used as a band (open-tables strip, in-game header) rather than the page
+ * ground. A whisper of woven texture over the flat felt so it reads as cloth, not paint.
+ */
+.felt {
+  background-color: var(--felt);
+  background-image:
+    radial-gradient(circle at 20% 20%, rgb(255 255 255 / 5%), transparent 60%),
+    radial-gradient(circle at 80% 0%, rgb(0 0 0 / 12%), transparent 55%);
 }
 
 /* Subtle entrance for panels that appear mid-turn (auction, results). Motion-reduced users get none. */

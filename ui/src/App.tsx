@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { Header } from '@/shell/Header';
-import { Landing } from '@/shell/Landing';
+import { Shelf } from '@/shell/Shelf';
+import { GameDetail } from '@/shell/GameDetail';
 import { WaitingRoom } from '@/shell/WaitingRoom';
 import { ChatPanel } from '@/shell/ChatPanel';
 import { useGameTransport } from '@/hooks/useGameTransport';
@@ -32,8 +33,11 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Which game a new table is for. Set from the catalog once it loads.
+  // Which game a new table is for, and which game's detail screen (box lid) is open on the shelf. The
+  // shelf shows no detail (`detailGame === null`); opening a lid sets both, so the detail form is built
+  // for that game. `gameType` also drives the page heading once a game is running.
   const [gameType, setGameType] = useState<string | null>(null);
+  const [detailGame, setDetailGame] = useState<string | null>(null);
   // Hotseat setup.
   const [names, setNames] = useState<string[]>([]);
   const [seatIsBot, setSeatIsBot] = useState<boolean[]>([]);
@@ -69,20 +73,33 @@ export default function App() {
   const onLanding = !game && !lobby;
   const { catalog, openLobbies, activeGames, forget } = useHomeLists(onLanding);
 
-  // Default the new-game form to the first game the server offers, once we know what that is.
+  // The game a new table is being set up for — the open box lid, falling back to the first hosted game
+  // so `selected`-dependent handlers stay safe before one is opened.
   const selected = catalog.find((entry) => entry.id === gameType) ?? catalog[0];
-  // The selected game's UI plugin, for its landing blurb/rules. Via the registry (the sanctioned
-  // lookup), so the shell shows a game's description without naming or importing the game itself.
+  // The selected game's UI plugin, for its box lid / detail blurb+rules+mark. Via the registry (the
+  // sanctioned lookup), so the shell shows a game's identity without naming or importing the game itself.
   const selectedClient = selected ? clientFor(selected.id) : undefined;
-  useEffect(() => {
-    if (!selected) return;
-    setGameType((current) => current ?? selected.id);
-    setLobbySeats((current) => (current === 0 ? selected.minPlayers : current));
-    setNames((current) => (current.length === 0 ? NAME_POOL.slice(0, selected.minPlayers) : current));
-    setSeatIsBot((current) =>
-      current.length === 0 ? NAME_POOL.slice(0, selected.minPlayers).map(() => false) : current,
-    );
-  }, [selected]);
+
+  /**
+   * Open a game's detail screen from the shelf, seeding a fresh setup for *that* game: a sensible default
+   * table size, generic filler names, no bots/colours/difficulties. The default is three seats where the
+   * game allows it (clamped into `[min, max]`) — a typical table, and the size a quick-start has always
+   * produced. Resetting per game (rather than carrying seat state across a switch) keeps a 2-player game
+   * from inheriting a table set up for another.
+   */
+  function openDetail(id: string) {
+    const entry = catalog.find((e) => e.id === id) ?? catalog[0];
+    if (!entry) return;
+    const seats = Math.min(entry.maxPlayers, Math.max(entry.minPlayers, 3));
+    setGameType(entry.id);
+    setDetailGame(entry.id);
+    setLobbySeats(seats);
+    setNames(NAME_POOL.slice(0, seats));
+    setSeatIsBot(NAME_POOL.slice(0, seats).map(() => false));
+    setSeatColors([]);
+    setSeatDifficulties([]);
+    setError(null);
+  }
 
   /** Run async work with busy/error handling but no state assignment (for lobby flows). */
   async function guard(work: () => Promise<void>) {
@@ -103,12 +120,13 @@ export default function App() {
     await guard(async () => applyPayload(await work()));
   }
 
-  /** Reset everything and return to the landing screen. */
+  /** Reset everything and return to the shelf (the landing's front door). */
   function resetToLanding() {
     transport.clear();
     setLobby(null);
     setMySeats([]);
     setControlledIds(null);
+    setDetailGame(null);
     setError(null);
   }
 
@@ -486,27 +504,15 @@ export default function App() {
             onLeave={() => {
               setLobby(null);
               setMySeats([]);
+              setDetailGame(null);
             }}
           />
-        ) : (
-          <Landing
-            catalog={catalog}
+        ) : detailGame && selected ? (
+          <GameDetail
             selected={selected}
-            selectedBlurb={selectedClient?.blurb}
-            selectedRules={selectedClient?.rules}
-            onSelect={setGameType}
-            openLobbies={openLobbies}
-            activeGames={activeGames}
+            client={selectedClient}
             busy={busy}
-            displayName={displayName}
-            onDisplayNameChange={setDisplayName}
-            onJoinWaiting={(id) => void joinFromBrowse(id)}
-            onRejoinWaiting={(id, seat) => void rejoinLobbyAs(id, seat)}
-            onResume={(id, playerId) => void resumeAs(id, playerId)}
-            onResumeHotseat={(id) => void resumeHotseat(id)}
-            confirmingAbandon={confirmingAbandon}
-            onConfirmAbandon={setConfirmingAbandon}
-            onAbandon={(id) => void abandon(id)}
+            onBack={() => setDetailGame(null)}
             lobbySeats={lobbySeats}
             onLobbySeatsChange={setLobbySeats}
             onCreateLobby={() => void createSharedGame()}
@@ -538,10 +544,27 @@ export default function App() {
                 ),
               )
             }
+            nameForSeat={nameForSeat}
+          />
+        ) : (
+          <Shelf
+            catalog={catalog}
+            onOpen={openDetail}
+            busy={busy}
             joinCode={joinCode}
             onJoinCodeChange={setJoinCode}
             onJoinByCode={() => void joinByCode(joinCode.trim())}
-            nameForSeat={nameForSeat}
+            openLobbies={openLobbies}
+            activeGames={activeGames}
+            displayName={displayName}
+            onDisplayNameChange={setDisplayName}
+            onJoinWaiting={(id) => void joinFromBrowse(id)}
+            onRejoinWaiting={(id, seat) => void rejoinLobbyAs(id, seat)}
+            onResume={(id, playerId) => void resumeAs(id, playerId)}
+            onResumeHotseat={(id) => void resumeHotseat(id)}
+            confirmingAbandon={confirmingAbandon}
+            onConfirmAbandon={setConfirmingAbandon}
+            onAbandon={(id) => void abandon(id)}
           />
         )}
       </main>

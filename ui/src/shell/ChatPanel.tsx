@@ -55,10 +55,10 @@ export function ChatPanel({ players, controlledIds, activePlayerId, chat, presen
   }
 
   return (
-    <Card data-testid="chat-panel" className="mt-6">
+    <Card data-testid="chat-panel" className="mt-6 border-wood/25">
       <CardHeader className="gap-2">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-base">Chat</CardTitle>
+          <CardTitle className="font-display text-base">Chat</CardTitle>
           <span className="text-xs text-muted-foreground">{presence.length} watching</span>
         </div>
         {/* Presence roster — who is currently connected to this game. */}
@@ -80,7 +80,7 @@ export function ChatPanel({ players, controlledIds, activePlayerId, chat, presen
         <div
           ref={listRef}
           data-testid="chat-messages"
-          className="flex max-h-64 min-h-24 flex-col gap-1.5 overflow-y-auto rounded-md border bg-muted/30 p-3"
+          className="flex max-h-64 min-h-24 flex-col gap-1.5 overflow-y-auto rounded-md border border-wood/20 bg-cream/50 p-3"
         >
           {chat.length === 0 ? (
             <p data-testid="chat-empty" className="text-sm text-muted-foreground">

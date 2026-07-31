@@ -74,7 +74,7 @@ export function WaitingRoom({
   return (
     <Card className="mx-auto max-w-md" data-testid="lobby">
       <CardHeader>
-        <CardTitle>Waiting for players</CardTitle>
+        <CardTitle className="font-display">Waiting for players</CardTitle>
         <p className="text-sm text-muted-foreground">Share this code. The game starts once every seat is filled.</p>
       </CardHeader>
       <CardContent className="space-y-4">
