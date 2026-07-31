@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('the full trade chain: factory purchase, then harbor purchase', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board')).toBeVisible();
 

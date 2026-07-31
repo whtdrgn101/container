@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('the board minimap shows every ship and sails the active player by clicking a location', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board-map')).toBeVisible();
 

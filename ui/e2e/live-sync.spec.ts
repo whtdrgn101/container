@@ -13,6 +13,7 @@ test('a joined client sees another client’s moves live', async ({ browser }) =
 
   // Host creates a game and reads its shareable code.
   await host.goto('/');
+  await host.getByTestId('pick-game-container').click();
   await host.getByTestId('start-game').click();
   await expect(host.getByTestId('board')).toBeVisible();
   const code = await host.getByTestId('game-code').getAttribute('data-game-id');

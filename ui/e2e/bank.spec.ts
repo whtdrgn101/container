@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('call a Bank auction, win it next turn, and load the containers', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board')).toBeVisible();
 
@@ -28,6 +29,7 @@ test('call a Bank auction, win it next turn, and load the containers', async ({ 
 
 test('bid a container in a cash-lot auction and win the cash', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board')).toBeVisible();
 
@@ -59,6 +61,7 @@ test('bid a container in a cash-lot auction and win the cash', async ({ page }) 
  */
 test('a callable cash lot does not light up the container lot at the same index', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('add-player').click();
   await page.getByTestId('add-player').click();
   await page.getByTestId('start-game').click();

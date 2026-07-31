@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('hotseat: hand a seat to the AI and it plays its own turns', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
 
   // Seats 2 and 3 go to the AI; Ann stays human.
   await page.getByTestId('toggle-bot-1').click();
@@ -26,6 +27,7 @@ test('hotseat: hand a seat to the AI and it plays its own turns', async ({ page 
 
 test('hotseat: a human is never asked to take an AI seat’s turn', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('toggle-bot-1').click();
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board')).toBeVisible();
@@ -40,6 +42,8 @@ test('hotseat: a human is never asked to take an AI seat’s turn', async ({ pag
 
 test('lobby: fill the empty seats with AI and start', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
+  await page.getByTestId('mode-online').click();
   await page.getByTestId('create-lobby').click();
   await expect(page.getByTestId('lobby')).toBeVisible();
 
@@ -64,6 +68,7 @@ test('an all-AI table plays itself to a finish', async ({ page }) => {
   // Nice demo, and a strong end-to-end proof: the whole game runs through the real engine, the real
   // auction flow, and the real HTTP layer with no human input at all.
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('toggle-bot-0').click();
   await page.getByTestId('toggle-bot-1').click();
   await page.getByTestId('toggle-bot-2').click();

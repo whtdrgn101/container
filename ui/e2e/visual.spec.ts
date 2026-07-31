@@ -11,6 +11,7 @@ import { expect, test } from '@playwright/test';
  */
 test('board minimap matches its visual baseline', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('start-game').click();
   const board = page.getByTestId('board-map');
   await expect(board).toBeVisible();

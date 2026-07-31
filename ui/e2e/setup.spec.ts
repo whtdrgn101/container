@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('add seats to start a 5-player game', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
 
   // Defaults to the 3-player minimum: no seat can be removed yet.
   await expect(page.getByTestId('remove-player-0')).toBeDisabled();
@@ -19,6 +20,7 @@ test('add seats to start a 5-player game', async ({ page }) => {
 
 test('a blank seat name blocks starting', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('player-name-1').fill('');
   await expect(page.getByTestId('setup-hint')).toBeVisible();
   await expect(page.getByTestId('start-game')).toBeDisabled();

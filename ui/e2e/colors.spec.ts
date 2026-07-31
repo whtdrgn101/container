@@ -11,6 +11,7 @@ test('pick player colours in the waiting room and see them on the board', async 
 
   // Can't Stop is a 2-player game, so we can make a 2-seat table (Container's minimum is 3).
   await page.getByTestId('pick-game-cantstop').click();
+  await page.getByTestId('mode-online').click();
   // Bring the seat count down to 2 (Can't Stop's minimum).
   while ((await page.getByTestId('seat-count').textContent())?.trim() !== '2') {
     await page.getByTestId('seats-dec').click();

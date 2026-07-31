@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 async function startGame(page: Page): Promise<void> {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board')).toBeVisible();
 }

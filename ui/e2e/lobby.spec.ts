@@ -12,6 +12,8 @@ test('create an empty lobby, join and name seats by code, then start', async ({ 
 
   // Host creates a 3-seat shared game (no names up front) and reads the shareable code.
   await host.goto('/');
+  await host.getByTestId('pick-game-container').click();
+  await host.getByTestId('mode-online').click();
   await host.getByTestId('create-lobby').click();
   await expect(host.getByTestId('lobby')).toBeVisible();
   const code = await host.getByTestId('lobby-code').getAttribute('data-lobby-id');
@@ -86,6 +88,8 @@ test('create an empty lobby, join and name seats by code, then start', async ({ 
  */
 test('rejoin a lobby you already hold a seat in, rather than claiming another', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
+  await page.getByTestId('mode-online').click();
   await page.getByTestId('create-lobby').click();
   const code = await page.getByTestId('lobby-code').getAttribute('data-lobby-id');
   await page.getByTestId('seat-name').fill('Tim');

@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 test('the activity feed narrates what each player did, newest first', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board')).toBeVisible();
   await expect(page.getByTestId('game-log-empty')).toBeVisible();
@@ -21,6 +22,7 @@ test('the activity feed narrates what each player did, newest first', async ({ p
 test('the feed follows the AI’s moves too, and marks them as a bot', async ({ page }) => {
   // The whole point of the feed: seeing what the other players — human or not — actually did.
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('toggle-bot-1').click();
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board')).toBeVisible();
@@ -50,6 +52,7 @@ test('a delivery reports the winner and the winning bid, and never a losing one'
 // Same chain the delivery spec uses: Ann sells to Bob's ship, Bob sails it to the island.
 async function reachAuction(page: Page) {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board')).toBeVisible();
 

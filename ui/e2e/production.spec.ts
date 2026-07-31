@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('create a game and produce a container', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
 
   await page.getByTestId('start-game').click();
 

@@ -4,6 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 // Leaves the page showing the open auction, with no bids placed yet.
 async function reachAuction(page: Page) {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board')).toBeVisible();
 

@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('take and repay a loan as free actions', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board')).toBeVisible();
   await expect(page.getByTestId('money-p1')).toHaveText('$20');
@@ -20,6 +21,7 @@ test('take and repay a loan as free actions', async ({ page }) => {
 
 test('interest is charged at the start of your next turn', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board')).toBeVisible();
 

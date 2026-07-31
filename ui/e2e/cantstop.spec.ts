@@ -108,12 +108,15 @@ test('rematch: finish a game and start a new one with the same players', async (
   await expect(page.getByTestId('results')).toBeVisible(); // the new all-bot game also finishes
 });
 
-test('the landing shows a per-game blurb and a how-to-play (C4)', async ({ page }) => {
+test('a game detail screen shows its blurb and a how-to-play (C4)', async ({ page }) => {
   await page.goto('/');
-  // Default selection is the first hosted game (Container).
-  await expect(page.getByTestId('game-blurb')).toContainText('Container');
 
-  // Picking Can't Stop swaps in its blurb and its own rules.
+  // Opening Container's box lid shows its detail screen with its blurb.
+  await page.getByTestId('pick-game-container').click();
+  await expect(page.getByTestId('game-blurb')).toContainText('supply-chain');
+
+  // Back to the shelf, then Can't Stop's lid shows its own blurb and rules.
+  await page.getByTestId('back-to-shelf').click();
   await page.getByTestId('pick-game-cantstop').click();
   await expect(page.getByTestId('game-blurb')).toContainText('push-your-luck');
 

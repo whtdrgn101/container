@@ -17,6 +17,7 @@ test('two clients see each other’s presence and chat, and presence drops on cl
 
   // Host starts a game and reads its shareable code.
   await host.goto('/');
+  await host.getByTestId('pick-game-container').click();
   await host.getByTestId('start-game').click();
   await expect(host.getByTestId('board')).toBeVisible();
   await expect(host.getByTestId('chat-panel')).toBeVisible();

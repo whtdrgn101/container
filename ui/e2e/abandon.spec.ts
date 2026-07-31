@@ -10,6 +10,7 @@ import { expect, test } from '@playwright/test';
 test('abandon an in-progress game from the home screen', async ({ page }) => {
   // Start a game (Ann/Bob/Cid) and grab its id, then head home — the game persists server-side.
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board')).toBeVisible();
   const code = await page.getByTestId('game-code').getAttribute('data-game-id');
@@ -41,6 +42,7 @@ test('abandon an in-progress game from the home screen', async ({ page }) => {
 /** An abandoned game is soft-deleted: still readable by anyone holding a link, but out of play. */
 test('an abandoned game can no longer be played', async ({ page, request }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board')).toBeVisible();
   const code = await page.getByTestId('game-code').getAttribute('data-game-id');

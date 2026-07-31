@@ -28,6 +28,7 @@ test('lobby: two players join a shared Saint Petersburg game with picked colours
   // Host makes a 2-seat Saint Petersburg lobby and claims seat 0 as Ann, picking blue.
   await host.goto('/');
   await host.getByTestId('pick-game-stpetersburg').click();
+  await host.getByTestId('mode-online').click();
   await setSeats(host, 2);
   await host.getByTestId('create-lobby').click();
   await expect(host.getByTestId('lobby')).toBeVisible();

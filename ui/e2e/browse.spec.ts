@@ -12,6 +12,8 @@ test('browse an open game from the home screen and join with a display name', as
 
   // Host opens a shared game and takes a seat so the listing shows a player.
   await host.goto('/');
+  await host.getByTestId('pick-game-container').click();
+  await host.getByTestId('mode-online').click();
   await host.getByTestId('create-lobby').click();
   const code = await host.getByTestId('lobby-code').getAttribute('data-lobby-id');
   expect(code).toBeTruthy();

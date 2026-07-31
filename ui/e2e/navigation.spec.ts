@@ -2,16 +2,17 @@ import { expect, test } from '@playwright/test';
 
 test('the title takes you back to the Game Hub, and the game is still there', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board')).toBeVisible();
   const gameId = await page.getByTestId('game-code').getAttribute('data-game-id');
 
   await page.getByTestId('home-link').click();
 
-  // Back at the landing screen…
+  // Back at the shelf (the landing's front door)…
   await expect(page.getByTestId('board')).toHaveCount(0);
-  await expect(page.getByTestId('start-game')).toBeVisible();
-  // …and leaving didn't destroy anything: the game is on the server, waiting to be rejoined.
+  await expect(page.getByTestId('pick-game-container')).toBeVisible();
+  // …and leaving didn't destroy anything: the game is on the server, waiting under "Open tables".
   await expect(page.getByTestId(`resume-${gameId}-p1`)).toBeVisible();
   await page.getByTestId(`resume-${gameId}-p1`).click();
   await expect(page.getByTestId('board')).toBeVisible();
@@ -20,12 +21,16 @@ test('the title takes you back to the Game Hub, and the game is still there', as
 test('the title is only a link once you are in a game or lobby', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('home-link')).toHaveCount(0); // nothing to go back to yet
+  // A game's detail screen is still part of the hub (no game running), so no back-link in the header.
+  await page.getByTestId('pick-game-container').click();
+  await expect(page.getByTestId('home-link')).toHaveCount(0);
 
+  await page.getByTestId('mode-online').click();
   await page.getByTestId('create-lobby').click();
   await expect(page.getByTestId('lobby')).toBeVisible();
   await expect(page.getByTestId('home-link')).toBeVisible(); // a lobby counts too
   await page.getByTestId('home-link').click();
-  await expect(page.getByTestId('start-game')).toBeVisible();
+  await expect(page.getByTestId('pick-game-container')).toBeVisible();
 });
 
 /**
@@ -39,6 +44,8 @@ test('the heading is the Game Hub off the board and the game on it', async ({ pa
 
   // The waiting room is part of the hub, not part of a game — you haven't started one yet. Claiming
   // a seat adds your name, so two playtest windows stay tellable apart.
+  await page.getByTestId('pick-game-container').click();
+  await page.getByTestId('mode-online').click();
   await page.getByTestId('create-lobby').click();
   await expect(page.getByTestId('lobby')).toBeVisible();
   await expect(page.getByTestId('page-title')).toContainText('Game Hub');
@@ -48,6 +55,7 @@ test('the heading is the Game Hub off the board and the game on it', async ({ pa
   await page.getByTestId('home-link').click();
 
   // Hotseat drives every seat, so no single name fits and the heading is just the game.
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board')).toBeVisible();
   await expect(page.getByTestId('page-title')).toContainText('Container');

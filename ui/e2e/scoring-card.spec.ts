@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test("shows the active player's secret scoring card and hides opponents'", async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('pick-game-container').click();
   await page.getByTestId('start-game').click();
   await expect(page.getByTestId('board')).toBeVisible();
 
