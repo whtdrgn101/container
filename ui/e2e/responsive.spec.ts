@@ -36,3 +36,26 @@ test('no horizontal overflow at a narrow mobile width', async ({ page }) => {
   const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
   expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
 });
+
+test('the chat + presence panel reflows to 320px without overflow', async ({ page }) => {
+  await startGame(page);
+  await page.setViewportSize({ width: 320, height: 720 });
+
+  const panel = page.getByTestId('chat-panel');
+  await expect(panel).toBeVisible();
+  // Presence roster, the message list, the input and the send button all render and fit the viewport.
+  await expect(page.getByTestId('presence-viewer').first()).toBeVisible();
+  await expect(page.getByTestId('chat-input')).toBeVisible();
+  await expect(page.getByTestId('chat-send')).toBeVisible();
+
+  const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+  const box = await panel.boundingBox();
+  expect(box).not.toBeNull();
+  // The panel stays within the viewport — its right edge never spills past the client width.
+  expect(box!.x + box!.width).toBeLessThanOrEqual(clientWidth + 1);
+
+  // Sending still works at this width, and the message shows in the log.
+  await page.getByTestId('chat-input').fill('mobile hello');
+  await page.getByTestId('chat-send').click();
+  await expect(page.getByTestId('chat-messages')).toContainText('mobile hello');
+});

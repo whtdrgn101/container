@@ -229,6 +229,55 @@ function streamUrl(gameId: string): string {
   return `${proto}//${window.location.host}${apiUrl(`/games/${gameId}/stream`)}`;
 }
 
+/**
+ * In-game chat + presence — platform (shell-owned) coordination, not a game side-channel.
+ *
+ * These ride the same socket as game state, as `{ type: 'chat' }` / `{ type: 'presence' }` frames. The
+ * kernel's `GameMessage` is intentionally open (`{ type: string; [k]: unknown }`), so they already flow
+ * through `subscribeGame`'s `onMessage` without a kernel change — the shell just narrows them by `type`
+ * with the local types below. ⚠️ Giving `chat`/`presence` a *typed* place in the kernel's `GameMessage`
+ * union is a **next kernel-minor** job (a release is out of scope here); see ROADMAP.
+ */
+export interface ChatMessage {
+  seq: number;
+  senderId: string;
+  sender: string;
+  body: string;
+  at: string;
+}
+
+/** One entry in a game room's presence roster: a stable per-connection id and its viewer label. */
+export interface PresenceViewer {
+  id: string;
+  label: string;
+}
+
+/** Narrow an open `GameMessage` to a chat frame (a batch of messages — one new, or a resume backfill). */
+export function isChatPush(message: GameMessage): message is GameMessage & { type: 'chat'; messages: ChatMessage[] } {
+  return message.type === 'chat' && Array.isArray((message as { messages?: unknown }).messages);
+}
+
+/** Narrow an open `GameMessage` to a presence frame (the current viewer roster). */
+export function isPresencePush(
+  message: GameMessage,
+): message is GameMessage & { type: 'presence'; viewers: PresenceViewer[] } {
+  return message.type === 'presence' && Array.isArray((message as { viewers?: unknown }).viewers);
+}
+
+/**
+ * Send a chat message to a game, as one of its seats (`playerId`). Table-public: the server fans it out
+ * to every viewer over the socket. A spectator holds no seat and is refused (`INVALID_SENDER`, 400).
+ */
+export async function sendChat(gameId: string, playerId: string, body: string): Promise<ChatMessage> {
+  const response = await fetch(apiUrl(`/games/${gameId}/chat`), {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ playerId, body }),
+  });
+  if (!response.ok) await fail(response);
+  return ((await response.json()) as { message: ChatMessage }).message;
+}
+
 /** The state push every game gets. A board casts `game` to its own view type. */
 export interface StatePush {
   type: 'state';

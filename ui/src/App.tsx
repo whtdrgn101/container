@@ -2,6 +2,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { Header } from '@/shell/Header';
 import { Landing } from '@/shell/Landing';
 import { WaitingRoom } from '@/shell/WaitingRoom';
+import { ChatPanel } from '@/shell/ChatPanel';
 import { useGameTransport } from '@/hooks/useGameTransport';
 import { useHomeLists } from '@/hooks/useHomeLists';
 import { clientFor } from '@/games/registry';
@@ -63,7 +64,7 @@ export default function App() {
   // Hotseat (null) follows the active player; a seat-bound client streams as its own seats only.
   const viewer = controlledIds === null ? undefined : controlledIds.join(',');
   const transport = useGameTransport(viewer);
-  const { game, gameId, bots, colors, players, lastMessage } = transport;
+  const { game, gameId, bots, colors, players, lastMessage, activePlayerId, chat, presence } = transport;
 
   const onLanding = !game && !lobby;
   const { catalog, openLobbies, activeGames, forget } = useHomeLists(onLanding);
@@ -349,6 +350,14 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastMessage]);
 
+  /** Send an in-game chat message as `playerId`. The broadcast echoes back over the socket into `chat`. */
+  async function sendChatMessage(playerId: string, body: string) {
+    if (!gameId) return;
+    await guard(async () => {
+      await api.sendChat(gameId, playerId, body);
+    });
+  }
+
   /** Propose or accept a rematch on behalf of this client's seats. */
   async function requestRematch() {
     if (!gameId) return;
@@ -420,33 +429,45 @@ export default function App() {
         )}
 
         {game && gameId ? (
-          client ? (
-            // Lazily fetched on first render of a board — the hub itself ships none of it. The rematch
-            // controls reach the board's shared GameOver screen through context, not through props.
-            <Suspense fallback={<p className="text-sm text-muted-foreground">Loading the board…</p>}>
-              <RematchContext.Provider value={rematchControls}>
-                <client.Board
-                  gameId={gameId}
-                  game={game}
-                  bots={bots}
-                  colors={colors}
-                  controlledIds={controlledIds}
-                  viewer={viewer}
-                  busy={busy}
-                  guard={guard}
-                  onPayload={applyPayload}
-                  onLeave={resetToLanding}
-                  lastMessage={lastMessage}
-                />
-              </RematchContext.Provider>
-            </Suspense>
-          ) : (
-            // The server hosts a game this build can't draw — a backend deployed ahead of the UI.
-            // Say so rather than render an empty board.
-            <p data-testid="unknown-game" role="alert" className="text-sm text-muted-foreground">
-              This game (“{transport.gameType}”) isn’t available in this version of the app.
-            </p>
-          )
+          <>
+            {client ? (
+              // Lazily fetched on first render of a board — the hub itself ships none of it. The rematch
+              // controls reach the board's shared GameOver screen through context, not through props.
+              <Suspense fallback={<p className="text-sm text-muted-foreground">Loading the board…</p>}>
+                <RematchContext.Provider value={rematchControls}>
+                  <client.Board
+                    gameId={gameId}
+                    game={game}
+                    bots={bots}
+                    colors={colors}
+                    controlledIds={controlledIds}
+                    viewer={viewer}
+                    busy={busy}
+                    guard={guard}
+                    onPayload={applyPayload}
+                    onLeave={resetToLanding}
+                    lastMessage={lastMessage}
+                  />
+                </RematchContext.Provider>
+              </Suspense>
+            ) : (
+              // The server hosts a game this build can't draw — a backend deployed ahead of the UI.
+              // Say so rather than render an empty board.
+              <p data-testid="unknown-game" role="alert" className="text-sm text-muted-foreground">
+                This game (“{transport.gameType}”) isn’t available in this version of the app.
+              </p>
+            )}
+            {/* Shell chrome, game-agnostic: chat + presence beside whatever board is showing. */}
+            <ChatPanel
+              players={players}
+              controlledIds={controlledIds}
+              activePlayerId={activePlayerId}
+              chat={chat}
+              presence={presence}
+              busy={busy}
+              onSend={(playerId, body) => void sendChatMessage(playerId, body)}
+            />
+          </>
         ) : lobby ? (
           <WaitingRoom
             lobby={lobby}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as api from '@/lib/api';
+import type { ChatMessage, PresenceViewer } from '@/lib/api';
 import type { GameMessage, GamePayload } from '@game-hub/kernel/client';
 
 /**
@@ -30,6 +31,13 @@ export interface GameTransport {
   readonly activePlayerId: string | null;
   /** The most recent non-state push, for the board to read. */
   readonly lastMessage: GameMessage | null;
+  /**
+   * Platform chat/presence (shell-owned coordination, not a game side-channel — see `lib/api`). The
+   * transport accumulates the chat log (deduped by `seq`) and holds the latest presence roster, so the
+   * shell's chat panel is a pure view. Both reset when the game changes; empty off the board.
+   */
+  readonly chat: ChatMessage[];
+  readonly presence: PresenceViewer[];
   readonly apply: (payload: GamePayload) => void;
   readonly clear: () => void;
 }
@@ -54,6 +62,8 @@ export function useGameTransport(viewer: string | undefined): GameTransport {
   const [players, setPlayers] = useState<{ id: string; name: string }[]>([]);
   const [activePlayerId, setActivePlayerId] = useState<string | null>(null);
   const [lastMessage, setLastMessage] = useState<GameMessage | null>(null);
+  const [chat, setChat] = useState<ChatMessage[]>([]);
+  const [presence, setPresence] = useState<PresenceViewer[]>([]);
 
   // Read inside the socket callback without making the subscription depend on it — re-subscribing on
   // every state change would tear the socket down on each move.
@@ -77,12 +87,18 @@ export function useGameTransport(viewer: string | undefined): GameTransport {
     setPlayers([]);
     setActivePlayerId(null);
     setLastMessage(null);
+    setChat([]);
+    setPresence([]);
   }, []);
 
   const gameId = typeof game === 'object' && game !== null ? (game as { id?: string }).id : undefined;
 
   useEffect(() => {
     if (!gameId) return;
+    // A new game (or a re-subscribe) starts from an empty conversation and roster — the backfill and the
+    // fresh presence frame arrive right after the socket opens.
+    setChat([]);
+    setPresence([]);
     return api.subscribeGame(
       gameId,
       (push) => {
@@ -95,9 +111,43 @@ export function useGameTransport(viewer: string | undefined): GameTransport {
         setActivePlayerId(push.activePlayerId ?? null);
       },
       viewer,
-      setLastMessage,
+      (message) => {
+        // Chat and presence are platform frames the shell owns; everything else (a game's own
+        // side-channel, e.g. Container's auction) is handed to the board verbatim as `lastMessage`.
+        if (api.isChatPush(message)) {
+          setChat((prev) => mergeBySeq(prev, message.messages));
+        } else if (api.isPresencePush(message)) {
+          setPresence(message.viewers);
+        } else {
+          setLastMessage(message);
+        }
+      },
     );
   }, [gameId, viewer]);
 
-  return { game, gameType, bots, colors, gameId: gameId ?? null, players, activePlayerId, lastMessage, apply, clear };
+  return {
+    game,
+    gameType,
+    bots,
+    colors,
+    gameId: gameId ?? null,
+    players,
+    activePlayerId,
+    lastMessage,
+    chat,
+    presence,
+    apply,
+    clear,
+  };
+}
+
+/**
+ * Merge incoming chat messages into the log, deduped and ordered by `seq`. A resume backfill and a live
+ * push can overlap (and a reconnect replays the backfill), so keying on the server's per-game sequence
+ * keeps the log idempotent under either.
+ */
+function mergeBySeq(existing: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
+  const bySeq = new Map(existing.map((message) => [message.seq, message]));
+  for (const message of incoming) bySeq.set(message.seq, message);
+  return [...bySeq.values()].sort((a, b) => a.seq - b.seq);
 }
