@@ -1,4 +1,3 @@
-import { Button } from '@game-hub/ui-kit';
 import { clientFor } from '@/games/registry';
 import { GameIcon } from '@/shell/GameIcon';
 import { OpenTables } from '@/shell/OpenTables';
@@ -20,11 +19,6 @@ export interface ShelfProps {
   readonly onOpen: (gameType: string) => void;
   readonly busy: boolean;
 
-  /** Join any table (lobby or started game) by its shareable code — the front-door affordance. */
-  readonly joinCode: string;
-  readonly onJoinCodeChange: (code: string) => void;
-  readonly onJoinByCode: () => void;
-
   // The "Open tables" band (waiting + in-progress), passed straight through.
   readonly openLobbies: Lobby[];
   readonly activeGames: GameSummary[];
@@ -43,9 +37,6 @@ export function Shelf({
   catalog,
   onOpen,
   busy,
-  joinCode,
-  onJoinCodeChange,
-  onJoinByCode,
   openLobbies,
   activeGames,
   displayName,
@@ -115,26 +106,6 @@ export function Shelf({
         onConfirmAbandon={onConfirmAbandon}
         onAbandon={onAbandon}
       />
-
-      {/* Join any table straight from the front door — a lobby code or a started game's code both work. */}
-      <div className="mx-auto flex max-w-md items-center gap-2">
-        <input
-          aria-label="Game code"
-          data-testid="join-code"
-          placeholder="Have a code? Paste it to join a table"
-          className="w-full rounded-md border border-wood/30 bg-card px-3 py-2 text-sm text-card-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          value={joinCode}
-          onChange={(event) => onJoinCodeChange(event.target.value)}
-        />
-        <Button
-          variant="outline"
-          data-testid="join-game"
-          disabled={busy || joinCode.trim() === ''}
-          onClick={onJoinByCode}
-        >
-          Join
-        </Button>
-      </div>
     </div>
   );
 }

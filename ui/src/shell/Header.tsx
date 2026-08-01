@@ -25,9 +25,14 @@ export interface HeaderProps {
   readonly onLeave: () => void;
   /** The current game's status line, rendered by its own board. */
   readonly status?: ReactNode;
+  /**
+   * The join-by-code control, right-aligned off the board (the front-door affordance). A slot for the
+   * same reason `status` is one: the header stays game-agnostic and owns no join state or transport.
+   */
+  readonly joinSlot?: ReactNode;
 }
 
-export function Header({ heading, gameId, canLeave, onLeave, status }: HeaderProps) {
+export function Header({ heading, gameId, canLeave, onLeave, status, joinSlot }: HeaderProps) {
   const onFelt = !!gameId; // the board: felt band. A lobby (no gameId) stays on parchment.
   return (
     <header
@@ -65,6 +70,7 @@ export function Header({ heading, gameId, canLeave, onLeave, status }: HeaderPro
             )}
           </h1>
         </div>
+        {!gameId && joinSlot && <div className="flex min-w-0 items-center gap-2">{joinSlot}</div>}
         {gameId && (
           <div className="flex items-center gap-3">
             <button

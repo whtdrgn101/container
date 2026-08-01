@@ -9,7 +9,7 @@ import { useHomeLists } from '@/hooks/useHomeLists';
 import { clientFor } from '@/games/registry';
 import * as api from '@/lib/api';
 import type { GamePayload, Lobby, RematchInfo } from '@/lib/api';
-import { RematchContext } from '@game-hub/ui-kit';
+import { Button, RematchContext } from '@game-hub/ui-kit';
 
 /**
  * The Game Hub shell (roadmap C2).
@@ -433,6 +433,29 @@ export default function App() {
         canLeave={!!game || !!lobby}
         onLeave={resetToLanding}
         status={client?.Status && game ? <client.Status game={game} /> : undefined}
+        joinSlot={
+          // The front door rides in the menubar: any table's code — lobby or started game — joins from
+          // anywhere off the board.
+          <>
+            <input
+              aria-label="Game code"
+              data-testid="join-code"
+              placeholder="Have a code? Paste it here to join a table"
+              className="w-40 min-w-0 rounded-md border border-wood/30 bg-card px-3 py-1.5 text-sm text-card-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-72"
+              value={joinCode}
+              onChange={(event) => setJoinCode(event.target.value)}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="join-game"
+              disabled={busy || joinCode.trim() === ''}
+              onClick={() => void joinByCode(joinCode.trim())}
+            >
+              Join
+            </Button>
+          </>
+        }
       />
 
       <main className="mx-auto max-w-5xl px-4 py-6">
@@ -551,9 +574,6 @@ export default function App() {
             catalog={catalog}
             onOpen={openDetail}
             busy={busy}
-            joinCode={joinCode}
-            onJoinCodeChange={setJoinCode}
-            onJoinByCode={() => void joinByCode(joinCode.trim())}
             openLobbies={openLobbies}
             activeGames={activeGames}
             displayName={displayName}
