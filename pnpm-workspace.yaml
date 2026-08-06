@@ -49,3 +49,8 @@ minimumReleaseAgeExclude:
   - '@game-hub/game-russianrailroads@0.1.1'
   - '@game-hub/game-stoneage@0.1.1'
   - '@game-hub/game-stpetersburg@0.1.1'
+  # Labyrinth 0.1.3 is its L4c player-feedback pass (banner pawn badge, arrow tooltips off,
+  # hide-other-pawns toggle, spider redrawn). Freshly published, so excluded like the two before it.
+  # ⚠️ Not 0.1.2 — that publish is deprecated: `npm publish` ignores `publishConfig.exports` and shipped
+  # src-pointing exports in a dist-only tarball (game repo, docs/d2c-findings.md §23).
+  - '@game-hub/game-labyrinth@0.1.3'
