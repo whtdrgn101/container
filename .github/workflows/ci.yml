@@ -10,6 +10,11 @@ name: CI
 # `mcr.microsoft.com/playwright:v1.61.1-jammy` — the exact image the committed `-linux` snapshot
 # baselines were generated in, so rendering matches bit-for-bit (REVIEW.md §2.2). Regenerate baselines
 # in that same image if the board art changes (see ui/e2e/README or the REVIEW note).
+#
+# ⚠️ ui's `@playwright/test` is pinned **exact** (`1.61.1`, no caret) to match this image: a ranged spec
+# let a routine lockfile rebuild drift it to 1.62.1, whose browsers the 1.61.1 image does not carry, and
+# every e2e failed at browser launch (run 31061090970). Bump the image tag and the manifest pin together,
+# regenerating the snapshot baselines in the new image.
 
 on:
   push:
