@@ -197,6 +197,24 @@ The near-term order, decided while play-testing:
    `mode-hotseat`/`mode-online`, `game-detail`, `back-to-shelf`); full suite green in the pinned CI image,
    visual board baselines unchanged (boards untouched).
 
+8. **Shell polish — favicon, an alphabetised shelf, and an About page ✅ (2026-08-07).** Three small
+   owner-requested changes to the room itself, no game touched. (a) **Favicon** (`ui/public/favicon.svg`,
+   linked from `ui/index.html`): the header's own mark — the brass tile + lucide `Dices` glyph — redrawn as
+   a standalone SVG, so the tab and the page read as one thing. It hardcodes the palette (a favicon renders
+   outside the document and can't see the `index.css` theme tokens) and carries its own background, so it
+   holds up on a light or a dark tab strip; the glyph is drawn a touch larger and heavier than the header's
+   16-in-32 proportion because the header's exact weight goes muddy at 16px. (b) **The shelf sorts by
+   name** — display order only, inside `Shelf`; the catalog's own order is still registration order
+   (`games.config.ts`), and nothing downstream reads the shelf's order. (c) **A footer + About screen**
+   (`shell/Footer.tsx`, `shell/About.tsx`): what the room is (a no-accounts, no-tracking family games
+   table), and why it exists (React practice at the modular-seam level; a container on a local Portainer
+   instance as groundwork toward production Kubernetes). About is an **overlay screen**, not a place — it
+   opens over whatever you were doing and closing it puts you back, which is why it sits *outside* the
+   game/lobby/detail/shelf cascade in `App.tsx`. ⚠️ Its privacy section is a **factual claim about the
+   running system**, not marketing: if a login, a tracker or a third-party script ever lands, that copy
+   changes in the same commit. New `e2e/about.spec.ts` (open/close from the shelf, over a detail screen,
+   and 320px no-overflow); full e2e suite green.
+
 ## Principles
 
 - **Every slice is vertical:** engine → API → UI → tests. Each ends **green and demoable** — a safe place

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Game Hub">
+  <!--
+    The browser-tab mark: the same brass tile + lucide `Dices` glyph the site header stamps beside the
+    wordmark (`ui/src/shell/Header.tsx`), so the tab and the page read as one thing.
+
+    Colours are the Card Table palette, hardcoded because a favicon renders outside the document and
+    can't see the `index.css` theme tokens: brass #b98a2f, ink #2a241c. The tile carries its own
+    background, so it stays legible on a light or a dark tab strip.
+
+    The glyph is lucide-react v0.469.0 `Dices` (ISC), authored on a 24x24 grid: it's placed at 22px
+    inside the 32px tile — translate(5 5) scale(0.9167) — a little larger and heavier than the header's
+    16-in-32 proportion, because a tab renders this at 16px and the header's exact weight goes muddy
+    there. Checked at 16px on both a light and a dark tab strip.
+  -->
+  <rect width="32" height="32" rx="8" fill="#b98a2f" />
+  <g
+    transform="translate(5 5) scale(0.9167)"
+    fill="none"
+    stroke="#2a241c"
+    stroke-width="2.6"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <rect width="12" height="12" x="2" y="10" rx="2" ry="2" />
+    <path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6" />
+    <path d="M6 18h.01" />
+    <path d="M10 14h.01" />
+    <path d="M15 6h.01" />
+    <path d="M18 9h.01" />
+  </g>
+</svg>

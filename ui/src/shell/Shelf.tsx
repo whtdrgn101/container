@@ -8,10 +8,14 @@ import type { GameInfo, GameSummary, Lobby } from '@/lib/api';
  * game, over the felt "Open tables" band and a join-by-code strip. It replaces the old pill picker +
  * combined new-game form; clicking a lid opens that game's detail screen.
  *
- * **Game-agnostic** (roadmap C2): the lids come from the server catalog, in catalog order — no hardcoded
- * game list. A lid's mark (`client.Icon`) and one-line description come from the game's own UI plugin via
- * the registry (`clientFor`, the sanctioned lookup); the shell never names or imports a game itself. A
- * game with no `Icon` gets a neutral cream lid stamped with its initial.
+ * **Game-agnostic** (roadmap C2): the lids come from the server catalog — no hardcoded game list. A lid's
+ * mark (`client.Icon`) and one-line description come from the game's own UI plugin via the registry
+ * (`clientFor`, the sanctioned lookup); the shell never names or imports a game itself. A game with no
+ * `Icon` gets a neutral cream lid stamped with its initial.
+ *
+ * The shelf is sorted **by name**, so a browsing eye can find a box the way it would on a real shelf.
+ * That's display order only — the catalog's own order is registration order (`games.config.ts`), which
+ * still means what it meant; nothing downstream reads the shelf's order.
  */
 export interface ShelfProps {
   readonly catalog: GameInfo[];
@@ -49,6 +53,8 @@ export function Shelf({
   onConfirmAbandon,
   onAbandon,
 }: ShelfProps) {
+  // Copy before sorting — `catalog` is the caller's array, and the rest of the shell indexes into it.
+  const shelved = [...catalog].sort((a, b) => a.name.localeCompare(b.name));
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="space-y-1 pb-1 text-center">
@@ -60,7 +66,7 @@ export function Shelf({
 
       {/* The shelf of box lids. Two-up on phones, three-up from `sm`, so it reflows cleanly to 320px. */}
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4" data-testid="game-shelf">
-        {catalog.map((entry) => {
+        {shelved.map((entry) => {
           const client = clientFor(entry.id);
           return (
             <li key={entry.id}>

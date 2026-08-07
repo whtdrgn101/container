@@ -63,9 +63,12 @@ packages/
 backend/           @game-hub/backend — game-agnostic Fastify REST core + SQLite + the generated registry
 ui/                @game-hub/ui — game-agnostic React + Tailwind + shadcn shell + the generated registry.
                      Its front door is the **Card Table** (2026-07-31): a shelf of box-lid cards (each a
-                     game's own `client.Icon`) → a per-game detail screen (Pass and play / Play online) →
-                     a felt "Open tables" band. `shell/`: Shelf, GameDetail, GameIcon, OpenTables, Header,
-                     WaitingRoom, ChatPanel. Identity lives in `index.css` theme tokens; ui-kit untouched.
+                     game's own `client.Icon`, sorted by name) → a per-game detail screen (Pass and play /
+                     Play online) → a felt "Open tables" band, under a Footer whose one link is the About
+                     screen. `shell/`: Shelf, GameDetail, GameIcon, OpenTables, Header, WaitingRoom,
+                     ChatPanel, Footer, About. Identity lives in `index.css` theme tokens (and, for the
+                     tab, `ui/public/favicon.svg` — the header's brass dice mark, palette hardcoded because
+                     a favicon can't see them); ui-kit untouched.
 games.config.ts    the ordered list of hosted games → `pnpm generate` → the two checked-in registries
 
 The games themselves live OUTSIDE this repo (each `whtdrgn101/game-<id>`, published to npm), consumed here
@@ -229,6 +232,11 @@ helpers live in `backend/src/services.ts`.)
   the committed baselines. ⚠️ Never `docker run` the repo with `node_modules` mounted as **root** — a
   container-side `pnpm install` corrupts the host `.bin`/store (root-owned); if it happens, `chown` back
   and clean-reinstall.
+- ⚠️ **The About screen's privacy copy is a factual claim, not marketing** (2026-08-07). `ui/src/shell/About.tsx`
+  tells players there are no accounts, no personal data beyond a table's own state and the names typed at
+  it, and no analytics or third-party scripts. That is true of the code today; if a login, a tracker or a
+  hosted dependency ever lands, **the copy changes in the same commit**. About is an overlay screen (it
+  opens over whatever you were doing), which is why it sits outside `App.tsx`'s screen cascade.
 - **A player colour may be rules data** (kernel 1.2.0, 2026-07-30): every seat's resolved colour is passed
   to `createGame` as `players[].color`. All five hosted games ignore it — for them a colour is still
   presentation and stays coordination state — but a game where the pick *is* a rule (Labyrinth's starting

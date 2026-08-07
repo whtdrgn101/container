@@ -4,6 +4,8 @@ import { Shelf } from '@/shell/Shelf';
 import { GameDetail } from '@/shell/GameDetail';
 import { WaitingRoom } from '@/shell/WaitingRoom';
 import { ChatPanel } from '@/shell/ChatPanel';
+import { Footer } from '@/shell/Footer';
+import { About } from '@/shell/About';
 import { useGameTransport } from '@/hooks/useGameTransport';
 import { useHomeLists } from '@/hooks/useHomeLists';
 import { clientFor } from '@/games/registry';
@@ -61,6 +63,10 @@ export default function App() {
   const [joinCode, setJoinCode] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [confirmingAbandon, setConfirmingAbandon] = useState<string | null>(null);
+  // The About screen (footer link). An **overlay screen**, not a place: it takes over `main` from
+  // wherever you were and closing it puts you straight back, because none of the state behind it is
+  // touched. That's why it isn't folded into the game/lobby/detail/shelf cascade below.
+  const [showAbout, setShowAbout] = useState(false);
   // The open rematch proposal for the current (finished) game, or null. Platform state — the shell
   // owns it and feeds the shared GameOver screen through context.
   const [rematch, setRematch] = useState<RematchInfo | null>(null);
@@ -127,6 +133,7 @@ export default function App() {
     setMySeats([]);
     setControlledIds(null);
     setDetailGame(null);
+    setShowAbout(false);
     setError(null);
   }
 
@@ -426,7 +433,8 @@ export default function App() {
   }, [heading]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-accent/40 via-background to-background">
+    // A column so the footer sits under the content on a short page instead of floating mid-screen.
+    <div className="flex min-h-screen flex-col bg-gradient-to-b from-accent/40 via-background to-background">
       <Header
         heading={heading}
         gameId={gameId}
@@ -458,7 +466,7 @@ export default function App() {
         }
       />
 
-      <main className="mx-auto max-w-5xl px-4 py-6">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
         {error && (
           <p
             data-testid="error"
@@ -469,7 +477,9 @@ export default function App() {
           </p>
         )}
 
-        {game && gameId ? (
+        {showAbout ? (
+          <About onBack={() => setShowAbout(false)} />
+        ) : game && gameId ? (
           <>
             {client ? (
               // Lazily fetched on first render of a board — the hub itself ships none of it. The rematch
@@ -588,6 +598,8 @@ export default function App() {
           />
         )}
       </main>
+
+      <Footer onAbout={() => setShowAbout(true)} />
     </div>
   );
 }
