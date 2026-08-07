@@ -6,7 +6,7 @@
   "license": "BSD-3-Clause",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/whtdrgn101/container.git",
+    "url": "git+https://github.com/whtdrgn101/game-hub.git",
     "directory": "packages/kernel"
   },
   "keywords": [

@@ -1,6 +1,6 @@
 # @game-hub/kernel
 
-The tiny shared core of [Game Hub](https://github.com/whtdrgn101/container), a self-hosted
+The tiny shared core of [Game Hub](https://github.com/whtdrgn101/game-hub), a self-hosted
 board-game platform: the primitives every game package and both hosts (backend + UI shell) build
 against, and nothing else.
 

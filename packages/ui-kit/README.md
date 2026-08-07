@@ -1,6 +1,6 @@
 # @game-hub/ui-kit
 
-The shared **board chrome** of [Game Hub](https://github.com/whtdrgn101/container), a self-hosted
+The shared **board chrome** of [Game Hub](https://github.com/whtdrgn101/game-hub), a self-hosted
 board-game platform: the frames every game's board renders inside, plus the handful of REST calls a
 game client makes. Pairs with [`@game-hub/kernel`](https://www.npmjs.com/package/@game-hub/kernel),
 which owns the contracts and the DTOs.
