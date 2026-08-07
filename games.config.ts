@@ -81,6 +81,16 @@ const games: readonly GameEntry[] = [
     module: '@game-hub/game-labyrinth/module',
     client: '@game-hub/game-labyrinth/client',
   },
+  // Argute — the seventh game, and the first built out-of-repo from `whtdrgn101/game-template` rather
+  // than extracted from this workspace. It is the routine case Track D was aiming at: a game nobody here
+  // ever compiled, added with two dependency lines and this entry. It is also the widest table the hub
+  // has hosted — **7 seats** (every game before it stopped at 5), which is why the module declares a
+  // seven-colour palette; `MAX_SEATS` in `backend/src/security.ts` already allowed it.
+  {
+    id: 'argute',
+    module: '@game-hub/game-argute/module',
+    client: '@game-hub/game-argute/client',
+  },
 ];
 
 export default games;

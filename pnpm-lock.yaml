@@ -47,6 +47,9 @@ importers:
       '@fastify/websocket':
         specifier: ^11.3.0
         version: 11.3.0
+      '@game-hub/game-argute':
+        specifier: ^0.1.0
+        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
       '@game-hub/game-cantstop':
         specifier: ^0.1.0
         version: 0.1.1(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
@@ -167,6 +170,9 @@ importers:
 
   ui:
     dependencies:
+      '@game-hub/game-argute':
+        specifier: ^0.1.0
+        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
       '@game-hub/game-cantstop':
         specifier: ^0.1.0
         version: 0.1.1(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
@@ -487,6 +493,19 @@ packages:
 
   '@fastify/websocket@11.3.0':
     resolution: {integrity: sha512-g89ag4BCcD9YP5wBZXixzoLnuf5j89p/sXFcfpCiv2pdEkYYukBEoK3heVzqsp0EAtszVDc2BBZG0KZqeAShIA==}
+
+  '@game-hub/game-argute@0.1.0':
+    resolution: {integrity: sha512-Qv3BYibwpxjKiZCdxDvWgatWYN0avl44hlrPJPIY2rbqLN/XS5C1SJv4qqmf2bCKCgIqLxHbr9XH8wVk+OVhew==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      '@game-hub/kernel': ^1.2.0
+      '@game-hub/ui-kit': ^1.0.0
+      react: ^19.0.0
+    peerDependenciesMeta:
+      '@game-hub/ui-kit':
+        optional: true
+      react:
+        optional: true
 
   '@game-hub/game-cantstop@0.1.1':
     resolution: {integrity: sha512-ULYCLs4EieWmdqetWn47oEZctaTssFm6m6fLL30Tg5klrXor3AuS6qSC1SCendFYmR1Gvu4LO2Uts8o5uy4b9Q==}
@@ -2624,6 +2643,13 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+
+  '@game-hub/game-argute@0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)':
+    dependencies:
+      '@game-hub/kernel': link:packages/kernel
+    optionalDependencies:
+      '@game-hub/ui-kit': link:packages/ui-kit
+      react: 19.2.8
 
   '@game-hub/game-cantstop@0.1.1(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)':
     dependencies:

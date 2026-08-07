@@ -74,7 +74,7 @@ test('only the registry reaches into a game', () => {
 
 /*
  * The other half of the seam — **no game package may import the host's UI** — is no longer testable
- * from here, and that is the point. Since 2026-07-31 all six games live in their own repositories
+ * from here, and that is the point. Since 2026-07-31 every game lives in its own repository
  * (`whtdrgn101/game-<id>`) and install here as compiled `dist/` from npm; there is no `packages/games/`
  * left to scan. A game package's `./client` may import only `@game-hub/kernel/client` (the contract +
  * transport DTOs) and `@game-hub/ui-kit` (the shared chrome + the game-facing REST calls); a reach into

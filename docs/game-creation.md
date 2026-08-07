@@ -3,7 +3,7 @@
 This is the complete, self-sufficient guide to building a new game for Game Hub. As of 2026-07-31 there is
 **one way to build a game and it is out-of-repo**: a game is its own repository, published to npm as
 `@game-hub/game-<id>`, and hosted here as an ordinary installed dependency resolving to compiled `dist/`.
-All six games — the five originally in-workspace and Labyrinth, which was born external — now live this way
+All games — the five originally in-workspace, Labyrinth (born external), and Argute (born from the template) — live this way
 (`whtdrgn101/game-<id>`), and nothing lives under `packages/games/` anymore.
 
 You are the audience whether you work for this project or are a third party: a game builds against the

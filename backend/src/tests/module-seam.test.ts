@@ -285,8 +285,9 @@ describe('hosting two games at once', () => {
   it('lists every hosted game in the catalog', async () => {
     const response = await app.inject({ method: 'GET', url: '/games/catalog' });
     // The default registry ships the real games (Container, Can't Stop, Stone Age, Saint Petersburg, the
-    // Track D pilot Russian Railroads, and — since D2d — Labyrinth, the first one built outside this repo
-    // and installed as a package); this test adds the counter stub on top, so all appear side by side.
+    // Track D pilot Russian Railroads, Labyrinth — the first one built outside this repo and installed as
+    // a package — and Argute, the first built from the template rather than extracted from here); this
+    // test adds the counter stub on top, so all appear side by side.
     expect((response.json().games as { id: string }[]).map((g) => g.id)).toEqual([
       'container',
       'cantstop',
@@ -294,6 +295,7 @@ describe('hosting two games at once', () => {
       'stpetersburg',
       'russianrailroads',
       'labyrinth',
+      'argute',
       'counter',
     ]);
   });

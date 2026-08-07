@@ -37,6 +37,7 @@ describe('Stone Age bootstrap', () => {
       'stpetersburg',
       'russianrailroads',
       'labyrinth',
+      'argute',
     ]);
   });
 

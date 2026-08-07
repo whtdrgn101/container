@@ -130,6 +130,7 @@ describe('Saint Petersburg', () => {
       'stpetersburg',
       'russianrailroads',
       'labyrinth',
+      'argute',
     ]);
     const sp = catalog.find((g) => g.id === 'stpetersburg')!;
     expect(sp.colors).toEqual(['blue', 'yellow', 'green', 'red']);

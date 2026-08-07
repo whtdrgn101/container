@@ -5,9 +5,9 @@ Context and working agreement for this repo. Read this first, then the two refer
 ## What we're building
 
 **Game Hub** — a self-hosted board-game platform (a "games room") that hosts *multiple* games behind
-shared engine/backend/UI seams. Each game is its own package. As of 2026-07-31 **all six games are built
+shared engine/backend/UI seams. Each game is its own package. As of 2026-07-31 **all games are built
 in their own repositories** (`whtdrgn101/game-<id>`) and installed here like any npm dependency —
-published to the public registry at `0.1.0` and consumed as `@game-hub/game-*@^0.1.0` over compiled
+published to the public registry and consumed as `@game-hub/game-*@^0.1.0` over compiled
 `dist/`. Nothing under `packages/games/` remains; the hub is a pure *host*. The platform is game-agnostic.
 The games (each links its own repo):
 
@@ -19,11 +19,13 @@ The games (each links its own repo):
 | **Saint Petersburg** (1st ed.) — [`whtdrgn101/game-stpetersburg`](https://github.com/whtdrgn101/game-stpetersburg) | 2–4 | card-buying engine | **complete** (SP0–SP9): first game with real hidden info (hand + rubles secret) |
 | **Russian Railroads** (Ultimate ed.) — [`whtdrgn101/game-russianrailroads`](https://github.com/whtdrgn101/game-russianrailroads) | 2–4 | worker-placement | **in build** — base game + art (RR9) complete; board-UI revamp (RR9b) queued behind the Labyrinth kickoff (it should borrow Labyrinth's board-UI findings); bot (RR10) after; the Track D **package pilot** |
 | **Labyrinth** (Ravensburger) — [`whtdrgn101/game-labyrinth`](https://github.com/whtdrgn101/game-labyrinth) | 2–4 | sliding-maze race, hidden treasure targets | **playable — the Track D D2 proof**: game 6, the *first* built out-of-repo against published `@game-hub/*`. L0–L4 shipped; L4b (art) + L5 (bot) remain |
+| **Argute** (Indipro) — [`whtdrgn101/game-argute`](https://github.com/whtdrgn101/game-argute) | **2–7** | suitless trick-taking, secret bids, wooden pegboard | **complete** (A0–A6): game 7, the first built from `whtdrgn101/game-template` rather than extracted from here. Widest table the hub hosts. ⚠️ Its rules have **no published PDF** — the repo's `ROADMAP.md` §1 digest is the citable spec and §3 carries numbered rulings R1–R13 |
 
 Per-game rules and slice history now live **in each game's own repo** (`ROADMAP.md`, `CLAUDE.md`, and —
 for Labyrinth — `docs/d2c-findings.md`), not in this repo. The authoritative rules are the rulebook PDFs
-in `reference_materials/` (gitignored — copyrighted). ⚠️ **Read the spec before implementing a rule** —
-never from memory.
+in `reference_materials/` (gitignored — copyrighted) — **except Argute, which has no published PDF**; its
+repo's `ROADMAP.md` §1 digest is the citable spec and §3 the numbered rulings. ⚠️ **Read the spec before
+implementing a rule** — never from memory.
 
 **Naming split:** the **platform** is "Game Hub" (npm scope `@game-hub/*`). **Container** is one game *on*
 it (id `container`), not the platform. Don't conflate them.
@@ -157,7 +159,7 @@ docker run -d -p 8080:3001 -v game-hub-game-data:/data game-hub:latest   # → h
 ```
 
 **Deployment:** a multi-stage `Dockerfile` builds the UI + native SQLite and **esbuild-bundles** the
-backend (inlining `@game-hub/kernel` — a workspace TS dep shipping `.ts` source — plus the six installed
+backend (inlining `@game-hub/kernel` — a workspace TS dep shipping `.ts` source — plus the seven installed
 games' already-compiled `dist/` JS from `node_modules`), producing a slim Node runtime image (no
 tsx/vite/vitest, runs as unprivileged `node`, in-image
 `HEALTHCHECK`, boot-proven by `backend/scripts/smoke.mjs`). Games persist to `DATABASE_PATH`
@@ -190,6 +192,23 @@ helpers live in `backend/src/services.ts`.)
   `deps.inline` **still lists `game-`** even though the games ship dist: each game's dist imports the
   *workspace TS-source* kernel, so the whole `@game-hub/*` subtree must go through Vite's transform (see
   the note in `backend/vitest.config.ts`).
+- **Argute is game 7, and the first built _from the template_** (2026-08-06). Every earlier game was
+  either extracted from this workspace or (Labyrinth) hand-built out-of-repo; Argute was created from
+  `whtdrgn101/game-template` and added here the routine way — two dependency lines, one `games.config.ts`
+  entry, `pnpm generate`. Nothing else was needed, which is the result Track D was aiming at. Three things
+  it established:
+  - **7 seats.** Every game before it stopped at 5. Nothing platform-side had to change —
+    `MAX_SEATS` was already 8 — but a module may now declare a **seven**-colour palette, and the shell's
+    `SWATCH` fallback (unknown id used as a raw CSS colour) is what lets `orange`/`white`/`black` render.
+  - ⚠️ **A game may have no published rulebook PDF.** Argute's rules ship as three cards in the box, so
+    the usual "cite the page" discipline has no page to cite. The pattern that replaced it: the game
+    repo's `ROADMAP.md` §1 rules digest **is** the citable spec (code cites `ROADMAP §1`), and every gap
+    the source leaves open is a numbered ruling in §3 cited as `ruling R<n>`. Nothing is implemented from
+    an undocumented guess. `reference_materials/README.md` records the sourcing.
+  - ⚠️ **The template lacks `scripts/assert-pnpm-publish.mjs`.** Copy it into every new game (Argute did).
+    `npm publish` ignores `publishConfig.exports` and ships a dist-only tarball whose exports still point
+    at `./src/*.ts` — it installs and then resolves no subpath, which is how Labyrinth 0.1.2 broke.
+    `pack:smoke` cannot catch it. **Publish with `pnpm publish`.**
 - **Package manager is pnpm** (installed via Homebrew — corepack couldn't symlink into `/usr/local/bin`).
   Native `better-sqlite3` and `esbuild` builds are allow-listed in `pnpm-workspace.yaml`.
 - **Container colours:** `white, red, green, blue, yellow` (container cargo, from the rulebook scoring
@@ -218,7 +237,7 @@ helpers live in `backend/src/services.ts`.)
 - **Reference PDFs stay gitignored** (copyright) — local-only; cite page numbers in comments instead.
 - **v1 was hotseat / pass-and-play.** Online multiplayer (lobbies, live sync, seat identity, resume) and
   AI both shipped; hotseat still works and its testids are intact.
-- All six games are persisted-state **shape-v1** (no `schemaVersion` declared).
+- All seven games are persisted-state **shape-v1** (no `schemaVersion` declared).
 - **`@game-hub/kernel`'s major version IS the host↔game contract version** (Track D / D2a). It exports
   `KERNEL_CONTRACT_VERSION` (= 1); every module declares `kernelContract: KERNEL_CONTRACT_VERSION` and
   `GameRegistry.register` boot-crashes on a mismatch. Additive optional hooks = minor; a changed required
@@ -228,7 +247,7 @@ helpers live in `backend/src/services.ts`.)
   `tsc` emits relative specifiers verbatim, and Node ESM does neither extension nor directory
   resolution — an extensionless `from './errors'` makes the installed tarball unloadable while every
   in-repo suite stays green. `pack:smoke` is what catches it. Applies to `@game-hub/kernel`,
-  `@game-hub/ui-kit`, and all six out-of-repo game packages (each carries its own pack smoke).
+  `@game-hub/ui-kit`, and all seven out-of-repo game packages (each carries its own pack smoke).
 
 Older decision detail (Track A/B/C/D slice history) lives in `ROADMAP.md` and the per-game roadmaps.
 

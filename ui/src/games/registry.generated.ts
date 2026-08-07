@@ -8,6 +8,7 @@ import stoneageClient from '@game-hub/game-stoneage/client';
 import stpetersburgClient from '@game-hub/game-stpetersburg/client';
 import russianrailroadsClient from '@game-hub/game-russianrailroads/client';
 import labyrinthClient from '@game-hub/game-labyrinth/client';
+import arguteClient from '@game-hub/game-argute/client';
 
 /**
  * A registered client with its state type erased. Only a game's own board may pair itself with its own
@@ -26,4 +27,5 @@ export const CLIENTS: readonly AnyGameClient[] = [
   stpetersburgClient as unknown as AnyGameClient,
   russianrailroadsClient as unknown as AnyGameClient,
   labyrinthClient as unknown as AnyGameClient,
+  arguteClient as unknown as AnyGameClient,
 ];

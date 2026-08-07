@@ -47,7 +47,7 @@ export const CHAT_BACKFILL_LIMIT = 100;
 /** Longest accepted `gameType` id. */
 export const MAX_GAME_TYPE_LENGTH = 64;
 
-/** Upper bound on the `players` array of `POST /games` — above any module's `maxPlayers` (5 today). */
+/** Upper bound on the `players` array of `POST /games` — above any module's `maxPlayers` (7 today, Argute). */
 export const MAX_SEATS = 8;
 
 /** Explicit Fastify `bodyLimit`. Actions are tiny; 256 KiB is generous and caps a hostile body. */

@@ -147,6 +147,39 @@ The near-term order, decided while play-testing:
    React and the design keeps it off the React-typed `./client` subpath; its `chat.ts`/`hub.ts` DTOs stay
    the wire source of truth.
 
+7. **Game 7 — Argute, the first built _from the template_ ✅ (2026-08-06).** Argute (Indipro Games): a
+   suitless trick-taking card game for **2–7** players — 42 play cards (7 each of 0–5, no suits), a secret
+   bid of 0–3 per hand, three tricks of 3 / 2 / 1 cards won on the highest *count*, and a wooden pegboard
+   you score on and can fall off the bottom of. Repo `whtdrgn101/game-argute`, published
+   `@game-hub/game-argute@0.1.0`.
+   **What it proves.** Every game before it was either extracted from this workspace or (Labyrinth)
+   hand-built out-of-repo. Argute was created from `whtdrgn101/game-template` and added the routine way —
+   **two dependency lines, one `games.config.ts` entry, `pnpm generate`** — with no Vite alias, no tsconfig
+   include, no vitest inline entry. That is Track D's thesis reduced to a chore, which is what it was for.
+   **Three things it established.**
+   (a) **Seven seats.** The widest table the hub hosts; every game before it stopped at 5. Nothing
+   platform-side had to change (`MAX_SEATS` was already 8), but the module declares a **seven**-colour
+   palette — the seven pegs physically in the box — and the shell's `SWATCH` fallback (an unknown id used
+   as a raw CSS colour) is what lets `orange`/`white`/`black` render. `backend/src/tests/argute.test.ts`
+   is the first test to drive the core at the top of its seat range.
+   (b) ⚠️ **A game can have no published rulebook PDF.** Argute's rules ship as three cards in the box, so
+   "cite the page" has no page. The pattern that replaced it, and which the next such game should copy:
+   the game repo's `ROADMAP.md` §1 rules digest **is** the citable spec (code cites `ROADMAP §1`), and
+   every gap the publisher's description leaves open is a **numbered ruling** in §3 cited as `ruling R<n>`
+   — 13 of them, including how a trick's tie-break orders play, that bids stay secret until scoring, and
+   the pegboard's geometry, which was read off the publisher's **box photograph** (counting the five rows
+   of holes between the two inlaid lines is what fixes white = 0 and dark = 6).
+   (c) ⚠️ **The template is missing `scripts/assert-pnpm-publish.mjs`** — copy it into every new game, as
+   Argute did, and publish with **`pnpm publish`**. `npm publish` ignores `publishConfig.exports` and ships
+   a dist-only tarball still pointing at `./src/*.ts`; `pack:smoke` cannot catch it. Worth fixing in the
+   template itself.
+   **A property of the ruleset worth knowing** (found building the bot, recorded as R6 in the game's
+   roadmap): a made bid of 0 scores +0 and is *not* a miss, so "always bid 0" is strictly safe — a table
+   where everyone does it never scores and **the game never ends**. The shipped bot maximises expected
+   score rather than bid accuracy precisely so games terminate (180/180 seeded self-play games at 2–7
+   seats finished). If a physical rules card ever surfaces, that is the first thing to check for a rule
+   the publisher's summary omits.
+
 6. **The Card Table — shell redesign ✅ (2026-07-31).** One warm, physical, board-game-room identity for
    the whole shell (felt / cream / brass / wood / ink, serif display headings), applied as **Tailwind v4
    theme tokens** in `ui/src/index.css` — the five named colours are also mapped onto the semantic tokens

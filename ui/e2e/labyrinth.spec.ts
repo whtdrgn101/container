@@ -22,7 +22,7 @@ import { expect, test } from '@playwright/test';
 test('pick Labyrinth, slide the maze at an arrow, then move — the feed narrates both', async ({ page }) => {
   await page.goto('/');
 
-  // Six games are hosted, so the picker is shown. Choose Labyrinth, then start a hotseat game.
+  // Several games are hosted, so the shelf is shown. Choose Labyrinth, then start a hotseat game.
   await page.getByTestId('pick-game-labyrinth').click();
   await expect(page.getByTestId('game-blurb')).toContainText('maze that moves');
   await page.getByTestId('start-game').click();
