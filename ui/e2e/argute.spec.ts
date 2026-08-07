@@ -15,9 +15,10 @@ import { expect, test } from '@playwright/test';
  *     is that a seat which has bid advertises only *that* it has bid until the hand is scored — the value
  *     is never in the DOM for a seat the viewer doesn't hold, and never in the public log.
  *
- * The hand is three tricks of 3, then 2, then 1 card, so "play a trick" means selecting three cards and
- * committing them. The deal is the live server's, so this drives the *loop* rather than any specific
- * cards: it never assumes a denomination is in hand.
+ * The hand is three tricks of 3, then 2, then 1 card each, laid **one card per turn** (the game's ruling
+ * R1, corrected in 0.2.0) — so "play a trick" means going round the table that many times, not selecting a
+ * group. The deal is the live server's, so this drives the *loop* rather than any specific cards: it never
+ * assumes a denomination is in hand.
  */
 test('pick Argute, bid in secret, and play the first trick on a real pegboard', async ({ page }) => {
   await page.goto('/');
@@ -65,23 +66,31 @@ test('pick Argute, bid in secret, and play the first trick on a real pegboard', 
   await expect(page.getByTestId('argute-log')).toContainText('placed a bid card face-down');
   await expect(page.getByTestId('argute-log')).not.toContainText(/bid (?:card )?[0-3]\b/);
 
-  // ── The first trick: three cards from every hand ────────────────────────────────────────────────
+  // ── The first trick: three passes round the table, one card each (ruling R1) ─────────────────────
   await expect(page.getByTestId('my-hand')).toBeVisible();
   await expect(page.locator('[data-testid^="card-"]')).toHaveCount(6);
 
-  // Each seat in turn selects three cards and commits them. The board only enables the play once
-  // exactly the trick's size is selected (trick 1 takes 3), so the disabled state is a real assertion.
-  for (let seat = 0; seat < seatCount; seat += 1) {
+  // One card per turn, so trick 1 is `seats × 3` plays. The board only enables the play once a card is
+  // picked and a second click moves the pick rather than adding to it — both are real assertions, and
+  // together they are the UI half of "a turn is one card".
+  for (let play = 0; play < seatCount * 3; play += 1) {
     const cards = page.locator('[data-testid^="card-"]');
     await expect(page.getByTestId('play-cards')).toBeDisabled();
-    for (let i = 0; i < 3; i += 1) await cards.nth(i).click();
+    await cards.nth(0).click();
     await expect(page.getByTestId('play-cards')).toBeEnabled();
+    if ((await cards.count()) > 1) {
+      // Picking a second card *moves* the selection — it never accumulates into a group.
+      await cards.nth(1).click();
+      await expect(cards.nth(0)).toHaveAttribute('aria-pressed', 'false');
+      await expect(cards.nth(1)).toHaveAttribute('aria-pressed', 'true');
+    }
     await page.getByTestId('play-cards').click();
-    await expect(page.getByTestId('argute-log')).toContainText('played');
+    await expect(page.getByTestId('argute-log')).toContainText('laid a');
   }
 
-  // With every seat in, the trick resolved: somebody took it on the highest count (ROADMAP §1), the
-  // feed says so, and the next trick is under way with two cards from each hand.
+  // With every card in, the trick resolved: somebody took it on the highest count, and on a tie whoever
+  // reached that count first (ROADMAP §1 + R1). The feed says so, and the next trick is under way with
+  // three cards left in each hand.
   await expect(page.getByTestId('argute-log')).toContainText('took trick 1 with');
   await expect(page.locator('[data-testid^="card-"]')).toHaveCount(3);
 });

@@ -14,7 +14,7 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@game-hub/game-argute": "^0.1.0",
+    "@game-hub/game-argute": "^0.2.0",
     "@game-hub/game-cantstop": "^0.1.0",
     "@game-hub/game-container": "^0.1.0",
     "@game-hub/game-labyrinth": "^0.1.0",

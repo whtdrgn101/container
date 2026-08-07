@@ -48,8 +48,8 @@ importers:
         specifier: ^11.3.0
         version: 11.3.0
       '@game-hub/game-argute':
-        specifier: ^0.1.0
-        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
+        specifier: ^0.2.0
+        version: 0.2.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
       '@game-hub/game-cantstop':
         specifier: ^0.1.0
         version: 0.1.1(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
@@ -171,8 +171,8 @@ importers:
   ui:
     dependencies:
       '@game-hub/game-argute':
-        specifier: ^0.1.0
-        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
+        specifier: ^0.2.0
+        version: 0.2.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
       '@game-hub/game-cantstop':
         specifier: ^0.1.0
         version: 0.1.1(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
@@ -494,8 +494,8 @@ packages:
   '@fastify/websocket@11.3.0':
     resolution: {integrity: sha512-g89ag4BCcD9YP5wBZXixzoLnuf5j89p/sXFcfpCiv2pdEkYYukBEoK3heVzqsp0EAtszVDc2BBZG0KZqeAShIA==}
 
-  '@game-hub/game-argute@0.1.0':
-    resolution: {integrity: sha512-Qv3BYibwpxjKiZCdxDvWgatWYN0avl44hlrPJPIY2rbqLN/XS5C1SJv4qqmf2bCKCgIqLxHbr9XH8wVk+OVhew==}
+  '@game-hub/game-argute@0.2.0':
+    resolution: {integrity: sha512-ymaZSxCmkxPB7MbthqYvPNqArI9QZo2fDPwhLTJ/e4g/fqUXSk0tu4gfUKnNNTostqZjacQ2voKFg04ObdqXtg==}
     engines: {node: '>=22'}
     peerDependencies:
       '@game-hub/kernel': ^1.2.0
@@ -2644,7 +2644,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@game-hub/game-argute@0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)':
+  '@game-hub/game-argute@0.2.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)':
     dependencies:
       '@game-hub/kernel': link:packages/kernel
     optionalDependencies:

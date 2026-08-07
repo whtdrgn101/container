@@ -57,3 +57,8 @@ minimumReleaseAgeExclude:
   # Argute 0.1.0 — the seventh game, and the first built from `whtdrgn101/game-template` rather than
   # extracted from this workspace. Freshly published, so excluded like every game before it.
   - '@game-hub/game-argute@0.1.0'
+  # Argute 0.2.0 corrects the game's ruling R1 against the publisher's own description: a play is **one
+  # card per turn**, so a trick is that many passes round the table rather than a group from each seat.
+  # That changes the action shape, hence a breaking bump and a dependency moved by hand. Freshly
+  # published, so excluded like every game before it.
+  - '@game-hub/game-argute@0.2.0'

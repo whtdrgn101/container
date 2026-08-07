@@ -110,7 +110,7 @@ describe('Argute over REST — seven seats and two secrets', () => {
     expect(spectator.players.every((p) => p.bid === null)).toBe(true);
   });
 
-  it('takes exactly the trick’s worth of cards and rejects a card the seat does not hold', async () => {
+  it('takes one card per turn and rejects a card the seat does not hold', async () => {
     const { game } = await create(sevenNames.slice(0, 2));
     // Bidding runs in seat order from the dealer's left (ruling R3), so ask the game whose turn it is
     // rather than assuming — bidding out of order is a 409, and swallowing it would leave the hand stuck.
@@ -125,24 +125,57 @@ describe('Argute over REST — seven seats and two secrets', () => {
     const leader = game.players[playing.activePlayerIndex]!;
     const hand = (await read(game.id, leader.id)).game.players.find((p) => p.id === leader.id)!.hand!;
 
-    // Trick 1 takes exactly three cards; two is a bad request, not a silent partial play.
-    const short = await act(game.id, leader.id, { type: 'PLAY', cards: hand.slice(0, 2) } as Action);
-    expect(short.statusCode).toBe(400);
-    expect(short.json().error.code).toBe('WRONG_CARD_COUNT');
+    // ⚠️ A play is **one card** (the game repo's ruling R1, corrected in 0.2.0): each player lays a single
+    // card per turn, so trick 1 is three passes around the table rather than one group each. A group is
+    // therefore not a short play — it is not an Argute action at all, and `parseAction` refuses the shape.
+    const group = await act(game.id, leader.id, { type: 'PLAY', cards: hand.slice(0, 3) } as unknown as Action);
+    expect(group.statusCode).toBe(400);
 
-    // And a denomination the seat doesn't hold is refused by count, not by identity (ruling R8).
+    // A denomination the seat doesn't hold is refused by value, not by identity (ruling R8).
     const absent = [0, 1, 2, 3, 4, 5].find((card) => !hand.includes(card as never));
     if (absent !== undefined) {
-      const bogus = await act(game.id, leader.id, {
-        type: 'PLAY',
-        cards: [absent, ...hand.slice(0, 2)],
-      } as Action);
+      const bogus = await act(game.id, leader.id, { type: 'PLAY', card: absent } as Action);
       expect(bogus.statusCode).toBe(400);
       expect(bogus.json().error.code).toBe('CARD_NOT_IN_HAND');
     }
 
-    const played = await act(game.id, leader.id, { type: 'PLAY', cards: hand.slice(0, TRICK_SIZES[0]) } as Action);
+    // The real thing: one card leaves five, and the trick stays open — it closes on N × TRICK_SIZES[0].
+    const played = await act(game.id, leader.id, { type: 'PLAY', card: hand[0] } as Action);
     expect(played.statusCode).toBe(200);
-    expect((await read(game.id, leader.id)).game.players.find((p) => p.id === leader.id)!.hand).toHaveLength(3);
+    const after = (await read(game.id, leader.id)).game;
+    expect(after.players.find((p) => p.id === leader.id)!.hand).toHaveLength(5);
+    expect(after.plays).toHaveLength(1);
+    expect(after.plays[0]).toMatchObject({ playerId: leader.id, card: hand[0], count: hand[0] });
+    expect(after.lastTrick).toBeNull();
+  });
+
+  it('runs a whole three-card trick as three passes, carrying each seat’s running count (R1)', async () => {
+    const { game } = await create(sevenNames.slice(0, 3));
+    for (let i = 0; i < game.players.length; i += 1) {
+      const current = (await read(game.id, '')).game;
+      expect(
+        (await act(game.id, game.players[current.activePlayerIndex]!.id, { type: 'BID', bid: 1 } as Action)).statusCode,
+      ).toBe(200);
+    }
+
+    // Nine cards — three seats × TRICK_SIZES[0] — laid one per turn by whoever the clock names.
+    const counts = new Map<string, number>();
+    for (let played = 0; played < 3 * TRICK_SIZES[0]!; played += 1) {
+      const current = (await read(game.id, '')).game;
+      const seat = game.players[current.activePlayerIndex]!;
+      const card = (await read(game.id, seat.id)).game.players.find((p) => p.id === seat.id)!.hand![0]!;
+      expect((await act(game.id, seat.id, { type: 'PLAY', card } as Action)).statusCode).toBe(200);
+      counts.set(seat.id, (counts.get(seat.id) ?? 0) + card);
+    }
+
+    const resolved = (await read(game.id, '')).game;
+    // The trick resolved on the ninth card: a winner, an empty table, and the next trick under way.
+    expect(resolved.lastTrick).not.toBeNull();
+    expect(resolved.plays).toHaveLength(0);
+    expect(resolved.trickIndex).toBe(1);
+    // The winner is the seat on the highest total — and every seat's published total is its running sum.
+    const best = Math.max(...counts.values());
+    expect(counts.get(resolved.lastTrick!.winnerId)).toBe(best);
+    expect(resolved.players.find((p) => p.id === resolved.lastTrick!.winnerId)!.tricksWon).toBe(1);
   });
 });
