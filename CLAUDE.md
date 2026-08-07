@@ -205,10 +205,13 @@ helpers live in `backend/src/services.ts`.)
     repo's `ROADMAP.md` §1 rules digest **is** the citable spec (code cites `ROADMAP §1`), and every gap
     the source leaves open is a numbered ruling in §3 cited as `ruling R<n>`. Nothing is implemented from
     an undocumented guess. `reference_materials/README.md` records the sourcing.
-  - ⚠️ **The template lacks `scripts/assert-pnpm-publish.mjs`.** Copy it into every new game (Argute did).
-    `npm publish` ignores `publishConfig.exports` and ships a dist-only tarball whose exports still point
-    at `./src/*.ts` — it installs and then resolves no subpath, which is how Labyrinth 0.1.2 broke.
-    `pack:smoke` cannot catch it. **Publish with `pnpm publish`.**
+  - ⚠️ **Publish a game with `pnpm publish`, never `npm publish`.** npm ignores `publishConfig.exports`
+    and ships a dist-only tarball whose exports still point at `./src/*.ts` — it installs and then
+    resolves no subpath, which is how Labyrinth 0.1.2 broke. `pack:smoke` cannot catch it (it packs with
+    `pnpm pack`, which *does* apply the override). Argute had to copy the guard from Labyrinth by hand,
+    which is what prompted **fixing the template**: `scripts/assert-pnpm-publish.mjs` + `prepublishOnly`
+    now ship in `whtdrgn101/game-template` (2026-08-06), so every game scaffolded from it is protected.
+    Only a game started from an older copy needs the guard copied in.
 - **Package manager is pnpm** (installed via Homebrew — corepack couldn't symlink into `/usr/local/bin`).
   Native `better-sqlite3` and `esbuild` builds are allow-listed in `pnpm-workspace.yaml`.
 - **Container colours:** `white, red, green, blue, yellow` (container cargo, from the rulebook scoring

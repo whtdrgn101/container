@@ -169,10 +169,12 @@ The near-term order, decided while play-testing:
    — 13 of them, including how a trick's tie-break orders play, that bids stay secret until scoring, and
    the pegboard's geometry, which was read off the publisher's **box photograph** (counting the five rows
    of holes between the two inlaid lines is what fixes white = 0 and dark = 6).
-   (c) ⚠️ **The template is missing `scripts/assert-pnpm-publish.mjs`** — copy it into every new game, as
-   Argute did, and publish with **`pnpm publish`**. `npm publish` ignores `publishConfig.exports` and ships
-   a dist-only tarball still pointing at `./src/*.ts`; `pack:smoke` cannot catch it. Worth fixing in the
-   template itself.
+   (c) ⚠️ **Publish with `pnpm publish`, never `npm publish`** — npm ignores `publishConfig.exports` and
+   ships a dist-only tarball still pointing at `./src/*.ts`, and `pack:smoke` cannot catch it (it packs
+   with `pnpm pack`, which *does* apply the override). Argute had to copy the guard out of Labyrinth by
+   hand, so **the template was fixed**: `scripts/assert-pnpm-publish.mjs` + `prepublishOnly` now ship in
+   `whtdrgn101/game-template` (2026-08-06, verified to reject an npm user agent, accept a pnpm one, and
+   leave `pack:smoke` alone), and `docs/game-creation.md` §6 no longer tells anyone to run `npm publish`.
    **A property of the ruleset worth knowing** (found building the bot, recorded as R6 in the game's
    roadmap): a made bid of 0 scores +0 and is *not* a miss, so "always bid 0" is strictly safe — a table
    where everyone does it never scores and **the game never ends**. The shipped bot maximises expected

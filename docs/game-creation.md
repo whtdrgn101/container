@@ -351,8 +351,21 @@ keeps the pattern visible for the game you build.)
 
 ```bash
 pnpm pack:smoke          # prove the tarball loads before you publish it (§7)
-npm publish              # publishConfig already sets access: public and rewrites exports → dist/
+pnpm publish             # publishConfig already sets access: public and rewrites exports → dist/
 ```
+
+⚠️ **`pnpm publish`, never `npm publish` — and carry the guard that enforces it.** The whole dev/publish
+exports split depends on `publishConfig.exports`, which **pnpm applies at pack time and npm silently
+ignores**. `npm publish` therefore uploads the _dev_ exports (`"./engine": "./src/engine/index.ts"`)
+inside a `files: ["dist"]` tarball: a package that installs cleanly and then resolves **no subpath at
+all**, failing in the host with `TS2307` and `ERR_MODULE_NOT_FOUND`. `@game-hub/game-labyrinth@0.1.2`
+shipped exactly that way and had to be deprecated and republished.
+
+**`pack:smoke` cannot catch this** — it packs with `pnpm pack`, which _does_ apply the override, so it
+sees a correct tarball every time. The only defence is `scripts/assert-pnpm-publish.mjs`, wired as
+`prepublishOnly`, which reads `npm_config_user_agent` and refuses the publish unless pnpm is driving.
+It ships in `whtdrgn101/game-template`, so a game scaffolded from the template already has it; if you
+started from an older copy, copy it in.
 
 `prepack` builds `dist/` first, so `publish` can never ship stale output. **Semver:** a game's own versions
 are ordinary (`0.1.0`, `0.2.0`, …); the number that carries contract meaning is the **kernel's** — its
