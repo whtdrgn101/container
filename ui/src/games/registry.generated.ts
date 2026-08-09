@@ -29,3 +29,18 @@ export const CLIENTS: readonly AnyGameClient[] = [
   labyrinthClient as unknown as AnyGameClient,
   arguteClient as unknown as AnyGameClient,
 ];
+
+/**
+ * Each game's installed package version, by id — what the footer prints beside the game's name so a
+ * running table says exactly which build of the game it is. Read off the installed package at generate
+ * time (`GameClient` carries no version of its own), so this tracks the tarball on disk.
+ */
+export const GAME_VERSIONS: Readonly<Record<string, string>> = {
+  container: '0.1.1',
+  cantstop: '0.1.1',
+  stoneage: '0.1.1',
+  stpetersburg: '0.1.1',
+  russianrailroads: '0.1.1',
+  labyrinth: '0.1.3',
+  argute: '0.2.0',
+};

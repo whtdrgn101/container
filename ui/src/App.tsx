@@ -8,7 +8,7 @@ import { Footer } from '@/shell/Footer';
 import { About } from '@/shell/About';
 import { useGameTransport } from '@/hooks/useGameTransport';
 import { useHomeLists } from '@/hooks/useHomeLists';
-import { clientFor } from '@/games/registry';
+import { clientFor, versionFor } from '@/games/registry';
 import * as api from '@/lib/api';
 import type { GamePayload, Lobby, RematchInfo } from '@/lib/api';
 import { Button, RematchContext } from '@game-hub/ui-kit';
@@ -427,6 +427,7 @@ export default function App() {
    */
   const client = transport.gameType ? clientFor(transport.gameType) : undefined;
   const place = game ? (client?.name ?? 'Game') : 'Game Hub';
+  const footerGameVersion = transport.gameType ? versionFor(transport.gameType) : undefined;
   const heading = tabName ? `${place} - [${tabName}]` : place;
   useEffect(() => {
     document.title = heading;
@@ -599,7 +600,15 @@ export default function App() {
         )}
       </main>
 
-      <Footer onAbout={() => setShowAbout(true)} />
+      {/*
+        The footer's version stamp always names the hub; it names the game only while one is actually on
+        the table — the same `game` the heading above uses, so the two can't disagree about whether a
+        game is up. A game the registry has no version for simply doesn't get that half.
+      */}
+      <Footer
+        onAbout={() => setShowAbout(true)}
+        game={game && client && footerGameVersion ? { name: client.name, version: footerGameVersion } : undefined}
+      />
     </div>
   );
 }

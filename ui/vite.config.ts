@@ -1,9 +1,24 @@
+import { readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
+/**
+ * The hub's own version, for the footer's "Game Hub v1.0.0" line.
+ *
+ * Read from the **root** package.json — the monorepo is the thing that ships, so its version is the one
+ * a deployment is identified by; `ui` and `backend` stay at 0.0.0 as private workspace members. Injected
+ * here at build time rather than imported at runtime, so no package.json (and none of its other fields)
+ * ends up in the browser bundle.
+ */
+const hubVersion = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'))
+  .version as string;
+
 export default defineConfig({
+  define: {
+    __HUB_VERSION__: JSON.stringify(hubVersion),
+  },
   plugins: [react(), tailwindcss()],
   optimizeDeps: {
     /**

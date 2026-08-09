@@ -1,4 +1,4 @@
-import { CLIENTS } from './registry.generated';
+import { CLIENTS, GAME_VERSIONS } from './registry.generated';
 
 /**
  * The UI games registry. The **client list** (`CLIENTS`) — which clients this build can draw, in what
@@ -28,3 +28,12 @@ export const clientFor = (gameType: string) => CLIENTS.find((client) => client.i
 
 /** Every game this build can draw, for cross-checking against the server's catalog. */
 export const knownGameTypes = (): string[] => CLIENTS.map((client) => client.id);
+
+/**
+ * The installed package version of a game, for the footer's version stamp — `undefined` when this build
+ * has no version for that id, which the footer treats as "say nothing" rather than printing a blank.
+ *
+ * Baked into the generated file at `pnpm generate` time from the package actually installed, because
+ * `GameClient` carries no version of its own. See `scripts/generate-registries.ts`.
+ */
+export const versionFor = (gameType: string): string | undefined => GAME_VERSIONS[gameType];

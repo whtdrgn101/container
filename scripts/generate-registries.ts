@@ -16,6 +16,7 @@
  * Run with `pnpm generate`.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format, resolveConfig } from 'prettier';
@@ -26,6 +27,32 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** A safe local identifier for a game's default import (ids are simple lowercase, so this is 1:1). */
 const localName = (entry: GameEntry, suffix: string): string => `${entry.id.replace(/[^a-zA-Z0-9_$]/g, '_')}${suffix}`;
+
+/**
+ * The version of the game package a `client` specifier resolves to — read from the **installed** package,
+ * so what the footer prints is the tarball actually on disk rather than the caret in `ui/package.json`.
+ *
+ * Baked in at generate time on purpose. `GameClient` (the kernel contract) carries no version field, and
+ * adding one would mean a kernel release plus a republish of every game; nothing here is worth that. The
+ * freshness check that already guards these files (`pnpm generate` + `git diff --exit-code`) then does
+ * double duty — bump a game and forget to regenerate, and CI says so.
+ *
+ * A relative-path entry (the shape that predates Track D — none remain, but the codegen still accepts
+ * one) has no package to read, so it reports no version and the footer simply omits it.
+ */
+function installedVersion(entry: GameEntry): string | null {
+  if (entry.client.startsWith('.')) return null;
+  // '@scope/name/sub' -> '@scope/name'; 'name/sub' -> 'name'.
+  const parts = entry.client.split('/');
+  const pkg = entry.client.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0]!;
+  // Resolved from the UI workspace, because the UI is what renders the footer — if the two hosts ever
+  // disagreed on a version, the honest thing to print is the copy the board came from.
+  const uiRequire = createRequire(join(ROOT, 'ui', 'package.json'));
+  const manifest = JSON.parse(readFileSync(uiRequire.resolve(`${pkg}/package.json`), 'utf8')) as {
+    version?: string;
+  };
+  return manifest.version ?? null;
+}
 
 const header = (regenFrom: string): string =>
   [
@@ -59,6 +86,11 @@ export const DEFAULT_GAME_ID = ${JSON.stringify(defaultId)};
 function uiSource(games: readonly GameEntry[]): string {
   const imports = games.map((g) => `import ${localName(g, 'Client')} from '${g.client}';`).join('\n');
   const entries = games.map((g) => `  ${localName(g, 'Client')} as unknown as AnyGameClient,`).join('\n');
+  const versions = games
+    .map((g) => ({ id: g.id, version: installedVersion(g) }))
+    .filter((g): g is { id: string; version: string } => g.version !== null)
+    .map((g) => `  ${JSON.stringify(g.id)}: ${JSON.stringify(g.version)},`)
+    .join('\n');
   return `${header('games.config.ts')}
 import type { GameClient } from './types';
 ${imports}
@@ -76,6 +108,15 @@ export type AnyGameClient = GameClient<unknown>;
 export const CLIENTS: readonly AnyGameClient[] = [
 ${entries}
 ];
+
+/**
+ * Each game's installed package version, by id — what the footer prints beside the game's name so a
+ * running table says exactly which build of the game it is. Read off the installed package at generate
+ * time (\`GameClient\` carries no version of its own), so this tracks the tarball on disk.
+ */
+export const GAME_VERSIONS: Readonly<Record<string, string>> = {
+${versions}
+};
 `;
 }
 
