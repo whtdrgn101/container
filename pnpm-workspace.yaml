@@ -62,3 +62,6 @@ minimumReleaseAgeExclude:
   # That changes the action shape, hence a breaking bump and a dependency moved by hand. Freshly
   # published, so excluded like every game before it.
   - '@game-hub/game-argute@0.2.0'
+  # Argute 0.3.0 is the first game to adopt kernel 1.4.0: its move log is typed to its own record kinds
+  # and it declares `GameClient.version`. Freshly published, so excluded like every game before it.
+  - '@game-hub/game-argute@0.3.0'

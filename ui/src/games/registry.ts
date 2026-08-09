@@ -30,10 +30,19 @@ export const clientFor = (gameType: string) => CLIENTS.find((client) => client.i
 export const knownGameTypes = (): string[] => CLIENTS.map((client) => client.id);
 
 /**
- * The installed package version of a game, for the footer's version stamp — `undefined` when this build
- * has no version for that id, which the footer treats as "say nothing" rather than printing a blank.
+ * The version of a game, for the footer's version stamp — `undefined` when this build has no version for
+ * that id, which the footer treats as "say nothing" rather than printing a blank.
  *
- * Baked into the generated file at `pnpm generate` time from the package actually installed, because
- * `GameClient` carries no version of its own. See `scripts/generate-registries.ts`.
+ * **Two sources, and the game's own answer wins.** Since kernel 1.4.0 a `GameClient` may declare its own
+ * `version`, which is the honest one: it ships inside the package, so it cannot disagree with the code it
+ * came with. The fallback is `GAME_VERSIONS`, baked into the generated registry at `pnpm generate` time by
+ * reading each installed package's manifest — which is what the hub had to do before the contract carried
+ * a version, and still needs for the games that have not adopted it yet (Argute is the only one that has).
+ *
+ * ⚠️ The fallback is the part to delete, not to build on. Once **every** hosted game declares `version`,
+ * `GAME_VERSIONS` and `installedVersion` in `scripts/generate-registries.ts` both go, and this collapses
+ * to `clientFor(gameType)?.version`. A host reading `node_modules` to display a string is a workaround,
+ * and it should not outlive the contract change that made it unnecessary.
  */
-export const versionFor = (gameType: string): string | undefined => GAME_VERSIONS[gameType];
+export const versionFor = (gameType: string): string | undefined =>
+  clientFor(gameType)?.version ?? GAME_VERSIONS[gameType];

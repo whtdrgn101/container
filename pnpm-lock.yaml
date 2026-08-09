@@ -48,8 +48,8 @@ importers:
         specifier: ^11.3.0
         version: 11.3.0
       '@game-hub/game-argute':
-        specifier: ^0.2.0
-        version: 0.2.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
+        specifier: ^0.3.0
+        version: 0.3.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
       '@game-hub/game-cantstop':
         specifier: ^0.1.0
         version: 0.1.1(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
@@ -171,8 +171,8 @@ importers:
   ui:
     dependencies:
       '@game-hub/game-argute':
-        specifier: ^0.2.0
-        version: 0.2.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
+        specifier: ^0.3.0
+        version: 0.3.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
       '@game-hub/game-cantstop':
         specifier: ^0.1.0
         version: 0.1.1(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
@@ -494,11 +494,11 @@ packages:
   '@fastify/websocket@11.3.0':
     resolution: {integrity: sha512-g89ag4BCcD9YP5wBZXixzoLnuf5j89p/sXFcfpCiv2pdEkYYukBEoK3heVzqsp0EAtszVDc2BBZG0KZqeAShIA==}
 
-  '@game-hub/game-argute@0.2.0':
-    resolution: {integrity: sha512-ymaZSxCmkxPB7MbthqYvPNqArI9QZo2fDPwhLTJ/e4g/fqUXSk0tu4gfUKnNNTostqZjacQ2voKFg04ObdqXtg==}
+  '@game-hub/game-argute@0.3.0':
+    resolution: {integrity: sha512-9uIwU79h8XyvjZh3cGXrXDfxOaVizG0y7BM5PeC/985JSR//vN0VHBeJDDmLKWbO4gC6/5QBwdlIHXR1khmj4g==}
     engines: {node: '>=22'}
     peerDependencies:
-      '@game-hub/kernel': ^1.2.0
+      '@game-hub/kernel': ^1.4.0
       '@game-hub/ui-kit': ^1.0.0
       react: ^19.0.0
     peerDependenciesMeta:
@@ -2644,7 +2644,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@game-hub/game-argute@0.2.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)':
+  '@game-hub/game-argute@0.3.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)':
     dependencies:
       '@game-hub/kernel': link:packages/kernel
     optionalDependencies:
