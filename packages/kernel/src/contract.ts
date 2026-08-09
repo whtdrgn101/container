@@ -72,5 +72,25 @@
  *      "box lid" identity mark, a `LazyExoticComponent<ComponentType<{ className?: string }>>` erased and
  *      lazy-loaded exactly like `Board`. Optional, so every existing `GameClient` (which omits it) still
  *      satisfies the contract; the shell renders it (with a neutral fallback) in the Card Table redesign.
+ * - **1.4.0** (2026-08-09) — *additive*: two independent additions, neither changing an existing
+ *   member's meaning nor adding a required one, so **minor** again and the contract stays **1**. A game
+ *   built against any earlier `1.x` compiles, registers and behaves identically — verified by leaving
+ *   all seven hosted games untouched across the bump.
+ *   1. **A typed move log.** `MoveRecord` gained a type parameter for the game's own record-type union
+ *      (`MoveRecord<'BID' | 'PLAY' | …>`), `VersionedState` forwards it, and `record()`'s `type`
+ *      argument is now `RecordTypeOf<S>` — checked against the state's own log rather than being a bare
+ *      `string`. Previously a game could log `'TRIKC'` and nothing would notice: not the compiler, not
+ *      the tests asserting `'TRICK'` (they just never match), not the feed (it renders what it is
+ *      handed) — and the entry is on the wire and in the replay, so the audit record is permanently
+ *      wrong. Both parameters **default to `string`**, so a game that has not typed its log is entirely
+ *      unaffected; typing it is opt-in, per game, whenever that game next has reason to.
+ *      ⚠️ Type it against what the game **logs**, not its `ActionType`: a cascade appends entries no
+ *      client ever sends (Argute's third trick appends `TRICK`, `HAND` and `DEAL` from one `PLAY`), so
+ *      the two unions are related but genuinely different sets.
+ *   2. **`GameClient.version`.** A new **optional** field carrying the game package's own version, so a
+ *      host can say which build of a game is on the table. Without it a host has to read versions out of
+ *      `node_modules` itself at build time — which the hub did, and which made displaying a string cost
+ *      every host its own package resolution. A game should fill it from its package.json at build time,
+ *      never by hand; a literal is a second place the version lives and the two drift.
  */
 export const KERNEL_CONTRACT_VERSION = 1;

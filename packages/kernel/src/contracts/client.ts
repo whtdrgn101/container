@@ -56,6 +56,19 @@ export interface GameClient<S = unknown, Payload = unknown, Message = unknown> {
   /** A few short "how to play" bullets, shown in a collapsible on the landing. Optional. */
   readonly rules?: readonly string[];
   /**
+   * The game package's own version — what a host shows to say which build of *this game* is on the
+   * table (kernel 1.4.0). Optional, so a client that omits it still satisfies the contract.
+   *
+   * ⚠️ **A game should set this from its own package.json at build time, never by hand.** A literal here
+   * is a second place the version lives, and the two drift the first time someone bumps one and not the
+   * other — at which point the field is worse than useless, because it is confidently wrong.
+   *
+   * It exists because the alternative is worse: without it a host that wants to show game versions has
+   * to read them out of `node_modules` itself at build time, which the hub did (and can now stop doing)
+   * — accurate, but it makes every host reimplement package resolution to display a string.
+   */
+  readonly version?: string;
+  /**
    * The game's own identity mark — its "box lid". Rendered by the shell in the game picker; a game without
    * one gets a neutral lid. A component taking `{ className?: string }` so the shell sizes/tints it.
    *

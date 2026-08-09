@@ -27,6 +27,9 @@ export { KERNEL_CONTRACT_VERSION } from './contract.js';
 // Engine primitives.
 export { GameError } from './errors.js';
 export type { MoveRecord } from './moveRecord.js';
+// `RecordTypeOf` is exported because a game that types its log may want to name the same union in its
+// own helpers (a `describeMoveRecord` switch, a test's record assertions) without restating it.
+export type { RecordTypeOf } from './record.js';
 export type { Viewer } from './viewer.js';
 export { record } from './record.js';
 export type { VersionedState } from './record.js';
