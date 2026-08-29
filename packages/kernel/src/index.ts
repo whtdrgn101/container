@@ -58,3 +58,17 @@ export type {
   ErrorResponse,
   GameSummary,
 } from './contracts/module.js';
+
+// Table options (kernel 1.5.0) — the per-table rule variants a game declares and a table picks before
+// the deal. The two helpers are **runtime** code and live here rather than in the hub on purpose: what
+// counts as a legal pick is the contract's rule, so a host, a second host, and a game's own tests must
+// all get the same answer from the same function. See `contracts/tableOptions.ts` for the design.
+export { defaultTableOptions, resolveTableOptions } from './contracts/tableOptions.js';
+export type {
+  BooleanTableOption,
+  ChoiceTableOption,
+  ResolveOptionsResult,
+  TableOptions,
+  TableOptionSpec,
+  TableOptionValue,
+} from './contracts/tableOptions.js';

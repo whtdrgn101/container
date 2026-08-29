@@ -1,4 +1,5 @@
 import type { MoveRecord } from '../moveRecord.js';
+import type { TableOptions, TableOptionSpec } from './tableOptions.js';
 import type { Viewer } from '../viewer.js';
 
 /**
@@ -81,6 +82,22 @@ export interface GameModule<S, A, Ctx = unknown, App = unknown> {
   readonly botDifficulties?: readonly string[];
 
   /**
+   * The **table options** this game offers — rule variants a table picks before the deal (kernel
+   * 1.5.0). Absent ⇒ the game has one fixed set of rules and the host renders no options control.
+   *
+   * Declared exactly like `colors` and `botDifficulties`: opaque, game-owned ids the host validates
+   * against and renders generically, so the contract never learns what any option *means*. The host
+   * resolves picks into a complete record (defaults filled) and hands it to `createGame` as
+   * `options`; see `contracts/tableOptions.ts` for why the value union is closed and why there is no
+   * free-number type.
+   *
+   * ⚠️ Unlike bots and colours, this is **rules data** — it reaches the engine, is folded into the
+   * state at setup, and is therefore frozen at the deal. A game must not treat it as something a
+   * player can change mid-game.
+   */
+  readonly tableOptions?: readonly TableOptionSpec[];
+
+  /**
    * Build a fresh game. **`rng` is injected, never reached for.** Every engine here is pure and
    * deterministic; the module must not call `Math.random` itself, or replay and reproducible tests
    * both die. (Container shuffles its scoring deck with this.)
@@ -103,6 +120,13 @@ export interface GameModule<S, A, Ctx = unknown, App = unknown> {
     readonly id: string;
     readonly players: readonly { readonly name: string; readonly color?: string }[];
     readonly rng: () => number;
+    /**
+     * The table's resolved rule variants (kernel 1.5.0) — **complete**: every id this module declared
+     * in `tableOptions`, each at a validated pick or its declared default. Absent only for a game
+     * that declares no options (and for a test that doesn't care), which is why it is optional here
+     * and yet safe to read without a fallback in a game that does declare them.
+     */
+    readonly options?: TableOptions;
   }): S;
 
   /** Apply a move. Throws the game's own domain error, which `mapError` turns into a status. */

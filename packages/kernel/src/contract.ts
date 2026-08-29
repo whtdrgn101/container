@@ -92,5 +92,21 @@
  *      `node_modules` itself at build time — which the hub did, and which made displaying a string cost
  *      every host its own package resolution. A game should fill it from its package.json at build time,
  *      never by hand; a literal is a second place the version lives and the two drift.
+ * - **1.5.0** (2026-08-28) — *additive*: **table options**, the channel a game uses to offer rule
+ *   variants a table picks before the deal. `GameModule` gained an optional `tableOptions` declaration
+ *   (opaque, game-owned option specs, exactly the `botDifficulties` pattern one size larger) and
+ *   `createGame`'s opts gained an optional `options` record carrying the host-resolved picks. Two
+ *   runtime helpers ship with it — `defaultTableOptions` and `resolveTableOptions` — because what
+ *   counts as a legal pick is the *contract's* rule, and a host, a second host and a game's own tests
+ *   must not each reimplement it. Nothing existing changed shape or became required, so **minor**, and
+ *   the contract stays **1**: a game built against any earlier `1.x` declares no options, is resolved
+ *   to `{}`, and deals exactly as before — verified by leaving all seven hosted games untouched across
+ *   the bump.
+ *
+ *   ⚠️ Table options are **rules data**, unlike every other per-table thing the platform tracks. Bots,
+ *   colours and rematch are coordination state precisely because the engine must not see them
+ *   (design-patterns §2); an option *is* a rule, so it reaches `createGame`, is folded into the game's
+ *   own state at setup, and is frozen there for the life of the game. It is therefore replayed and
+ *   migrated as ordinary state, and no host ever stores it twice.
  */
 export const KERNEL_CONTRACT_VERSION = 1;
