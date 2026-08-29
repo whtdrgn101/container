@@ -47,6 +47,6 @@ export const GAME_VERSIONS: Readonly<Record<string, string>> = {
   russianrailroads: '0.1.1',
   labyrinth: '0.1.3',
   argute: '0.3.0',
-  euchre: '0.1.0',
-  spades: '0.1.0',
+  euchre: '0.1.1',
+  spades: '0.1.1',
 };
