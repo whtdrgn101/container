@@ -1,4 +1,6 @@
 import { Suspense, useEffect, useState } from 'react';
+import { defaultTableOptions } from '@game-hub/kernel';
+import type { TableOptions as TableOptionValues } from '@game-hub/kernel';
 import { Header } from '@/shell/Header';
 import { Shelf } from '@/shell/Shelf';
 import { GameDetail } from '@/shell/GameDetail';
@@ -49,6 +51,12 @@ export default function App() {
   // Each hotseat bot seat's chosen AI difficulty tier (CS4), or undefined for the default ('normal').
   // Sparse like seatColors: a seat with no explicit pick omits `difficulty` entirely from the request.
   const [seatDifficulties, setSeatDifficulties] = useState<(string | undefined)[]>([]);
+  /**
+   * The table's rule variants for the game being set up (kernel 1.5.0). Held here beside the other
+   * setup state, keyed by nothing — it is reset whenever a different game's detail screen is opened,
+   * because an option id only means something to the game that declared it.
+   */
+  const [tableOptions, setTableOptions] = useState<TableOptionValues>({});
   // The AI difficulty to hand a bot added in the waiting room (CS4). Defaults to 'normal'.
   const [botDifficulty, setBotDifficulty] = useState('normal');
   // Shared-game (lobby) setup + waiting-room state.
@@ -104,6 +112,9 @@ export default function App() {
     setSeatIsBot(NAME_POOL.slice(0, seats).map(() => false));
     setSeatColors([]);
     setSeatDifficulties([]);
+    // Start from this game's own declared defaults rather than `{}`, so the form shows what will
+    // actually be dealt and a table that touches nothing still posts a coherent, complete record.
+    setTableOptions(defaultTableOptions(entry.tableOptions));
     setError(null);
   }
 
@@ -175,7 +186,7 @@ export default function App() {
   async function createSharedGame() {
     if (!selected) return;
     await guard(async () => {
-      const created = await api.createLobby(selected.id, lobbySeats);
+      const created = await api.createLobby(selected.id, lobbySeats, tableOptions);
       setMySeats([]);
       setLobby(created);
     });
@@ -547,6 +558,8 @@ export default function App() {
             client={selectedClient}
             busy={busy}
             onBack={() => setDetailGame(null)}
+            tableOptions={tableOptions}
+            onTableOptionsChange={setTableOptions}
             lobbySeats={lobbySeats}
             onLobbySeatsChange={setLobbySeats}
             onCreateLobby={() => void createSharedGame()}
@@ -575,6 +588,9 @@ export default function App() {
                       ? { difficulty: seatDifficulties[index] }
                       : {}),
                   })),
+                  // The table's agreed house rules (kernel 1.5.0). `{}` for a game that declares none,
+                  // which the server resolves to an empty record — the pre-1.5.0 request unchanged.
+                  tableOptions,
                 ),
               )
             }

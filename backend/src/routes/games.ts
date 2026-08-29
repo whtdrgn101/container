@@ -1,12 +1,17 @@
 import type { FastifyInstance } from 'fastify';
 import { StaleVersionError } from '../repository';
-import { MAX_GAME_TYPE_LENGTH, MAX_NAME_LENGTH, MAX_SEATS } from '../security';
+import { MAX_GAME_TYPE_LENGTH, MAX_NAME_LENGTH, MAX_SEATS, MAX_TABLE_OPTIONS } from '../security';
 import type { NewSeat, AppServices } from '../services';
 
 interface CreateGameBody {
   /** Which game to deal. Omit for the server's default (keeps the hotseat quick-start working). */
   gameType?: string;
   players: NewSeat[];
+  /**
+   * The table's rule-variant picks (kernel 1.5.0) — ids the chosen game declared in `tableOptions`.
+   * Omit for a game's declared defaults, which is what every client sent before the feature existed.
+   */
+  options?: Record<string, unknown>;
 }
 
 interface ActionBody {
@@ -41,6 +46,7 @@ export function registerGameRoutes(app: FastifyInstance, services: AppServices):
     badRequest,
     rejectColorPicks,
     rejectDifficultyPicks,
+    tableOptionsOrReject,
   } = services;
 
   app.post<{ Body: CreateGameBody }>(
@@ -54,6 +60,11 @@ export function registerGameRoutes(app: FastifyInstance, services: AppServices):
             // Which game to deal. Optional: a bare POST still starts the default (the hotseat
             // quick-start posts no type), while C2's picker names one explicitly.
             gameType: { type: 'string', minLength: 1, maxLength: MAX_GAME_TYPE_LENGTH },
+            // The table's rule variants. Values stay unconstrained here because only the *module*
+            // knows which ids exist and what each accepts — `tableOptionsOrReject` does that check
+            // below, against the game's own declaration. The schema's job is just to bound the object
+            // (§4.7) so a hostile body can't be parsed before that check runs.
+            options: { type: 'object', maxProperties: MAX_TABLE_OPTIONS },
             players: {
               type: 'array',
               // Bounded (§4.7): above any module's max seats (5 today), so no game is constrained, but
@@ -99,8 +110,12 @@ export function registerGameRoutes(app: FastifyInstance, services: AppServices):
       // Validate each bot seat's difficulty against this game's declared tiers (CS4). A game with no
       // tiers rejects any difficulty at all; an unset tier always passes.
       if (rejectDifficultyPicks(reply, module.botDifficulties, request.body.players)) return reply;
+      // Validate the table's rule variants against this game's declaration and fill in its defaults
+      // (kernel 1.5.0). `null` ⇒ a 400 has already been sent naming the offending option.
+      const options = tableOptionsOrReject(reply, module, request.body.options);
+      if (!options) return reply;
       try {
-        const started = startGame(module, request.body.players);
+        const started = startGame(module, request.body.players, options);
         const gameId = module.summarize(started).id;
         return reply.code(201).send(gamePayload(module, gameId, started, module.summarize(started).activePlayerId));
       } catch (error) {

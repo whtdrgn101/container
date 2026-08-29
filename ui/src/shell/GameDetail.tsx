@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button, Card, CardContent, cn } from '@game-hub/ui-kit';
 import { GameIcon } from '@/shell/GameIcon';
+import { TableOptions } from '@/shell/TableOptions';
 import { swatchColor } from '@/shell/WaitingRoom';
 import type { AnyGameClient } from '@/games/registry';
 import type { GameInfo } from '@/lib/api';
+import type { TableOptions as TableOptionValues } from '@game-hub/kernel';
 
 /**
  * A game's detail screen (Card Table redesign): the box lid writ large — the game's mark, name, player
@@ -24,6 +26,14 @@ export interface GameDetailProps {
   readonly client: AnyGameClient | undefined;
   readonly busy: boolean;
   readonly onBack: () => void;
+
+  /**
+   * The table's rule variants (kernel 1.5.0) and their setter. Shared by both ways of sitting down —
+   * house rules are a property of the game being dealt, not of how the players got to the table — so
+   * they render once, above the mode panels. A game that declares none renders nothing.
+   */
+  readonly tableOptions: TableOptionValues;
+  readonly onTableOptionsChange: (values: TableOptionValues) => void;
 
   // Play online (shared lobby).
   readonly lobbySeats: number;
@@ -49,6 +59,8 @@ export function GameDetail({
   client,
   busy,
   onBack,
+  tableOptions,
+  onTableOptionsChange,
   lobbySeats,
   onLobbySeatsChange,
   onCreateLobby,
@@ -140,6 +152,17 @@ export function GameDetail({
 
       <Card>
         <CardContent className="space-y-3 pt-6">
+          {/*
+            House rules first, above the fork: they apply to a hotseat table and a shared one alike, and
+            deciding them is the first thing a table does. Built entirely from the game's catalog entry —
+            the shell names no option and knows no game.
+          */}
+          <TableOptions
+            specs={selected.tableOptions ?? []}
+            values={tableOptions}
+            onChange={onTableOptionsChange}
+            busy={busy}
+          />
           {mode === 'online' ? (
             <div className="space-y-2" data-testid="online-panel">
               <div className="font-display text-base font-semibold text-ink">Create a shared table</div>

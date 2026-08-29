@@ -53,8 +53,9 @@ packages/
                      bindings are generics), the transport DTOs (GamePayload/GameMessage), the platform
                      envelopes (chat/presence DTOs + guards) and optional GameClient.icon, and the
                      @game-hub/kernel/{client,bot} subpaths. Its own 100% gate.
-                     Published through **1.3.0** (1.2.0 = the colour channel + rng helpers; 1.3.0 = the
-                     typed chat/presence envelopes + GameClient.icon — see contract.ts's version history).
+                     Published through **1.5.0** (1.2.0 = the colour channel + rng helpers; 1.3.0 = the
+                     typed chat/presence envelopes + GameClient.icon; 1.4.0 = the typed move log +
+                     GameClient.version; 1.5.0 = table options — see contract.ts's version history).
   ui-kit/          @game-hub/ui-kit — the shared board chrome every game's UI renders inside
                      (TurnBanner, ActivityFeed, GameOver, ActionTip, PanZoom, Button/Card, cn,
                      seatIdentity) + the game-facing REST calls (getGame/applyAction/apiUrl).
@@ -215,6 +216,18 @@ helpers live in `backend/src/services.ts`.)
     which is what prompted **fixing the template**: `scripts/assert-pnpm-publish.mjs` + `prepublishOnly`
     now ship in `whtdrgn101/game-template` (2026-08-06), so every game scaffolded from it is protected.
     Only a game started from an older copy needs the guard copied in.
+- ⚠️ **Table options are rules data, and the one exception to "coordination state lives outside the
+  engine"** (kernel 1.5.0, 2026-08-28). A game may declare `tableOptions` — rule variants a table agrees
+  *before* the deal (Euchre's stick-the-dealer, Spades' blind nil and target score). Mechanically it
+  mirrors `botDifficulties`: the module declares opaque specs, the host validates and publishes them on
+  `/games/catalog`, and `ui/src/shell/TableOptions.tsx` renders a "House rules" section that names no
+  option and no game. But unlike bots/colours/rematch the resolved record reaches `createGame`, because
+  an option **is** a rule — the game folds it into its own state at setup, so it replays, persists and
+  migrates as ordinary rule data and no host stores it twice. A lobby fixes its options when the room is
+  **opened**, not at start. Only `boolean` and `choice` exist; there is deliberately no free-number type
+  (design-patterns §2). Validation lives in the kernel (`resolveTableOptions`) so a second host and a
+  game's own tests can't disagree with the platform about what a legal pick is. All seven games that
+  predate it declare nothing, put no key on the wire, and were untouched by the bump.
 - **Package manager is pnpm** (installed via Homebrew — corepack couldn't symlink into `/usr/local/bin`).
   Native `better-sqlite3` and `esbuild` builds are allow-listed in `pnpm-workspace.yaml`.
 - **Container colours:** `white, red, green, blue, yellow` (container cargo, from the rulebook scoring

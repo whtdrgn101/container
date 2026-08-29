@@ -1,6 +1,9 @@
 import { apiUrl, applyAction, fail, getGame, JSON_HEADERS, unwrap } from '@game-hub/ui-kit';
 import { isChatPush, isPresencePush } from '@game-hub/kernel/client';
 import type { ChatMessage, GameMessage, GamePayload } from '@game-hub/kernel/client';
+// The table-option spec is framework-free contract, so it comes from the kernel's `.` barrel rather than
+// its React-dependent `/client` subpath — the shell renders a control it is *told* about, never one it knows.
+import type { TableOptions, TableOptionSpec } from '@game-hub/kernel';
 
 /**
  * The games-platform API client — **game-agnostic** (roadmap C2).
@@ -68,6 +71,12 @@ export interface GameInfo {
    * Present ⇒ the bot-seat affordances show a difficulty picker; absent ⇒ exactly today's UI.
    */
   botDifficulties?: string[];
+  /**
+   * The rule variants this game lets a table pick before the deal (kernel 1.5.0), or absent if its
+   * rules are fixed. Present ⇒ the setup form grows a "House rules" section built entirely from this
+   * declaration; absent ⇒ exactly the pre-1.5.0 form. The shell never learns what an option *means*.
+   */
+  tableOptions?: TableOptionSpec[];
 }
 
 /** A secret-free summary of an in-progress game (for the home-screen "resume" list). */
@@ -105,24 +114,38 @@ export async function listGameTypes(): Promise<GameInfo[]> {
   return ((await response.json()) as { games: GameInfo[] }).games;
 }
 
-/** Create a new game of `gameType` and return its initial state. */
-export async function createGame<S = unknown>(gameType: string, players: NewSeat[]): Promise<GamePayload<S>> {
+/**
+ * Create a new game of `gameType` and return its initial state.
+ *
+ * `options` are the table's rule variants (kernel 1.5.0). Omitted entirely when the game declares none,
+ * so a request for any of the seven games that predate the feature is byte-identical to before it.
+ */
+export async function createGame<S = unknown>(
+  gameType: string,
+  players: NewSeat[],
+  options?: TableOptions,
+): Promise<GamePayload<S>> {
   return unwrap<S>(
     await fetch(apiUrl(`/games`), {
       method: 'POST',
       headers: JSON_HEADERS,
-      body: JSON.stringify({ gameType, players }),
+      body: JSON.stringify({ gameType, players, ...(options ? { options } : {}) }),
     }),
   );
 }
 
-/** Create an empty lobby for `gameType` with `seats` unclaimed seats (its id is the shareable code). */
-export async function createLobby(gameType: string, seats: number): Promise<Lobby> {
+/**
+ * Create an empty lobby for `gameType` with `seats` unclaimed seats (its id is the shareable code).
+ *
+ * The table's rule variants are fixed here, when the room is opened, rather than at start — the house
+ * rules are agreed before the cards come out, and every player who joins is looking at the same table.
+ */
+export async function createLobby(gameType: string, seats: number, options?: TableOptions): Promise<Lobby> {
   return unwrapLobby(
     await fetch(apiUrl(`/lobbies`), {
       method: 'POST',
       headers: JSON_HEADERS,
-      body: JSON.stringify({ gameType, seats }),
+      body: JSON.stringify({ gameType, seats, ...(options ? { options } : {}) }),
     }),
   );
 }

@@ -50,6 +50,14 @@ export const MAX_GAME_TYPE_LENGTH = 64;
 /** Upper bound on the `players` array of `POST /games` — above any module's `maxPlayers` (7 today, Argute). */
 export const MAX_SEATS = 8;
 
+/**
+ * Upper bound on the `options` object of `POST /games` / `POST /lobbies` (input-bound §4.7). Table
+ * options are validated against the module's declaration — an id it never declared is rejected — but
+ * that check runs *after* Fastify has parsed the object, so the schema caps it first. Far above any
+ * plausible game's option count (Euchre and Spades declare two each).
+ */
+export const MAX_TABLE_OPTIONS = 32;
+
 /** Explicit Fastify `bodyLimit`. Actions are tiny; 256 KiB is generous and caps a hostile body. */
 export const BODY_LIMIT_BYTES = 256 * 1024;
 

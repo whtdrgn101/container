@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { Lobby, LobbyMember } from '../lobbies';
-import { MAX_GAME_TYPE_LENGTH, MAX_NAME_LENGTH } from '../security';
+import { MAX_GAME_TYPE_LENGTH, MAX_NAME_LENGTH, MAX_TABLE_OPTIONS } from '../security';
 import type { AppServices } from '../services';
 
 /**
@@ -9,7 +9,16 @@ import type { AppServices } from '../services';
  * when every seat is filled. Coordination state outside the engine, like bots and rematches.
  */
 export function registerLobbyRoutes(app: FastifyInstance, services: AppServices): void {
-  const { registry, lobbies, defaultGameType, startGame, gamePayload, sendGameError, rejectDifficulty } = services;
+  const {
+    registry,
+    lobbies,
+    defaultGameType,
+    startGame,
+    gamePayload,
+    sendGameError,
+    rejectDifficulty,
+    tableOptionsOrReject,
+  } = services;
 
   const lobbyNotFound = (reply: FastifyReply, id: string) =>
     reply.code(404).send({ error: { code: 'LOBBY_NOT_FOUND', message: `No lobby with id "${id}"` } });
@@ -46,7 +55,7 @@ export function registerLobbyRoutes(app: FastifyInstance, services: AppServices)
     return null;
   };
 
-  app.post<{ Body: { seats?: number; gameType?: string } }>(
+  app.post<{ Body: { seats?: number; gameType?: string; options?: Record<string, unknown> } }>(
     '/lobbies',
     {
       schema: {
@@ -55,6 +64,10 @@ export function registerLobbyRoutes(app: FastifyInstance, services: AppServices)
           properties: {
             seats: { type: 'number' },
             gameType: { type: 'string', minLength: 1, maxLength: MAX_GAME_TYPE_LENGTH },
+            // The table's rule variants, chosen when the room is opened (kernel 1.5.0). Bounded here;
+            // validated against the chosen game's declaration below. See `POST /games` for why the
+            // values themselves are unconstrained at the schema layer.
+            options: { type: 'object', maxProperties: MAX_TABLE_OPTIONS },
           },
         },
       },
@@ -75,6 +88,10 @@ export function registerLobbyRoutes(app: FastifyInstance, services: AppServices)
           .code(400)
           .send({ error: { code: 'INVALID_SEAT_COUNT', message: `Seats must be ${minPlayers}–${maxPlayers}` } });
       }
+      // Resolve the house rules once, here, and store them on the room — so every player who joins is
+      // looking at the same agreed table, and `start` needs no second validation pass.
+      const options = tableOptionsOrReject(reply, module, request.body?.options);
+      if (!options) return reply;
       const lobby: Lobby = {
         id: randomUUID(),
         gameType,
@@ -82,6 +99,7 @@ export function registerLobbyRoutes(app: FastifyInstance, services: AppServices)
         members: Array.from({ length: seats }, () => null),
         status: 'open',
         gameId: null,
+        options,
       };
       lobbies.create(lobby);
       return reply.code(201).send({ lobby });
@@ -210,6 +228,9 @@ export function registerLobbyRoutes(app: FastifyInstance, services: AppServices)
           color: member.color,
           difficulty: member.difficulty,
         })),
+        // The house rules agreed when the room was opened. Absent on a lobby written before the
+        // feature, which `startGame` resolves to this game's declared defaults.
+        lobby.options,
       );
       const gameId = module.summarize(started).id;
       lobbies.update({ ...lobby, status: 'started', gameId });

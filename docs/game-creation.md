@@ -106,6 +106,36 @@ well-formed move this state refuses — out of turn, illegal now). The module's 
 into a status through a **total** record, so a code added later fails to compile until its status is
 decided.
 
+### Table options — rule variants the table picks (kernel 1.5.0)
+
+If your game has a genuine house-rule fork decided *before* the deal — Euchre's stick-the-dealer,
+Spades' blind nil — declare it rather than baking one variant in or shipping the fork as a second game id:
+
+```ts
+// src/module/index.ts
+tableOptions: [
+  { id: 'stickTheDealer', label: 'Stick the dealer', type: 'boolean', default: false,
+    help: 'The dealer must name trump if the second round passes to them.' },
+  { id: 'target', label: 'Play to', type: 'choice', default: '10',
+    choices: [{ value: '10', label: '10 points' }, { value: '11', label: '11 points' }] },
+],
+```
+
+The host publishes these on its catalog, renders a generic form from them, validates the picks against
+your declaration, fills every unpicked id with your default, and hands `createGame` a **complete**
+record as `options`. Your `createGame` reads it and folds the variant into your own state:
+
+```ts
+export function createEuchreGame(opts: { …; options?: TableOptions }): EuchreState {
+  return { …, stickTheDealer: opts.options?.['stickTheDealer'] === true };
+}
+```
+
+⚠️ **An option is rules data and is frozen at the deal.** Read it once at setup and store it in state —
+don't thread the host's record through your engine, and don't treat it as something a player can change
+mid-game (that's an action). Test both settings: each option doubles a branch the 100% gate will find.
+Only `boolean` and `choice` exist — see design-patterns §2 for why there is no free-number type.
+
 ### Coverage discipline
 
 - **Engine 100%** — every rule and every rejection path, enforced by a `src/engine/**` per-glob gate. Tests

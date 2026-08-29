@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply } from 'fastify';
+import { defaultTableOptions, resolveTableOptions } from '@game-hub/kernel';
+import type { TableOptions } from '@game-hub/kernel';
 import { BotRepository } from './bots';
 import { ChatRepository } from './chat';
 import { ColorRepository, assignColors, colorsForSeats } from './colors';
@@ -105,7 +107,7 @@ export interface AppServices {
   viewerFrom(raw: string | undefined, module: AnyGameModule, state: unknown): Viewer;
   colorsFor(module: AnyGameModule, gameId: string, state: unknown): Record<string, string>;
   load(reply: FastifyReply, id: string): { state: unknown; module: AnyGameModule } | null;
-  startGame(module: AnyGameModule, seats: readonly NewSeat[]): unknown;
+  startGame(module: AnyGameModule, seats: readonly NewSeat[], options?: TableOptions): unknown;
   gamePayload(module: AnyGameModule, gameId: string, state: unknown, viewer: Viewer): Record<string, unknown>;
 
   sendError(reply: FastifyReply, mapped: ErrorResponse): FastifyReply;
@@ -132,6 +134,11 @@ export interface AppServices {
     tiers: readonly string[] | undefined,
     seats: readonly NewSeat[],
   ): FastifyReply | null;
+  tableOptionsOrReject(
+    reply: FastifyReply,
+    module: AnyGameModule,
+    picks: Readonly<Record<string, unknown>> | undefined,
+  ): TableOptions | null;
 }
 
 /**
@@ -428,8 +435,31 @@ export function buildServices(app: FastifyInstance, options: AppOptions): AppSer
     return null;
   };
 
+  /**
+   * Validate a table's rule-variant picks against what the module declares (kernel 1.5.0), returning
+   * the **resolved, complete** options record — or `null` after sending a `400`.
+   *
+   * Unlike its `rejectColorPicks`/`rejectDifficultyPicks` neighbours this returns a *value* rather than
+   * just a verdict, because validating and resolving are one pass: the kernel's `resolveTableOptions`
+   * fills every unpicked option with its declared default while it checks the picked ones, and running
+   * it twice (once to reject, once to resolve) would be two chances for the host and the contract to
+   * disagree. The rule itself lives in the kernel, not here — see `contracts/tableOptions.ts`.
+   */
+  const tableOptionsOrReject = (
+    reply: FastifyReply,
+    module: AnyGameModule,
+    picks: Readonly<Record<string, unknown>> | undefined,
+  ): TableOptions | null => {
+    const resolved = resolveTableOptions(module.tableOptions, picks);
+    if (!resolved.ok) {
+      reply.code(400).send({ error: { code: 'INVALID_TABLE_OPTION', message: resolved.message } });
+      return null;
+    }
+    return resolved.options;
+  };
+
   /** Deal a new game of one type and record which of its seats an AI holds and each seat's colour. */
-  const startGame = (module: AnyGameModule, seats: readonly NewSeat[]): unknown => {
+  const startGame = (module: AnyGameModule, seats: readonly NewSeat[], options?: TableOptions): unknown => {
     // Resolve every seat's colour **before** dealing: honour each pick, fill the rest with the first
     // free palette colour in order (so a table with no picks reproduces today's seat-order tints —
     // visual baselines hold). Pure and game-agnostic, so it can run this early.
@@ -445,6 +475,12 @@ export function buildServices(app: FastifyInstance, options: AppOptions): AppSer
       // lobby's pick, and without it such a game's colour picker would silently pick nothing. All five
       // hosted games ignore the field and deal exactly as they did before it existed.
       players: seats.map((seat, i) => ({ name: seat.name, color: assigned[i]! })),
+      // The table's rule variants (kernel 1.5.0). Unlike bots and colours these are **rules data**:
+      // the game folds them into its own state here and reads them from there forever after, so a
+      // table's choice is frozen at the deal and replays with the game. Defaulted rather than passed
+      // through as `undefined` so a caller that never touched the form (an old client, a test) still
+      // deals the game's own declared defaults instead of leaving the engine to guess.
+      options: options ?? defaultTableOptions(module.tableOptions),
       // Randomness is injected, never reached for inside a module — that is what keeps every engine
       // pure, deterministic and replayable.
       rng,
@@ -532,5 +568,6 @@ export function buildServices(app: FastifyInstance, options: AppOptions): AppSer
     rejectColorPicks,
     rejectDifficulty,
     rejectDifficultyPicks,
+    tableOptionsOrReject,
   };
 }

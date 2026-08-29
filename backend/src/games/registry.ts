@@ -1,4 +1,5 @@
 import { KERNEL_CONTRACT_VERSION } from '@game-hub/kernel';
+import type { TableOptionSpec } from '@game-hub/kernel';
 import type { GameModule } from './module';
 
 /**
@@ -27,6 +28,12 @@ export interface GameInfo {
   readonly colors: readonly string[];
   /** The AI difficulty tiers this game offers (CS4), or absent if it has just one. Drives the picker. */
   readonly botDifficulties?: readonly string[];
+  /**
+   * The rule variants this game lets a table pick before the deal (kernel 1.5.0), or absent if its
+   * rules are fixed. Published here for exactly the reason `botDifficulties` is: the setup form is
+   * generic, so the only way it can render a game's options is to be told what they are.
+   */
+  readonly tableOptions?: readonly TableOptionSpec[];
 }
 
 /**
@@ -75,15 +82,20 @@ export class GameRegistry {
 
   /** Every registered game, for the picker. Registration order. */
   list(): GameInfo[] {
-    return [...this.modules.values()].map(({ id, name, minPlayers, maxPlayers, colors, botDifficulties }) => ({
-      id,
-      name,
-      minPlayers,
-      maxPlayers,
-      colors,
-      // Only surface the field when a game declares tiers, so a game without them stays exactly as it
-      // was on the wire (no `botDifficulties` key) and the UI shows no dead picker.
-      ...(botDifficulties ? { botDifficulties } : {}),
-    }));
+    return [...this.modules.values()].map(
+      ({ id, name, minPlayers, maxPlayers, colors, botDifficulties, tableOptions }) => ({
+        id,
+        name,
+        minPlayers,
+        maxPlayers,
+        colors,
+        // Only surface the field when a game declares tiers, so a game without them stays exactly as it
+        // was on the wire (no `botDifficulties` key) and the UI shows no dead picker.
+        ...(botDifficulties ? { botDifficulties } : {}),
+        // Same rule for table options (kernel 1.5.0): a game with fixed rules puts no key on the wire,
+        // so the setup form renders no empty "Table options" section for the seven games that predate it.
+        ...(tableOptions ? { tableOptions } : {}),
+      }),
+    );
   }
 }

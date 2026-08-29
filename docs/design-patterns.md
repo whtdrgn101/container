@@ -206,6 +206,37 @@ a physical game can print it on the board.
 
 Difficulty tiers are coordination state too (see §6).
 
+### Table options are the deliberate exception — rules data, not coordination state
+
+**Table options** (kernel 1.5.0) are the rule variants a table agrees before the deal: Euchre's
+stick-the-dealer, Spades' blind nil and target score. They look like the neighbours above — declared by
+the module, picked in the setup form, validated by the host — and they are filed here precisely because
+the resemblance is a trap. Everything else in this section sits outside the engine *because the engine
+must not see it*. An option **is a rule**, so it goes in.
+
+The mechanism mirrors `botDifficulties` one size larger. A module declares `tableOptions`: an ordered
+list of opaque, game-owned specs, each a `boolean` (a rule is on or off) or a `choice` (one of a closed,
+game-declared set). The host publishes them on `GET /games/catalog`, the shell renders a generic "House
+rules" section it does not understand (`ui/src/shell/TableOptions.tsx` — it names no option and no game),
+`POST /games` and `POST /lobbies` accept the picks, and `resolveTableOptions` (in the **kernel**, so a
+second host and a game's own tests get the same answer) validates them and fills every unpicked option
+with its declared default. The resolved, **complete** record reaches `createGame` as `options`.
+
+- **A game folds them into its own state at setup and reads them from there.** They are therefore
+  replayed, persisted and migrated as ordinary rule data, and no host stores them a second time.
+- **They are frozen at the deal** — which is the physical truth: you agree the house rules before the
+  cards come out, not once someone is losing. A lobby fixes them when the room is *opened*, so every
+  player who joins is looking at the same table.
+- **Two types, and no more, on purpose.** A free-number option is the obvious third and is deliberately
+  absent: every number a table actually picks is a small closed set (Spades to 200 or 500), which
+  `choice` already expresses *with labels*, while a free number drags min/max/step validation into a
+  contract meant to stay declarative. Add it when a third game needs one — see §8.
+- ⚠️ **Don't reach for this to express a mid-game decision.** An option is settled before the deal; a
+  choice a player makes *during* play is an action, and belongs in the action union.
+
+A game that declares nothing puts no key on the wire and renders no section — which is why all seven
+games that predate the feature were untouched by it.
+
 ---
 
 ## 3. Redaction & hidden information

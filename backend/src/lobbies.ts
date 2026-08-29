@@ -1,4 +1,5 @@
 import type { DB } from './db';
+import type { TableOptions } from '@game-hub/kernel';
 
 /**
  * How long a never-started open lobby lives before the sweep reclaims it. A day is plenty for a home
@@ -37,6 +38,16 @@ export interface Lobby {
   readonly status: 'open' | 'started';
   /** The created game's id once the lobby has started, else `null`. */
   readonly gameId: string | null;
+  /**
+   * The rule variants this table will be dealt with (kernel 1.5.0), chosen by whoever opened the room
+   * and fixed from that moment — the physical truth that you agree the house rules before the cards
+   * come out, not once someone is losing. Absent on a lobby written before the feature (and on any
+   * game that declares no options), which reads back as the game's own defaults at start.
+   *
+   * Needed **no migration**: lobbies are a JSON blob rather than columns, the same thing that made
+   * `gameType` free to add at C1.
+   */
+  readonly options?: TableOptions;
 }
 
 /**
@@ -68,6 +79,8 @@ const readMember = (raw: unknown): LobbyMember | null => {
  */
 const readLobby = (json: string): Lobby => {
   const stored = JSON.parse(json) as Lobby;
+  // `options` needs no normalizing (kernel 1.5.0): absent on an older row is exactly what "deal this
+  // game's defaults" means, and `startGame` resolves an absent record to the module's declared defaults.
   return { ...stored, gameType: stored.gameType ?? 'container', members: stored.members.map(readMember) };
 };
 
