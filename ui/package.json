@@ -17,6 +17,7 @@
     "@game-hub/game-argute": "^0.3.0",
     "@game-hub/game-cantstop": "^0.1.0",
     "@game-hub/game-container": "^0.1.0",
+    "@game-hub/game-euchre": "^0.1.0",
     "@game-hub/game-labyrinth": "^0.1.0",
     "@game-hub/game-russianrailroads": "^0.1.0",
     "@game-hub/game-stoneage": "^0.1.0",

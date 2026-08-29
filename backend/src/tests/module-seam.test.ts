@@ -296,6 +296,7 @@ describe('hosting two games at once', () => {
       'russianrailroads',
       'labyrinth',
       'argute',
+      'euchre',
       'counter',
     ]);
   });

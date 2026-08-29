@@ -9,6 +9,7 @@ import stpetersburgClient from '@game-hub/game-stpetersburg/client';
 import russianrailroadsClient from '@game-hub/game-russianrailroads/client';
 import labyrinthClient from '@game-hub/game-labyrinth/client';
 import arguteClient from '@game-hub/game-argute/client';
+import euchreClient from '@game-hub/game-euchre/client';
 
 /**
  * A registered client with its state type erased. Only a game's own board may pair itself with its own
@@ -28,6 +29,7 @@ export const CLIENTS: readonly AnyGameClient[] = [
   russianrailroadsClient as unknown as AnyGameClient,
   labyrinthClient as unknown as AnyGameClient,
   arguteClient as unknown as AnyGameClient,
+  euchreClient as unknown as AnyGameClient,
 ];
 
 /**
@@ -43,4 +45,5 @@ export const GAME_VERSIONS: Readonly<Record<string, string>> = {
   russianrailroads: '0.1.1',
   labyrinth: '0.1.3',
   argute: '0.3.0',
+  euchre: '0.1.0',
 };

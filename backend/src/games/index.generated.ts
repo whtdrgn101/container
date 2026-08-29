@@ -9,6 +9,7 @@ import stpetersburgModule from '@game-hub/game-stpetersburg/module';
 import russianrailroadsModule from '@game-hub/game-russianrailroads/module';
 import labyrinthModule from '@game-hub/game-labyrinth/module';
 import arguteModule from '@game-hub/game-argute/module';
+import euchreModule from '@game-hub/game-euchre/module';
 
 /**
  * The games this site hosts, registered in config order. A factory rather than a shared singleton: the
@@ -23,7 +24,8 @@ export const createDefaultRegistry = (): GameRegistry =>
     .register(stpetersburgModule)
     .register(russianrailroadsModule)
     .register(labyrinthModule)
-    .register(arguteModule);
+    .register(arguteModule)
+    .register(euchreModule);
 
 /** The id every existing row is backfilled to when C1 adds `game_type` (the first hosted game). */
 export const DEFAULT_GAME_ID = 'container';

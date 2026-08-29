@@ -91,6 +91,16 @@ const games: readonly GameEntry[] = [
     module: '@game-hub/game-argute/module',
     client: '@game-hub/game-argute/client',
   },
+  // Euchre — the eighth game, and the first to use **table options** (kernel 1.5.0). Its rules genuinely
+  // fork before the deal (stick the dealer; play to 10 or 11; whether a lone defence is allowed), which
+  // is what the option channel was added for: previously such a game had to bake one variant in or ship
+  // the fork as a second game id. Nothing about this entry is special — the same two subpath specifiers
+  // as every other game — because the options ride on the *module's* declaration, not on the wiring.
+  {
+    id: 'euchre',
+    module: '@game-hub/game-euchre/module',
+    client: '@game-hub/game-euchre/client',
+  },
 ];
 
 export default games;

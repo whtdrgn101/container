@@ -38,6 +38,7 @@ describe('Stone Age bootstrap', () => {
       'russianrailroads',
       'labyrinth',
       'argute',
+      'euchre',
     ]);
   });
 

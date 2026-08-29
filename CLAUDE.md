@@ -20,6 +20,7 @@ The games (each links its own repo):
 | **Russian Railroads** (Ultimate ed.) — [`whtdrgn101/game-russianrailroads`](https://github.com/whtdrgn101/game-russianrailroads) | 2–4 | worker-placement | **in build** — base game + art (RR9) complete; board-UI revamp (RR9b) queued behind the Labyrinth kickoff (it should borrow Labyrinth's board-UI findings); bot (RR10) after; the Track D **package pilot** |
 | **Labyrinth** (Ravensburger) — [`whtdrgn101/game-labyrinth`](https://github.com/whtdrgn101/game-labyrinth) | 2–4 | sliding-maze race, hidden treasure targets | **playable — the Track D D2 proof**: game 6, the *first* built out-of-repo against published `@game-hub/*`. L0–L4 shipped; L4b (art) + L5 (bot) remain |
 | **Argute** (Indipro) — [`whtdrgn101/game-argute`](https://github.com/whtdrgn101/game-argute) | **2–7** | suitless trick-taking, secret bids, wooden pegboard | **complete** (A0–A6): game 7, the first built from `whtdrgn101/game-template` rather than extracted from here. Widest table the hub hosts. ⚠️ Its rules have **no published PDF** — the repo's `ROADMAP.md` §1 digest is the citable spec and §3 carries numbered rulings R1–R13 |
+| **Euchre** — [`whtdrgn101/game-euchre`](https://github.com/whtdrgn101/game-euchre) | 4 | partnership trick-taking, bowers, bidding on an upcard | **complete** (EU0–EU4): game 8, and the **first to declare table options** (kernel 1.5.0) — stick-the-dealer, lone defence, play to 10/11. ⚠️ No published rulebook (a traditional game): the repo's `ROADMAP.md` §1 digest is the citable spec, §3 carries rulings R1–R11 |
 
 Per-game rules and slice history now live **in each game's own repo** (`ROADMAP.md`, `CLAUDE.md`, and —
 for Labyrinth — `docs/d2c-findings.md`), not in this repo. The authoritative rules are the rulebook PDFs
@@ -227,7 +228,23 @@ helpers live in `backend/src/services.ts`.)
   **opened**, not at start. Only `boolean` and `choice` exist; there is deliberately no free-number type
   (design-patterns §2). Validation lives in the kernel (`resolveTableOptions`) so a second host and a
   game's own tests can't disagree with the platform about what a legal pick is. All seven games that
-  predate it declare nothing, put no key on the wire, and were untouched by the bump.
+  predate it (Euchre is the first to use it) declare nothing, put no key on the wire, and were untouched by the bump.
+- **Euchre is game 8, and the first to use table options** (2026-08-29). Added the routine way — two
+  dependency lines, one `games.config.ts` entry, `pnpm generate` — and built from
+  `whtdrgn101/game-template` like Argute. Three things it established:
+  - **A game may have a genuine rules fork.** Euchre's stick-the-dealer, lone defence and 10-vs-11 target
+    are settled by the table *before the deal*, which is what prompted the `tableOptions` channel (kernel
+    1.5.0, see the entry above). Before it, such a game had to bake one variant in or ship the fork as a
+    second game id.
+  - **A fixed seat count.** `minPlayers === maxPlayers === 4`, in two fixed partnerships (seats 0&2 vs
+    1&3). Partnerships live entirely inside the engine — derived as `seat % 2`, never stored — and the
+    kernel's `GameEndState.winnerIds` already took several winners, so the platform needed no change.
+  - ⚠️ **A second game with no published rulebook.** Like Argute, Euchre is traditional and has no
+    citable page, so it takes the same shape: `ROADMAP.md` §1 *is* the spec (digested from pagat.com and
+    sourced in `reference_materials/README.md`), and every gap is a numbered ruling. The load-bearing one
+    is **R5** — the left bower is trump for every purpose, following suit included — which is the rule
+    Euchre implementations most often get wrong; the engine never reads a card's printed suit during a
+    hand, only its *effective* suit.
 - **Package manager is pnpm** (installed via Homebrew — corepack couldn't symlink into `/usr/local/bin`).
   Native `better-sqlite3` and `esbuild` builds are allow-listed in `pnpm-workspace.yaml`.
 - **Container colours:** `white, red, green, blue, yellow` (container cargo, from the rulebook scoring
@@ -261,7 +278,7 @@ helpers live in `backend/src/services.ts`.)
 - **Reference PDFs stay gitignored** (copyright) — local-only; cite page numbers in comments instead.
 - **v1 was hotseat / pass-and-play.** Online multiplayer (lobbies, live sync, seat identity, resume) and
   AI both shipped; hotseat still works and its testids are intact.
-- All seven games are persisted-state **shape-v1** (no `schemaVersion` declared).
+- All eight games are persisted-state **shape-v1** (no `schemaVersion` declared).
 - **`@game-hub/kernel`'s major version IS the host↔game contract version** (Track D / D2a). It exports
   `KERNEL_CONTRACT_VERSION` (= 1); every module declares `kernelContract: KERNEL_CONTRACT_VERSION` and
   `GameRegistry.register` boot-crashes on a mismatch. Additive optional hooks = minor; a changed required
@@ -271,7 +288,7 @@ helpers live in `backend/src/services.ts`.)
   `tsc` emits relative specifiers verbatim, and Node ESM does neither extension nor directory
   resolution — an extensionless `from './errors'` makes the installed tarball unloadable while every
   in-repo suite stays green. `pack:smoke` is what catches it. Applies to `@game-hub/kernel`,
-  `@game-hub/ui-kit`, and all seven out-of-repo game packages (each carries its own pack smoke).
+  `@game-hub/ui-kit`, and all eight out-of-repo game packages (each carries its own pack smoke).
 
 Older decision detail (Track A/B/C/D slice history) lives in `ROADMAP.md` and the per-game roadmaps.
 
