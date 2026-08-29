@@ -35,9 +35,12 @@ autoInstallPeers: false
 linkWorkspacePackages: true
 
 minimumReleaseAgeExclude:
-  # Euchre (game 8) — published today, so it is excluded from the release-age gate exactly like every
-  # other game's first release was. Delete this line once it ages past the threshold.
-  - '@game-hub/game-euchre@0.1.0'
+  # Euchre (game 8) and Spades (game 9) — published today, so they are excluded from the release-age
+  # gate exactly like every other game's first release was. Delete these once they age past the
+  # threshold. 0.1.1 is a shared client fix: a disabled card is now disabled in the markup, not only in
+  # its class list (it rendered as a <div> with no `disabled` attribute).
+  - '@game-hub/game-euchre@0.1.0 || 0.1.1'
+  - '@game-hub/game-spades@0.1.0 || 0.1.1'
   - '@game-hub/game-cantstop@0.1.0'
   - '@game-hub/game-container@0.1.0'
   - '@game-hub/game-labyrinth@0.1.0'

@@ -21,6 +21,7 @@ The games (each links its own repo):
 | **Labyrinth** (Ravensburger) — [`whtdrgn101/game-labyrinth`](https://github.com/whtdrgn101/game-labyrinth) | 2–4 | sliding-maze race, hidden treasure targets | **playable — the Track D D2 proof**: game 6, the *first* built out-of-repo against published `@game-hub/*`. L0–L4 shipped; L4b (art) + L5 (bot) remain |
 | **Argute** (Indipro) — [`whtdrgn101/game-argute`](https://github.com/whtdrgn101/game-argute) | **2–7** | suitless trick-taking, secret bids, wooden pegboard | **complete** (A0–A6): game 7, the first built from `whtdrgn101/game-template` rather than extracted from here. Widest table the hub hosts. ⚠️ Its rules have **no published PDF** — the repo's `ROADMAP.md` §1 digest is the citable spec and §3 carries numbered rulings R1–R13 |
 | **Euchre** — [`whtdrgn101/game-euchre`](https://github.com/whtdrgn101/game-euchre) | 4 | partnership trick-taking, bowers, bidding on an upcard | **complete** (EU0–EU4): game 8, and the **first to declare table options** (kernel 1.5.0) — stick-the-dealer, lone defence, play to 10/11. ⚠️ No published rulebook (a traditional game): the repo's `ROADMAP.md` §1 digest is the citable spec, §3 carries rulings R1–R11 |
+| **Spades** — [`whtdrgn101/game-spades`](https://github.com/whtdrgn101/game-spades) | 4 | partnership bidding, nil, sandbagging | **complete** (SP0–SP4): game 9. Blind nil + a 200/500 target are table options. ⚠️ No published rulebook: the repo's `ROADMAP.md` §1 digest is the citable spec, §3 carries rulings R1–R11 |
 
 Per-game rules and slice history now live **in each game's own repo** (`ROADMAP.md`, `CLAUDE.md`, and —
 for Labyrinth — `docs/d2c-findings.md`), not in this repo. The authoritative rules are the rulebook PDFs
@@ -245,6 +246,20 @@ helpers live in `backend/src/services.ts`.)
     is **R5** — the left bower is trump for every purpose, following suit included — which is the rule
     Euchre implementations most often get wrong; the engine never reads a card's printed suit during a
     hand, only its *effective* suit.
+- **Spades is game 9, and the second to use table options** (2026-08-29). Added the routine way, and worth
+  recording only for what it proves and for one redaction nothing else here does:
+  - **The option channel generalised on its second use.** Euchre's fork is about *bidding procedure*,
+    Spades' is about *a whole extra phase* (blind nil, with its own eligibility rule and a two-card
+    exchange) plus a target score. Neither needed a line of host code beyond its `games.config.ts` entry —
+    which is the result the channel was designed for, and the reason it stays two option types.
+  - ⚠️ **A game may need to hide a hand from its own holder.** During Spades' blind-nil offer `viewFor`
+    redacts *every* hand, the viewer's included (the game's ruling R11): a bid made "before looking at your
+    cards" is meaningless if the wire carries them. Every other hidden-information game here hides other
+    people's cards from you; this is the first with a phase that hides yours. The hub's `spades.test.ts`
+    asserts it on the real response body, because it is exactly the kind of rule that passes a unit test
+    and leaks through a host.
+  - **The 13-card hand is the widest a board has had to lay out.** Every other card game here deals five
+    or six; the responsive spec's 320px bar is what keeps that honest.
 - **Package manager is pnpm** (installed via Homebrew — corepack couldn't symlink into `/usr/local/bin`).
   Native `better-sqlite3` and `esbuild` builds are allow-listed in `pnpm-workspace.yaml`.
 - **Container colours:** `white, red, green, blue, yellow` (container cargo, from the rulebook scoring
@@ -278,7 +293,7 @@ helpers live in `backend/src/services.ts`.)
 - **Reference PDFs stay gitignored** (copyright) — local-only; cite page numbers in comments instead.
 - **v1 was hotseat / pass-and-play.** Online multiplayer (lobbies, live sync, seat identity, resume) and
   AI both shipped; hotseat still works and its testids are intact.
-- All eight games are persisted-state **shape-v1** (no `schemaVersion` declared).
+- All nine games are persisted-state **shape-v1** (no `schemaVersion` declared).
 - **`@game-hub/kernel`'s major version IS the host↔game contract version** (Track D / D2a). It exports
   `KERNEL_CONTRACT_VERSION` (= 1); every module declares `kernelContract: KERNEL_CONTRACT_VERSION` and
   `GameRegistry.register` boot-crashes on a mismatch. Additive optional hooks = minor; a changed required
@@ -288,7 +303,7 @@ helpers live in `backend/src/services.ts`.)
   `tsc` emits relative specifiers verbatim, and Node ESM does neither extension nor directory
   resolution — an extensionless `from './errors'` makes the installed tarball unloadable while every
   in-repo suite stays green. `pack:smoke` is what catches it. Applies to `@game-hub/kernel`,
-  `@game-hub/ui-kit`, and all eight out-of-repo game packages (each carries its own pack smoke).
+  `@game-hub/ui-kit`, and all nine out-of-repo game packages (each carries its own pack smoke).
 
 Older decision detail (Track A/B/C/D slice history) lives in `ROADMAP.md` and the per-game roadmaps.
 

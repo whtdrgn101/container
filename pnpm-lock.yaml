@@ -57,13 +57,16 @@ importers:
         specifier: ^0.1.0
         version: 0.1.1(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
       '@game-hub/game-euchre':
-        specifier: ^0.1.0
-        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
+        specifier: ^0.1.1
+        version: 0.1.1(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
       '@game-hub/game-labyrinth':
         specifier: ^0.1.0
         version: 0.1.3(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
       '@game-hub/game-russianrailroads':
         specifier: ^0.1.0
+        version: 0.1.1(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
+      '@game-hub/game-spades':
+        specifier: ^0.1.1
         version: 0.1.1(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
       '@game-hub/game-stoneage':
         specifier: ^0.1.0
@@ -183,13 +186,16 @@ importers:
         specifier: ^0.1.0
         version: 0.1.1(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
       '@game-hub/game-euchre':
-        specifier: ^0.1.0
-        version: 0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
+        specifier: ^0.1.1
+        version: 0.1.1(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
       '@game-hub/game-labyrinth':
         specifier: ^0.1.0
         version: 0.1.3(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
       '@game-hub/game-russianrailroads':
         specifier: ^0.1.0
+        version: 0.1.1(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
+      '@game-hub/game-spades':
+        specifier: ^0.1.1
         version: 0.1.1(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)
       '@game-hub/game-stoneage':
         specifier: ^0.1.0
@@ -539,8 +545,8 @@ packages:
       react:
         optional: true
 
-  '@game-hub/game-euchre@0.1.0':
-    resolution: {integrity: sha512-edNRLYf3JAIOMSfARSoqh06RXTKBj6biu1tMXNW3i4LpD2F/6zxKZzY8eumxZEen2nV/x/59pNK73eeSfEZdBw==}
+  '@game-hub/game-euchre@0.1.1':
+    resolution: {integrity: sha512-17AEeI52iBMOrTzZqCrox7IlGsSbXEKySznf8pRLq2vfGIB2zcZaDylBo4l4YPvw/Pp81+1tboyeEKABa3cQSQ==}
     engines: {node: '>=22'}
     peerDependencies:
       '@game-hub/kernel': ^1.5.0
@@ -570,6 +576,19 @@ packages:
     engines: {node: '>=22'}
     peerDependencies:
       '@game-hub/kernel': ^1.2.0
+      '@game-hub/ui-kit': ^1.0.0
+      react: ^19.0.0
+    peerDependenciesMeta:
+      '@game-hub/ui-kit':
+        optional: true
+      react:
+        optional: true
+
+  '@game-hub/game-spades@0.1.1':
+    resolution: {integrity: sha512-pG2paN9faF4wZpVkzwzDaW4zP7NXAU8WMd09xZzu6OlUdSIj3Hi5oMGgNBlGH6vXF7l+OPpaXzG3F82QyeTjXA==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      '@game-hub/kernel': ^1.5.0
       '@game-hub/ui-kit': ^1.0.0
       react: ^19.0.0
     peerDependenciesMeta:
@@ -2686,7 +2705,7 @@ snapshots:
       '@game-hub/ui-kit': link:packages/ui-kit
       react: 19.2.8
 
-  '@game-hub/game-euchre@0.1.0(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)':
+  '@game-hub/game-euchre@0.1.1(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)':
     dependencies:
       '@game-hub/kernel': link:packages/kernel
     optionalDependencies:
@@ -2701,6 +2720,13 @@ snapshots:
       react: 19.2.8
 
   '@game-hub/game-russianrailroads@0.1.1(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)':
+    dependencies:
+      '@game-hub/kernel': link:packages/kernel
+    optionalDependencies:
+      '@game-hub/ui-kit': link:packages/ui-kit
+      react: 19.2.8
+
+  '@game-hub/game-spades@0.1.1(@game-hub/kernel@packages+kernel)(@game-hub/ui-kit@packages+ui-kit)(react@19.2.8)':
     dependencies:
       '@game-hub/kernel': link:packages/kernel
     optionalDependencies:

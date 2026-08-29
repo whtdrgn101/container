@@ -132,6 +132,7 @@ describe('Saint Petersburg', () => {
       'labyrinth',
       'argute',
       'euchre',
+      'spades',
     ]);
     const sp = catalog.find((g) => g.id === 'stpetersburg')!;
     expect(sp.colors).toEqual(['blue', 'yellow', 'green', 'red']);

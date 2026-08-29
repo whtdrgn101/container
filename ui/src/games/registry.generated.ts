@@ -10,6 +10,7 @@ import russianrailroadsClient from '@game-hub/game-russianrailroads/client';
 import labyrinthClient from '@game-hub/game-labyrinth/client';
 import arguteClient from '@game-hub/game-argute/client';
 import euchreClient from '@game-hub/game-euchre/client';
+import spadesClient from '@game-hub/game-spades/client';
 
 /**
  * A registered client with its state type erased. Only a game's own board may pair itself with its own
@@ -30,6 +31,7 @@ export const CLIENTS: readonly AnyGameClient[] = [
   labyrinthClient as unknown as AnyGameClient,
   arguteClient as unknown as AnyGameClient,
   euchreClient as unknown as AnyGameClient,
+  spadesClient as unknown as AnyGameClient,
 ];
 
 /**
@@ -46,4 +48,5 @@ export const GAME_VERSIONS: Readonly<Record<string, string>> = {
   labyrinth: '0.1.3',
   argute: '0.3.0',
   euchre: '0.1.0',
+  spades: '0.1.0',
 };

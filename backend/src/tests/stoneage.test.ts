@@ -39,6 +39,7 @@ describe('Stone Age bootstrap', () => {
       'labyrinth',
       'argute',
       'euchre',
+      'spades',
     ]);
   });
 

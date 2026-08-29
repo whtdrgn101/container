@@ -101,6 +101,14 @@ const games: readonly GameEntry[] = [
     module: '@game-hub/game-euchre/module',
     client: '@game-hub/game-euchre/client',
   },
+  // Spades — the ninth game, and the second to declare table options (blind nil, and a 200/500 target).
+  // Nothing about this entry is special either, which is now the point: two games in a row have used a
+  // platform feature that reaches the engine, and neither needed a line of host wiring beyond this one.
+  {
+    id: 'spades',
+    module: '@game-hub/game-spades/module',
+    client: '@game-hub/game-spades/client',
+  },
 ];
 
 export default games;

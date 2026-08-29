@@ -297,6 +297,7 @@ describe('hosting two games at once', () => {
       'labyrinth',
       'argute',
       'euchre',
+      'spades',
       'counter',
     ]);
   });
